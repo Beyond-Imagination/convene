@@ -1,8 +1,16 @@
+import {
+  ChatEntry,
+  ExternalReference,
+  Source,
+} from '../../shared-kernel/domain/value-objects';
 import { Clock } from '../../shared-kernel/domain/ports';
-import { ExternalReference, Source } from '../../shared-kernel/domain/value-objects';
 import { Meeting } from '../domain/meeting';
 import { Participant } from '../domain/participant';
-import { MeetingCodeGenerator, MeetingRepository } from '../domain/ports';
+import {
+  ChatRepository,
+  MeetingCodeGenerator,
+  MeetingRepository,
+} from '../domain/ports';
 import { IdleTimeout } from '../domain/value-objects';
 
 /**
@@ -34,8 +42,15 @@ export interface LeaveMeetingCommand {
   participantId: string;
 }
 
+export interface PostChatCommand {
+  code: string;
+  nickname: string;
+  text: string;
+}
+
 export interface MeetingServiceDeps {
   repository: MeetingRepository;
+  chatRepository: ChatRepository;
   codeGenerator: MeetingCodeGenerator;
   clock: Clock;
 }
@@ -72,6 +87,10 @@ export class MeetingService {
     meeting.removeParticipant(command.participantId, this.deps.clock.now());
     await this.deps.repository.save(meeting);
     return meeting;
+  }
+
+  async postChat(_command: PostChatCommand): Promise<ChatEntry> {
+    throw new Error('MeetingService.postChat not implemented');
   }
 
   private async requireMeeting(code: string): Promise<Meeting> {

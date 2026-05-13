@@ -1,4 +1,4 @@
-import { externalReference } from '../../shared-kernel/domain/value-objects';
+import { ChatEntry, externalReference } from '../../shared-kernel/domain/value-objects';
 import { Meeting } from '../domain/meeting';
 import { IdleTimeout, MeetingCode } from '../domain/value-objects';
 import { MeetingService } from './meeting.service';
@@ -14,6 +14,11 @@ const makeMeeting = (startedAt: Date) =>
     startedAt,
   });
 
+const noopChatRepository = () => ({
+  append: async () => {},
+  listByCode: async (): Promise<ChatEntry[]> => [],
+});
+
 describe('MeetingService.createMeeting', () => {
   const fakeNow = new Date('2026-01-01T00:00:00Z');
 
@@ -26,6 +31,7 @@ describe('MeetingService.createMeeting', () => {
         },
         findByCode: async () => null,
       },
+      chatRepository: noopChatRepository(),
       codeGenerator: { next: () => code },
       clock: { now: () => fakeNow },
     });
@@ -88,6 +94,7 @@ describe('MeetingService.joinMeeting', () => {
           saved.push(m);
         },
       },
+      chatRepository: noopChatRepository(),
       codeGenerator: { next: () => code },
       clock: { now: () => t1 },
     });
@@ -154,6 +161,7 @@ describe('MeetingService.leaveMeeting', () => {
           saved.push(m);
         },
       },
+      chatRepository: noopChatRepository(),
       codeGenerator: { next: () => code },
       clock: { now: () => t2 },
     });
@@ -182,5 +190,82 @@ describe('MeetingService.leaveMeeting', () => {
     await expect(
       service.leaveMeeting({ code: 'abc12xyz', participantId: 'unknown' }),
     ).rejects.toThrow(/not found/);
+  });
+});
+
+describe('MeetingService.postChat', () => {
+  const t0 = new Date('2026-01-01T00:00:00Z');
+  const t1 = new Date('2026-01-01T00:01:00Z');
+  const t2 = new Date('2026-01-01T00:02:00Z');
+
+  const makeMeetingActive = () => {
+    const m = makeMeeting(t0);
+    m.addParticipant('s1', 'alice', t1);
+    return m;
+  };
+
+  const makeService = (meeting: Meeting | null) => {
+    const saved: Meeting[] = [];
+    const appended: { code: string; entry: ChatEntry }[] = [];
+    const service = new MeetingService({
+      repository: {
+        findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
+        save: async (m) => {
+          saved.push(m);
+        },
+      },
+      chatRepository: {
+        append: async (c, entry) => {
+          appended.push({ code: c, entry });
+        },
+        listByCode: async () => appended.map((a) => a.entry),
+      },
+      codeGenerator: { next: () => code },
+      clock: { now: () => t2 },
+    });
+    return { service, saved, appended };
+  };
+
+  it('정상 발화 시 ChatEntry를 만들어 ChatRepository.append + Meeting.markActive + Repository.save', async () => {
+    const meeting = makeMeetingActive();
+    const { service, saved, appended } = makeService(meeting);
+    const entry = await service.postChat({
+      code: 'abc12xyz',
+      nickname: 'alice',
+      text: 'hello',
+    });
+    expect(entry.nickname).toBe('alice');
+    expect(entry.text).toBe('hello');
+    expect(entry.sentAt).toBe(t2);
+    expect(appended).toEqual([{ code: 'abc12xyz', entry }]);
+    expect(meeting.lastActiveAt).toBe(t2);
+    expect(saved[0]).toBe(meeting);
+  });
+
+  it('Repository에 없는 code면 throw, append 호출 안 됨', async () => {
+    const { service, appended } = makeService(null);
+    await expect(
+      service.postChat({ code: 'abc12xyz', nickname: 'alice', text: 'hi' }),
+    ).rejects.toThrow(/not found/);
+    expect(appended).toHaveLength(0);
+  });
+
+  it('이미 종료된 Meeting이면 Aggregate 에러 전파, append 호출 안 됨', async () => {
+    const meeting = makeMeetingActive();
+    meeting.close(t1);
+    const { service, appended } = makeService(meeting);
+    await expect(
+      service.postChat({ code: 'abc12xyz', nickname: 'alice', text: 'hi' }),
+    ).rejects.toThrow(/already closed/);
+    expect(appended).toHaveLength(0);
+  });
+
+  it('잘못된 text(빈 문자열)는 ChatEntry factory가 거부 → append 호출 안 됨', async () => {
+    const meeting = makeMeetingActive();
+    const { service, appended } = makeService(meeting);
+    await expect(
+      service.postChat({ code: 'abc12xyz', nickname: 'alice', text: '   ' }),
+    ).rejects.toThrow(/text/);
+    expect(appended).toHaveLength(0);
   });
 });
