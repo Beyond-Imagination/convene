@@ -38,3 +38,57 @@ export interface CloseMeetingResponse {
   code: string;
   endedAt: string;
 }
+
+/**
+ * Meeting bounded context의 WebSocket 이벤트 이름.
+ *
+ * 도메인 이벤트(`meeting.*` dot prefix)와 구분하기 위해 **colon** prefix를 사용한다.
+ *   - `meeting:join` / `meeting:leave` / `meeting:chat` — client → server 요청
+ *   - `meeting:participantJoined` / `meeting:participantLeft` / `meeting:chatPosted`
+ *     — server → client 브로드캐스트
+ */
+export const MEETING_WS_EVENTS = {
+  JOIN: 'meeting:join',
+  LEAVE: 'meeting:leave',
+  CHAT: 'meeting:chat',
+  PARTICIPANT_JOINED: 'meeting:participantJoined',
+  PARTICIPANT_LEFT: 'meeting:participantLeft',
+  CHAT_POSTED: 'meeting:chatPosted',
+} as const;
+
+export type MeetingWsEventName = (typeof MEETING_WS_EVENTS)[keyof typeof MEETING_WS_EVENTS];
+
+// ---------- client → server ----------
+
+export interface JoinMeetingMessage {
+  code: string;
+  nickname: string;
+}
+
+export interface LeaveMeetingMessage {
+  code: string;
+}
+
+export interface ChatMessage {
+  code: string;
+  text: string;
+}
+
+// ---------- server → client (broadcast) ----------
+
+export interface ParticipantJoinedBroadcast {
+  socketId: string;
+  nickname: string;
+  joinedAt: string;
+}
+
+export interface ParticipantLeftBroadcast {
+  socketId: string;
+  leftAt: string;
+}
+
+export interface ChatPostedBroadcast {
+  nickname: string;
+  text: string;
+  sentAt: string;
+}

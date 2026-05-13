@@ -5,6 +5,8 @@ import {
   type CreateMeetingRequest,
   type CreateMeetingResponse,
   type ExternalReferencePayload,
+  MEETING_WS_EVENTS,
+  type MeetingWsEventName,
   SOURCES,
   type Source,
 } from './meeting.js';
@@ -44,5 +46,22 @@ describe('meeting wire format', () => {
       endedAt: '2026-01-01T00:30:00.000Z',
     };
     expect(r.endedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('MEETING_WS_EVENTS는 모두 meeting: prefix를 사용한다 (도메인 이벤트의 dot prefix와 구분)', () => {
+    for (const name of Object.values(MEETING_WS_EVENTS)) {
+      expect(name.startsWith('meeting:')).toBe(true);
+    }
+  });
+
+  it('MEETING_WS_EVENTS는 client→server 3개 + server→client 3개 = 총 6개', () => {
+    expect(Object.values(MEETING_WS_EVENTS)).toHaveLength(6);
+    expect(new Set(Object.values(MEETING_WS_EVENTS)).size).toBe(6);
+  });
+
+  it('MeetingWsEventName 타입은 MEETING_WS_EVENTS 값들의 literal union이다 (컴파일 체크)', () => {
+    const a: MeetingWsEventName = MEETING_WS_EVENTS.JOIN;
+    const b: MeetingWsEventName = MEETING_WS_EVENTS.CHAT_POSTED;
+    expect([a, b]).toEqual(['meeting:join', 'meeting:chatPosted']);
   });
 });
