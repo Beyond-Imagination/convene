@@ -56,11 +56,29 @@ export class MeetingService {
     return meeting;
   }
 
-  async joinMeeting(_command: JoinMeetingCommand): Promise<JoinMeetingResult> {
-    throw new Error('MeetingService.joinMeeting not implemented');
+  async joinMeeting(command: JoinMeetingCommand): Promise<JoinMeetingResult> {
+    const meeting = await this.requireMeeting(command.code);
+    const participant = meeting.addParticipant(
+      command.participantId,
+      command.nickname,
+      this.deps.clock.now(),
+    );
+    await this.deps.repository.save(meeting);
+    return { meeting, participant };
   }
 
-  async leaveMeeting(_command: LeaveMeetingCommand): Promise<Meeting> {
-    throw new Error('MeetingService.leaveMeeting not implemented');
+  async leaveMeeting(command: LeaveMeetingCommand): Promise<Meeting> {
+    const meeting = await this.requireMeeting(command.code);
+    meeting.removeParticipant(command.participantId, this.deps.clock.now());
+    await this.deps.repository.save(meeting);
+    return meeting;
+  }
+
+  private async requireMeeting(code: string): Promise<Meeting> {
+    const meeting = await this.deps.repository.findByCode(code);
+    if (!meeting) {
+      throw new Error(`Meeting "${code}" not found`);
+    }
+    return meeting;
   }
 }
