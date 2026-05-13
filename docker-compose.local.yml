@@ -1,0 +1,42 @@
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: migration-redis
+    ports:
+      - '6379:6379'
+    command: >-
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 256mb
+      --maxmemory-policy volatile-lru
+      --notify-keyspace-events Ex
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    container_name: migration-mongo
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+
+  ai-worker:
+    build:
+      context: ./apps/ai-worker
+      dockerfile: Dockerfile
+    container_name: migration-ai-worker
+    ports:
+      - '8000:8000'
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+    driver: local
+  mongo-data:
+    driver: local

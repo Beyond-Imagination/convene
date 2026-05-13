@@ -1,0 +1,36 @@
+node_modules/
+dist/
+build/
+.next/
+out/
+.turbo/
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# env
+.env
+.env.local
+.env.*.local
+
+# editor
+.idea/
+.vscode/
+*.swp
+
+# os
+.DS_Store
+Thumbs.db
+
+# test artifacts
+coverage/
+playwright-report/
+test-results/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
