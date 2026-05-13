@@ -42,9 +42,17 @@ export class MeetingController {
 
   @Delete(':code')
   @HttpCode(HttpStatus.OK)
-  async closeMeeting(@Param('code') _code: string): Promise<CloseMeetingResponse> {
-    void MeetingCode;
-    void BadRequestException;
-    throw new Error('not implemented');
+  async closeMeeting(@Param('code') code: string): Promise<CloseMeetingResponse> {
+    // 형식 위반은 도메인 에러가 아니라 클라이언트 요청 오류이므로 BadRequestException으로 매핑.
+    try {
+      MeetingCode.from(code);
+    } catch (e) {
+      throw new BadRequestException((e as Error).message);
+    }
+    const meeting = await this.service.closeMeeting({ code, reason: 'manual' });
+    return {
+      code: meeting.code.value,
+      endedAt: meeting.endedAt!.toISOString(),
+    };
   }
 }
