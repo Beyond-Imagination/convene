@@ -49,6 +49,18 @@ Re-read both at the start of every session. This file is just an English index f
 7. **Cross-context coupling only via Domain Events (`@nestjs/event-emitter`) or Ports.** No direct imports of Aggregates / Application Services / Repositories across bounded contexts. Read-only Value Objects shared by multiple contexts live in `apps/backend/src/shared-kernel/domain/` — this is the DDD **Shared Kernel** pattern. Changes to the shared kernel require alignment from every consumer.
 8. **Validation pipe is global** with `whitelist: true, forbidNonWhitelisted: true, transform: true`. Every inbound HTTP/WS payload must be a DTO class.
 
+## TDD cycle (per non-trivial unit)
+
+1. Write the spec.
+2. Add a buildable stub so the spec compiles but fails (`throw new Error('not implemented')`).
+3. Run jest/vitest — confirm **red**.
+4. Commit: `test(scope): ... spec (red)`.
+5. Replace the stub with the real implementation until the spec passes.
+6. Run jest/vitest — confirm **green**.
+7. Commit: `feat(scope): ... impl (green)`.
+
+Domain VO/Entity/Aggregate may collapse into a single `test(...)` commit when the size is trivial, but the working order (spec → impl → run) still holds. See `~/.claude/.../memory/feedback_tdd_order.md`.
+
 ## Workflow
 
 1. `PLAN.md` + `ARCHITECTURE.md` agreed. ✅
