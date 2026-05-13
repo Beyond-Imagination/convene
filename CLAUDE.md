@@ -108,5 +108,5 @@ feature/<name>/
 1. Read `CLAUDE.md` (this file) → `PLAN.md` → `ARCHITECTURE.md`.
 2. Check `git log -10 --oneline` for recent progress.
 3. Locate the current task: failing specs, TODO comments, or ask the user.
-4. **Speak Korean to the user.** Code identifiers stay English. PLAN/ARCHITECTURE stay Korean.
+4. **Speak Korean to the user.** Code identifiers (class/function/variable/event names, file paths) stay English. **All code comments, JSDoc bodies, and test (`it`/`describe`) labels are written in Korean** so non-Claude collaborators can read them. PLAN/ARCHITECTURE stay Korean. This file (CLAUDE.md) stays English because it is for future Claude sessions.
 5. Memory in `~/.claude/projects/D--programming-boostcamp-2025-membership-web12-plum/memory/` carries user preferences and project state across sessions; check `MEMORY.md` there.
