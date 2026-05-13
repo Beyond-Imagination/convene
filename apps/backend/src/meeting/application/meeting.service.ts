@@ -1,6 +1,7 @@
 import { Clock } from '../../shared-kernel/domain/ports';
 import { ExternalReference, Source } from '../../shared-kernel/domain/value-objects';
 import { Meeting } from '../domain/meeting';
+import { Participant } from '../domain/participant';
 import { MeetingCodeGenerator, MeetingRepository } from '../domain/ports';
 import { IdleTimeout } from '../domain/value-objects';
 
@@ -15,6 +16,22 @@ import { IdleTimeout } from '../domain/value-objects';
 export interface CreateMeetingCommand {
   source: Source;
   externalReference: ExternalReference;
+}
+
+export interface JoinMeetingCommand {
+  code: string;
+  participantId: string;
+  nickname: string;
+}
+
+export interface JoinMeetingResult {
+  meeting: Meeting;
+  participant: Participant;
+}
+
+export interface LeaveMeetingCommand {
+  code: string;
+  participantId: string;
 }
 
 export interface MeetingServiceDeps {
@@ -37,5 +54,13 @@ export class MeetingService {
     });
     await this.deps.repository.save(meeting);
     return meeting;
+  }
+
+  async joinMeeting(_command: JoinMeetingCommand): Promise<JoinMeetingResult> {
+    throw new Error('MeetingService.joinMeeting not implemented');
+  }
+
+  async leaveMeeting(_command: LeaveMeetingCommand): Promise<Meeting> {
+    throw new Error('MeetingService.leaveMeeting not implemented');
   }
 }
