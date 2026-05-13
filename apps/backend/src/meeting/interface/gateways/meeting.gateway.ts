@@ -7,10 +7,15 @@ import {
 } from '@nestjs/websockets';
 import type { Socket } from 'socket.io';
 
-import { MEETING_WS_EVENTS } from '@migration/shared-interfaces';
+import {
+  MEETING_WS_EVENTS,
+  type ParticipantJoinedBroadcast,
+} from '@migration/shared-interfaces';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
 import { JoinMeetingDto } from '@/meeting/interface/dto/join-meeting.dto';
+
+const roomOf = (code: string): string => `meeting:${code}`;
 
 /**
  * Meeting bounded context의 WebSocket Interface layer.
@@ -30,10 +35,21 @@ export class MeetingGateway {
 
   @SubscribeMessage(MEETING_WS_EVENTS.JOIN)
   async handleJoin(
-    @MessageBody() _dto: JoinMeetingDto,
-    @ConnectedSocket() _client: Socket,
+    @MessageBody() dto: JoinMeetingDto,
+    @ConnectedSocket() client: Socket,
   ): Promise<void> {
-    void this.service;
-    throw new Error('not implemented');
+    const { participant } = await this.service.joinMeeting({
+      code: dto.code,
+      participantId: client.id,
+      nickname: dto.nickname,
+    });
+    const room = roomOf(dto.code);
+    await client.join(room);
+    const broadcast: ParticipantJoinedBroadcast = {
+      socketId: participant.id,
+      nickname: participant.nickname,
+      joinedAt: participant.joinedAt.toISOString(),
+    };
+    client.to(room).emit(MEETING_WS_EVENTS.PARTICIPANT_JOINED, broadcast);
   }
 }
