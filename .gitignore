@@ -5,6 +5,9 @@ build/
 out/
 .turbo/
 
+# tsc incremental cache
+*.tsbuildinfo
+
 # logs
 *.log
 npm-debug.log*
