@@ -1,3 +1,5 @@
+import { BadRequestException } from '@nestjs/common';
+
 import { Meeting } from '@/meeting/domain/meeting';
 import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';
 import { externalReference } from '@/shared-kernel/domain/value-objects';
@@ -72,5 +74,55 @@ describe('MeetingController.createMeeting', () => {
       source: 'web',
       startedAt: '2026-01-01T00:00:00.000Z',
     });
+  });
+});
+
+describe('MeetingController.closeMeeting', () => {
+  const endedAt = new Date('2026-01-01T00:30:00.000Z');
+
+  const makeClosed = () => {
+    const m = Meeting.create({
+      code: fakeCode,
+      source: 'web',
+      externalReference: externalReference(),
+      idleTimeout: IdleTimeout.default(),
+      startedAt: fakeStartedAt,
+    });
+    m.close(endedAt);
+    return m;
+  };
+
+  const makeController = () => {
+    const calls: Array<{ code: string; reason: string }> = [];
+    const service = {
+      closeMeeting: jest.fn(async (cmd: { code: string; reason: string }) => {
+        calls.push(cmd);
+        return makeClosed();
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const controller = new MeetingController(service as any);
+    return { controller, service, calls };
+  };
+
+  it('service.closeMeeting을 code + reason="manual"로 호출한다', async () => {
+    const { controller, calls } = makeController();
+    await controller.closeMeeting('abc12xyz');
+    expect(calls).toEqual([{ code: 'abc12xyz', reason: 'manual' }]);
+  });
+
+  it('응답은 CloseMeetingResponse 형식(code/endedAt ISO)으로 직렬화된다', async () => {
+    const { controller } = makeController();
+    const result = await controller.closeMeeting('abc12xyz');
+    expect(result).toEqual({
+      code: 'abc12xyz',
+      endedAt: '2026-01-01T00:30:00.000Z',
+    });
+  });
+
+  it('잘못된 code 형식(대문자·길이 등)은 BadRequestException으로 거부하고 service를 호출하지 않는다', async () => {
+    const { controller, service } = makeController();
+    await expect(controller.closeMeeting('BAD')).rejects.toBeInstanceOf(BadRequestException);
+    expect(service.closeMeeting).not.toHaveBeenCalled();
   });
 });

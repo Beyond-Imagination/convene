@@ -1,9 +1,19 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+} from '@nestjs/common';
 
-import type { CreateMeetingResponse } from '@migration/shared-interfaces';
+import type { CloseMeetingResponse, CreateMeetingResponse } from '@migration/shared-interfaces';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
 import { CreateMeetingDto } from '@/meeting/interface/dto/create-meeting.dto';
+import { MeetingCode } from '@/meeting/domain/value-objects';
 import { externalReference } from '@/shared-kernel/domain/value-objects';
 
 /**
@@ -28,5 +38,13 @@ export class MeetingController {
       source: meeting.source,
       startedAt: meeting.startedAt.toISOString(),
     };
+  }
+
+  @Delete(':code')
+  @HttpCode(HttpStatus.OK)
+  async closeMeeting(@Param('code') _code: string): Promise<CloseMeetingResponse> {
+    void MeetingCode;
+    void BadRequestException;
+    throw new Error('not implemented');
   }
 }

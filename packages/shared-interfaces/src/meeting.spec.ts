@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  type CloseMeetingResponse,
   type CreateMeetingRequest,
   type CreateMeetingResponse,
   type ExternalReferencePayload,
@@ -35,5 +36,13 @@ describe('meeting wire format', () => {
       startedAt: '2026-01-01T00:00:00.000Z',
     };
     expect(r.code).toMatch(/^[a-z0-9]{8}$/);
+  });
+
+  it('CloseMeetingResponse는 code / endedAt(ISO)을 가진다', () => {
+    const r: CloseMeetingResponse = {
+      code: 'abc12xyz',
+      endedAt: '2026-01-01T00:30:00.000Z',
+    };
+    expect(r.endedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 });

@@ -28,3 +28,13 @@ export interface CreateMeetingResponse {
   source: Source;
   startedAt: string;
 }
+
+/**
+ * DELETE /meetings/:code 응답. 수동 종료(reason='manual') 전용.
+ * idle 종료는 서버 내부 스케줄러가 직접 도메인 use case를 호출하므로
+ * HTTP 응답으로 노출되지 않는다.
+ */
+export interface CloseMeetingResponse {
+  code: string;
+  endedAt: string;
+}
