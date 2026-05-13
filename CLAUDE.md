@@ -15,7 +15,7 @@ Re-read both at the start of every session. This file is just an English index f
 
 ## Stack (locked)
 
-- **Backend**: NestJS 10 (**CommonJS**, standard NestJS convention; no `"type": "module"`, no `.js` extension on relative imports) + Mediasoup 3 + Socket.IO 4. Validation: `class-validator` + `class-transformer`. State: Redis (container-local). Persistence: MongoDB Atlas. **Tests: jest + ts-jest.**
+- **Backend**: NestJS 11 (**CommonJS**, standard NestJS convention; no `"type": "module"`, no `.js` extension on relative imports) + Mediasoup 3 + Socket.IO 4 (`@nestjs/websockets` + `@nestjs/platform-socket.io`). Validation: `class-validator` + `class-transformer`. State: Redis (container-local, **ioredis**). Persistence: MongoDB Atlas. **Tests: jest + ts-jest, `setupFiles: ["reflect-metadata"]`.**
 - **Frontend**: Next.js 14+ (App Router) + TypeScript + Zustand + mediasoup-client. **Static export only** (`output: 'export'`) → S3 + CloudFront. **No SSR/RSC data fetching, no `route.ts`, no middleware.** Dynamic routes use `'use client'` + `useParams()` and rely on CloudFront `/404 → /index.html` SPA fallback. **Tests: vitest + Playwright.**
 - **AI worker**: FastAPI + faster-whisper (STT). LLM summary lives in backend behind `SummarizerPort` (default: Gemini).
 - **Monorepo**: pnpm 9 + Turborepo. Workspaces: `apps/*`, `packages/*`. **Test runners are per-package: backend = jest, frontend & shared-interfaces = vitest. Do not unify** without explicit user approval — see `~/.claude/.../memory/feedback_stack_decisions.md`.
