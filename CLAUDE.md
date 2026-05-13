@@ -46,7 +46,7 @@ Re-read both at the start of every session. This file is just an English index f
 4. **Static export constraints.** No `app/**/route.ts`, no server actions, no middleware, no `getServerSideProps`-equivalents. All data comes from `fetch(NEXT_PUBLIC_API_URL/...)` in client components.
 5. **Audio is ephemeral.** Buffered on backend disk → sent to ai-worker → **deleted immediately**. No S3. No long-term audio storage.
 6. **Domain is framework-free.** No `@nestjs/...`, `mongoose`, `ioredis` imports inside `domain/`. Ports are TS interfaces.
-7. **Cross-context coupling only via Domain Events (`@nestjs/event-emitter`) or Ports.** No direct imports across context boundaries.
+7. **Cross-context coupling only via Domain Events (`@nestjs/event-emitter`) or Ports.** No direct imports of Aggregates / Application Services / Repositories across bounded contexts. Read-only Value Objects shared by multiple contexts live in `apps/backend/src/shared-kernel/domain/` — this is the DDD **Shared Kernel** pattern. Changes to the shared kernel require alignment from every consumer.
 8. **Validation pipe is global** with `whitelist: true, forbidNonWhitelisted: true, transform: true`. Every inbound HTTP/WS payload must be a DTO class.
 
 ## Workflow

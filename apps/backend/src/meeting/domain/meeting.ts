@@ -1,5 +1,6 @@
+import { ExternalReference, Source } from '../../shared-kernel/domain/value-objects';
 import { Participant, ParticipantSnapshot } from './participant';
-import { ExternalReference, IdleTimeout, MeetingCode, Source } from './value-objects';
+import { IdleTimeout, MeetingCode } from './value-objects';
 
 /**
  * 회의 한 건. Bounded Context 'Meeting'의 Aggregate Root.

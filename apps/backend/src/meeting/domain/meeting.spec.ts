@@ -1,5 +1,6 @@
+import { externalReference } from '../../shared-kernel/domain/value-objects';
 import { Meeting } from './meeting';
-import { externalReference, IdleTimeout, MeetingCode } from './value-objects';
+import { IdleTimeout, MeetingCode } from './value-objects';
 
 describe('Meeting (Aggregate Root)', () => {
   const T_0 = new Date('2026-01-01T00:00:00Z');
