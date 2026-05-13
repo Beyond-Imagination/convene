@@ -1,5 +1,6 @@
 import {
   ChatEntry,
+  chatEntry,
   ExternalReference,
   Source,
 } from '../../shared-kernel/domain/value-objects';
@@ -89,8 +90,15 @@ export class MeetingService {
     return meeting;
   }
 
-  async postChat(_command: PostChatCommand): Promise<ChatEntry> {
-    throw new Error('MeetingService.postChat not implemented');
+  async postChat(command: PostChatCommand): Promise<ChatEntry> {
+    const meeting = await this.requireMeeting(command.code);
+    const now = this.deps.clock.now();
+    // ChatEntry 검증을 markActive보다 먼저 수행 → 검증 실패 시 Meeting 상태 미변경.
+    const entry = chatEntry({ nickname: command.nickname, text: command.text, sentAt: now });
+    meeting.markActive(now);
+    await this.deps.chatRepository.append(command.code, entry);
+    await this.deps.repository.save(meeting);
+    return entry;
   }
 
   private async requireMeeting(code: string): Promise<Meeting> {
