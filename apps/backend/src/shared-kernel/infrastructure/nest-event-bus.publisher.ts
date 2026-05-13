@@ -7,15 +7,16 @@ import type { DomainEventPublisher } from '@/shared-kernel/domain/ports';
 
 /**
  * DomainEventPublisher 포트의 production 어댑터.
- * 빌드 단계에서는 컴파일만 통과하면 충분하다 (TDD red 단계).
+ *
+ * `@nestjs/event-emitter`의 EventEmitter2에 위임한다. AppModule의
+ * `EventEmitterModule.forRoot({ wildcard: true, delimiter: '.' })` 설정과
+ * 짝지어 `meeting.**`, `report.**` 같은 와일드카드 구독을 지원한다.
  */
 @Injectable()
 export class NestEventBusDomainEventPublisher implements DomainEventPublisher {
-  constructor(private readonly _emitter: EventEmitter2) {
-    void this._emitter; // silence unused-warning until impl
-  }
+  constructor(private readonly emitter: EventEmitter2) {}
 
-  publish(_name: DomainEventName, _payload: unknown): void {
-    throw new Error('not implemented');
+  publish(name: DomainEventName, payload: unknown): void {
+    this.emitter.emit(name, payload);
   }
 }
