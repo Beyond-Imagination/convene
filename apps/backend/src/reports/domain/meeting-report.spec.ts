@@ -1,5 +1,5 @@
-import { externalReference } from '../../shared-kernel/domain/value-objects';
-import { chatEntry, participantEntry, transcriptSegment } from './entries';
+import { chatEntry, externalReference } from '../../shared-kernel/domain/value-objects';
+import { participantEntry, transcriptSegment } from './entries';
 import { MeetingReport } from './meeting-report';
 import { notionPushResult, reportSummary } from './value-objects';
 

@@ -1,5 +1,9 @@
-import { ExternalReference, Source } from '../../shared-kernel/domain/value-objects';
-import { ChatEntry, ParticipantEntry, TranscriptSegment } from './entries';
+import {
+  ChatEntry,
+  ExternalReference,
+  Source,
+} from '../../shared-kernel/domain/value-objects';
+import { ParticipantEntry, TranscriptSegment } from './entries';
 import {
   NotionPushResult,
   PipelineState,
