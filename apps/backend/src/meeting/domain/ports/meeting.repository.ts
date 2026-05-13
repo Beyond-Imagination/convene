@@ -1,4 +1,4 @@
-import { Meeting } from '../meeting';
+import { Meeting } from '@/meeting/domain/meeting';
 
 /**
  * Meeting Aggregate의 영속 경계. 구현체(Redis 등)는 infrastructure layer가 제공한다.

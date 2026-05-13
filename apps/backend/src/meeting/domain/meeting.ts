@@ -1,4 +1,5 @@
-import { ExternalReference, Source } from '../../shared-kernel/domain/value-objects';
+import { ExternalReference, Source } from '@/shared-kernel/domain/value-objects';
+
 import { Participant, ParticipantSnapshot } from './participant';
 import { IdleTimeout, MeetingCode } from './value-objects';
 

@@ -1,18 +1,18 @@
+import { Meeting } from '@/meeting/domain/meeting';
+import { Participant } from '@/meeting/domain/participant';
+import {
+  ChatRepository,
+  MeetingCodeGenerator,
+  MeetingRepository,
+} from '@/meeting/domain/ports';
+import { IdleTimeout } from '@/meeting/domain/value-objects';
+import { Clock } from '@/shared-kernel/domain/ports';
 import {
   ChatEntry,
   chatEntry,
   ExternalReference,
   Source,
-} from '../../shared-kernel/domain/value-objects';
-import { Clock } from '../../shared-kernel/domain/ports';
-import { Meeting } from '../domain/meeting';
-import { Participant } from '../domain/participant';
-import {
-  ChatRepository,
-  MeetingCodeGenerator,
-  MeetingRepository,
-} from '../domain/ports';
-import { IdleTimeout } from '../domain/value-objects';
+} from '@/shared-kernel/domain/value-objects';
 
 /**
  * Meeting Bounded Context의 Application Service.

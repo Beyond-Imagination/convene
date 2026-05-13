@@ -1,4 +1,4 @@
-import { ChatEntry } from '../../../shared-kernel/domain/value-objects';
+import { ChatEntry } from '@/shared-kernel/domain/value-objects';
 
 /**
  * 회의 중 흐르는 채팅 보관소.

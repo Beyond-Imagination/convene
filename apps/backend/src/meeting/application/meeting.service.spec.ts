@@ -1,6 +1,7 @@
-import { ChatEntry, externalReference } from '../../shared-kernel/domain/value-objects';
-import { Meeting } from '../domain/meeting';
-import { IdleTimeout, MeetingCode } from '../domain/value-objects';
+import { Meeting } from '@/meeting/domain/meeting';
+import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';
+import { ChatEntry, externalReference } from '@/shared-kernel/domain/value-objects';
+
 import { MeetingService } from './meeting.service';
 
 const code = MeetingCode.from('abc12xyz');
