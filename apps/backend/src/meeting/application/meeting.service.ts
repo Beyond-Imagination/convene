@@ -1,3 +1,5 @@
+import { MEETING_EVENTS } from '@migration/shared-interfaces';
+
 import { Meeting } from '@/meeting/domain/meeting';
 import { Participant } from '@/meeting/domain/participant';
 import {
@@ -113,12 +115,40 @@ export class MeetingService {
     return entry;
   }
 
-  async closeMeeting(_command: CloseMeetingCommand): Promise<Meeting> {
-    throw new Error('not implemented');
+  async closeMeeting(command: CloseMeetingCommand): Promise<Meeting> {
+    const meeting = await this.requireMeeting(command.code);
+    const endedAt = this.deps.clock.now();
+    meeting.close(endedAt);
+    await this.deps.repository.save(meeting);
+    this.deps.eventPublisher.publish(MEETING_EVENTS.ENDED, {
+      code: command.code,
+      endedAt,
+      reason: command.reason,
+    });
+    return meeting;
   }
 
-  async detectIdleAndClose(_command: DetectIdleAndCloseCommand): Promise<boolean> {
-    throw new Error('not implemented');
+  /**
+   * idle 스케줄러가 주기적으로 호출하는 멱등 use case.
+   * 이미 종료됐거나 idle 조건 미충족이면 no-op(false). idle이면 close + 이벤트 두 건.
+   */
+  async detectIdleAndClose(command: DetectIdleAndCloseCommand): Promise<boolean> {
+    const meeting = await this.requireMeeting(command.code);
+    if (!meeting.isOpen) return false;
+    const now = this.deps.clock.now();
+    if (!meeting.isIdleSince(now)) return false;
+    meeting.close(now);
+    await this.deps.repository.save(meeting);
+    this.deps.eventPublisher.publish(MEETING_EVENTS.IDLE_DETECTED, {
+      code: command.code,
+      detectedAt: now,
+    });
+    this.deps.eventPublisher.publish(MEETING_EVENTS.ENDED, {
+      code: command.code,
+      endedAt: now,
+      reason: 'idle',
+    });
+    return true;
   }
 
   private async requireMeeting(code: string): Promise<Meeting> {
