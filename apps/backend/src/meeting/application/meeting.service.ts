@@ -6,7 +6,7 @@ import {
   MeetingRepository,
 } from '@/meeting/domain/ports';
 import { IdleTimeout } from '@/meeting/domain/value-objects';
-import { Clock } from '@/shared-kernel/domain/ports';
+import { Clock, DomainEventPublisher } from '@/shared-kernel/domain/ports';
 import {
   ChatEntry,
   chatEntry,
@@ -49,11 +49,23 @@ export interface PostChatCommand {
   text: string;
 }
 
+export type CloseMeetingReason = 'manual' | 'idle';
+
+export interface CloseMeetingCommand {
+  code: string;
+  reason: CloseMeetingReason;
+}
+
+export interface DetectIdleAndCloseCommand {
+  code: string;
+}
+
 export interface MeetingServiceDeps {
   repository: MeetingRepository;
   chatRepository: ChatRepository;
   codeGenerator: MeetingCodeGenerator;
   clock: Clock;
+  eventPublisher: DomainEventPublisher;
 }
 
 export class MeetingService {
@@ -99,6 +111,14 @@ export class MeetingService {
     await this.deps.chatRepository.append(command.code, entry);
     await this.deps.repository.save(meeting);
     return entry;
+  }
+
+  async closeMeeting(_command: CloseMeetingCommand): Promise<Meeting> {
+    throw new Error('not implemented');
+  }
+
+  async detectIdleAndClose(_command: DetectIdleAndCloseCommand): Promise<boolean> {
+    throw new Error('not implemented');
   }
 
   private async requireMeeting(code: string): Promise<Meeting> {

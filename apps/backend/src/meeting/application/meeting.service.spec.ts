@@ -1,8 +1,27 @@
+import { MEETING_EVENTS } from '@migration/shared-interfaces';
+
 import { Meeting } from '@/meeting/domain/meeting';
 import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';
 import { ChatEntry, externalReference } from '@/shared-kernel/domain/value-objects';
 
 import { MeetingService } from './meeting.service';
+
+interface CapturedEvent {
+  name: string;
+  payload: unknown;
+}
+
+const makeEventPublisher = () => {
+  const events: CapturedEvent[] = [];
+  return {
+    events,
+    publisher: {
+      publish: (name: string, payload: unknown) => {
+        events.push({ name, payload });
+      },
+    },
+  };
+};
 
 const code = MeetingCode.from('abc12xyz');
 
@@ -25,6 +44,7 @@ describe('MeetingService.createMeeting', () => {
 
   const makeService = () => {
     const saved: Meeting[] = [];
+    const { publisher } = makeEventPublisher();
     const service = new MeetingService({
       repository: {
         save: async (m) => {
@@ -35,6 +55,7 @@ describe('MeetingService.createMeeting', () => {
       chatRepository: noopChatRepository(),
       codeGenerator: { next: () => code },
       clock: { now: () => fakeNow },
+      eventPublisher: publisher,
     });
     return { service, saved };
   };
@@ -88,6 +109,7 @@ describe('MeetingService.joinMeeting', () => {
 
   const makeService = (meeting: Meeting | null) => {
     const saved: Meeting[] = [];
+    const { publisher } = makeEventPublisher();
     const service = new MeetingService({
       repository: {
         findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
@@ -98,6 +120,7 @@ describe('MeetingService.joinMeeting', () => {
       chatRepository: noopChatRepository(),
       codeGenerator: { next: () => code },
       clock: { now: () => t1 },
+      eventPublisher: publisher,
     });
     return { service, saved };
   };
@@ -155,6 +178,7 @@ describe('MeetingService.leaveMeeting', () => {
 
   const makeService = (meeting: Meeting | null) => {
     const saved: Meeting[] = [];
+    const { publisher } = makeEventPublisher();
     const service = new MeetingService({
       repository: {
         findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
@@ -165,6 +189,7 @@ describe('MeetingService.leaveMeeting', () => {
       chatRepository: noopChatRepository(),
       codeGenerator: { next: () => code },
       clock: { now: () => t2 },
+      eventPublisher: publisher,
     });
     return { service, saved };
   };
@@ -208,6 +233,7 @@ describe('MeetingService.postChat', () => {
   const makeService = (meeting: Meeting | null) => {
     const saved: Meeting[] = [];
     const appended: { code: string; entry: ChatEntry }[] = [];
+    const { publisher } = makeEventPublisher();
     const service = new MeetingService({
       repository: {
         findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
@@ -223,6 +249,7 @@ describe('MeetingService.postChat', () => {
       },
       codeGenerator: { next: () => code },
       clock: { now: () => t2 },
+      eventPublisher: publisher,
     });
     return { service, saved, appended };
   };
@@ -268,5 +295,153 @@ describe('MeetingService.postChat', () => {
       service.postChat({ code: 'abc12xyz', nickname: 'alice', text: '   ' }),
     ).rejects.toThrow(/text/);
     expect(appended).toHaveLength(0);
+  });
+});
+
+describe('MeetingService.closeMeeting', () => {
+  const t0 = new Date('2026-01-01T00:00:00Z');
+  const t1 = new Date('2026-01-01T00:01:00Z');
+  const tClose = new Date('2026-01-01T00:30:00Z');
+
+  const makeService = (meeting: Meeting | null) => {
+    const saved: Meeting[] = [];
+    const { publisher, events } = makeEventPublisher();
+    const service = new MeetingService({
+      repository: {
+        findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
+        save: async (m) => {
+          saved.push(m);
+        },
+      },
+      chatRepository: noopChatRepository(),
+      codeGenerator: { next: () => code },
+      clock: { now: () => tClose },
+      eventPublisher: publisher,
+    });
+    return { service, saved, events };
+  };
+
+  it('Meeting.close를 호출하고 save한 뒤 meeting.ended 이벤트를 발행한다', async () => {
+    const meeting = makeMeeting(t0);
+    meeting.addParticipant('s1', 'alice', t1);
+    const { service, saved, events } = makeService(meeting);
+    const result = await service.closeMeeting({ code: 'abc12xyz', reason: 'manual' });
+    expect(result).toBe(meeting);
+    expect(meeting.isOpen).toBe(false);
+    expect(meeting.endedAt).toBe(tClose);
+    expect(saved[0]).toBe(meeting);
+    expect(events).toEqual([
+      {
+        name: MEETING_EVENTS.ENDED,
+        payload: { code: 'abc12xyz', endedAt: tClose, reason: 'manual' },
+      },
+    ]);
+  });
+
+  it('Repository에 없는 code면 throw, 이벤트 발행 안 됨', async () => {
+    const { service, events } = makeService(null);
+    await expect(
+      service.closeMeeting({ code: 'abc12xyz', reason: 'manual' }),
+    ).rejects.toThrow(/not found/);
+    expect(events).toHaveLength(0);
+  });
+
+  it('이미 종료된 Meeting이면 Aggregate 에러 전파, 이벤트 발행 안 됨', async () => {
+    const meeting = makeMeeting(t0);
+    meeting.close(t1);
+    const { service, events } = makeService(meeting);
+    await expect(
+      service.closeMeeting({ code: 'abc12xyz', reason: 'manual' }),
+    ).rejects.toThrow(/already closed/);
+    expect(events).toHaveLength(0);
+  });
+});
+
+describe('MeetingService.detectIdleAndClose', () => {
+  const t0 = new Date('2026-01-01T00:00:00Z');
+  const tJoin = new Date('2026-01-01T00:01:00Z');
+  const tLeave = new Date('2026-01-01T00:02:00Z');
+  const tWithinIdle = new Date('2026-01-01T00:10:00Z'); // tLeave + 8m < 10m
+  const tIdleElapsed = new Date('2026-01-01T00:12:30Z'); // tLeave + 10m30s ≥ 10m
+
+  const makeService = (meeting: Meeting | null, now: Date) => {
+    const saved: Meeting[] = [];
+    const { publisher, events } = makeEventPublisher();
+    const service = new MeetingService({
+      repository: {
+        findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
+        save: async (m) => {
+          saved.push(m);
+        },
+      },
+      chatRepository: noopChatRepository(),
+      codeGenerator: { next: () => code },
+      clock: { now: () => now },
+      eventPublisher: publisher,
+    });
+    return { service, saved, events };
+  };
+
+  const makeIdleMeeting = () => {
+    const m = makeMeeting(t0);
+    m.addParticipant('s1', 'alice', tJoin);
+    m.removeParticipant('s1', tLeave);
+    return m;
+  };
+
+  it('활성 참가자가 있으면 close하지 않고 false 반환, 이벤트 발행 안 됨', async () => {
+    const m = makeMeeting(t0);
+    m.addParticipant('s1', 'alice', tJoin);
+    const { service, saved, events } = makeService(m, tIdleElapsed);
+    const closed = await service.detectIdleAndClose({ code: 'abc12xyz' });
+    expect(closed).toBe(false);
+    expect(m.isOpen).toBe(true);
+    expect(saved).toHaveLength(0);
+    expect(events).toHaveLength(0);
+  });
+
+  it('idle 임계 미달이면 close하지 않고 false 반환', async () => {
+    const m = makeIdleMeeting();
+    const { service, events } = makeService(m, tWithinIdle);
+    const closed = await service.detectIdleAndClose({ code: 'abc12xyz' });
+    expect(closed).toBe(false);
+    expect(m.isOpen).toBe(true);
+    expect(events).toHaveLength(0);
+  });
+
+  it('idle 조건 충족 시 close + meeting.idle.detected + meeting.ended 두 이벤트 발행', async () => {
+    const m = makeIdleMeeting();
+    const { service, saved, events } = makeService(m, tIdleElapsed);
+    const closed = await service.detectIdleAndClose({ code: 'abc12xyz' });
+    expect(closed).toBe(true);
+    expect(m.isOpen).toBe(false);
+    expect(m.endedAt).toBe(tIdleElapsed);
+    expect(saved[0]).toBe(m);
+    expect(events).toEqual([
+      {
+        name: MEETING_EVENTS.IDLE_DETECTED,
+        payload: { code: 'abc12xyz', detectedAt: tIdleElapsed },
+      },
+      {
+        name: MEETING_EVENTS.ENDED,
+        payload: { code: 'abc12xyz', endedAt: tIdleElapsed, reason: 'idle' },
+      },
+    ]);
+  });
+
+  it('이미 종료된 Meeting은 멱등하게 no-op(false) 반환, 이벤트 발행 안 됨', async () => {
+    const m = makeMeeting(t0);
+    m.close(t0);
+    const { service, saved, events } = makeService(m, tIdleElapsed);
+    const closed = await service.detectIdleAndClose({ code: 'abc12xyz' });
+    expect(closed).toBe(false);
+    expect(saved).toHaveLength(0);
+    expect(events).toHaveLength(0);
+  });
+
+  it('Repository에 없는 code면 throw, 이벤트 발행 안 됨', async () => {
+    const { service, events } = makeService(null, tIdleElapsed);
+    await expect(service.detectIdleAndClose({ code: 'abc12xyz' })).rejects.toThrow(/not found/);
+    expect(events).toHaveLength(0);
   });
 });
