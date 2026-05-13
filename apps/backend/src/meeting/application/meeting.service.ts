@@ -2,6 +2,7 @@ import { Clock } from '../../shared-kernel/domain/ports';
 import { ExternalReference, Source } from '../../shared-kernel/domain/value-objects';
 import { Meeting } from '../domain/meeting';
 import { MeetingCodeGenerator, MeetingRepository } from '../domain/ports';
+import { IdleTimeout } from '../domain/value-objects';
 
 /**
  * Meeting Bounded Context의 Application Service.
@@ -25,7 +26,16 @@ export interface MeetingServiceDeps {
 export class MeetingService {
   constructor(private readonly deps: MeetingServiceDeps) {}
 
-  async createMeeting(_command: CreateMeetingCommand): Promise<Meeting> {
-    throw new Error('MeetingService.createMeeting not implemented');
+  async createMeeting(command: CreateMeetingCommand): Promise<Meeting> {
+    const code = this.deps.codeGenerator.next();
+    const meeting = Meeting.create({
+      code,
+      source: command.source,
+      externalReference: command.externalReference,
+      idleTimeout: IdleTimeout.default(),
+      startedAt: this.deps.clock.now(),
+    });
+    await this.deps.repository.save(meeting);
+    return meeting;
   }
 }
