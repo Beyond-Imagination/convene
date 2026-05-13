@@ -8,20 +8,20 @@ import {
   type ReportEventName,
 } from './events.js';
 
-describe('domain event names', () => {
-  it('every meeting event uses the meeting. prefix', () => {
+describe('도메인 이벤트 이름', () => {
+  it('모든 meeting 이벤트는 meeting. prefix를 사용한다', () => {
     for (const name of Object.values(MEETING_EVENTS)) {
       expect(name.startsWith('meeting.')).toBe(true);
     }
   });
 
-  it('every report event uses the report. prefix', () => {
+  it('모든 report 이벤트는 report. prefix를 사용한다', () => {
     for (const name of Object.values(REPORT_EVENTS)) {
       expect(name.startsWith('report.')).toBe(true);
     }
   });
 
-  it('matches ARCHITECTURE §2.4: 6 meeting + 4 report = 10 distinct events', () => {
+  it('ARCHITECTURE §2.4와 일치: meeting 6 + report 4 = 10개, 모두 서로 다르다', () => {
     const meeting = Object.values(MEETING_EVENTS);
     const report = Object.values(REPORT_EVENTS);
     expect(meeting).toHaveLength(6);
@@ -29,7 +29,7 @@ describe('domain event names', () => {
     expect(new Set([...meeting, ...report]).size).toBe(10);
   });
 
-  it('DomainEventName unifies meeting + report event unions', () => {
+  it('DomainEventName은 MeetingEventName과 ReportEventName의 union이다', () => {
     const a: MeetingEventName = MEETING_EVENTS.CREATED;
     const b: ReportEventName = REPORT_EVENTS.FINALIZED;
     const c: DomainEventName = a;

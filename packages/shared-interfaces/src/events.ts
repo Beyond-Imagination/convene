@@ -1,12 +1,12 @@
 /**
- * Domain event names. See ARCHITECTURE.md §2.4.
+ * 도메인 이벤트 이름 상수. ARCHITECTURE.md §2.4 참고.
  *
- * Prefix convention:
+ * Prefix 규칙:
  *   - `meeting.*` — Meeting bounded context.
  *   - `report.*`  — Report bounded context.
  *
- * Single source of truth for event-name strings used by
- * `@nestjs/event-emitter` on the backend and any future bus.
+ * 백엔드의 `@nestjs/event-emitter`와 향후 다른 이벤트 버스가 사용할
+ * 이벤트 이름 문자열의 단일 진실원(single source of truth).
  */
 
 export const MEETING_EVENTS = {
