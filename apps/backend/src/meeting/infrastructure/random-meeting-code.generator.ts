@@ -1,12 +1,23 @@
-import { MeetingCode } from '@/meeting/domain/value-objects';
+import { randomInt } from 'node:crypto';
+
 import { MeetingCodeGenerator } from '@/meeting/domain/ports';
+import { MeetingCode } from '@/meeting/domain/value-objects';
+
+const ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
 /**
- * MeetingCodeGenerator 포트의 production 구현체.
- * 빌드 단계에서는 컴파일만 통과하면 충분하다 (TDD red 단계).
+ * MeetingCodeGenerator의 production 구현체.
+ *
+ * `crypto.randomInt`로 ALPHABET(소문자 영숫자 36자)에서 8자리를 균등 추출한다.
+ * 36^8 ≈ 2.8 × 10^12 조합이라 v1 트래픽 규모에서 충돌은 무시 가능하며,
+ * 실제 유일성은 MeetingRepository가 보장한다.
  */
 export class RandomMeetingCodeGenerator implements MeetingCodeGenerator {
   next(): MeetingCode {
-    throw new Error('not implemented');
+    let raw = '';
+    for (let i = 0; i < MeetingCode.LENGTH; i++) {
+      raw += ALPHABET[randomInt(ALPHABET.length)];
+    }
+    return MeetingCode.from(raw);
   }
 }
