@@ -143,4 +143,48 @@ describe('Meeting e2e', () => {
   it('존재하지 않는 회의 종료는 404 NotFound로 매핑된다', async () => {
     await request(httpServer).delete('/meetings/00000000').expect(404);
   });
+
+  it('잘못된 WS payload는 exception 이벤트로 client에 전달되고 broadcast는 발생하지 않는다', async () => {
+    const created = await request(httpServer).post('/meetings').send({ source: 'web' }).expect(201);
+    const code = (created.body as CreateMeetingResponse).code;
+
+    const alice = await connectClient(baseUrl);
+    const bob = await connectClient(baseUrl);
+
+    try {
+      // bob을 먼저 정상 join 시켜 둠 — alice의 invalid join이 broadcast를 일으키면 bob이 받게 됨.
+      bob.emit(MEETING_WS_EVENTS.JOIN, { code, nickname: 'bob' });
+      await new Promise((r) => setTimeout(r, 30));
+
+      // bob이 participantJoined를 받으면 안 됨 (invalid payload는 service까지 도달 X).
+      const bobGotJoinAfter = new Promise<ParticipantJoinedBroadcast | null>((resolve) => {
+        const timer = setTimeout(() => resolve(null), 200);
+        bob.once(MEETING_WS_EVENTS.PARTICIPANT_JOINED, (payload: ParticipantJoinedBroadcast) => {
+          clearTimeout(timer);
+          resolve(payload);
+        });
+      });
+
+      const aliceGotException = new Promise<unknown>((resolve) => {
+        alice.once('exception', (payload: unknown) => resolve(payload));
+      });
+
+      // code 길이 위반: 8자가 아니라 5자.
+      alice.emit(MEETING_WS_EVENTS.JOIN, { code: 'short', nickname: 'alice' });
+
+      const exceptionPayload = (await aliceGotException) as Record<string, unknown>;
+      expect(exceptionPayload).toBeDefined();
+      // WS 컨텍스트라 HTTP semantic(statusCode, error: 'Bad Request')은 누설하지 않는다.
+      expect(exceptionPayload).not.toHaveProperty('statusCode');
+      expect(exceptionPayload.status).toBe('error');
+      // 'Internal server error'로 가려지면 안 되고, validation 정보가 client에 전달돼야 한다.
+      expect(JSON.stringify(exceptionPayload.message)).toMatch(/validation|code/i);
+
+      const broadcast = await bobGotJoinAfter;
+      expect(broadcast).toBeNull();
+    } finally {
+      alice.disconnect();
+      bob.disconnect();
+    }
+  });
 });
