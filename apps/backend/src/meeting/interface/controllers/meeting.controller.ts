@@ -5,12 +5,14 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   Param,
   Post,
 } from '@nestjs/common';
 
 import type { CloseMeetingResponse, CreateMeetingResponse } from '@migration/shared-interfaces';
 
+import { MeetingNotFoundError } from '@/meeting/application/meeting.errors';
 import { MeetingService } from '@/meeting/application/meeting.service';
 import { CreateMeetingDto } from '@/meeting/interface/dto/create-meeting.dto';
 import { MeetingCode } from '@/meeting/domain/value-objects';
@@ -49,10 +51,17 @@ export class MeetingController {
     } catch (e) {
       throw new BadRequestException((e as Error).message);
     }
-    const meeting = await this.service.closeMeeting({ code, reason: 'manual' });
-    return {
-      code: meeting.code.value,
-      endedAt: meeting.endedAt!.toISOString(),
-    };
+    try {
+      const meeting = await this.service.closeMeeting({ code, reason: 'manual' });
+      return {
+        code: meeting.code.value,
+        endedAt: meeting.endedAt!.toISOString(),
+      };
+    } catch (e) {
+      if (e instanceof MeetingNotFoundError) {
+        throw new NotFoundException(e.message);
+      }
+      throw e;
+    }
   }
 }
