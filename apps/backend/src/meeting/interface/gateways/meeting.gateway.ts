@@ -10,6 +10,7 @@ import type { Socket } from 'socket.io';
 import {
   MEETING_WS_EVENTS,
   type ParticipantJoinedBroadcast,
+  type ParticipantLeftBroadcast,
 } from '@migration/shared-interfaces';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
@@ -56,9 +57,21 @@ export class MeetingGateway {
 
   @SubscribeMessage(MEETING_WS_EVENTS.LEAVE)
   async handleLeave(
-    @MessageBody() _dto: LeaveMeetingDto,
-    @ConnectedSocket() _client: Socket,
+    @MessageBody() dto: LeaveMeetingDto,
+    @ConnectedSocket() client: Socket,
   ): Promise<void> {
-    throw new Error('not implemented');
+    const { participant } = await this.service.leaveMeeting({
+      code: dto.code,
+      participantId: client.id,
+    });
+    const room = roomOf(dto.code);
+    // broadcast 먼저, 그 뒤 socket.leave — 남은 참가자에게 알림이 가도록 한다.
+    const leftAt = participant.leftAt ?? new Date();
+    const broadcast: ParticipantLeftBroadcast = {
+      socketId: participant.id,
+      leftAt: leftAt.toISOString(),
+    };
+    client.to(room).emit(MEETING_WS_EVENTS.PARTICIPANT_LEFT, broadcast);
+    await client.leave(room);
   }
 }
