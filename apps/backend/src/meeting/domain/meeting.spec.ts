@@ -61,6 +61,16 @@ describe('Meeting (Aggregate Root)', () => {
       expect(m.lastActiveAt).toBe(T_1m);
     });
 
+    it('떠난 Participant entity를 반환한다(leftAt 채워짐)', () => {
+      const m = newMeeting();
+      m.addParticipant('s1', 'alice', T_30s);
+      const removed = m.removeParticipant('s1', T_1m);
+      expect(removed.id).toBe('s1');
+      expect(removed.nickname).toBe('alice');
+      expect(removed.leftAt).toBe(T_1m);
+      expect(removed.isActive).toBe(false);
+    });
+
     it('등록되지 않은 id 제거는 거부한다', () => {
       const m = newMeeting();
       expect(() => m.removeParticipant('s1', T_30s)).toThrow(/not found/);

@@ -75,7 +75,7 @@ export class Meeting {
     return participant;
   }
 
-  removeParticipant(id: string, at: Date): void {
+  removeParticipant(id: string, at: Date): Participant {
     this.assertOpen('removeParticipant');
     const participant = this.participants.get(id);
     if (!participant) {
@@ -86,6 +86,7 @@ export class Meeting {
     }
     participant.leave(at);
     this.touchActive(at);
+    return participant;
   }
 
   /** 채팅·미디어 활동 등 idle 윈도우를 리셋해야 할 때 호출. */
