@@ -1,7 +1,8 @@
-import { UsePipes, ValidationPipe } from '@nestjs/common';
+import { Logger, UsePipes, ValidationPipe } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
+  OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
@@ -35,7 +36,9 @@ const roomOf = (code: string): string => `meeting:${code}`;
     transform: true,
   }),
 )
-export class MeetingGateway {
+export class MeetingGateway implements OnGatewayDisconnect {
+  private readonly logger = new Logger(MeetingGateway.name);
+
   @WebSocketServer()
   server!: Server;
 
@@ -83,8 +86,27 @@ export class MeetingGateway {
     await client.leave(room);
   }
 
-  async handleDisconnect(_client: Socket): Promise<void> {
-    throw new Error('not implemented');
+  async handleDisconnect(client: Socket): Promise<void> {
+    const code = client.data?.code as string | undefined;
+    if (!code) return;
+    try {
+      const { participant } = await this.service.leaveMeeting({
+        code,
+        participantId: client.id,
+      });
+      const room = roomOf(code);
+      const leftAt = participant.leftAt ?? new Date();
+      const broadcast: ParticipantLeftBroadcast = {
+        socketId: participant.id,
+        leftAt: leftAt.toISOString(),
+      };
+      client.to(room).emit(MEETING_WS_EVENTS.PARTICIPANT_LEFT, broadcast);
+    } catch (error) {
+      // disconnect는 best-effort: 이미 leave했거나 회의가 종료된 경우 swallow.
+      this.logger.debug(
+        `handleDisconnect swallow for code=${code} sid=${client.id}: ${(error as Error).message}`,
+      );
+    }
   }
 
   @SubscribeMessage(MEETING_WS_EVENTS.CHAT)
