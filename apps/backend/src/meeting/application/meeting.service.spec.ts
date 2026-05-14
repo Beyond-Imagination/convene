@@ -257,12 +257,12 @@ describe('MeetingService.postChat', () => {
     return { service, saved, appended };
   };
 
-  it('정상 발화 시 ChatEntry를 만들어 ChatRepository.append + Meeting.markActive + Repository.save', async () => {
+  it('정상 발화 시 socket.id로 nickname을 lookup해 ChatEntry를 만들고 append + markActive + save', async () => {
     const meeting = makeMeetingActive();
     const { service, saved, appended } = makeService(meeting);
     const entry = await service.postChat({
       code: 'abc12xyz',
-      nickname: 'alice',
+      participantId: 's1',
       text: 'hello',
     });
     expect(entry.nickname).toBe('alice');
@@ -276,8 +276,17 @@ describe('MeetingService.postChat', () => {
   it('Repository에 없는 code면 throw, append 호출 안 됨', async () => {
     const { service, appended } = makeService(null);
     await expect(
-      service.postChat({ code: 'abc12xyz', nickname: 'alice', text: 'hi' }),
+      service.postChat({ code: 'abc12xyz', participantId: 's1', text: 'hi' }),
     ).rejects.toThrow(/not found/);
+    expect(appended).toHaveLength(0);
+  });
+
+  it('Meeting에 없는 participantId면 throw, append 호출 안 됨', async () => {
+    const meeting = makeMeetingActive();
+    const { service, appended } = makeService(meeting);
+    await expect(
+      service.postChat({ code: 'abc12xyz', participantId: 'unknown', text: 'hi' }),
+    ).rejects.toThrow(/participant/i);
     expect(appended).toHaveLength(0);
   });
 
@@ -286,7 +295,7 @@ describe('MeetingService.postChat', () => {
     meeting.close(t1);
     const { service, appended } = makeService(meeting);
     await expect(
-      service.postChat({ code: 'abc12xyz', nickname: 'alice', text: 'hi' }),
+      service.postChat({ code: 'abc12xyz', participantId: 's1', text: 'hi' }),
     ).rejects.toThrow(/already closed/);
     expect(appended).toHaveLength(0);
   });
@@ -295,7 +304,7 @@ describe('MeetingService.postChat', () => {
     const meeting = makeMeetingActive();
     const { service, appended } = makeService(meeting);
     await expect(
-      service.postChat({ code: 'abc12xyz', nickname: 'alice', text: '   ' }),
+      service.postChat({ code: 'abc12xyz', participantId: 's1', text: '   ' }),
     ).rejects.toThrow(/text/);
     expect(appended).toHaveLength(0);
   });

@@ -52,7 +52,7 @@ export interface LeaveMeetingResult {
 
 export interface PostChatCommand {
   code: string;
-  nickname: string;
+  participantId: string;
   text: string;
 }
 
@@ -112,15 +112,8 @@ export class MeetingService {
     return { meeting, participant };
   }
 
-  async postChat(command: PostChatCommand): Promise<ChatEntry> {
-    const meeting = await this.requireMeeting(command.code);
-    const now = this.deps.clock.now();
-    // ChatEntry 검증을 markActive보다 먼저 수행 → 검증 실패 시 Meeting 상태 미변경.
-    const entry = chatEntry({ nickname: command.nickname, text: command.text, sentAt: now });
-    meeting.markActive(now);
-    await this.deps.chatRepository.append(command.code, entry);
-    await this.deps.repository.save(meeting);
-    return entry;
+  async postChat(_command: PostChatCommand): Promise<ChatEntry> {
+    throw new Error('not implemented');
   }
 
   async closeMeeting(command: CloseMeetingCommand): Promise<Meeting> {
