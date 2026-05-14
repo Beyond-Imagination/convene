@@ -4,8 +4,9 @@ import {
   MessageBody,
   SubscribeMessage,
   WebSocketGateway,
+  WebSocketServer,
 } from '@nestjs/websockets';
-import type { Socket } from 'socket.io';
+import type { Server, Socket } from 'socket.io';
 
 import {
   MEETING_WS_EVENTS,
@@ -14,6 +15,7 @@ import {
 } from '@migration/shared-interfaces';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
+import { ChatDto } from '@/meeting/interface/dto/chat.dto';
 import { JoinMeetingDto } from '@/meeting/interface/dto/join-meeting.dto';
 import { LeaveMeetingDto } from '@/meeting/interface/dto/leave-meeting.dto';
 
@@ -33,6 +35,9 @@ const roomOf = (code: string): string => `meeting:${code}`;
   }),
 )
 export class MeetingGateway {
+  @WebSocketServer()
+  server!: Server;
+
   constructor(private readonly service: MeetingService) {}
 
   @SubscribeMessage(MEETING_WS_EVENTS.JOIN)
@@ -73,5 +78,13 @@ export class MeetingGateway {
     };
     client.to(room).emit(MEETING_WS_EVENTS.PARTICIPANT_LEFT, broadcast);
     await client.leave(room);
+  }
+
+  @SubscribeMessage(MEETING_WS_EVENTS.CHAT)
+  async handleChat(
+    @MessageBody() _dto: ChatDto,
+    @ConnectedSocket() _client: Socket,
+  ): Promise<void> {
+    throw new Error('not implemented');
   }
 }

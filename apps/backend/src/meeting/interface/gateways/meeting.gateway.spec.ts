@@ -4,8 +4,12 @@ import { MEETING_WS_EVENTS } from '@migration/shared-interfaces';
 
 import { Meeting } from '@/meeting/domain/meeting';
 import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';
-import { externalReference } from '@/shared-kernel/domain/value-objects';
+import {
+  chatEntry,
+  externalReference,
+} from '@/shared-kernel/domain/value-objects';
 
+import { ChatDto } from '@/meeting/interface/dto/chat.dto';
 import { JoinMeetingDto } from '@/meeting/interface/dto/join-meeting.dto';
 import { LeaveMeetingDto } from '@/meeting/interface/dto/leave-meeting.dto';
 
@@ -65,6 +69,28 @@ const leaveDtoOf = (code = 'abc12xyz'): LeaveMeetingDto => {
   const dto = new LeaveMeetingDto();
   dto.code = code;
   return dto;
+};
+
+const chatDtoOf = (code = 'abc12xyz', text = 'hello'): ChatDto => {
+  const dto = new ChatDto();
+  dto.code = code;
+  dto.text = text;
+  return dto;
+};
+
+const makeServer = () => {
+  const broadcasts: Broadcast[] = [];
+  const server = {
+    to(room: string) {
+      return {
+        emit(event: string, payload: unknown): boolean {
+          broadcasts.push({ room, event, payload });
+          return true;
+        },
+      };
+    },
+  };
+  return { server, broadcasts };
 };
 
 describe('MeetingGateway.handleJoin', () => {
@@ -165,3 +191,64 @@ describe('MeetingGateway.handleLeave', () => {
     ]);
   });
 });
+
+describe('MeetingGateway.handleChat', () => {
+  const tChat = new Date('2026-01-01T00:03:00Z');
+
+  const makeGateway = () => {
+    const entry = chatEntry({ nickname: 'alice', text: 'hello', sentAt: tChat });
+    const calls: Array<{ code: string; participantId: string; text: string }> = [];
+    const service = {
+      postChat: jest.fn(async (cmd: { code: string; participantId: string; text: string }) => {
+        calls.push(cmd);
+        return entry;
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const gateway = new MeetingGateway(service as any);
+    const { server, broadcasts: serverBroadcasts } = makeServer();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    gateway.server = server as any;
+    return { gateway, service, calls, entry, serverBroadcasts };
+  };
+
+  it('service.postChat을 socket.id를 participantId로 호출한다', async () => {
+    const { gateway, calls } = makeGateway();
+    const { socket } = makeSocket('s1');
+    await gateway.handleChat(chatDtoOf(), socket as unknown as Socket);
+    expect(calls).toEqual([{ code: 'abc12xyz', participantId: 's1', text: 'hello' }]);
+  });
+
+  it('자신을 포함한 같은 room 전체에 chatPosted를 브로드캐스트한다 (server.to)', async () => {
+    const { gateway, serverBroadcasts } = makeGateway();
+    const { socket, broadcasts: clientBroadcasts } = makeSocket('s1');
+    await gateway.handleChat(chatDtoOf(), socket as unknown as Socket);
+    expect(serverBroadcasts).toEqual([
+      {
+        room: 'meeting:abc12xyz',
+        event: MEETING_WS_EVENTS.CHAT_POSTED,
+        payload: {
+          nickname: 'alice',
+          text: 'hello',
+          sentAt: tChat.toISOString(),
+        },
+      },
+    ]);
+    // client.to(...)로는 발송하지 않는다 — 자신도 받아야 하므로 server.to만 사용.
+    expect(clientBroadcasts).toEqual([]);
+  });
+
+  it('service.postChat이 throw하면 broadcast하지 않는다', async () => {
+    const { gateway, serverBroadcasts } = makeGateway();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (gateway as any).service.postChat = jest.fn(async () => {
+      throw new Error('Meeting "abc12xyz" not found');
+    });
+    const { socket } = makeSocket('s1');
+    await expect(
+      gateway.handleChat(chatDtoOf(), socket as unknown as Socket),
+    ).rejects.toThrow(/not found/);
+    expect(serverBroadcasts).toEqual([]);
+  });
+});
+
