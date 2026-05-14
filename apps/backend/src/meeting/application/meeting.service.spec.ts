@@ -194,12 +194,15 @@ describe('MeetingService.leaveMeeting', () => {
     return { service, saved };
   };
 
-  it('해당 code 회의의 참가자를 leave 처리하고 갱신된 Meeting을 반환한다', async () => {
+  it('해당 code 회의의 참가자를 leave 처리하고 Meeting+떠난 Participant를 반환한다', async () => {
     const meeting = makeMeetingWithParticipant();
     const { service, saved } = makeService(meeting);
-    const m = await service.leaveMeeting({ code: 'abc12xyz', participantId: 's1' });
-    expect(m).toBe(meeting);
-    expect(m.activeParticipantCount).toBe(0);
+    const result = await service.leaveMeeting({ code: 'abc12xyz', participantId: 's1' });
+    expect(result.meeting).toBe(meeting);
+    expect(result.meeting.activeParticipantCount).toBe(0);
+    expect(result.participant.id).toBe('s1');
+    expect(result.participant.nickname).toBe('alice');
+    expect(result.participant.leftAt).toBe(t2);
     expect(saved[0]).toBe(meeting);
   });
 

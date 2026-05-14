@@ -45,6 +45,11 @@ export interface LeaveMeetingCommand {
   participantId: string;
 }
 
+export interface LeaveMeetingResult {
+  meeting: Meeting;
+  participant: Participant;
+}
+
 export interface PostChatCommand {
   code: string;
   nickname: string;
@@ -97,11 +102,8 @@ export class MeetingService {
     return { meeting, participant };
   }
 
-  async leaveMeeting(command: LeaveMeetingCommand): Promise<Meeting> {
-    const meeting = await this.requireMeeting(command.code);
-    meeting.removeParticipant(command.participantId, this.deps.clock.now());
-    await this.deps.repository.save(meeting);
-    return meeting;
+  async leaveMeeting(_command: LeaveMeetingCommand): Promise<LeaveMeetingResult> {
+    throw new Error('not implemented');
   }
 
   async postChat(command: PostChatCommand): Promise<ChatEntry> {
