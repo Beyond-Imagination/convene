@@ -37,9 +37,11 @@ interface Broadcast {
 const makeSocket = (id: string) => {
   const joined = new Set<string>();
   const broadcasts: Broadcast[] = [];
+  const data: { code?: string } = {};
   const socket = {
     id,
     rooms: joined,
+    data,
     async join(room: string): Promise<void> {
       joined.add(room);
     },
@@ -55,7 +57,7 @@ const makeSocket = (id: string) => {
       };
     },
   };
-  return { socket, joined, broadcasts };
+  return { socket, joined, broadcasts, data };
 };
 
 const dtoOf = (code = 'abc12xyz', nickname = 'alice'): JoinMeetingDto => {
@@ -138,6 +140,13 @@ describe('MeetingGateway.handleJoin', () => {
         },
       },
     ]);
+  });
+
+  it('handleDisconnect가 회의 code를 찾을 수 있도록 socket.data.code를 저장한다', async () => {
+    const { gateway } = makeGateway();
+    const { socket, data } = makeSocket('s1');
+    await gateway.handleJoin(dtoOf(), socket as unknown as Socket);
+    expect(data.code).toBe('abc12xyz');
   });
 });
 
