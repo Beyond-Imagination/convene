@@ -112,8 +112,21 @@ export class MeetingService {
     return { meeting, participant };
   }
 
-  async postChat(_command: PostChatCommand): Promise<ChatEntry> {
-    throw new Error('not implemented');
+  async postChat(command: PostChatCommand): Promise<ChatEntry> {
+    const meeting = await this.requireMeeting(command.code);
+    const participant = meeting.findParticipant(command.participantId);
+    if (!participant) {
+      throw new Error(
+        `Participant "${command.participantId}" not found in meeting "${command.code}"`,
+      );
+    }
+    const now = this.deps.clock.now();
+    // ChatEntry 검증을 markActive보다 먼저 수행 → 검증 실패 시 Meeting 상태 미변경.
+    const entry = chatEntry({ nickname: participant.nickname, text: command.text, sentAt: now });
+    meeting.markActive(now);
+    await this.deps.chatRepository.append(command.code, entry);
+    await this.deps.repository.save(meeting);
+    return entry;
   }
 
   async closeMeeting(command: CloseMeetingCommand): Promise<Meeting> {
