@@ -53,6 +53,8 @@ export class MeetingGateway {
     });
     const room = roomOf(dto.code);
     await client.join(room);
+    // handleDisconnect에서 어느 회의 code였는지 복원하기 위해 저장.
+    client.data.code = dto.code;
     const broadcast: ParticipantJoinedBroadcast = {
       socketId: participant.id,
       nickname: participant.nickname,
