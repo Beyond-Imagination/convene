@@ -83,6 +83,10 @@ export class MeetingGateway {
     await client.leave(room);
   }
 
+  async handleDisconnect(_client: Socket): Promise<void> {
+    throw new Error('not implemented');
+  }
+
   @SubscribeMessage(MEETING_WS_EVENTS.CHAT)
   async handleChat(
     @MessageBody() dto: ChatDto,

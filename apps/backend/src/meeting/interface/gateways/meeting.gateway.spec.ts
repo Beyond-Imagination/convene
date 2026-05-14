@@ -261,3 +261,72 @@ describe('MeetingGateway.handleChat', () => {
   });
 });
 
+describe('MeetingGateway.handleDisconnect', () => {
+  const tLeave = new Date('2026-01-01T00:05:00Z');
+
+  const makeGateway = (overrides?: {
+    leave?: jest.Mock;
+  }) => {
+    const meeting = makeMeeting();
+    const participant = meeting.addParticipant('s1', 'alice', t1);
+    participant.leave(tLeave);
+    const calls: Array<{ code: string; participantId: string }> = [];
+    const defaultLeave = jest.fn(async (cmd: { code: string; participantId: string }) => {
+      calls.push(cmd);
+      return { meeting, participant };
+    });
+    const service = {
+      leaveMeeting: overrides?.leave ?? defaultLeave,
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const gateway = new MeetingGateway(service as any);
+    return { gateway, service, calls };
+  };
+
+  it('socket.data.code가 있으면 service.leaveMeeting을 socket.id로 호출한다', async () => {
+    const { gateway, calls } = makeGateway();
+    const { socket, data } = makeSocket('s1');
+    data.code = 'abc12xyz';
+    await gateway.handleDisconnect(socket as unknown as Socket);
+    expect(calls).toEqual([{ code: 'abc12xyz', participantId: 's1' }]);
+  });
+
+  it('socket.data.code가 있으면 같은 room에 participantLeft를 브로드캐스트한다', async () => {
+    const { gateway } = makeGateway();
+    const { socket, data, broadcasts } = makeSocket('s1');
+    data.code = 'abc12xyz';
+    await gateway.handleDisconnect(socket as unknown as Socket);
+    expect(broadcasts).toEqual([
+      {
+        room: 'meeting:abc12xyz',
+        event: MEETING_WS_EVENTS.PARTICIPANT_LEFT,
+        payload: {
+          socketId: 's1',
+          leftAt: tLeave.toISOString(),
+        },
+      },
+    ]);
+  });
+
+  it('socket.data.code가 없으면 service 호출 없이 조용히 종료한다(join 전 disconnect)', async () => {
+    const { gateway, calls } = makeGateway();
+    const { socket, broadcasts } = makeSocket('s1');
+    await gateway.handleDisconnect(socket as unknown as Socket);
+    expect(calls).toEqual([]);
+    expect(broadcasts).toEqual([]);
+  });
+
+  it('service.leaveMeeting이 throw해도 swallow한다 (이미 종료된 회의 등)', async () => {
+    const leave = jest.fn(async () => {
+      throw new Error('Meeting "abc12xyz" not found');
+    });
+    const { gateway } = makeGateway({ leave });
+    const { socket, data, broadcasts } = makeSocket('s1');
+    data.code = 'abc12xyz';
+    await expect(
+      gateway.handleDisconnect(socket as unknown as Socket),
+    ).resolves.toBeUndefined();
+    expect(broadcasts).toEqual([]);
+  });
+});
+
