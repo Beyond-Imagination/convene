@@ -125,6 +125,11 @@ export class Meeting {
     return this._endedAt === null;
   }
 
+  /** 닉네임 조회 등 read-only 용도. leave한 Participant도 반환한다. */
+  findParticipant(id: string): Participant | undefined {
+    return this.participants.get(id);
+  }
+
   /** 아직 leave 하지 않은 참가자 수. */
   get activeParticipantCount(): number {
     let n = 0;

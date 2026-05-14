@@ -91,6 +91,30 @@ describe('Meeting (Aggregate Root)', () => {
     });
   });
 
+  describe('findParticipant', () => {
+    it('등록된 id면 해당 Participant를 반환한다', () => {
+      const m = newMeeting();
+      m.addParticipant('s1', 'alice', T_30s);
+      const found = m.findParticipant('s1');
+      expect(found?.id).toBe('s1');
+      expect(found?.nickname).toBe('alice');
+    });
+
+    it('없는 id면 undefined를 반환한다', () => {
+      const m = newMeeting();
+      expect(m.findParticipant('unknown')).toBeUndefined();
+    });
+
+    it('leave한 Participant도 반환한다(닉네임 조회용)', () => {
+      const m = newMeeting();
+      m.addParticipant('s1', 'alice', T_30s);
+      m.removeParticipant('s1', T_1m);
+      const found = m.findParticipant('s1');
+      expect(found?.isActive).toBe(false);
+      expect(found?.nickname).toBe('alice');
+    });
+  });
+
   describe('markActive', () => {
     it('lastActiveAt을 입력 시각으로 갱신한다', () => {
       const m = newMeeting();
