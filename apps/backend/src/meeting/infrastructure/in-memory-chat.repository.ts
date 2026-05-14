@@ -1,3 +1,5 @@
+import { Injectable } from '@nestjs/common';
+
 import { ChatRepository } from '@/meeting/domain/ports';
 import { ChatEntry } from '@/shared-kernel/domain/value-objects';
 
@@ -6,6 +8,7 @@ import { ChatEntry } from '@/shared-kernel/domain/value-objects';
  *
  * e2e 테스트와 v1 초기 부트스트랩용. Redis 구현체로 교체되기 전까지의 default provider.
  */
+@Injectable()
 export class InMemoryChatRepository implements ChatRepository {
   private readonly store = new Map<string, ChatEntry[]>();
 

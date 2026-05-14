@@ -1,3 +1,5 @@
+import { Injectable } from '@nestjs/common';
+
 import { Meeting } from '@/meeting/domain/meeting';
 import { MeetingRepository } from '@/meeting/domain/ports';
 
@@ -7,6 +9,7 @@ import { MeetingRepository } from '@/meeting/domain/ports';
  * e2e 테스트와 v1 마이그레이션 초기 부트스트랩용. Redis 구현체로 교체되기 전까지의
  * default provider이며, 동시성/영속성 보장은 없다.
  */
+@Injectable()
 export class InMemoryMeetingRepository implements MeetingRepository {
   private readonly store = new Map<string, Meeting>();
 

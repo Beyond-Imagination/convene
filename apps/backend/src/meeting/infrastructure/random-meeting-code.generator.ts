@@ -1,5 +1,7 @@
 import { randomInt } from 'node:crypto';
 
+import { Injectable } from '@nestjs/common';
+
 import { MeetingCodeGenerator } from '@/meeting/domain/ports';
 import { MeetingCode } from '@/meeting/domain/value-objects';
 
@@ -12,6 +14,7 @@ const ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
  * 36^8 ≈ 2.8 × 10^12 조합이라 v1 트래픽 규모에서 충돌은 무시 가능하며,
  * 실제 유일성은 MeetingRepository가 보장한다.
  */
+@Injectable()
 export class RandomMeetingCodeGenerator implements MeetingCodeGenerator {
   next(): MeetingCode {
     let raw = '';
