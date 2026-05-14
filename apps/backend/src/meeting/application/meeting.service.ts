@@ -1,5 +1,6 @@
 import { MEETING_EVENTS } from '@migration/shared-interfaces';
 
+import { MeetingNotFoundError } from '@/meeting/application/meeting.errors';
 import { Meeting } from '@/meeting/domain/meeting';
 import { Participant } from '@/meeting/domain/participant';
 import {
@@ -168,7 +169,7 @@ export class MeetingService {
   private async requireMeeting(code: string): Promise<Meeting> {
     const meeting = await this.deps.repository.findByCode(code);
     if (!meeting) {
-      throw new Error(`Meeting "${code}" not found`);
+      throw new MeetingNotFoundError(code);
     }
     return meeting;
   }

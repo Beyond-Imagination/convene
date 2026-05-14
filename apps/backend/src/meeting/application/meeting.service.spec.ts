@@ -4,6 +4,7 @@ import { Meeting } from '@/meeting/domain/meeting';
 import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';
 import { ChatEntry, externalReference } from '@/shared-kernel/domain/value-objects';
 
+import { MeetingNotFoundError } from './meeting.errors';
 import { MeetingService } from './meeting.service';
 
 interface CapturedEvent {
@@ -148,11 +149,11 @@ describe('MeetingService.joinMeeting', () => {
     expect(saved[0]).toBe(meeting);
   });
 
-  it('Repository에 없는 code면 throw', async () => {
+  it('Repository에 없는 code면 MeetingNotFoundError를 던진다', async () => {
     const { service } = makeService(null);
     await expect(
       service.joinMeeting({ code: 'abc12xyz', participantId: 's1', nickname: 'alice' }),
-    ).rejects.toThrow(/not found/);
+    ).rejects.toBeInstanceOf(MeetingNotFoundError);
   });
 
   it('이미 종료된 Meeting이면 Aggregate 에러가 그대로 전파된다', async () => {
