@@ -1,11 +1,21 @@
+import { IsString, Length } from 'class-validator';
+
 import type { ChatMessage } from '@migration/shared-interfaces';
 
+import { MeetingCode } from '@/meeting/domain/value-objects';
+
+const TEXT_MIN = 1;
+const TEXT_MAX = 1000;
+
 /**
- * `meeting:chat` WS payload DTO (stub).
- *
- * 구현은 ChatDto spec green 사이클에서 채운다.
+ * `meeting:chat` WS payload DTO. shared-interfaces.ChatMessage를 implements한다.
  */
 export class ChatDto implements ChatMessage {
+  @IsString()
+  @Length(MeetingCode.LENGTH, MeetingCode.LENGTH)
   code!: string;
+
+  @IsString()
+  @Length(TEXT_MIN, TEXT_MAX)
   text!: string;
 }
