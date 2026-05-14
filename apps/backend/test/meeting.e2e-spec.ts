@@ -140,9 +140,7 @@ describe('Meeting e2e', () => {
     await request(httpServer).delete('/meetings/short').expect(400);
   });
 
-  it('존재하지 않는 회의 종료는 500이 아니라 도메인 에러로 전파된다(현 구현 한계 확인)', async () => {
-    // 회의가 없으면 service가 throw → Nest 기본 매핑상 500. 추후 NotFoundException 매핑은 별도 사이클.
-    const res = await request(httpServer).delete('/meetings/00000000');
-    expect([404, 500]).toContain(res.status);
+  it('존재하지 않는 회의 종료는 404 NotFound로 매핑된다', async () => {
+    await request(httpServer).delete('/meetings/00000000').expect(404);
   });
 });

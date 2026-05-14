@@ -1,5 +1,6 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 
+import { MeetingNotFoundError } from '@/meeting/application/meeting.errors';
 import { Meeting } from '@/meeting/domain/meeting';
 import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';
 import { externalReference } from '@/shared-kernel/domain/value-objects';
@@ -124,5 +125,27 @@ describe('MeetingController.closeMeeting', () => {
     const { controller, service } = makeController();
     await expect(controller.closeMeeting('BAD')).rejects.toBeInstanceOf(BadRequestException);
     expect(service.closeMeeting).not.toHaveBeenCalled();
+  });
+
+  it('service가 MeetingNotFoundError를 던지면 NotFoundException으로 매핑된다', async () => {
+    const service = {
+      closeMeeting: jest.fn(async () => {
+        throw new MeetingNotFoundError('abc12xyz');
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const controller = new MeetingController(service as any);
+    await expect(controller.closeMeeting('abc12xyz')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('service의 기타 도메인 에러는 그대로 전파된다(NotFoundException으로 감싸지 않음)', async () => {
+    const service = {
+      closeMeeting: jest.fn(async () => {
+        throw new Error('Meeting is already closed');
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const controller = new MeetingController(service as any);
+    await expect(controller.closeMeeting('abc12xyz')).rejects.toThrow(/already closed/);
   });
 });
