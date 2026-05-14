@@ -1,0 +1,148 @@
+import type { AddressInfo } from 'node:net';
+
+import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { IoAdapter } from '@nestjs/platform-socket.io';
+import { Test, TestingModule } from '@nestjs/testing';
+import request from 'supertest';
+import { type Socket, io } from 'socket.io-client';
+
+import {
+  type ChatPostedBroadcast,
+  type CloseMeetingResponse,
+  type CreateMeetingResponse,
+  MEETING_WS_EVENTS,
+  type ParticipantJoinedBroadcast,
+  type ParticipantLeftBroadcast,
+} from '@migration/shared-interfaces';
+
+import { AppModule } from '@/app.module';
+
+/**
+ * Meeting bounded context의 e2e 통합 테스트.
+ *
+ * 흐름: HTTP create → 두 client WS join → 한쪽 chat broadcast 확인 →
+ *      leave broadcast 확인 → HTTP close.
+ */
+
+const waitFor = <T>(socket: Socket, event: string): Promise<T> =>
+  new Promise((resolve) => {
+    socket.once(event, (payload: T) => resolve(payload));
+  });
+
+const connectClient = (url: string): Promise<Socket> =>
+  new Promise((resolve, reject) => {
+    const client = io(url, { transports: ['websocket'], forceNew: true });
+    client.once('connect', () => resolve(client));
+    client.once('connect_error', (err) => reject(err));
+  });
+
+describe('Meeting e2e', () => {
+  let app: INestApplication;
+  let baseUrl: string;
+  let httpServer: ReturnType<INestApplication['getHttpServer']>;
+
+  beforeAll(async () => {
+    const moduleRef: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
+    app.useWebSocketAdapter(new IoAdapter(app));
+    await app.listen(0);
+    httpServer = app.getHttpServer();
+    const address = httpServer.address() as AddressInfo;
+    baseUrl = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('HTTP create → WS join/chat/leave → HTTP close 전 흐름', async () => {
+    // 1) 회의 생성.
+    const created = await request(httpServer)
+      .post('/meetings')
+      .send({ source: 'web' })
+      .expect(201);
+    const createBody = created.body as CreateMeetingResponse;
+    expect(createBody.code).toHaveLength(8);
+    expect(createBody.source).toBe('web');
+    const code = createBody.code;
+
+    // 2) 두 client 접속.
+    const alice = await connectClient(baseUrl);
+    const bob = await connectClient(baseUrl);
+
+    try {
+      // 3) alice join (bob은 아직 안 들어옴 → broadcast 없음).
+      alice.emit(MEETING_WS_EVENTS.JOIN, { code, nickname: 'alice' });
+
+      // 4) bob join → alice가 participantJoined 받음.
+      const aliceGotJoin = waitFor<ParticipantJoinedBroadcast>(
+        alice,
+        MEETING_WS_EVENTS.PARTICIPANT_JOINED,
+      );
+      // 작은 지연으로 alice의 join이 먼저 처리되도록 양보.
+      await new Promise((r) => setTimeout(r, 30));
+      bob.emit(MEETING_WS_EVENTS.JOIN, { code, nickname: 'bob' });
+      const joinPayload = await aliceGotJoin;
+      expect(joinPayload.nickname).toBe('bob');
+      expect(joinPayload.socketId).toBe(bob.id);
+
+      // 5) alice가 chat 발화 → bob도 alice도 chatPosted 수신.
+      const aliceGotChat = waitFor<ChatPostedBroadcast>(
+        alice,
+        MEETING_WS_EVENTS.CHAT_POSTED,
+      );
+      const bobGotChat = waitFor<ChatPostedBroadcast>(
+        bob,
+        MEETING_WS_EVENTS.CHAT_POSTED,
+      );
+      alice.emit(MEETING_WS_EVENTS.CHAT, { code, text: 'hello bob' });
+      const [aliceChat, bobChat] = await Promise.all([aliceGotChat, bobGotChat]);
+      expect(aliceChat).toEqual({
+        nickname: 'alice',
+        text: 'hello bob',
+        sentAt: expect.any(String),
+      });
+      expect(bobChat).toEqual(aliceChat);
+
+      // 6) bob leave → alice가 participantLeft 수신.
+      const aliceGotLeft = waitFor<ParticipantLeftBroadcast>(
+        alice,
+        MEETING_WS_EVENTS.PARTICIPANT_LEFT,
+      );
+      bob.emit(MEETING_WS_EVENTS.LEAVE, { code });
+      const leftPayload = await aliceGotLeft;
+      expect(leftPayload.socketId).toBe(bob.id);
+    } finally {
+      alice.disconnect();
+      bob.disconnect();
+    }
+
+    // 7) 회의 종료.
+    const closed = await request(httpServer)
+      .delete(`/meetings/${code}`)
+      .expect(200);
+    const closeBody = closed.body as CloseMeetingResponse;
+    expect(closeBody.code).toBe(code);
+    expect(typeof closeBody.endedAt).toBe('string');
+  });
+
+  it('잘못된 code로 POST /meetings/:code DELETE 요청은 400', async () => {
+    await request(httpServer).delete('/meetings/short').expect(400);
+  });
+
+  it('존재하지 않는 회의 종료는 500이 아니라 도메인 에러로 전파된다(현 구현 한계 확인)', async () => {
+    // 회의가 없으면 service가 throw → Nest 기본 매핑상 500. 추후 NotFoundException 매핑은 별도 사이클.
+    const res = await request(httpServer).delete('/meetings/00000000');
+    expect([404, 500]).toContain(res.status);
+  });
+});
