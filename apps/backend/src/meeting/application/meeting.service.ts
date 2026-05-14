@@ -102,8 +102,14 @@ export class MeetingService {
     return { meeting, participant };
   }
 
-  async leaveMeeting(_command: LeaveMeetingCommand): Promise<LeaveMeetingResult> {
-    throw new Error('not implemented');
+  async leaveMeeting(command: LeaveMeetingCommand): Promise<LeaveMeetingResult> {
+    const meeting = await this.requireMeeting(command.code);
+    const participant = meeting.removeParticipant(
+      command.participantId,
+      this.deps.clock.now(),
+    );
+    await this.deps.repository.save(meeting);
+    return { meeting, participant };
   }
 
   async postChat(command: PostChatCommand): Promise<ChatEntry> {
