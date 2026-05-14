@@ -14,6 +14,7 @@ import {
 
 import { MeetingService } from '@/meeting/application/meeting.service';
 import { JoinMeetingDto } from '@/meeting/interface/dto/join-meeting.dto';
+import { LeaveMeetingDto } from '@/meeting/interface/dto/leave-meeting.dto';
 
 const roomOf = (code: string): string => `meeting:${code}`;
 
@@ -51,5 +52,13 @@ export class MeetingGateway {
       joinedAt: participant.joinedAt.toISOString(),
     };
     client.to(room).emit(MEETING_WS_EVENTS.PARTICIPANT_JOINED, broadcast);
+  }
+
+  @SubscribeMessage(MEETING_WS_EVENTS.LEAVE)
+  async handleLeave(
+    @MessageBody() _dto: LeaveMeetingDto,
+    @ConnectedSocket() _client: Socket,
+  ): Promise<void> {
+    throw new Error('not implemented');
   }
 }

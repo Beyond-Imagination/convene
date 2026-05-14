@@ -7,6 +7,7 @@ import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';
 import { externalReference } from '@/shared-kernel/domain/value-objects';
 
 import { JoinMeetingDto } from '@/meeting/interface/dto/join-meeting.dto';
+import { LeaveMeetingDto } from '@/meeting/interface/dto/leave-meeting.dto';
 
 import { MeetingGateway } from './meeting.gateway';
 
@@ -38,6 +39,9 @@ const makeSocket = (id: string) => {
     async join(room: string): Promise<void> {
       joined.add(room);
     },
+    async leave(room: string): Promise<void> {
+      joined.delete(room);
+    },
     to(room: string) {
       return {
         emit(event: string, payload: unknown): boolean {
@@ -54,6 +58,12 @@ const dtoOf = (code = 'abc12xyz', nickname = 'alice'): JoinMeetingDto => {
   const dto = new JoinMeetingDto();
   dto.code = code;
   dto.nickname = nickname;
+  return dto;
+};
+
+const leaveDtoOf = (code = 'abc12xyz'): LeaveMeetingDto => {
+  const dto = new LeaveMeetingDto();
+  dto.code = code;
   return dto;
 };
 
@@ -99,6 +109,57 @@ describe('MeetingGateway.handleJoin', () => {
           socketId: 's1',
           nickname: 'alice',
           joinedAt: t1.toISOString(),
+        },
+      },
+    ]);
+  });
+});
+
+describe('MeetingGateway.handleLeave', () => {
+  const t2 = new Date('2026-01-01T00:02:00Z');
+
+  const makeGateway = () => {
+    const meeting = makeMeeting();
+    const participant = meeting.addParticipant('s1', 'alice', t1);
+    participant.leave(t2);
+    const calls: Array<{ code: string; participantId: string }> = [];
+    const service = {
+      leaveMeeting: jest.fn(async (cmd: { code: string; participantId: string }) => {
+        calls.push(cmd);
+        return { meeting, participant };
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const gateway = new MeetingGateway(service as any);
+    return { gateway, service, calls };
+  };
+
+  it('service.leaveMeeting을 socket.id를 participantId로 호출한다', async () => {
+    const { gateway, calls } = makeGateway();
+    const { socket } = makeSocket('s1');
+    await gateway.handleLeave(leaveDtoOf(), socket as unknown as Socket);
+    expect(calls).toEqual([{ code: 'abc12xyz', participantId: 's1' }]);
+  });
+
+  it('소켓을 meeting:{code} room에서 leave 시킨다', async () => {
+    const { gateway } = makeGateway();
+    const { socket, joined } = makeSocket('s1');
+    joined.add('meeting:abc12xyz');
+    await gateway.handleLeave(leaveDtoOf(), socket as unknown as Socket);
+    expect(joined.has('meeting:abc12xyz')).toBe(false);
+  });
+
+  it('같은 room의 남은 참가자에게 participantLeft 브로드캐스트', async () => {
+    const { gateway } = makeGateway();
+    const { socket, broadcasts } = makeSocket('s1');
+    await gateway.handleLeave(leaveDtoOf(), socket as unknown as Socket);
+    expect(broadcasts).toEqual([
+      {
+        room: 'meeting:abc12xyz',
+        event: MEETING_WS_EVENTS.PARTICIPANT_LEFT,
+        payload: {
+          socketId: 's1',
+          leftAt: t2.toISOString(),
         },
       },
     ]);
