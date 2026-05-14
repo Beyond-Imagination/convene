@@ -10,6 +10,7 @@ import type { Server, Socket } from 'socket.io';
 
 import {
   MEETING_WS_EVENTS,
+  type ChatPostedBroadcast,
   type ParticipantJoinedBroadcast,
   type ParticipantLeftBroadcast,
 } from '@migration/shared-interfaces';
@@ -82,9 +83,21 @@ export class MeetingGateway {
 
   @SubscribeMessage(MEETING_WS_EVENTS.CHAT)
   async handleChat(
-    @MessageBody() _dto: ChatDto,
-    @ConnectedSocket() _client: Socket,
+    @MessageBody() dto: ChatDto,
+    @ConnectedSocket() client: Socket,
   ): Promise<void> {
-    throw new Error('not implemented');
+    const entry = await this.service.postChat({
+      code: dto.code,
+      participantId: client.id,
+      text: dto.text,
+    });
+    const room = roomOf(dto.code);
+    const broadcast: ChatPostedBroadcast = {
+      nickname: entry.nickname,
+      text: entry.text,
+      sentAt: entry.sentAt.toISOString(),
+    };
+    // 자신도 자기 메시지를 받아야 하므로 client.to가 아닌 server.to를 사용.
+    this.server.to(room).emit(MEETING_WS_EVENTS.CHAT_POSTED, broadcast);
   }
 }
