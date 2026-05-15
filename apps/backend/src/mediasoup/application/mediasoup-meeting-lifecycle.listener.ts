@@ -1,0 +1,61 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
+
+import { MEETING_EVENTS } from '@migration/shared-interfaces';
+
+import { MediasoupSignalingService } from './mediasoup-signaling.service';
+
+interface MeetingCreatedPayload {
+  code: string;
+}
+interface ParticipantJoinedPayload {
+  code: string;
+  participantId: string;
+}
+interface ParticipantLeftPayload {
+  code: string;
+  participantId: string;
+}
+interface MeetingEndedPayload {
+  code: string;
+}
+
+/**
+ * Meeting BC 의 도메인 이벤트를 구독해 Mediasoup BC 의 lifecycle 을
+ * 트리거하는 application listener.
+ *
+ * 이로써 Meeting BC 와 Mediasoup BC 는 코드 의존 없이 이벤트로만 결합한다
+ * (CLAUDE.md hard rule 7 — cross-context coupling only via Domain Events).
+ */
+@Injectable()
+export class MediasoupMeetingLifecycleListener {
+  private readonly logger = new Logger(MediasoupMeetingLifecycleListener.name);
+
+  constructor(private readonly service: MediasoupSignalingService) {}
+
+  @OnEvent(MEETING_EVENTS.CREATED)
+  async onMeetingCreated(payload: MeetingCreatedPayload): Promise<void> {
+    await this.service.openRoom({ meetingCode: payload.code });
+  }
+
+  @OnEvent(MEETING_EVENTS.PARTICIPANT_JOINED)
+  async onParticipantJoined(payload: ParticipantJoinedPayload): Promise<void> {
+    await this.service.admitParticipant({
+      meetingCode: payload.code,
+      participantId: payload.participantId,
+    });
+  }
+
+  @OnEvent(MEETING_EVENTS.PARTICIPANT_LEFT)
+  async onParticipantLeft(payload: ParticipantLeftPayload): Promise<void> {
+    await this.service.dismissParticipant({
+      meetingCode: payload.code,
+      participantId: payload.participantId,
+    });
+  }
+
+  @OnEvent(MEETING_EVENTS.ENDED)
+  async onMeetingEnded(payload: MeetingEndedPayload): Promise<void> {
+    await this.service.closeRoom({ meetingCode: payload.code });
+  }
+}
