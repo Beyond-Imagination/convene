@@ -10,6 +10,9 @@ import {
   type ChatPostedBroadcast,
   type CloseMeetingResponse,
   type CreateMeetingResponse,
+  type CreateTransportResponse,
+  type GetRtpCapabilitiesResponse,
+  MEDIASOUP_WS_EVENTS,
   MEETING_WS_EVENTS,
   type ParticipantJoinedBroadcast,
   type ParticipantLeftBroadcast,
@@ -142,6 +145,43 @@ describe('Meeting e2e', () => {
 
   it('존재하지 않는 회의 종료는 404 NotFound로 매핑된다', async () => {
     await request(httpServer).delete('/meetings/00000000').expect(404);
+  });
+
+  it('HTTP create → WS join → mediasoup:getRtpCapabilities + createTransport 까지 시그널링 동작', async () => {
+    const created = await request(httpServer)
+      .post('/meetings')
+      .send({ source: 'web' })
+      .expect(201);
+    const code = (created.body as CreateMeetingResponse).code;
+
+    const alice = await connectClient(baseUrl);
+    try {
+      alice.emit(MEETING_WS_EVENTS.JOIN, { code, nickname: 'alice' });
+      // Meeting BC join 처리 후 mediasoup admitParticipant lifecycle 이 완료될 시간 양보.
+      await new Promise((r) => setTimeout(r, 80));
+
+      const caps = (await alice.emitWithAck(MEDIASOUP_WS_EVENTS.GET_RTP_CAPABILITIES, {
+        code,
+      })) as GetRtpCapabilitiesResponse;
+      expect(caps).toHaveProperty('rtpCapabilities');
+      expect((caps.rtpCapabilities as { codecs?: unknown[] }).codecs).toBeDefined();
+
+      const transport = (await alice.emitWithAck(MEDIASOUP_WS_EVENTS.CREATE_TRANSPORT, {
+        code,
+        direction: 'send',
+      })) as CreateTransportResponse;
+      expect(typeof transport.id).toBe('string');
+      expect(transport.id.length).toBeGreaterThan(0);
+      expect(transport.iceParameters).toEqual(
+        expect.objectContaining({
+          usernameFragment: expect.any(String),
+        }),
+      );
+    } finally {
+      alice.disconnect();
+    }
+
+    await request(httpServer).delete(`/meetings/${code}`).expect(200);
   });
 
   it('잘못된 WS payload는 exception 이벤트로 client에 전달되고 broadcast는 발생하지 않는다', async () => {
