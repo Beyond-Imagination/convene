@@ -1,6 +1,7 @@
 import {
   ConsumeResponse,
   CreateTransportResponse,
+  MEDIASOUP_EVENTS,
   MediaType,
   TransportDirection,
 } from '@migration/shared-interfaces';
@@ -12,6 +13,8 @@ import {
   ParticipantMediaRepository,
 } from '@/mediasoup/domain/ports';
 import { DomainEventPublisher } from '@/shared-kernel/domain/ports';
+
+import { ParticipantMediaNotFoundError } from './mediasoup.errors';
 
 /**
  * Mediasoup Bounded Context 의 Application Service.
@@ -66,51 +69,131 @@ export interface ResumeConsumerCommand extends ParticipantCommand {
 }
 
 export class MediasoupSignalingService {
-  constructor(private readonly _deps: MediasoupSignalingServiceDeps) {}
+  constructor(private readonly deps: MediasoupSignalingServiceDeps) {}
 
   // ---------- room lifecycle ----------
 
-  async openRoom(_cmd: RoomCommand): Promise<void> {
-    throw new Error('not implemented');
+  async openRoom(command: RoomCommand): Promise<void> {
+    await this.deps.routerPort.createRoom(command.meetingCode);
   }
 
-  async closeRoom(_cmd: RoomCommand): Promise<void> {
-    throw new Error('not implemented');
+  async closeRoom(command: RoomCommand): Promise<void> {
+    await this.deps.participantMediaRepository.removeAllByMeetingCode(command.meetingCode);
+    await this.deps.routerPort.closeRoom(command.meetingCode);
   }
 
   // ---------- participant lifecycle ----------
 
-  async admitParticipant(_cmd: ParticipantCommand): Promise<ParticipantMedia> {
-    throw new Error('not implemented');
+  async admitParticipant(command: ParticipantCommand): Promise<ParticipantMedia> {
+    const routerIndex = await this.deps.routerPort.assignParticipant(
+      command.meetingCode,
+      command.participantId,
+    );
+    const media = ParticipantMedia.spawn({
+      participantId: command.participantId,
+      meetingCode: command.meetingCode,
+      routerIndex,
+    });
+    await this.deps.participantMediaRepository.save(media);
+    return media;
   }
 
-  async dismissParticipant(_cmd: ParticipantCommand): Promise<void> {
-    throw new Error('not implemented');
+  async dismissParticipant(command: ParticipantCommand): Promise<void> {
+    const existing = await this.deps.participantMediaRepository.findByParticipantId(
+      command.participantId,
+    );
+    if (existing) {
+      if (!existing.isClosed) existing.close();
+      await this.deps.participantMediaRepository.removeByParticipantId(command.participantId);
+    }
+    await this.deps.routerPort.releaseParticipant(command.meetingCode, command.participantId);
   }
 
   // ---------- signaling RPC ----------
 
-  async getRtpCapabilities(_cmd: RoomCommand): Promise<unknown> {
-    throw new Error('not implemented');
+  async getRtpCapabilities(command: RoomCommand): Promise<unknown> {
+    return this.deps.routerPort.getRtpCapabilities(command.meetingCode);
   }
 
-  async createTransport(_cmd: CreateTransportCommand): Promise<CreateTransportResponse> {
-    throw new Error('not implemented');
+  async createTransport(command: CreateTransportCommand): Promise<CreateTransportResponse> {
+    const media = await this.requireParticipantMedia(command.participantId);
+    const res = await this.deps.transportPort.createWebRtcTransport({
+      meetingCode: command.meetingCode,
+      participantId: command.participantId,
+      direction: command.direction,
+    });
+    media.attachTransport(command.direction, res.id);
+    await this.deps.participantMediaRepository.save(media);
+    return res;
   }
 
-  async connectTransport(_cmd: ConnectTransportCommand): Promise<void> {
-    throw new Error('not implemented');
+  async connectTransport(command: ConnectTransportCommand): Promise<void> {
+    await this.deps.transportPort.connectTransport(command.transportId, command.dtlsParameters);
   }
 
-  async produce(_cmd: ProduceCommand): Promise<{ producerId: string }> {
-    throw new Error('not implemented');
+  async produce(command: ProduceCommand): Promise<{ producerId: string }> {
+    const media = await this.requireParticipantMedia(command.participantId);
+    const { producerId } = await this.deps.transportPort.produce({
+      meetingCode: command.meetingCode,
+      participantId: command.participantId,
+      transportId: command.transportId,
+      kind: command.kind,
+      source: command.source,
+      rtpParameters: command.rtpParameters,
+    });
+    media.addProducer(producerId, { kind: command.kind, source: command.source });
+    await this.deps.participantMediaRepository.save(media);
+    this.deps.eventPublisher.publish(MEDIASOUP_EVENTS.PRODUCER_CREATED, {
+      meetingCode: command.meetingCode,
+      participantId: command.participantId,
+      producerId,
+      kind: command.kind,
+      source: command.source,
+    });
+    return { producerId };
   }
 
-  async consume(_cmd: ConsumeCommand): Promise<ConsumeResponse> {
-    throw new Error('not implemented');
+  async consume(command: ConsumeCommand): Promise<ConsumeResponse> {
+    const media = await this.requireParticipantMedia(command.participantId);
+    const source = await this.lookupProducerSource(command.meetingCode, command.producerId);
+    if (source === null) {
+      throw new Error(
+        `Producer "${command.producerId}" not found in meeting "${command.meetingCode}"`,
+      );
+    }
+    const res = await this.deps.transportPort.consume({
+      meetingCode: command.meetingCode,
+      participantId: command.participantId,
+      transportId: command.transportId,
+      producerId: command.producerId,
+      rtpCapabilities: command.rtpCapabilities,
+    });
+    media.addConsumer(res.id, { producerId: command.producerId, kind: res.kind, source });
+    await this.deps.participantMediaRepository.save(media);
+    return res;
   }
 
-  async resumeConsumer(_cmd: ResumeConsumerCommand): Promise<void> {
-    throw new Error('not implemented');
+  async resumeConsumer(command: ResumeConsumerCommand): Promise<void> {
+    await this.deps.transportPort.resumeConsumer(command.consumerId);
+  }
+
+  private async requireParticipantMedia(participantId: string): Promise<ParticipantMedia> {
+    const media = await this.deps.participantMediaRepository.findByParticipantId(participantId);
+    if (!media) {
+      throw new ParticipantMediaNotFoundError(participantId);
+    }
+    return media;
+  }
+
+  private async lookupProducerSource(
+    meetingCode: string,
+    producerId: string,
+  ): Promise<MediaType | null> {
+    const peers = await this.deps.participantMediaRepository.findByMeetingCode(meetingCode);
+    for (const peer of peers) {
+      const producer = peer.producers.find((p) => p.id === producerId);
+      if (producer) return producer.source;
+    }
+    return null;
   }
 }
