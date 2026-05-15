@@ -45,7 +45,7 @@ describe('MeetingService.createMeeting', () => {
 
   const makeService = () => {
     const saved: Meeting[] = [];
-    const { publisher } = makeEventPublisher();
+    const { events, publisher } = makeEventPublisher();
     const service = new MeetingService({
       repository: {
         save: async (m) => {
@@ -58,7 +58,7 @@ describe('MeetingService.createMeeting', () => {
       clock: { now: () => fakeNow },
       eventPublisher: publisher,
     });
-    return { service, saved };
+    return { service, saved, events };
   };
 
   it('CodeGenerator로 받은 code와 Clock.now()로 Meeting을 생성한다', async () => {
@@ -102,6 +102,17 @@ describe('MeetingService.createMeeting', () => {
     expect(result.externalReference).toBe(ref);
     expect(result.source).toBe('notion-issue');
   });
+
+  it('생성 후 meeting.created 도메인 이벤트를 발행한다', async () => {
+    const { service, events } = makeService();
+    await service.createMeeting({ source: 'web', externalReference: externalReference() });
+    expect(events).toEqual([
+      {
+        name: MEETING_EVENTS.CREATED,
+        payload: { code: code.value, source: 'web', startedAt: fakeNow },
+      },
+    ]);
+  });
 });
 
 describe('MeetingService.joinMeeting', () => {
@@ -110,7 +121,7 @@ describe('MeetingService.joinMeeting', () => {
 
   const makeService = (meeting: Meeting | null) => {
     const saved: Meeting[] = [];
-    const { publisher } = makeEventPublisher();
+    const { events, publisher } = makeEventPublisher();
     const service = new MeetingService({
       repository: {
         findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
@@ -123,7 +134,7 @@ describe('MeetingService.joinMeeting', () => {
       clock: { now: () => t1 },
       eventPublisher: publisher,
     });
-    return { service, saved };
+    return { service, saved, events };
   };
 
   it('해당 code 회의에 참가자를 추가하고 Meeting+Participant를 반환한다', async () => {
@@ -164,6 +175,18 @@ describe('MeetingService.joinMeeting', () => {
       service.joinMeeting({ code: 'abc12xyz', participantId: 's1', nickname: 'alice' }),
     ).rejects.toThrow(/already closed/);
   });
+
+  it('성공 시 meeting.participant.joined 도메인 이벤트를 발행한다', async () => {
+    const meeting = makeMeeting(t0);
+    const { service, events } = makeService(meeting);
+    await service.joinMeeting({ code: 'abc12xyz', participantId: 's1', nickname: 'alice' });
+    expect(events).toEqual([
+      {
+        name: MEETING_EVENTS.PARTICIPANT_JOINED,
+        payload: { code: 'abc12xyz', participantId: 's1', nickname: 'alice', joinedAt: t1 },
+      },
+    ]);
+  });
 });
 
 describe('MeetingService.leaveMeeting', () => {
@@ -179,7 +202,7 @@ describe('MeetingService.leaveMeeting', () => {
 
   const makeService = (meeting: Meeting | null) => {
     const saved: Meeting[] = [];
-    const { publisher } = makeEventPublisher();
+    const { events, publisher } = makeEventPublisher();
     const service = new MeetingService({
       repository: {
         findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
@@ -192,7 +215,7 @@ describe('MeetingService.leaveMeeting', () => {
       clock: { now: () => t2 },
       eventPublisher: publisher,
     });
-    return { service, saved };
+    return { service, saved, events };
   };
 
   it('해당 code 회의의 참가자를 leave 처리하고 Meeting+떠난 Participant를 반환한다', async () => {
@@ -220,6 +243,18 @@ describe('MeetingService.leaveMeeting', () => {
     await expect(
       service.leaveMeeting({ code: 'abc12xyz', participantId: 'unknown' }),
     ).rejects.toThrow(/not found/);
+  });
+
+  it('성공 시 meeting.participant.left 도메인 이벤트를 발행한다', async () => {
+    const meeting = makeMeetingWithParticipant();
+    const { service, events } = makeService(meeting);
+    await service.leaveMeeting({ code: 'abc12xyz', participantId: 's1' });
+    expect(events).toEqual([
+      {
+        name: MEETING_EVENTS.PARTICIPANT_LEFT,
+        payload: { code: 'abc12xyz', participantId: 's1', leftAt: t2 },
+      },
+    ]);
   });
 });
 

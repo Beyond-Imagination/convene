@@ -81,14 +81,20 @@ export class MeetingService {
 
   async createMeeting(command: CreateMeetingCommand): Promise<Meeting> {
     const code = this.deps.codeGenerator.next();
+    const startedAt = this.deps.clock.now();
     const meeting = Meeting.create({
       code,
       source: command.source,
       externalReference: command.externalReference,
       idleTimeout: IdleTimeout.default(),
-      startedAt: this.deps.clock.now(),
+      startedAt,
     });
     await this.deps.repository.save(meeting);
+    this.deps.eventPublisher.publish(MEETING_EVENTS.CREATED, {
+      code: code.value,
+      source: command.source,
+      startedAt,
+    });
     return meeting;
   }
 
@@ -100,6 +106,12 @@ export class MeetingService {
       this.deps.clock.now(),
     );
     await this.deps.repository.save(meeting);
+    this.deps.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_JOINED, {
+      code: command.code,
+      participantId: participant.id,
+      nickname: participant.nickname,
+      joinedAt: participant.joinedAt,
+    });
     return { meeting, participant };
   }
 
@@ -110,6 +122,11 @@ export class MeetingService {
       this.deps.clock.now(),
     );
     await this.deps.repository.save(meeting);
+    this.deps.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_LEFT, {
+      code: command.code,
+      participantId: participant.id,
+      leftAt: participant.leftAt,
+    });
     return { meeting, participant };
   }
 
