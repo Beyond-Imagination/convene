@@ -1,4 +1,5 @@
 import { Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import * as mediasoup from 'mediasoup';
 import { Worker, WorkerLogLevel, WorkerLogTag } from 'mediasoup/node/lib/types';
 
 export interface MediasoupWorkerPoolOptions {
@@ -29,11 +30,29 @@ export class MediasoupWorkerPool implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly options: MediasoupWorkerPoolOptions) {}
 
   async onModuleInit(): Promise<void> {
-    throw new Error('not implemented');
+    for (let i = 0; i < this.options.numWorkers; i += 1) {
+      const worker = await mediasoup.createWorker({
+        rtcMinPort: this.options.worker.rtcMinPort,
+        rtcMaxPort: this.options.worker.rtcMaxPort,
+        logLevel: this.options.worker.logLevel,
+        logTags: this.options.worker.logTags,
+      });
+      worker.on('died', () => {
+        this.logger.error(
+          `mediasoup worker (pid=${worker.pid}) died — exiting process for supervisor restart`,
+        );
+        process.exit(1);
+      });
+      this.workers.push(worker);
+    }
+    this.logger.log(`mediasoup workers ready (count=${this.workers.length})`);
   }
 
   async onModuleDestroy(): Promise<void> {
-    throw new Error('not implemented');
+    for (const worker of this.workers) {
+      if (!worker.closed) worker.close();
+    }
+    this.workers.length = 0;
   }
 
   get size(): number {
@@ -41,6 +60,11 @@ export class MediasoupWorkerPool implements OnModuleInit, OnModuleDestroy {
   }
 
   getNextWorker(): Worker {
-    throw new Error('not implemented');
+    if (this.workers.length === 0) {
+      throw new Error('MediasoupWorkerPool not initialized (call onModuleInit first)');
+    }
+    const worker = this.workers[this.nextIdx];
+    this.nextIdx = (this.nextIdx + 1) % this.workers.length;
+    return worker;
   }
 }
