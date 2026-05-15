@@ -106,6 +106,29 @@ describe('MediasoupRouterAdapter', () => {
     }
   });
 
+  it('getParticipantRouter 는 assignParticipant 결과의 router 와 동일 인스턴스를 돌려준다', async () => {
+    const { adapter, cleanup } = await setup(1, 2);
+    try {
+      await adapter.createRoom('CODE1111');
+      const idx = await adapter.assignParticipant('CODE1111', 's1');
+      expect(adapter.getParticipantRouter('CODE1111', 's1')).toBe(
+        adapter.getRouterFor('CODE1111', idx),
+      );
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('assign 안 된 참가자의 getParticipantRouter 는 throw 한다', async () => {
+    const { adapter, cleanup } = await setup(1, 1);
+    try {
+      await adapter.createRoom('CODE1111');
+      expect(() => adapter.getParticipantRouter('CODE1111', 's-no')).toThrow();
+    } finally {
+      await cleanup();
+    }
+  });
+
   it('서로 다른 회의의 router 풀은 독립적이다', async () => {
     const { adapter, cleanup } = await setup(2, 1);
     try {

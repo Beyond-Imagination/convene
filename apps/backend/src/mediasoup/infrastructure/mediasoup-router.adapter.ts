@@ -92,4 +92,15 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
     }
     return list[routerIndex];
   }
+
+  /** 참가자에게 할당된 router 를 lookup. TransportAdapter 가 transport 를 만들 때 호출. */
+  getParticipantRouter(meetingCode: string, participantId: string): Router {
+    const assignment = this.assignments.get(meetingCode)?.get(participantId);
+    if (assignment === undefined) {
+      throw new Error(
+        `MediasoupRouterAdapter: participant "${participantId}" not assigned in room "${meetingCode}"`,
+      );
+    }
+    return this.getRouterFor(meetingCode, assignment);
+  }
 }
