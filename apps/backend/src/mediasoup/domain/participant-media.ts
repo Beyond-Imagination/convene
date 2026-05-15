@@ -49,54 +49,146 @@ export interface SpawnParticipantMediaInput {
 }
 
 export class ParticipantMedia {
-  static spawn(_input: SpawnParticipantMediaInput): ParticipantMedia {
-    throw new Error('not implemented');
+  private _sendTransportId: string | null = null;
+  private _recvTransportId: string | null = null;
+  private readonly _producers = new Map<string, ProducerEntry>();
+  private readonly _consumers = new Map<string, ConsumerEntry>();
+  private _closed = false;
+
+  private constructor(
+    public readonly participantId: string,
+    public readonly meetingCode: string,
+    public readonly routerIndex: number,
+  ) {}
+
+  static spawn(input: SpawnParticipantMediaInput): ParticipantMedia {
+    const { participantId, meetingCode, routerIndex } = input;
+    if (!participantId || participantId.trim() === '') {
+      throw new Error('ParticipantMedia.participantId must be a non-empty string');
+    }
+    if (!meetingCode || meetingCode.trim() === '') {
+      throw new Error('ParticipantMedia.meetingCode must be a non-empty string');
+    }
+    if (!Number.isInteger(routerIndex) || routerIndex < 0) {
+      throw new Error(
+        `ParticipantMedia.routerIndex must be a non-negative integer, got ${routerIndex}`,
+      );
+    }
+    return new ParticipantMedia(participantId, meetingCode, routerIndex);
   }
 
-  get participantId(): string {
-    throw new Error('not implemented');
-  }
-  get meetingCode(): string {
-    throw new Error('not implemented');
-  }
-  get routerIndex(): number {
-    throw new Error('not implemented');
-  }
   get sendTransportId(): string | null {
-    throw new Error('not implemented');
+    return this._sendTransportId;
   }
   get recvTransportId(): string | null {
-    throw new Error('not implemented');
+    return this._recvTransportId;
   }
   get producers(): ProducerEntry[] {
-    throw new Error('not implemented');
+    return Array.from(this._producers.values());
   }
   get consumers(): ConsumerEntry[] {
-    throw new Error('not implemented');
+    return Array.from(this._consumers.values());
   }
   get isClosed(): boolean {
-    throw new Error('not implemented');
+    return this._closed;
   }
 
-  attachTransport(_direction: TransportDirection, _transportId: string): void {
-    throw new Error('not implemented');
+  attachTransport(direction: TransportDirection, transportId: string): void {
+    this.assertNotClosed();
+    if (!transportId || transportId.trim() === '') {
+      throw new Error('ParticipantMedia.transportId must be a non-empty string');
+    }
+    if (direction === 'send') {
+      if (this._sendTransportId !== null) {
+        throw new Error(
+          `ParticipantMedia(${this.participantId}) already has a send transport`,
+        );
+      }
+      this._sendTransportId = transportId;
+      return;
+    }
+    if (this._recvTransportId !== null) {
+      throw new Error(
+        `ParticipantMedia(${this.participantId}) already has a recv transport`,
+      );
+    }
+    this._recvTransportId = transportId;
   }
-  addProducer(_id: string, _info: ProducerInfo): void {
-    throw new Error('not implemented');
+
+  addProducer(id: string, info: ProducerInfo): void {
+    this.assertNotClosed();
+    if (this._sendTransportId === null) {
+      throw new Error(
+        `ParticipantMedia(${this.participantId}) cannot add producer without send transport`,
+      );
+    }
+    if (this._producers.has(id)) {
+      throw new Error(
+        `ParticipantMedia(${this.participantId}) already has producer ${id}`,
+      );
+    }
+    this._producers.set(id, { id, kind: info.kind, source: info.source });
   }
-  removeProducer(_id: string): void {
-    throw new Error('not implemented');
+
+  removeProducer(id: string): void {
+    this.assertNotClosed();
+    if (!this._producers.has(id)) {
+      throw new Error(`ParticipantMedia(${this.participantId}) has no producer ${id}`);
+    }
+    this._producers.delete(id);
   }
-  addConsumer(_id: string, _info: ConsumerInfo): void {
-    throw new Error('not implemented');
+
+  addConsumer(id: string, info: ConsumerInfo): void {
+    this.assertNotClosed();
+    if (this._recvTransportId === null) {
+      throw new Error(
+        `ParticipantMedia(${this.participantId}) cannot add consumer without recv transport`,
+      );
+    }
+    if (this._consumers.has(id)) {
+      throw new Error(
+        `ParticipantMedia(${this.participantId}) already has consumer ${id}`,
+      );
+    }
+    this._consumers.set(id, {
+      id,
+      producerId: info.producerId,
+      kind: info.kind,
+      source: info.source,
+    });
   }
-  removeConsumer(_id: string): void {
-    throw new Error('not implemented');
+
+  removeConsumer(id: string): void {
+    this.assertNotClosed();
+    if (!this._consumers.has(id)) {
+      throw new Error(`ParticipantMedia(${this.participantId}) has no consumer ${id}`);
+    }
+    this._consumers.delete(id);
   }
+
   close(): void {
-    throw new Error('not implemented');
+    if (this._closed) {
+      throw new Error(`ParticipantMedia(${this.participantId}) already closed`);
+    }
+    this._closed = true;
   }
+
   snapshot(): ParticipantMediaSnapshot {
-    throw new Error('not implemented');
+    return {
+      participantId: this.participantId,
+      meetingCode: this.meetingCode,
+      routerIndex: this.routerIndex,
+      sendTransportId: this._sendTransportId,
+      recvTransportId: this._recvTransportId,
+      producers: this.producers,
+      consumers: this.consumers,
+      closed: this._closed,
+    };
+  }
+
+  private assertNotClosed(): void {
+    if (this._closed) {
+      throw new Error(`ParticipantMedia(${this.participantId}) is closed`);
+    }
   }
 }
