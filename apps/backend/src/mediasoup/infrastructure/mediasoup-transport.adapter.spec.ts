@@ -1,7 +1,5 @@
 import { RtpCodecCapability, WorkerLogLevel, WorkerLogTag } from 'mediasoup/node/lib/types';
 
-import { ParticipantMedia } from '@/mediasoup/domain/participant-media';
-
 import { MediasoupRouterAdapter } from './mediasoup-router.adapter';
 import { MediasoupTransportAdapter } from './mediasoup-transport.adapter';
 import { MediasoupWorkerPool } from './mediasoup-worker.pool';
@@ -31,6 +29,7 @@ const setup = async () => {
     initialAvailableOutgoingBitrate: 1_000_000,
   });
   await routerAdapter.createRoom('CODE1111');
+  await routerAdapter.assignParticipant('CODE1111', 's1');
   return {
     pool,
     routerAdapter,
@@ -46,13 +45,6 @@ describe('MediasoupTransportAdapter', () => {
   it('createWebRtcTransport 는 회의의 router 위에서 transport 를 만들고 wire format 응답을 반환한다', async () => {
     const { transportAdapter, cleanup } = await setup();
     try {
-      // routerIndex 0 사용 (회의의 첫 router)
-      const _media = ParticipantMedia.spawn({
-        participantId: 's1',
-        meetingCode: 'CODE1111',
-        routerIndex: 0,
-      });
-
       const res = await transportAdapter.createWebRtcTransport({
         meetingCode: 'CODE1111',
         participantId: 's1',
@@ -61,7 +53,6 @@ describe('MediasoupTransportAdapter', () => {
 
       expect(typeof res.id).toBe('string');
       expect(res.id.length).toBeGreaterThan(0);
-      // iceParameters 는 usernameFragment·password 를 포함하는 객체
       expect(res.iceParameters).toEqual(
         expect.objectContaining({
           usernameFragment: expect.any(String),
@@ -70,12 +61,24 @@ describe('MediasoupTransportAdapter', () => {
       );
       expect(Array.isArray(res.iceCandidates)).toBe(true);
       expect((res.iceCandidates as unknown[]).length).toBeGreaterThan(0);
-      // dtlsParameters 는 fingerprints 배열을 포함
       expect(res.dtlsParameters).toEqual(
         expect.objectContaining({ fingerprints: expect.any(Array) }),
       );
+    } finally {
+      await cleanup();
+    }
+  });
 
-      void _media;
+  it('assign 안 된 참가자의 createWebRtcTransport 는 throw 한다', async () => {
+    const { transportAdapter, cleanup } = await setup();
+    try {
+      await expect(
+        transportAdapter.createWebRtcTransport({
+          meetingCode: 'CODE1111',
+          participantId: 's-no',
+          direction: 'send',
+        }),
+      ).rejects.toThrow();
     } finally {
       await cleanup();
     }

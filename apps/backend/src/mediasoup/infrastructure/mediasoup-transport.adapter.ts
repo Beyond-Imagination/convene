@@ -29,10 +29,12 @@ export interface MediasoupTransportAdapterOptions {
 /**
  * `MediaTransportPort` 의 mediasoup 어댑터.
  *
- * `MediasoupRouterAdapter.getRouterFor(code, routerIndex)` 로 회의·참가자에
- * 매핑된 router 를 찾아 그 위에서 `WebRtcTransport`/`Producer`/`Consumer`
- * 를 생성한다. 참가자의 routerIndex 는 application service 가 보유한
- * `ParticipantMedia.routerIndex` 에서 가져온다.
+ * `MediasoupRouterAdapter.getParticipantRouter(code, participantId)` 로
+ * 회의·참가자에 매핑된 router 를 찾아 그 위에서 `WebRtcTransport`/`Producer`/
+ * `Consumer` 를 생성한다.
+ *
+ * mediasoup 객체는 본 어댑터 내부 Map 에만 보관되고, application/domain 으로는
+ * 식별자(string) 와 wire format 응답만 노출한다.
  */
 export class MediasoupTransportAdapter implements MediaTransportPort {
   private readonly logger = new Logger(MediasoupTransportAdapter.name);
@@ -45,31 +47,94 @@ export class MediasoupTransportAdapter implements MediaTransportPort {
     private readonly options: MediasoupTransportAdapterOptions,
   ) {}
 
-  async createWebRtcTransport(_input: CreateWebRtcTransportInput): Promise<CreateTransportResponse> {
-    throw new Error('not implemented');
+  async createWebRtcTransport(input: CreateWebRtcTransportInput): Promise<CreateTransportResponse> {
+    const router = this.routerAdapter.getParticipantRouter(input.meetingCode, input.participantId);
+    const transport = await router.createWebRtcTransport({
+      listenIps: this.options.listenIps,
+      enableUdp: this.options.enableUdp,
+      enableTcp: this.options.enableTcp,
+      preferUdp: this.options.preferUdp,
+      initialAvailableOutgoingBitrate: this.options.initialAvailableOutgoingBitrate,
+      appData: { ownerId: input.participantId, direction: input.direction },
+    });
+    this.transports.set(transport.id, transport);
+    transport.observer.on('close', () => {
+      this.transports.delete(transport.id);
+    });
+    return {
+      id: transport.id,
+      iceParameters: transport.iceParameters,
+      iceCandidates: transport.iceCandidates,
+      dtlsParameters: transport.dtlsParameters,
+    };
   }
 
-  async connectTransport(_transportId: string, _dtlsParameters: unknown): Promise<void> {
-    throw new Error('not implemented');
+  async connectTransport(transportId: string, dtlsParameters: unknown): Promise<void> {
+    const transport = this.requireTransport(transportId);
+    await transport.connect({ dtlsParameters: dtlsParameters as DtlsParameters });
   }
 
-  async produce(_input: ProduceInput): Promise<{ producerId: string }> {
-    throw new Error('not implemented');
+  async produce(input: ProduceInput): Promise<{ producerId: string }> {
+    const transport = this.requireTransport(input.transportId);
+    const producer = await transport.produce({
+      kind: input.kind,
+      rtpParameters: input.rtpParameters as RtpParameters,
+      appData: { ownerId: input.participantId, source: input.source },
+    });
+    this.producers.set(producer.id, producer);
+    producer.observer.on('close', () => {
+      this.producers.delete(producer.id);
+    });
+    return { producerId: producer.id };
   }
 
-  async consume(_input: ConsumeInput): Promise<ConsumeResponse> {
-    throw new Error('not implemented');
+  async consume(input: ConsumeInput): Promise<ConsumeResponse> {
+    const transport = this.requireTransport(input.transportId);
+    const producer = this.producers.get(input.producerId);
+    if (!producer) {
+      throw new Error(`MediasoupTransportAdapter: producer "${input.producerId}" not found`);
+    }
+    const consumer = await transport.consume({
+      producerId: input.producerId,
+      rtpCapabilities: input.rtpCapabilities as RtpCapabilities,
+      paused: true,
+      appData: { ownerId: input.participantId },
+    });
+    this.consumers.set(consumer.id, consumer);
+    consumer.observer.on('close', () => {
+      this.consumers.delete(consumer.id);
+    });
+    return {
+      id: consumer.id,
+      producerId: input.producerId,
+      kind: consumer.kind as 'audio' | 'video',
+      rtpParameters: consumer.rtpParameters,
+    };
   }
 
-  async resumeConsumer(_consumerId: string): Promise<void> {
-    throw new Error('not implemented');
+  async resumeConsumer(consumerId: string): Promise<void> {
+    const consumer = this.consumers.get(consumerId);
+    if (!consumer) {
+      throw new Error(`MediasoupTransportAdapter: consumer "${consumerId}" not found`);
+    }
+    await consumer.resume();
   }
 
-  async closeProducer(_producerId: string): Promise<void> {
-    throw new Error('not implemented');
+  async closeProducer(producerId: string): Promise<void> {
+    const producer = this.producers.get(producerId);
+    if (producer && !producer.closed) producer.close();
   }
 
-  async closeTransport(_transportId: string): Promise<void> {
-    throw new Error('not implemented');
+  async closeTransport(transportId: string): Promise<void> {
+    const transport = this.transports.get(transportId);
+    if (transport && !transport.closed) transport.close();
+  }
+
+  private requireTransport(transportId: string): WebRtcTransport {
+    const transport = this.transports.get(transportId);
+    if (!transport || transport.closed) {
+      throw new Error(`MediasoupTransportAdapter: transport "${transportId}" not found`);
+    }
+    return transport;
   }
 }
