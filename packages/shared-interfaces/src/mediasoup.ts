@@ -1,0 +1,123 @@
+/**
+ * Mediasoup bounded context의 WebSocket wire format.
+ *
+ * 본 파일은 frontend ↔ backend가 공유하는 **순수 TS 인터페이스 / literal 타입**만
+ * 정의한다. mediasoup 라이브러리에 의존하지 않기 위해 RTP 관련 구조체는
+ * `unknown` 으로 노출하고, 양측이 각자의 라이브러리 타입
+ * (`mediasoup/node/lib/types` / `mediasoup-client/lib/types`)으로 cast 한다.
+ */
+
+export const MEDIA_TYPES = ['audio', 'video', 'screen'] as const;
+export type MediaType = (typeof MEDIA_TYPES)[number];
+
+/**
+ * Mediasoup bounded context의 WebSocket 이벤트 이름.
+ *
+ * 도메인 이벤트(`meeting.*` dot prefix)와 구분하기 위해 colon prefix를 사용한다.
+ *   - `mediasoup:getRtpCapabilities` / `mediasoup:createTransport` /
+ *     `mediasoup:connectTransport` / `mediasoup:produce` / `mediasoup:consume` /
+ *     `mediasoup:resumeConsumer`
+ *     — client → server 요청 (Socket.IO ack 기반 RPC)
+ *   - `mediasoup:newProducer` / `mediasoup:producerClosed` / `mediasoup:consumerClosed`
+ *     — server → client 브로드캐스트
+ */
+export const MEDIASOUP_WS_EVENTS = {
+  GET_RTP_CAPABILITIES: 'mediasoup:getRtpCapabilities',
+  CREATE_TRANSPORT: 'mediasoup:createTransport',
+  CONNECT_TRANSPORT: 'mediasoup:connectTransport',
+  PRODUCE: 'mediasoup:produce',
+  CONSUME: 'mediasoup:consume',
+  RESUME_CONSUMER: 'mediasoup:resumeConsumer',
+  NEW_PRODUCER: 'mediasoup:newProducer',
+  PRODUCER_CLOSED: 'mediasoup:producerClosed',
+  CONSUMER_CLOSED: 'mediasoup:consumerClosed',
+} as const;
+
+export type MediasoupWsEventName = (typeof MEDIASOUP_WS_EVENTS)[keyof typeof MEDIASOUP_WS_EVENTS];
+
+/**
+ * Transport 의 방향. mediasoup-client `Device.createSendTransport` /
+ * `createRecvTransport` 에 대응.
+ */
+export const TRANSPORT_DIRECTIONS = ['send', 'recv'] as const;
+export type TransportDirection = (typeof TRANSPORT_DIRECTIONS)[number];
+
+// ---------- client → server: RPC 요청 ----------
+
+export interface GetRtpCapabilitiesRequest {
+  code: string;
+}
+
+export interface GetRtpCapabilitiesResponse {
+  rtpCapabilities: unknown;
+}
+
+export interface CreateTransportRequest {
+  code: string;
+  direction: TransportDirection;
+}
+
+export interface CreateTransportResponse {
+  id: string;
+  iceParameters: unknown;
+  iceCandidates: unknown;
+  dtlsParameters: unknown;
+}
+
+export interface ConnectTransportRequest {
+  code: string;
+  transportId: string;
+  dtlsParameters: unknown;
+}
+
+export interface ProduceRequest {
+  code: string;
+  transportId: string;
+  kind: 'audio' | 'video';
+  source: MediaType;
+  rtpParameters: unknown;
+}
+
+export interface ProduceResponse {
+  producerId: string;
+}
+
+export interface ConsumeRequest {
+  code: string;
+  transportId: string;
+  producerId: string;
+  rtpCapabilities: unknown;
+}
+
+export interface ConsumeResponse {
+  id: string;
+  producerId: string;
+  kind: 'audio' | 'video';
+  rtpParameters: unknown;
+}
+
+export interface ResumeConsumerRequest {
+  code: string;
+  consumerId: string;
+}
+
+// ---------- server → client: 브로드캐스트 ----------
+
+/**
+ * 같은 회의의 다른 참가자가 새 Producer 를 만들었음을 알린다.
+ * 수신 측은 `mediasoup:consume` 으로 이어서 구독한다.
+ */
+export interface NewProducerBroadcast {
+  peerSocketId: string;
+  producerId: string;
+  kind: 'audio' | 'video';
+  source: MediaType;
+}
+
+export interface ProducerClosedBroadcast {
+  producerId: string;
+}
+
+export interface ConsumerClosedBroadcast {
+  consumerId: string;
+}
