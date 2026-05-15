@@ -31,28 +31,65 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
     private readonly options: MediasoupRouterAdapterOptions,
   ) {}
 
-  async createRoom(_meetingCode: string): Promise<void> {
-    throw new Error('not implemented');
+  async createRoom(meetingCode: string): Promise<void> {
+    if (this.routers.has(meetingCode)) {
+      throw new Error(`MediasoupRouterAdapter: room "${meetingCode}" already exists`);
+    }
+    const list: Router[] = [];
+    for (let i = 0; i < this.options.routersPerRoom; i += 1) {
+      const worker = this.workerPool.getNextWorker();
+      const router = await worker.createRouter({ mediaCodecs: this.options.mediaCodecs });
+      list.push(router);
+    }
+    this.routers.set(meetingCode, list);
+    this.assignments.set(meetingCode, new Map());
+    this.counters.set(meetingCode, 0);
+    this.logger.log(`room created (code=${meetingCode}, routers=${list.length})`);
   }
 
-  async closeRoom(_meetingCode: string): Promise<void> {
-    throw new Error('not implemented');
+  async closeRoom(meetingCode: string): Promise<void> {
+    const list = this.routers.get(meetingCode);
+    if (list) {
+      for (const router of list) {
+        if (!router.closed) router.close();
+      }
+    }
+    this.routers.delete(meetingCode);
+    this.assignments.delete(meetingCode);
+    this.counters.delete(meetingCode);
   }
 
-  async getRtpCapabilities(_meetingCode: string): Promise<unknown> {
-    throw new Error('not implemented');
+  async getRtpCapabilities(meetingCode: string): Promise<unknown> {
+    const list = this.routers.get(meetingCode);
+    if (!list || list.length === 0) {
+      throw new Error(`MediasoupRouterAdapter: room "${meetingCode}" not opened`);
+    }
+    return list[0].rtpCapabilities;
   }
 
-  async assignParticipant(_meetingCode: string, _participantId: string): Promise<number> {
-    throw new Error('not implemented');
+  async assignParticipant(meetingCode: string, participantId: string): Promise<number> {
+    const list = this.routers.get(meetingCode);
+    if (!list || list.length === 0) {
+      throw new Error(`MediasoupRouterAdapter: room "${meetingCode}" not opened`);
+    }
+    const counter = this.counters.get(meetingCode) ?? 0;
+    const idx = counter % list.length;
+    this.assignments.get(meetingCode)!.set(participantId, idx);
+    this.counters.set(meetingCode, counter + 1);
+    return idx;
   }
 
-  async releaseParticipant(_meetingCode: string, _participantId: string): Promise<void> {
-    throw new Error('not implemented');
+  async releaseParticipant(meetingCode: string, participantId: string): Promise<void> {
+    this.assignments.get(meetingCode)?.delete(participantId);
   }
 
-  /** Transport adapter 가 transport 를 생성할 때 호출. */
-  getRouterFor(_meetingCode: string, _routerIndex: number): Router {
-    throw new Error('not implemented');
+  getRouterFor(meetingCode: string, routerIndex: number): Router {
+    const list = this.routers.get(meetingCode);
+    if (!list || !list[routerIndex]) {
+      throw new Error(
+        `MediasoupRouterAdapter: router index ${routerIndex} of room "${meetingCode}" not found`,
+      );
+    }
+    return list[routerIndex];
   }
 }
