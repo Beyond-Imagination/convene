@@ -2,7 +2,12 @@ import { MEETING_EVENTS } from '@migration/shared-interfaces';
 
 import { Meeting } from '@/meeting/domain/meeting';
 import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';
-import { ChatEntry, externalReference } from '@/shared-kernel/domain/value-objects';
+import {
+  ChatEntry,
+  chatEntry,
+  externalReference,
+  NO_EXTERNAL_REFERENCE,
+} from '@/shared-kernel/domain/value-objects';
 
 import { MeetingNotFoundError } from './meeting.errors';
 import { MeetingService } from './meeting.service';
@@ -381,9 +386,46 @@ describe('MeetingService.closeMeeting', () => {
     expect(events).toEqual([
       {
         name: MEETING_EVENTS.ENDED,
-        payload: { code: 'abc12xyz', endedAt: tClose, reason: 'manual' },
+        payload: {
+          code: 'abc12xyz',
+          source: 'web',
+          externalReference: NO_EXTERNAL_REFERENCE,
+          startedAt: t0,
+          endedAt: tClose,
+          reason: 'manual',
+          participants: [{ id: 's1', nickname: 'alice', joinedAt: t1, leftAt: tClose }],
+          chat: [],
+        },
       },
     ]);
+  });
+
+  it('meeting.ended payload의 chat은 ChatRepository.listByCode 결과를 그대로 담는다', async () => {
+    const meeting = makeMeeting(t0);
+    meeting.addParticipant('s1', 'alice', t1);
+    const accumulated: ChatEntry[] = [
+      chatEntry({ nickname: 'alice', text: '안녕', sentAt: t1 }),
+    ];
+    const saved: Meeting[] = [];
+    const { publisher, events } = makeEventPublisher();
+    const service = new MeetingService({
+      repository: {
+        findByCode: async (c) => (c === 'abc12xyz' ? meeting : null),
+        save: async (m) => {
+          saved.push(m);
+        },
+      },
+      chatRepository: {
+        append: async () => {},
+        listByCode: async () => accumulated,
+      },
+      codeGenerator: { next: () => code },
+      clock: { now: () => tClose },
+      eventPublisher: publisher,
+    });
+    await service.closeMeeting({ code: 'abc12xyz', reason: 'manual' });
+    const endedEvent = events.find((e) => e.name === MEETING_EVENTS.ENDED);
+    expect(endedEvent?.payload).toMatchObject({ chat: accumulated });
   });
 
   it('Repository에 없는 code면 throw, 이벤트 발행 안 됨', async () => {
@@ -472,7 +514,16 @@ describe('MeetingService.detectIdleAndClose', () => {
       },
       {
         name: MEETING_EVENTS.ENDED,
-        payload: { code: 'abc12xyz', endedAt: tIdleElapsed, reason: 'idle' },
+        payload: {
+          code: 'abc12xyz',
+          source: 'web',
+          externalReference: NO_EXTERNAL_REFERENCE,
+          startedAt: t0,
+          endedAt: tIdleElapsed,
+          reason: 'idle',
+          participants: [{ id: 's1', nickname: 'alice', joinedAt: tJoin, leftAt: tLeave }],
+          chat: [],
+        },
       },
     ]);
   });
