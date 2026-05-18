@@ -109,8 +109,20 @@ export class ReportFinalizationService {
     }
   }
 
-  async failTranscription(_command: FailTranscriptionCommand): Promise<void> {
-    throw new Error('ReportFinalizationService.failTranscription not implemented');
+  async failTranscription(command: FailTranscriptionCommand): Promise<void> {
+    const report = await this.requireReport(command.reportId);
+    const at = this.deps.clock.now();
+    report.markTranscriptionFailed(command.error, at);
+    // STT가 실패하면 summary 입력이 없으므로 cascade로 종료 처리.
+    // 재시도 정책은 v2 운영 단계에서 다룬다(ARCHITECTURE §5).
+    report.markSummaryFailed(`Skipped due to transcription failure: ${command.error}`, at);
+    await this.deps.repository.save(report);
+
+    if (report.isFinalized) {
+      this.deps.eventPublisher.publish(REPORT_EVENTS.FINALIZED, {
+        reportId: report.id,
+      });
+    }
   }
 
   private async requireReport(reportId: string): Promise<MeetingReport> {
