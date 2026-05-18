@@ -153,6 +153,16 @@ describe('useMeetingViewModel', () => {
     expect(fakeSocket.disconnect).toHaveBeenCalled();
   });
 
+  it('mount 후 socket 인스턴스를 외부에 노출한다 (chat/미디어 hook 공유 용)', () => {
+    const { result } = setup('준');
+    expect(result.current.socket).toBe(fakeSocket);
+  });
+
+  it('닉네임 없으면(redirect) socket 은 null 로 유지된다', () => {
+    const { result } = setup(null);
+    expect(result.current.socket).toBeNull();
+  });
+
   it('leave() 호출 시 meeting:leave emit + 닉네임 clear + 홈으로 push', () => {
     const { result } = setup('준');
     connect();

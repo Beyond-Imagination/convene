@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 
 import {
-  type ChatPostedBroadcast,
   MEETING_WS_EVENTS,
   type ParticipantJoinedBroadcast,
   type ParticipantLeftBroadcast,
@@ -42,6 +41,11 @@ export interface UseMeetingViewModel {
   readonly nickname: string | null;
   readonly remoteParticipants: ReadonlyArray<RemoteParticipant>;
   readonly errorMessage: string | null;
+  /**
+   * mount 된 socket 인스턴스. 채팅/미디어 등 후속 ViewModel 이 같은 socket 으로
+   * emit/listen 하도록 노출한다. mount 직후 또는 nickname 없는 redirect 상태에서는 null.
+   */
+  readonly socket: Socket | null;
   readonly leave: () => void;
 }
 
@@ -53,6 +57,7 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
   const [status, setStatus] = useState<MeetingConnectionStatus>('connecting');
   const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [socket, setSocket] = useState<Socket | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
@@ -61,8 +66,10 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
       return;
     }
 
-    const socket = connectMeetingSocket();
-    socketRef.current = socket;
+    const next = connectMeetingSocket();
+    socketRef.current = next;
+    setSocket(next);
+    const socket = next;
 
     const onConnect = (): void => {
       socket.emit(MEETING_WS_EVENTS.JOIN, { code, nickname });
@@ -100,23 +107,21 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
       socket.off(MEETING_WS_EVENTS.PARTICIPANT_LEFT, onParticipantLeft);
       socket.disconnect();
       socketRef.current = null;
+      setSocket(null);
     };
   }, [code, nickname, router]);
 
   const leave = useCallback(() => {
-    const socket = socketRef.current;
-    if (socket !== null) {
-      socket.emit(MEETING_WS_EVENTS.LEAVE, { code });
-      socket.disconnect();
+    const current = socketRef.current;
+    if (current !== null) {
+      current.emit(MEETING_WS_EVENTS.LEAVE, { code });
+      current.disconnect();
       socketRef.current = null;
+      setSocket(null);
     }
     clearNickname();
     router.push('/');
   }, [code, clearNickname, router]);
-
-  // 채팅 통합(useChatViewModel) 후속 사이클에서 사용할 예정이므로 ChatPostedBroadcast
-  // 타입을 사용한 곳을 명시적으로 남겨둔다.
-  void ({} as ChatPostedBroadcast);
 
   return {
     code,
@@ -124,6 +129,7 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
     nickname,
     remoteParticipants,
     errorMessage,
+    socket,
     leave,
   };
 }
