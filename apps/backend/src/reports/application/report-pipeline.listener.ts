@@ -26,12 +26,19 @@ export class ReportPipelineListener {
   constructor(private readonly service: ReportFinalizationService) {}
 
   @OnEvent(REPORT_EVENTS.TRANSCRIPTION_COMPLETED)
-  async onTranscriptionCompleted(_payload: ReportTranscriptionCompletedPayload): Promise<void> {
-    throw new Error('ReportPipelineListener.onTranscriptionCompleted not implemented');
+  async onTranscriptionCompleted(payload: ReportTranscriptionCompletedPayload): Promise<void> {
+    const transcript = payload.transcript.map((seg) => transcriptSegment(seg));
+    await this.service.completeTranscription({
+      reportId: payload.reportId,
+      transcript,
+    });
   }
 
   @OnEvent(REPORT_EVENTS.TRANSCRIPTION_FAILED)
-  async onTranscriptionFailed(_payload: ReportTranscriptionFailedPayload): Promise<void> {
-    throw new Error('ReportPipelineListener.onTranscriptionFailed not implemented');
+  async onTranscriptionFailed(payload: ReportTranscriptionFailedPayload): Promise<void> {
+    await this.service.failTranscription({
+      reportId: payload.reportId,
+      error: payload.error,
+    });
   }
 }
