@@ -21,7 +21,10 @@ export class RecordingReportLifecycleListener {
   constructor(private readonly service: RecordingService) {}
 
   @OnEvent(REPORT_EVENTS.TRANSCRIPTION_REQUESTED)
-  async onTranscriptionRequested(_payload: ReportTranscriptionRequestedPayload): Promise<void> {
-    throw new Error('RecordingReportLifecycleListener.onTranscriptionRequested not implemented');
+  async onTranscriptionRequested(payload: ReportTranscriptionRequestedPayload): Promise<void> {
+    await this.service.requestTranscription({
+      reportId: payload.reportId,
+      meetingCode: payload.code,
+    });
   }
 }
