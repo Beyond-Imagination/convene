@@ -4,6 +4,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 
 import { MediasoupModule } from '@/mediasoup/mediasoup.module';
 import { MeetingModule } from '@/meeting/meeting.module';
+import { ReportsModule } from '@/reports/reports.module';
 import { SharedKernelModule } from '@/shared-kernel/shared-kernel.module';
 
 @Module({
@@ -13,6 +14,7 @@ import { SharedKernelModule } from '@/shared-kernel/shared-kernel.module';
     SharedKernelModule,
     MeetingModule,
     MediasoupModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}
