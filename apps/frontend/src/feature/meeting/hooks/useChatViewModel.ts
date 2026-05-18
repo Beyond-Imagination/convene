@@ -22,11 +22,16 @@ export type ChatMessageView = ChatPostedBroadcast;
 export interface UseChatViewModel {
   readonly messages: ReadonlyArray<ChatMessageView>;
   readonly canSend: boolean;
-  readonly send: (text: string) => void;
+  /** 입력 상태도 ViewModel 이 보유 — View 는 dumb 유지(ARCHITECTURE §4.2). */
+  readonly draft: string;
+  readonly setDraft: (text: string) => void;
+  /** draft 를 trim 해서 emit 하고 입력을 비운다. canSend=false 또는 공백이면 no-op. */
+  readonly submit: () => void;
 }
 
 export function useChatViewModel(socket: Socket | null, code: string): UseChatViewModel {
   const [messages, setMessages] = useState<ChatMessageView[]>([]);
+  const [draft, setDraft] = useState('');
 
   useEffect(() => {
     if (socket === null) return undefined;
@@ -39,15 +44,13 @@ export function useChatViewModel(socket: Socket | null, code: string): UseChatVi
     };
   }, [socket]);
 
-  const send = useCallback(
-    (text: string) => {
-      if (socket === null) return;
-      const trimmed = text.trim();
-      if (trimmed.length === 0) return;
-      socket.emit(MEETING_WS_EVENTS.CHAT, { code, text: trimmed });
-    },
-    [socket, code],
-  );
+  const submit = useCallback(() => {
+    if (socket === null) return;
+    const trimmed = draft.trim();
+    if (trimmed.length === 0) return;
+    socket.emit(MEETING_WS_EVENTS.CHAT, { code, text: trimmed });
+    setDraft('');
+  }, [socket, code, draft]);
 
-  return { messages, canSend: socket !== null, send };
+  return { messages, canSend: socket !== null, draft, setDraft, submit };
 }

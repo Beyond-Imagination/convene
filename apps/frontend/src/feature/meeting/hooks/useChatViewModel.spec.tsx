@@ -71,39 +71,65 @@ describe('useChatViewModel', () => {
     ]);
   });
 
-  it('send(text) 는 meeting:chat 을 trim 한 text 와 함께 emit 한다', () => {
+  it('초기 draft 는 빈 문자열, setDraft 로 갱신된다', () => {
+    const socket = new FakeSocket();
+    const { result } = renderHook(() =>
+      useChatViewModel(socket as unknown as never, code),
+    );
+    expect(result.current.draft).toBe('');
+    act(() => {
+      result.current.setDraft('안녕');
+    });
+    expect(result.current.draft).toBe('안녕');
+  });
+
+  it('submit() 은 draft 를 trim 해서 meeting:chat 으로 emit 하고 입력을 비운다', () => {
     const socket = new FakeSocket();
     const { result } = renderHook(() =>
       useChatViewModel(socket as unknown as never, code),
     );
     act(() => {
-      result.current.send('  안녕하세요  ');
+      result.current.setDraft('  안녕하세요  ');
+    });
+    act(() => {
+      result.current.submit();
     });
     expect(socket.emit).toHaveBeenCalledWith(MEETING_WS_EVENTS.CHAT, {
       code,
       text: '안녕하세요',
     });
+    expect(result.current.draft).toBe('');
   });
 
-  it('빈 문자열/공백만 있는 입력은 emit 하지 않는다', () => {
+  it('draft 가 빈 문자열/공백만이면 submit 은 no-op', () => {
     const socket = new FakeSocket();
     const { result } = renderHook(() =>
       useChatViewModel(socket as unknown as never, code),
     );
     act(() => {
-      result.current.send('');
-      result.current.send('   ');
+      result.current.submit();
+    });
+    act(() => {
+      result.current.setDraft('   ');
+    });
+    act(() => {
+      result.current.submit();
     });
     expect(socket.emit).not.toHaveBeenCalled();
   });
 
-  it('socket 이 null 이면 send 는 no-op (emit 호출 안 됨)', () => {
+  it('socket 이 null 이면 submit 도 emit 하지 않는다', () => {
     const socket = new FakeSocket();
     const { result } = renderHook(() => useChatViewModel(null, code));
     act(() => {
-      result.current.send('test');
+      result.current.setDraft('test');
+    });
+    act(() => {
+      result.current.submit();
     });
     expect(socket.emit).not.toHaveBeenCalled();
+    // draft 는 보존됨(전송 실패 → 사용자가 다시 시도 가능).
+    expect(result.current.draft).toBe('test');
   });
 
   it('unmount 시 chatPosted 리스너를 해제한다', () => {
