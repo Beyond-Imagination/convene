@@ -15,8 +15,9 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "plugins": [{ "name": "next" }],
-    "paths": { "@/*": ["./src/*"] }
+    "paths": { "@/*": ["./src/*"] },
+    "types": ["vitest/globals"]
   },
   "include": ["next-env.d.ts", "src/**/*", ".next/types/**/*.ts", "vitest.config.ts"],
-  "exclude": ["node_modules", "out", ".next"]
+  "exclude": ["node_modules", "out", ".next", "**/*.spec.ts", "**/*.spec.tsx", "test", "e2e"]
 }
