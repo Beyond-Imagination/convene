@@ -1,11 +1,11 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { type BaseSyntheticEvent, useState } from 'react';
 import {
   type FieldErrors,
-  type UseFormRegister,
   useForm,
+  type UseFormRegisterReturn,
 } from 'react-hook-form';
 
 import { useSessionStore } from '@/shared/stores/session.store';
@@ -31,9 +31,13 @@ export interface JoinMeetingFormValues {
 
 export interface UseJoinMeetingViewModel {
   readonly status: JoinMeetingStatus;
-  readonly register: UseFormRegister<JoinMeetingFormValues>;
+  /**
+   * View 가 input 에 spread 하는 register helper.
+   * 검증 규칙은 ViewModel 안에 캡슐화되어 View 가 알 필요 없다.
+   */
+  readonly register: (name: keyof JoinMeetingFormValues) => UseFormRegisterReturn;
   readonly errors: FieldErrors<JoinMeetingFormValues>;
-  readonly handleSubmit: (e?: React.BaseSyntheticEvent) => Promise<void>;
+  readonly handleSubmit: (e?: BaseSyntheticEvent) => Promise<void>;
 }
 
 export function useJoinMeetingViewModel(): UseJoinMeetingViewModel {
@@ -57,35 +61,28 @@ export function useJoinMeetingViewModel(): UseJoinMeetingViewModel {
     router.push(`/meetings/${values.code}`);
   });
 
-  return {
-    status,
-    register: (name, options) =>
-      register(name, {
-        ...options,
-        ...(name === 'code'
-          ? {
-              required: '회의 코드를 입력하세요.',
-              pattern: {
-                value: MEETING_CODE_PATTERN,
-                message: '회의 코드는 8자 소문자 영숫자입니다.',
-              },
-            }
-          : {}),
-        ...(name === 'nickname'
-          ? {
-              required: '닉네임을 입력하세요.',
-              validate: (raw: string) => {
-                const trimmed = raw.trim();
-                if (trimmed.length < NICKNAME_MIN) return '닉네임을 입력하세요.';
-                if (trimmed.length > NICKNAME_MAX) {
-                  return `닉네임은 ${NICKNAME_MAX}자 이하여야 합니다.`;
-                }
-                return true;
-              },
-            }
-          : {}),
-      }),
-    errors,
-    handleSubmit,
+  const registerField: UseJoinMeetingViewModel['register'] = (name) => {
+    if (name === 'code') {
+      return register('code', {
+        required: '회의 코드를 입력하세요.',
+        pattern: {
+          value: MEETING_CODE_PATTERN,
+          message: '회의 코드는 8자 소문자 영숫자입니다.',
+        },
+      });
+    }
+    return register('nickname', {
+      required: '닉네임을 입력하세요.',
+      validate: (raw: string) => {
+        const trimmed = raw.trim();
+        if (trimmed.length < NICKNAME_MIN) return '닉네임을 입력하세요.';
+        if (trimmed.length > NICKNAME_MAX) {
+          return `닉네임은 ${NICKNAME_MAX}자 이하여야 합니다.`;
+        }
+        return true;
+      },
+    });
   };
+
+  return { status, register: registerField, errors, handleSubmit };
 }
