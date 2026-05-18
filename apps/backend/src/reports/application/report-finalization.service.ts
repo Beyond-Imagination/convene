@@ -1,5 +1,7 @@
-import { MeetingReport } from '@/reports/domain/meeting-report';
+import { REPORT_EVENTS } from '@migration/shared-interfaces';
+
 import { ParticipantEntry } from '@/reports/domain/entries';
+import { MeetingReport } from '@/reports/domain/meeting-report';
 import {
   NotionPort,
   ReportIdGenerator,
@@ -40,7 +42,24 @@ export interface ReportFinalizationServiceDeps {
 export class ReportFinalizationService {
   constructor(private readonly deps: ReportFinalizationServiceDeps) {}
 
-  async createDraft(_command: CreateDraftCommand): Promise<MeetingReport> {
-    throw new Error('ReportFinalizationService.createDraft not implemented');
+  async createDraft(command: CreateDraftCommand): Promise<MeetingReport> {
+    const report = MeetingReport.fromEndedMeeting({
+      id: this.deps.idGenerator.next(),
+      meetingId: command.meetingId,
+      code: command.code,
+      source: command.source,
+      externalReference: command.externalReference,
+      startedAt: command.startedAt,
+      endedAt: command.endedAt,
+      participants: command.participants,
+      chat: command.chat,
+    });
+    await this.deps.repository.save(report);
+    this.deps.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_REQUESTED, {
+      reportId: report.id,
+      meetingId: report.meetingId,
+      code: report.code,
+    });
+    return report;
   }
 }
