@@ -109,6 +109,14 @@ export class ReportFinalizationService {
     }
   }
 
+  async listRecent(_limit: number): Promise<MeetingReport[]> {
+    throw new Error('ReportFinalizationService.listRecent not implemented');
+  }
+
+  async getById(_reportId: string): Promise<MeetingReport> {
+    throw new Error('ReportFinalizationService.getById not implemented');
+  }
+
   async failTranscription(command: FailTranscriptionCommand): Promise<void> {
     const report = await this.requireReport(command.reportId);
     const at = this.deps.clock.now();

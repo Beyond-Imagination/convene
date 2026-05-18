@@ -274,6 +274,105 @@ describe('ReportFinalizationService.completeTranscription', () => {
   });
 });
 
+describe('ReportFinalizationService.listRecent', () => {
+  const startedAt = new Date('2026-01-01T00:00:00Z');
+
+  const makeReport = (id: string, mid: string, durationMs: number) =>
+    MeetingReport.fromEndedMeeting({
+      id,
+      meetingId: mid,
+      code: `code-${mid}`,
+      source: 'web',
+      externalReference: NO_EXTERNAL_REFERENCE,
+      startedAt,
+      endedAt: new Date(startedAt.getTime() + durationMs),
+      participants: [],
+      chat: [],
+    });
+
+  const makeService = () => {
+    const repoListMock = jest.fn<Promise<MeetingReport[]>, [number]>(async () => []);
+    const { publisher } = makeEventPublisher();
+    const service = new ReportFinalizationService({
+      repository: {
+        save: async () => {},
+        findById: async () => null,
+        findByMeetingId: async () => null,
+        listRecent: repoListMock,
+      },
+      summarizer: noopSummarizer(),
+      notion: noopNotion(),
+      idGenerator: { next: () => 'unused' },
+      clock: { now: () => startedAt },
+      eventPublisher: publisher,
+    });
+    return { service, repoListMock };
+  };
+
+  it('Repository.listRecent에 인자로 받은 limit을 그대로 위임한다', async () => {
+    const { service, repoListMock } = makeService();
+    repoListMock.mockResolvedValueOnce([]);
+    await service.listRecent(7);
+    expect(repoListMock).toHaveBeenCalledWith(7);
+  });
+
+  it('Repository가 돌려준 MeetingReport 배열을 그대로 반환한다', async () => {
+    const { service, repoListMock } = makeService();
+    const a = makeReport('r1', 'mtg-1', 10 * 60_000);
+    const b = makeReport('r2', 'mtg-2', 20 * 60_000);
+    repoListMock.mockResolvedValueOnce([b, a]);
+    const result = await service.listRecent(5);
+    expect(result).toEqual([b, a]);
+  });
+});
+
+describe('ReportFinalizationService.getById', () => {
+  const startedAt = new Date('2026-01-01T00:00:00Z');
+  const endedAt = new Date('2026-01-01T00:30:00Z');
+
+  const makeReport = (id: string) =>
+    MeetingReport.fromEndedMeeting({
+      id,
+      meetingId: `mtg-${id}`,
+      code: `code-${id}`,
+      source: 'web',
+      externalReference: NO_EXTERNAL_REFERENCE,
+      startedAt,
+      endedAt,
+      participants: [],
+      chat: [],
+    });
+
+  const makeService = (stored: MeetingReport | null) => {
+    const { publisher } = makeEventPublisher();
+    const service = new ReportFinalizationService({
+      repository: {
+        save: async () => {},
+        findById: async (id) => (stored && stored.id === id ? stored : null),
+        findByMeetingId: async () => null,
+        listRecent: async () => [],
+      },
+      summarizer: noopSummarizer(),
+      notion: noopNotion(),
+      idGenerator: { next: () => 'unused' },
+      clock: { now: () => endedAt },
+      eventPublisher: publisher,
+    });
+    return { service };
+  };
+
+  it('존재하는 id면 해당 MeetingReport를 돌려준다', async () => {
+    const stored = makeReport('r1');
+    const { service } = makeService(stored);
+    expect(await service.getById('r1')).toBe(stored);
+  });
+
+  it('존재하지 않는 id면 ReportNotFoundError를 던진다', async () => {
+    const { service } = makeService(null);
+    await expect(service.getById('missing')).rejects.toThrow(ReportNotFoundError);
+  });
+});
+
 describe('ReportFinalizationService.failTranscription', () => {
   const startedAt = new Date('2026-01-01T00:00:00Z');
   const endedAt = new Date('2026-01-01T00:30:00Z');
