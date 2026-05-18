@@ -1,3 +1,5 @@
+import { REPORT_EVENTS } from '@migration/shared-interfaces';
+
 import { AudioBufferRepository, TranscriberPort } from '@/recording/domain/ports';
 import { DomainEventPublisher } from '@/shared-kernel/domain/ports';
 
@@ -26,7 +28,23 @@ export interface RecordingServiceDeps {
 export class RecordingService {
   constructor(private readonly deps: RecordingServiceDeps) {}
 
-  async requestTranscription(_command: RequestTranscriptionCommand): Promise<void> {
-    throw new Error('RecordingService.requestTranscription not implemented');
+  async requestTranscription(command: RequestTranscriptionCommand): Promise<void> {
+    try {
+      const audio = await this.deps.audioBufferRepository.consume(command.meetingCode);
+      const transcript = await this.deps.transcriber.transcribe({
+        meetingCode: command.meetingCode,
+        audio,
+      });
+      this.deps.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_COMPLETED, {
+        reportId: command.reportId,
+        transcript,
+      });
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      this.deps.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_FAILED, {
+        reportId: command.reportId,
+        error,
+      });
+    }
   }
 }
