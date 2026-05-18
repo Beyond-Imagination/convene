@@ -22,6 +22,7 @@ export const MEETING_EVENTS = {
 export const REPORT_EVENTS = {
   TRANSCRIPTION_REQUESTED: 'report.transcription.requested',
   TRANSCRIPTION_COMPLETED: 'report.transcription.completed',
+  TRANSCRIPTION_FAILED: 'report.transcription.failed',
   SUMMARY_COMPLETED: 'report.summary.completed',
   FINALIZED: 'report.finalized',
 } as const;
