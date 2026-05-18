@@ -9,6 +9,7 @@ import {
   MeetingRepository,
 } from '@/meeting/domain/ports';
 import { IdleTimeout } from '@/meeting/domain/value-objects';
+import { MeetingEndedPayload, MeetingEndedReason } from '@/shared-kernel/domain/events';
 import { Clock, DomainEventPublisher } from '@/shared-kernel/domain/ports';
 import {
   ChatEntry,
@@ -152,11 +153,8 @@ export class MeetingService {
     const endedAt = this.deps.clock.now();
     meeting.close(endedAt);
     await this.deps.repository.save(meeting);
-    this.deps.eventPublisher.publish(MEETING_EVENTS.ENDED, {
-      code: command.code,
-      endedAt,
-      reason: command.reason,
-    });
+    const payload = await this.buildEndedPayload(meeting, command.code, endedAt, command.reason);
+    this.deps.eventPublisher.publish(MEETING_EVENTS.ENDED, payload);
     return meeting;
   }
 
@@ -175,12 +173,29 @@ export class MeetingService {
       code: command.code,
       detectedAt: now,
     });
-    this.deps.eventPublisher.publish(MEETING_EVENTS.ENDED, {
-      code: command.code,
-      endedAt: now,
-      reason: 'idle',
-    });
+    const payload = await this.buildEndedPayload(meeting, command.code, now, 'idle');
+    this.deps.eventPublisher.publish(MEETING_EVENTS.ENDED, payload);
     return true;
+  }
+
+  private async buildEndedPayload(
+    meeting: Meeting,
+    code: string,
+    endedAt: Date,
+    reason: MeetingEndedReason,
+  ): Promise<MeetingEndedPayload> {
+    const snapshot = meeting.snapshot();
+    const chat = await this.deps.chatRepository.listByCode(code);
+    return {
+      code,
+      source: snapshot.source,
+      externalReference: snapshot.externalReference,
+      startedAt: snapshot.startedAt,
+      endedAt,
+      reason,
+      participants: snapshot.participants,
+      chat,
+    };
   }
 
   private async requireMeeting(code: string): Promise<Meeting> {
