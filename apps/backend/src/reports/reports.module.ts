@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { ReportFinalizationService } from '@/reports/application/report-finalization.service';
 import { ReportMeetingLifecycleListener } from '@/reports/application/report-meeting-lifecycle.listener';
+import { ReportPipelineListener } from '@/reports/application/report-pipeline.listener';
 import { InMemoryReportRepository } from '@/reports/infrastructure/in-memory-report.repository';
 import { NoopNotion } from '@/reports/infrastructure/noop.notion';
 import { NoopSummarizer } from '@/reports/infrastructure/noop.summarizer';
@@ -28,6 +29,7 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
     NoopNotion,
     UuidReportIdGenerator,
     ReportMeetingLifecycleListener,
+    ReportPipelineListener,
     {
       provide: ReportFinalizationService,
       useFactory: (

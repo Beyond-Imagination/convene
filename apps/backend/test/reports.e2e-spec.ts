@@ -34,25 +34,30 @@ const connectClient = (url: string): Promise<Socket> =>
   });
 
 /**
- * meeting.ended → ReportMeetingLifecycleListener → createDraft 흐름은 비동기다.
- * v1 에는 Recording BC 가 없어 transcription.completed 이벤트가 자동 발행되지
- * 않으므로 draft 상태에서 멈춘다. listener의 createDraft 호출이 완료될 때까지
- * 짧게 polling 한다.
+ * meeting.ended → ReportMeetingLifecycleListener → createDraft
+ *               → report.transcription.requested
+ *               → RecordingReportLifecycleListener → RecordingService → NoopTranscriber
+ *               → report.transcription.completed
+ *               → ReportPipelineListener → completeTranscription
+ *               → NoopSummarizer → report.summary.completed → report.finalized
+ *
+ * 모든 흐름이 비동기 이벤트로 연결돼 있으므로 controller 응답을 기다린 뒤
+ * pipeline 이 done/done 으로 finalize 될 때까지 짧게 polling 한다.
  */
-const waitForReport = async (
+const waitForFinalizedReport = async (
   httpServer: ReturnType<INestApplication['getHttpServer']>,
   code: string,
-  timeoutMs = 1000,
+  timeoutMs = 2000,
 ): Promise<ReportListResponse['items'][number]> => {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const res = await request(httpServer).get('/reports').expect(200);
     const body = res.body as ReportListResponse;
     const found = body.items.find((it) => it.code === code);
-    if (found) return found;
+    if (found && found.pipeline.summaryStatus === 'done') return found;
     await new Promise((r) => setTimeout(r, 30));
   }
-  throw new Error(`Report for code ${code} did not appear within ${timeoutMs}ms`);
+  throw new Error(`Report for code ${code} did not finalize within ${timeoutMs}ms`);
 };
 
 describe('Reports e2e', () => {
@@ -106,11 +111,14 @@ describe('Reports e2e', () => {
     // 3) 회의 종료(이 시점에 meeting.ended 이벤트가 발행되고 listener 가 createDraft 를 호출).
     await request(httpServer).delete(`/meetings/${code}`).expect(200);
 
-    // 4) GET /reports 에서 회의록 카드가 노출될 때까지 폴링.
-    const listItem = await waitForReport(httpServer, code);
+    // 4) Recording → Reports 파이프라인이 done/done 으로 finalize 될 때까지 폴링.
+    const listItem = await waitForFinalizedReport(httpServer, code);
     expect(listItem.code).toBe(code);
     expect(listItem.source).toBe('web');
     expect(listItem.participantCount).toBe(1);
+    expect(listItem.pipeline).toEqual({ sttStatus: 'done', summaryStatus: 'done' });
+    // NoopSummarizer 가 placeholder 요약(title="(요약 미적용)")을 채워 finalize 한다.
+    expect(listItem.title).toBe('(요약 미적용)');
 
     // 5) GET /reports/:id 상세 응답 검증.
     const detail = await request(httpServer).get(`/reports/${listItem.id}`).expect(200);
@@ -126,12 +134,13 @@ describe('Reports e2e', () => {
       text: '회의 시작',
       sentAt: expect.any(String),
     });
-    // v1: Recording BC 가 없어 report.transcription.completed/failed 가 발행되지 않는다.
-    // 따라서 createDraft 직후 pipeline 은 두 stage 모두 pending 으로 멈춰 있다.
-    // Recording BC 도입 시 본 spec 의 기대값을 done/skip 으로 갱신한다.
-    expect(body.pipeline.sttStatus).toBe('pending');
-    expect(body.pipeline.summaryStatus).toBe('pending');
-    expect(body.summary).toBeNull();
+    // Recording BC + NoopTranscriber: STT 결과는 빈 transcript, 그 위에 NoopSummarizer 가
+    // placeholder summary 를 적용해 두 stage 모두 done 으로 finalize.
+    expect(body.pipeline.sttStatus).toBe('done');
+    expect(body.pipeline.summaryStatus).toBe('done');
+    expect(body.pipeline.failures).toEqual([]);
+    expect(body.transcript).toEqual([]);
+    expect(body.summary?.title).toBe('(요약 미적용)');
   });
 
   it('존재하지 않는 report id는 404로 매핑된다', async () => {
