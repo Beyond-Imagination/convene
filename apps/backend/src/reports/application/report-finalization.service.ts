@@ -37,6 +37,11 @@ export interface CompleteTranscriptionCommand {
   transcript: ReadonlyArray<TranscriptSegment>;
 }
 
+export interface FailTranscriptionCommand {
+  reportId: string;
+  error: string;
+}
+
 export interface ReportFinalizationServiceDeps {
   repository: ReportRepository;
   summarizer: SummarizerPort;
@@ -102,6 +107,10 @@ export class ReportFinalizationService {
         reportId: report.id,
       });
     }
+  }
+
+  async failTranscription(_command: FailTranscriptionCommand): Promise<void> {
+    throw new Error('ReportFinalizationService.failTranscription not implemented');
   }
 
   private async requireReport(reportId: string): Promise<MeetingReport> {

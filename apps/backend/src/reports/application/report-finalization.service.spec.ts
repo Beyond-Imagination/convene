@@ -273,3 +273,78 @@ describe('ReportFinalizationService.completeTranscription', () => {
     expect(events.map((e) => e.name)).toEqual([REPORT_EVENTS.FINALIZED]);
   });
 });
+
+describe('ReportFinalizationService.failTranscription', () => {
+  const startedAt = new Date('2026-01-01T00:00:00Z');
+  const endedAt = new Date('2026-01-01T00:30:00Z');
+  const failedAt = new Date('2026-01-01T00:31:00Z');
+  const reportId = 'rep_stt_fail';
+
+  const makeDraft = () =>
+    MeetingReport.fromEndedMeeting({
+      id: reportId,
+      meetingId: 'mtg_x',
+      code: 'code-x',
+      source: 'web',
+      externalReference: NO_EXTERNAL_REFERENCE,
+      startedAt,
+      endedAt,
+      participants: [],
+      chat: [],
+    });
+
+  const makeService = () => {
+    const store = new Map<string, MeetingReport>();
+    store.set(reportId, makeDraft());
+    const { events, publisher } = makeEventPublisher();
+    const summarizer = noopSummarizer();
+    const notion = noopNotion();
+    const service = new ReportFinalizationService({
+      repository: {
+        save: async (r) => {
+          store.set(r.id, r);
+        },
+        findById: async (id) => store.get(id) ?? null,
+        findByMeetingId: async () => null,
+        listRecent: async () => [],
+      },
+      summarizer,
+      notion,
+      idGenerator: { next: () => 'unused' },
+      clock: { now: () => failedAt },
+      eventPublisher: publisher,
+    });
+    return { service, store, events, summarizer, notion };
+  };
+
+  it('존재하지 않는 reportId면 ReportNotFoundError를 던진다', async () => {
+    const { service } = makeService();
+    await expect(
+      service.failTranscription({ reportId: 'unknown', error: 'ai-worker timeout' }),
+    ).rejects.toThrow(ReportNotFoundError);
+  });
+
+  it('STT 실패 시 sttStatus는 failed, summary는 cascade로 skip 처리되어 failed가 된다', async () => {
+    const { service, store } = makeService();
+    await service.failTranscription({ reportId, error: 'ai-worker 5xx' });
+    const after = store.get(reportId)!;
+    expect(after.pipeline.sttStatus).toBe('failed');
+    expect(after.pipeline.summaryStatus).toBe('failed');
+    expect(after.pipeline.failures).toHaveLength(2);
+    expect(after.pipeline.failures[0]).toMatchObject({ stage: 'stt', error: 'ai-worker 5xx' });
+    expect(after.pipeline.failures[1]).toMatchObject({ stage: 'summary' });
+  });
+
+  it('Summarizer 포트는 호출되지 않는다', async () => {
+    const { service, summarizer } = makeService();
+    await service.failTranscription({ reportId, error: 'ai-worker 5xx' });
+    expect(summarizer.summarize).not.toHaveBeenCalled();
+  });
+
+  it('isFinalized 상태가 되면 report.finalized 이벤트를 발행한다', async () => {
+    const { service, events } = makeService();
+    await service.failTranscription({ reportId, error: 'ai-worker 5xx' });
+    expect(events.map((e) => e.name)).toEqual([REPORT_EVENTS.FINALIZED]);
+    expect(events[0].payload).toEqual({ reportId });
+  });
+});
