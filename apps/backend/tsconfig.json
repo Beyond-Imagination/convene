@@ -16,7 +16,6 @@
     "removeComments": true,
     "declaration": false,
     "sourceMap": true,
-    "incremental": true,
     "outDir": "./dist",
     "baseUrl": "./",
     "rootDir": "./src",
