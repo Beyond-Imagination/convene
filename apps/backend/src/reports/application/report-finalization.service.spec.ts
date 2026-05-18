@@ -1,6 +1,7 @@
 import { REPORT_EVENTS } from '@migration/shared-interfaces';
 
-import { participantEntry } from '@/reports/domain/entries';
+import { participantEntry, transcriptSegment } from '@/reports/domain/entries';
+import { ReportSummary, reportSummary } from '@/reports/domain/value-objects';
 import {
   chatEntry,
   externalReference,
@@ -9,6 +10,7 @@ import {
 
 import { MeetingReport } from '../domain/meeting-report';
 import { ReportFinalizationService } from './report-finalization.service';
+import { ReportNotFoundError } from './report.errors';
 
 interface CapturedEvent {
   name: string;
@@ -141,5 +143,133 @@ describe('ReportFinalizationService.createDraft', () => {
     await service.createDraft(validCommand());
     expect(summarizer.summarize).not.toHaveBeenCalled();
     expect(notion.push).not.toHaveBeenCalled();
+  });
+});
+
+describe('ReportFinalizationService.completeTranscription', () => {
+  const startedAt = new Date('2026-01-01T00:00:00Z');
+  const endedAt = new Date('2026-01-01T00:30:00Z');
+  const failedAt = new Date('2026-01-01T00:31:00Z');
+  const reportId = 'rep_done';
+  const chat = [chatEntry({ nickname: '준', text: '회의 시작', sentAt: startedAt })];
+  const transcript = [transcriptSegment({ text: '안녕하세요', startMs: 0, endMs: 1000 })];
+  const summaryResult: ReportSummary = reportSummary({
+    title: '회의 요약',
+    overview: '핵심만 요약',
+    decisions: ['결정 1'],
+    actionItems: [{ task: '문서 작성', owner: '준' }],
+    keyTopics: [{ topic: '백엔드 설계', points: ['DDD', 'CQRS'] }],
+  });
+
+  const makeDraft = () =>
+    MeetingReport.fromEndedMeeting({
+      id: reportId,
+      meetingId: 'mtg_x',
+      code: 'code-x',
+      source: 'web',
+      externalReference: NO_EXTERNAL_REFERENCE,
+      startedAt,
+      endedAt,
+      participants: [],
+      chat,
+    });
+
+  const makeService = (
+    opts: { summarizerResult?: ReportSummary; summarizerError?: Error } = {},
+  ) => {
+    const store = new Map<string, MeetingReport>();
+    const draft = makeDraft();
+    store.set(reportId, draft);
+    const saves: string[] = [];
+    const { events, publisher } = makeEventPublisher();
+
+    const summarizer = {
+      summarize: jest.fn(async () => {
+        if (opts.summarizerError) throw opts.summarizerError;
+        return opts.summarizerResult ?? summaryResult;
+      }),
+    };
+    const notion = noopNotion();
+    const service = new ReportFinalizationService({
+      repository: {
+        save: async (r) => {
+          store.set(r.id, r);
+          saves.push(r.id);
+        },
+        findById: async (id) => store.get(id) ?? null,
+        findByMeetingId: async () => null,
+        listRecent: async () => [],
+      },
+      summarizer,
+      notion,
+      idGenerator: { next: () => 'unused' },
+      clock: { now: () => failedAt },
+      eventPublisher: publisher,
+    });
+    return { service, store, saves, events, summarizer, notion };
+  };
+
+  it('존재하지 않는 reportId면 ReportNotFoundError를 던진다', async () => {
+    const { service } = makeService();
+    await expect(
+      service.completeTranscription({ reportId: 'unknown', transcript }),
+    ).rejects.toThrow(ReportNotFoundError);
+  });
+
+  it('transcript가 Aggregate에 반영되고 sttStatus가 done으로 전이된다', async () => {
+    const { service, store } = makeService();
+    await service.completeTranscription({ reportId, transcript });
+    const after = store.get(reportId)!;
+    expect(after.transcript).toEqual(transcript);
+    expect(after.pipeline.sttStatus).toBe('done');
+  });
+
+  it('Summarizer.summarize에 transcript+chat+meta를 그대로 전달한다', async () => {
+    const { service, summarizer } = makeService();
+    await service.completeTranscription({ reportId, transcript });
+    expect(summarizer.summarize).toHaveBeenCalledTimes(1);
+    expect(summarizer.summarize).toHaveBeenCalledWith({
+      transcript,
+      chat,
+      meta: {
+        meetingId: 'mtg_x',
+        code: 'code-x',
+        startedAt,
+        endedAt,
+      },
+    });
+  });
+
+  it('성공 시 summary가 Aggregate에 적용되고 summaryStatus가 done이 된다', async () => {
+    const { service, store } = makeService();
+    await service.completeTranscription({ reportId, transcript });
+    const after = store.get(reportId)!;
+    expect(after.summary).toEqual(summaryResult);
+    expect(after.pipeline.summaryStatus).toBe('done');
+  });
+
+  it('성공 시 report.summary.completed → report.finalized 순으로 발행한다', async () => {
+    const { service, events } = makeService();
+    await service.completeTranscription({ reportId, transcript });
+    expect(events.map((e) => e.name)).toEqual([
+      REPORT_EVENTS.SUMMARY_COMPLETED,
+      REPORT_EVENTS.FINALIZED,
+    ]);
+    expect(events[0].payload).toEqual({ reportId });
+    expect(events[1].payload).toEqual({ reportId });
+  });
+
+  it('Summarizer가 throw하면 markSummaryFailed로 전이하고 report.finalized만 발행한다', async () => {
+    const { service, store, events } = makeService({
+      summarizerError: new Error('LLM 502'),
+    });
+    await service.completeTranscription({ reportId, transcript });
+    const after = store.get(reportId)!;
+    expect(after.pipeline.sttStatus).toBe('done');
+    expect(after.pipeline.summaryStatus).toBe('failed');
+    expect(after.pipeline.failures).toEqual([
+      { stage: 'summary', error: 'LLM 502', at: failedAt },
+    ]);
+    expect(events.map((e) => e.name)).toEqual([REPORT_EVENTS.FINALIZED]);
   });
 });

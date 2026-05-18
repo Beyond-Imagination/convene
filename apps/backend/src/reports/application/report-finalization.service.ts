@@ -1,6 +1,6 @@
 import { REPORT_EVENTS } from '@migration/shared-interfaces';
 
-import { ParticipantEntry } from '@/reports/domain/entries';
+import { ParticipantEntry, TranscriptSegment } from '@/reports/domain/entries';
 import { MeetingReport } from '@/reports/domain/meeting-report';
 import {
   NotionPort,
@@ -28,6 +28,11 @@ export interface CreateDraftCommand {
   endedAt: Date;
   participants: ReadonlyArray<ParticipantEntry>;
   chat: ReadonlyArray<ChatEntry>;
+}
+
+export interface CompleteTranscriptionCommand {
+  reportId: string;
+  transcript: ReadonlyArray<TranscriptSegment>;
 }
 
 export interface ReportFinalizationServiceDeps {
@@ -61,5 +66,9 @@ export class ReportFinalizationService {
       code: report.code,
     });
     return report;
+  }
+
+  async completeTranscription(_command: CompleteTranscriptionCommand): Promise<void> {
+    throw new Error('ReportFinalizationService.completeTranscription not implemented');
   }
 }
