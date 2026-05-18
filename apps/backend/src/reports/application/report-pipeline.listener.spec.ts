@@ -1,0 +1,67 @@
+import {
+  ReportTranscriptionCompletedPayload,
+  ReportTranscriptionFailedPayload,
+} from '@/shared-kernel/domain/events';
+
+import {
+  CompleteTranscriptionCommand,
+  FailTranscriptionCommand,
+  ReportFinalizationService,
+} from './report-finalization.service';
+import { ReportPipelineListener } from './report-pipeline.listener';
+
+const makeListener = () => {
+  const completed: CompleteTranscriptionCommand[] = [];
+  const failed: FailTranscriptionCommand[] = [];
+  const service = {
+    completeTranscription: jest.fn(async (cmd: CompleteTranscriptionCommand) => {
+      completed.push(cmd);
+    }),
+    failTranscription: jest.fn(async (cmd: FailTranscriptionCommand) => {
+      failed.push(cmd);
+    }),
+  };
+  const listener = new ReportPipelineListener(service as unknown as ReportFinalizationService);
+  return { listener, completed, failed, service };
+};
+
+describe('ReportPipelineListener.onTranscriptionCompleted', () => {
+  it('payload.transcript을 그대로 TranscriptSegment 배열로 위임한다', async () => {
+    const { listener, completed } = makeListener();
+    const payload: ReportTranscriptionCompletedPayload = {
+      reportId: 'r1',
+      transcript: [
+        { text: '안녕', startMs: 0, endMs: 100 },
+        { speaker: '준', text: '두 번째', startMs: 200, endMs: 500 },
+      ],
+    };
+    await listener.onTranscriptionCompleted(payload);
+    expect(completed).toHaveLength(1);
+    expect(completed[0].reportId).toBe('r1');
+    expect(completed[0].transcript).toEqual([
+      { text: '안녕', startMs: 0, endMs: 100 },
+      { speaker: '준', text: '두 번째', startMs: 200, endMs: 500 },
+    ]);
+  });
+
+  it('빈 transcript도 그대로 위임한다 (Recording이 빈 결과 보고한 경우)', async () => {
+    const { listener, service } = makeListener();
+    await listener.onTranscriptionCompleted({ reportId: 'r2', transcript: [] });
+    expect(service.completeTranscription).toHaveBeenCalledWith({
+      reportId: 'r2',
+      transcript: [],
+    });
+  });
+});
+
+describe('ReportPipelineListener.onTranscriptionFailed', () => {
+  it('payload.reportId와 error를 그대로 failTranscription에 위임한다', async () => {
+    const { listener, failed } = makeListener();
+    const payload: ReportTranscriptionFailedPayload = {
+      reportId: 'r1',
+      error: 'ai-worker 503',
+    };
+    await listener.onTranscriptionFailed(payload);
+    expect(failed).toEqual([{ reportId: 'r1', error: 'ai-worker 503' }]);
+  });
+});
