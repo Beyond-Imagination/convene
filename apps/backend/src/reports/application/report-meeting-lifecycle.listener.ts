@@ -21,7 +21,21 @@ export class ReportMeetingLifecycleListener {
   constructor(private readonly service: ReportFinalizationService) {}
 
   @OnEvent(MEETING_EVENTS.ENDED)
-  async onMeetingEnded(_payload: MeetingEndedPayload): Promise<void> {
-    throw new Error('ReportMeetingLifecycleListener.onMeetingEnded not implemented');
+  async onMeetingEnded(payload: MeetingEndedPayload): Promise<void> {
+    await this.service.createDraft({
+      meetingId: payload.code,
+      code: payload.code,
+      source: payload.source,
+      externalReference: payload.externalReference,
+      startedAt: payload.startedAt,
+      endedAt: payload.endedAt,
+      participants: payload.participants.map((p) => ({
+        id: p.id,
+        nickname: p.nickname,
+        joinedAt: p.joinedAt,
+        leftAt: p.leftAt,
+      })),
+      chat: payload.chat,
+    });
   }
 }
