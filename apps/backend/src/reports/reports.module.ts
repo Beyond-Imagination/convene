@@ -6,6 +6,7 @@ import { InMemoryReportRepository } from '@/reports/infrastructure/in-memory-rep
 import { NoopNotion } from '@/reports/infrastructure/noop.notion';
 import { NoopSummarizer } from '@/reports/infrastructure/noop.summarizer';
 import { UuidReportIdGenerator } from '@/reports/infrastructure/uuid-report-id.generator';
+import { ReportsController } from '@/reports/interface/controllers/reports.controller';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 
@@ -20,6 +21,7 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
  *   둔다. MongoDB / Gemini / Notion 실어댑터가 준비되면 provider 토큰만 교체한다.
  */
 @Module({
+  controllers: [ReportsController],
   providers: [
     InMemoryReportRepository,
     NoopSummarizer,
