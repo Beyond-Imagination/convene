@@ -11,6 +11,8 @@ import {
 import { Clock, DomainEventPublisher } from '@/shared-kernel/domain/ports';
 import { ChatEntry, ExternalReference, Source } from '@/shared-kernel/domain/value-objects';
 
+import { ReportNotFoundError } from './report.errors';
+
 /**
  * Reports Bounded Context의 Application Service.
  *
@@ -68,7 +70,45 @@ export class ReportFinalizationService {
     return report;
   }
 
-  async completeTranscription(_command: CompleteTranscriptionCommand): Promise<void> {
-    throw new Error('ReportFinalizationService.completeTranscription not implemented');
+  async completeTranscription(command: CompleteTranscriptionCommand): Promise<void> {
+    const report = await this.requireReport(command.reportId);
+    report.applyTranscript(command.transcript);
+    await this.deps.repository.save(report);
+
+    try {
+      const summary = await this.deps.summarizer.summarize({
+        transcript: command.transcript,
+        chat: report.chat,
+        meta: {
+          meetingId: report.meetingId,
+          code: report.code,
+          startedAt: report.startedAt,
+          endedAt: report.endedAt,
+        },
+      });
+      report.applySummary(summary);
+      await this.deps.repository.save(report);
+      this.deps.eventPublisher.publish(REPORT_EVENTS.SUMMARY_COMPLETED, {
+        reportId: report.id,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      report.markSummaryFailed(message, this.deps.clock.now());
+      await this.deps.repository.save(report);
+    }
+
+    if (report.isFinalized) {
+      this.deps.eventPublisher.publish(REPORT_EVENTS.FINALIZED, {
+        reportId: report.id,
+      });
+    }
+  }
+
+  private async requireReport(reportId: string): Promise<MeetingReport> {
+    const report = await this.deps.repository.findById(reportId);
+    if (!report) {
+      throw new ReportNotFoundError(reportId);
+    }
+    return report;
   }
 }
