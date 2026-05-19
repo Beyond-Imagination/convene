@@ -13,6 +13,7 @@ import type { Server, Socket } from 'socket.io';
 import {
   MEETING_WS_EVENTS,
   type ChatPostedBroadcast,
+  type MeetingParticipantsBroadcast,
   type ParticipantJoinedBroadcast,
   type ParticipantLeftBroadcast,
 } from '@migration/shared-interfaces';
@@ -63,7 +64,7 @@ export class MeetingGateway implements OnGatewayDisconnect {
     @MessageBody() dto: JoinMeetingDto,
     @ConnectedSocket() client: Socket,
   ): Promise<void> {
-    const { participant } = await this.service.joinMeeting({
+    const { meeting, participant } = await this.service.joinMeeting({
       code: dto.code,
       participantId: client.id,
       nickname: dto.nickname,
@@ -78,6 +79,20 @@ export class MeetingGateway implements OnGatewayDisconnect {
       joinedAt: participant.joinedAt.toISOString(),
     };
     client.to(room).emit(MEETING_WS_EVENTS.PARTICIPANT_JOINED, broadcast);
+
+    // 늦게 입장한 클라이언트가 stale 한 빈 목록을 보지 않도록 본인에게만 기존
+    // 참가자 목록을 전달. 자기 자신은 제외.
+    const snapshot = meeting.snapshot();
+    const existing: MeetingParticipantsBroadcast = {
+      participants: snapshot.participants
+        .filter((p) => p.id !== participant.id && p.leftAt === null)
+        .map((p) => ({
+          socketId: p.id,
+          nickname: p.nickname,
+          joinedAt: p.joinedAt.toISOString(),
+        })),
+    };
+    client.emit(MEETING_WS_EVENTS.PARTICIPANTS, existing);
   }
 
   @SubscribeMessage(MEETING_WS_EVENTS.LEAVE)

@@ -38,6 +38,7 @@ const makeSocket = (id: string) => {
   const joined = new Set<string>();
   const broadcasts: Broadcast[] = [];
   const data: { code?: string } = {};
+  const selfEmits: Array<{ event: string; payload: unknown }> = [];
   const socket = {
     id,
     rooms: joined,
@@ -56,8 +57,12 @@ const makeSocket = (id: string) => {
         },
       };
     },
+    emit(event: string, payload: unknown): boolean {
+      selfEmits.push({ event, payload });
+      return true;
+    },
   };
-  return { socket, joined, broadcasts, data };
+  return { socket, joined, broadcasts, data, selfEmits };
 };
 
 const dtoOf = (code = 'abc12xyz', nickname = 'alice'): JoinMeetingDto => {

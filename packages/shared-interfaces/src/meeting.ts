@@ -53,6 +53,12 @@ export const MEETING_WS_EVENTS = {
   CHAT: 'meeting:chat',
   PARTICIPANT_JOINED: 'meeting:participantJoined',
   PARTICIPANT_LEFT: 'meeting:participantLeft',
+  /**
+   * 새로 입장한 참가자에게만 emit. 회의 입장 직후 기존 참가자 목록을 한 번
+   * 전달해 자동 재연결/늦은 입장에서 stale 한 빈 목록을 보지 않게 한다.
+   * (자신은 포함되지 않음)
+   */
+  PARTICIPANTS: 'meeting:participants',
   CHAT_POSTED: 'meeting:chatPosted',
 } as const;
 
@@ -91,4 +97,11 @@ export interface ChatPostedBroadcast {
   nickname: string;
   text: string;
   sentAt: string;
+}
+
+/**
+ * 회의 입장 직후 본인에게만 전달되는 기존 참가자 목록.
+ */
+export interface MeetingParticipantsBroadcast {
+  participants: ParticipantJoinedBroadcast[];
 }

@@ -6,6 +6,7 @@ import type { Socket } from 'socket.io-client';
 
 import {
   MEETING_WS_EVENTS,
+  type MeetingParticipantsBroadcast,
   type ParticipantJoinedBroadcast,
   type ParticipantLeftBroadcast,
 } from '@migration/shared-interfaces';
@@ -103,11 +104,23 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
     const onParticipantLeft = (p: ParticipantLeftBroadcast): void => {
       setRemoteParticipants((prev) => prev.filter((x) => x.socketId !== p.socketId));
     };
+    const onParticipants = (payload: MeetingParticipantsBroadcast): void => {
+      // 회의 입장 직후 본인에게만 오는 기존 참가자 스냅숏. stale 상태를 무시하고
+      // 서버 측 목록으로 덮어쓴다.
+      setRemoteParticipants(
+        payload.participants.map((p) => ({
+          socketId: p.socketId,
+          nickname: p.nickname,
+          joinedAt: p.joinedAt,
+        })),
+      );
+    };
 
     socket.on('connect', onConnect);
     socket.on('connect_error', onConnectError);
     socket.on(MEETING_WS_EVENTS.PARTICIPANT_JOINED, onParticipantJoined);
     socket.on(MEETING_WS_EVENTS.PARTICIPANT_LEFT, onParticipantLeft);
+    socket.on(MEETING_WS_EVENTS.PARTICIPANTS, onParticipants);
 
     if (socket.connected) {
       // 이미 connect 된 fake socket(테스트) 대응.
@@ -120,6 +133,7 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
       socket.off('connect_error', onConnectError);
       socket.off(MEETING_WS_EVENTS.PARTICIPANT_JOINED, onParticipantJoined);
       socket.off(MEETING_WS_EVENTS.PARTICIPANT_LEFT, onParticipantLeft);
+      socket.off(MEETING_WS_EVENTS.PARTICIPANTS, onParticipants);
       socket.disconnect();
       socketRef.current = null;
       setSocket(null);

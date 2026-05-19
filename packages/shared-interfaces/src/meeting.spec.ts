@@ -54,9 +54,9 @@ describe('meeting wire format', () => {
     }
   });
 
-  it('MEETING_WS_EVENTS는 client→server 3개 + server→client 3개 = 총 6개', () => {
-    expect(Object.values(MEETING_WS_EVENTS)).toHaveLength(6);
-    expect(new Set(Object.values(MEETING_WS_EVENTS)).size).toBe(6);
+  it('MEETING_WS_EVENTS는 client→server 3개 + server→client 4개 = 총 7개', () => {
+    expect(Object.values(MEETING_WS_EVENTS)).toHaveLength(7);
+    expect(new Set(Object.values(MEETING_WS_EVENTS)).size).toBe(7);
   });
 
   it('MeetingWsEventName 타입은 MEETING_WS_EVENTS 값들의 literal union이다 (컴파일 체크)', () => {

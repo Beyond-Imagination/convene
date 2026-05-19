@@ -51,6 +51,22 @@ export default defineConfig({
     },
   ],
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        // mediasoup 시나리오를 위한 Chromium fake media stream:
+        //  - `--use-fake-ui-for-media-stream`: getUserMedia 권한 자동 허용
+        //  - `--use-fake-device-for-media-stream`: 실제 카메라/마이크 없이
+        //    test pattern video + sine wave audio 를 송출
+        launchOptions: {
+          args: [
+            '--use-fake-ui-for-media-stream',
+            '--use-fake-device-for-media-stream',
+          ],
+        },
+        permissions: ['camera', 'microphone'],
+      },
+    },
   ],
 });
