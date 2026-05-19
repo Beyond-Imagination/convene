@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 
 import { MEDIASOUP_WS_EVENTS } from '@migration/shared-interfaces';
 
@@ -466,5 +466,73 @@ describe('useMediasoupViewModel.remoteConsume', () => {
       MEDIASOUP_WS_EVENTS.CONSUMER_CLOSED,
       expect.any(Function),
     );
+  });
+});
+
+describe('useMediasoupViewModel.reconnect', () => {
+  beforeEach(() => {
+    fakeDevice = new FakeDevice();
+    getUserMediaMock = vi.fn(async () => new FakeMediaStream());
+    vi.stubGlobal('navigator', {
+      mediaDevices: { getUserMedia: getUserMediaMock },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('socket 두 번째 connect 시 기존 transport 가 close 되고 새 transport 가 생성된다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    const sendOld = fakeDevice.createSendTransport.mock.results[0]
+      .value as FakeTransport;
+    const recvOld = fakeDevice.createRecvTransport.mock.results[0]
+      .value as FakeTransport;
+
+    const onConnect = captureSocketListener(socket, 'connect');
+    await act(async () => {
+      onConnect(); // 첫 connect 등록(count=1, reconnect 아님)
+      onConnect(); // 두 번째 connect = 재연결
+    });
+
+    await waitFor(() =>
+      expect(fakeDevice.createSendTransport).toHaveBeenCalledTimes(2),
+    );
+    expect(sendOld.close).toHaveBeenCalled();
+    expect(recvOld.close).toHaveBeenCalled();
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+  });
+
+  it('재연결 시 remoteMedia 가 초기화되어 stale 항목이 제거된다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    const onNewProducer = captureSocketListener(
+      socket,
+      MEDIASOUP_WS_EVENTS.NEW_PRODUCER,
+    );
+    onNewProducer({
+      peerSocketId: 's2',
+      producerId: 'p-stale',
+      kind: 'audio',
+      source: 'audio',
+    });
+    await waitFor(() => expect(result.current.remoteMedia).toHaveLength(1));
+
+    const onConnect = captureSocketListener(socket, 'connect');
+    await act(async () => {
+      onConnect();
+      onConnect();
+    });
+    await waitFor(() => expect(result.current.remoteMedia).toEqual([]));
   });
 });
