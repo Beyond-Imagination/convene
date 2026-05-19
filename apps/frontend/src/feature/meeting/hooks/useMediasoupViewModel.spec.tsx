@@ -393,4 +393,78 @@ describe('useMediasoupViewModel.remoteConsume', () => {
       expect.any(Function),
     );
   });
+
+  it('PRODUCER_CLOSED 수신 시 해당 producerId 항목이 remoteMedia 에서 제거된다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    const onNewProducer = captureSocketListener(
+      socket,
+      MEDIASOUP_WS_EVENTS.NEW_PRODUCER,
+    );
+    onNewProducer({
+      peerSocketId: 's2',
+      producerId: 'p-remote-audio',
+      kind: 'audio',
+      source: 'audio',
+    });
+    await waitFor(() => expect(result.current.remoteMedia).toHaveLength(1));
+
+    const onProducerClosed = captureSocketListener(
+      socket,
+      MEDIASOUP_WS_EVENTS.PRODUCER_CLOSED,
+    );
+    onProducerClosed({ producerId: 'p-remote-audio' });
+    await waitFor(() => expect(result.current.remoteMedia).toHaveLength(0));
+  });
+
+  it('CONSUMER_CLOSED 수신 시 해당 consumerId 항목이 remoteMedia 에서 제거된다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    const onNewProducer = captureSocketListener(
+      socket,
+      MEDIASOUP_WS_EVENTS.NEW_PRODUCER,
+    );
+    onNewProducer({
+      peerSocketId: 's2',
+      producerId: 'p-remote-audio',
+      kind: 'audio',
+      source: 'audio',
+    });
+    await waitFor(() => expect(result.current.remoteMedia).toHaveLength(1));
+
+    const onConsumerClosed = captureSocketListener(
+      socket,
+      MEDIASOUP_WS_EVENTS.CONSUMER_CLOSED,
+    );
+    onConsumerClosed({ consumerId: 'c-p-remote-audio' });
+    await waitFor(() => expect(result.current.remoteMedia).toHaveLength(0));
+  });
+
+  it('unmount 시 PRODUCER_CLOSED / CONSUMER_CLOSED 핸들러도 socket.off 로 해제된다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result, unmount } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    unmount();
+    expect(socket.off).toHaveBeenCalledWith(
+      MEDIASOUP_WS_EVENTS.PRODUCER_CLOSED,
+      expect.any(Function),
+    );
+    expect(socket.off).toHaveBeenCalledWith(
+      MEDIASOUP_WS_EVENTS.CONSUMER_CLOSED,
+      expect.any(Function),
+    );
+  });
 });
