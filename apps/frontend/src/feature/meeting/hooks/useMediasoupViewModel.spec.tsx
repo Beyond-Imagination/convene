@@ -540,6 +540,134 @@ describe('useMediasoupViewModel.reconnect', () => {
   });
 });
 
+describe('useMediasoupViewModel.screenShare', () => {
+  let getDisplayMediaMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fakeDevice = new FakeDevice();
+    getUserMediaMock = vi.fn(async () => new FakeMediaStream());
+    getDisplayMediaMock = vi.fn(async () => {
+      const stream = new FakeMediaStream();
+      // getDisplayMedia 는 video 만 반환하는 케이스가 일반적이라 audio track 은 제거.
+      stream.tracks.splice(0, 1);
+      return stream;
+    });
+    vi.stubGlobal('navigator', {
+      mediaDevices: {
+        getUserMedia: getUserMediaMock,
+        getDisplayMedia: getDisplayMediaMock,
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('초기 상태에서 isSharingScreen 은 false 이고 screenStream 은 null 이다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.isSharingScreen).toBe(false);
+    expect(result.current.screenStream).toBeNull();
+  });
+
+  it('startScreenShare() 호출 시 getDisplayMedia 가 호출되고 sendTransport.produce({source:screen}) 으로 produce 된다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    const send = fakeDevice.createSendTransport.mock.results[0]
+      .value as FakeTransport;
+    const initialProduceCount = send.produce.mock.calls.length;
+
+    await act(async () => {
+      await result.current.startScreenShare();
+    });
+
+    expect(getDisplayMediaMock).toHaveBeenCalledTimes(1);
+    expect(send.produce.mock.calls.length).toBe(initialProduceCount + 1);
+    const lastCall = send.produce.mock.calls[send.produce.mock.calls.length - 1];
+    expect(lastCall[0].appData).toEqual({ source: 'screen' });
+    expect(result.current.isSharingScreen).toBe(true);
+    expect(result.current.screenStream).not.toBeNull();
+  });
+
+  it('startScreenShare 의 produce 이벤트는 PRODUCE RPC 의 source=screen 으로 위임된다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    const send = fakeDevice.createSendTransport.mock.results[0]
+      .value as FakeTransport;
+    await act(async () => {
+      await result.current.startScreenShare();
+    });
+
+    const callback = vi.fn();
+    const errback = vi.fn();
+    socket.emitWithAck.mockClear();
+    send.listeners.get('produce')?.[0](
+      { kind: 'video', rtpParameters: { codecs: [] }, appData: { source: 'screen' } },
+      callback,
+      errback,
+    );
+    await waitFor(() => expect(callback).toHaveBeenCalled());
+    const produceCall = socket.emitWithAck.mock.calls.find(
+      (c) => c[0] === MEDIASOUP_WS_EVENTS.PRODUCE,
+    );
+    expect(produceCall?.[1]).toEqual(
+      expect.objectContaining({ source: 'screen', kind: 'video' }),
+    );
+  });
+
+  it('stopScreenShare() 호출 시 screenStream track 이 stop 되고 상태가 초기화된다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => {
+      await result.current.startScreenShare();
+    });
+    const stream = result.current.screenStream as unknown as FakeMediaStream;
+    expect(stream).not.toBeNull();
+
+    await act(async () => {
+      result.current.stopScreenShare();
+    });
+
+    expect(result.current.isSharingScreen).toBe(false);
+    expect(result.current.screenStream).toBeNull();
+    for (const t of stream.getTracks()) expect(t.stop).toHaveBeenCalled();
+  });
+
+  it('이미 공유 중이면 startScreenShare 는 getDisplayMedia 를 두 번 호출하지 않는다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => {
+      await result.current.startScreenShare();
+    });
+    expect(getDisplayMediaMock).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await result.current.startScreenShare();
+    });
+    expect(getDisplayMediaMock).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('useMediasoupViewModel.listProducers (기존 producer 합류)', () => {
   beforeEach(() => {
     fakeDevice = new FakeDevice();
@@ -574,7 +702,7 @@ describe('useMediasoupViewModel.listProducers (기존 producer 합류)', () => {
     expect(listCalls[0][1]).toEqual({ code });
   });
 
-  it('LIST_PRODUCERS 응답의 각 producer 가 NEW_PRODUCER 와 동일 흐름으로 consume 된다', async () => {
+  it('LIST_PRODUCERS 응답의 각 producer 는 NEW_PRODUCER 와 동일 흐름으로 consume 된다', async () => {
     const socket = new FakeSocket();
     socket.emitWithAck.mockImplementation(async (event: string, payload: unknown) => {
       if (event === MEDIASOUP_WS_EVENTS.GET_RTP_CAPABILITIES) {
