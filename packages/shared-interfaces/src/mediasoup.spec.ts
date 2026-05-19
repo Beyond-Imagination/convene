@@ -12,6 +12,8 @@ import {
   type CreateTransportResponse,
   type GetRtpCapabilitiesRequest,
   type GetRtpCapabilitiesResponse,
+  type ListProducersRequest,
+  type ListProducersResponse,
   type MediasoupWsEventName,
   type MediaType,
   type NewProducerBroadcast,
@@ -29,9 +31,9 @@ describe('Mediasoup wire format', () => {
     }
   });
 
-  it('WS 이벤트 이름은 모두 서로 다르고 9개다 (RPC 6 + 브로드캐스트 3)', () => {
+  it('WS 이벤트 이름은 모두 서로 다르고 10개다 (RPC 7 + 브로드캐스트 3)', () => {
     const all = Object.values(MEDIASOUP_WS_EVENTS);
-    expect(all).toHaveLength(9);
+    expect(all).toHaveLength(10);
     expect(new Set(all).size).toBe(all.length);
   });
 
@@ -98,7 +100,9 @@ describe('Mediasoup wire format', () => {
     };
     const l: ProducerClosedBroadcast = { producerId: 'p1' };
     const m: ConsumerClosedBroadcast = { consumerId: 'c1' };
+    const n: ListProducersRequest = { code: 'ABCDEFGH' };
+    const o: ListProducersResponse = { producers: [k] };
 
-    expect([a, b, c, d, e, f, g, h, i, j, k, l, m]).toHaveLength(13);
+    expect([a, b, c, d, e, f, g, h, i, j, k, l, m, n, o]).toHaveLength(15);
   });
 });

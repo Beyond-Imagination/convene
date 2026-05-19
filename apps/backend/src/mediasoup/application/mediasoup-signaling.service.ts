@@ -1,6 +1,7 @@
 import {
   ConsumeResponse,
   CreateTransportResponse,
+  type ListProducersResponse,
   MEDIASOUP_EVENTS,
   MediaType,
   TransportDirection,
@@ -175,6 +176,10 @@ export class MediasoupSignalingService {
 
   async resumeConsumer(command: ResumeConsumerCommand): Promise<void> {
     await this.deps.transportPort.resumeConsumer(command.consumerId);
+  }
+
+  async listProducers(_command: ParticipantCommand): Promise<ListProducersResponse> {
+    throw new Error('not implemented');
   }
 
   private async requireParticipantMedia(participantId: string): Promise<ParticipantMedia> {

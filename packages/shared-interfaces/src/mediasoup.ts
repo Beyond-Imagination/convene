@@ -28,6 +28,7 @@ export const MEDIASOUP_WS_EVENTS = {
   PRODUCE: 'mediasoup:produce',
   CONSUME: 'mediasoup:consume',
   RESUME_CONSUMER: 'mediasoup:resumeConsumer',
+  LIST_PRODUCERS: 'mediasoup:listProducers',
   NEW_PRODUCER: 'mediasoup:newProducer',
   PRODUCER_CLOSED: 'mediasoup:producerClosed',
   CONSUMER_CLOSED: 'mediasoup:consumerClosed',
@@ -99,6 +100,19 @@ export interface ConsumeResponse {
 export interface ResumeConsumerRequest {
   code: string;
   consumerId: string;
+}
+
+/**
+ * 회의에 늦게 입장한 참가자가 기존 producer 들을 받아오기 위해 호출하는 RPC.
+ * 자기 자신의 producer 는 제외한다. 응답을 받은 클라이언트는 각 항목을
+ * `NEW_PRODUCER` 브로드캐스트와 동일하게 처리(`CONSUME` → resume)한다.
+ */
+export interface ListProducersRequest {
+  code: string;
+}
+
+export interface ListProducersResponse {
+  producers: NewProducerBroadcast[];
 }
 
 // ---------- server → client: 브로드캐스트 ----------

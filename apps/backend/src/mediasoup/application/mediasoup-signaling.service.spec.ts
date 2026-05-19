@@ -430,3 +430,66 @@ describe('MediasoupSignalingService.resumeConsumer', () => {
     ).toBe(true);
   });
 });
+
+describe('MediasoupSignalingService.listProducers', () => {
+  const setupTwoProducers = async () => {
+    const ctx = makeService();
+    await ctx.service.openRoom({ meetingCode });
+    await ctx.service.admitParticipant({ meetingCode, participantId: 's1' });
+    await ctx.service.admitParticipant({ meetingCode, participantId: 's2' });
+    await ctx.service.createTransport({
+      meetingCode,
+      participantId: 's1',
+      direction: 'send',
+    });
+    const s1Media = (
+      await ctx.repo.repository.findByMeetingCode(meetingCode)
+    ).find((p) => p.participantId === 's1')!;
+    await ctx.service.produce({
+      meetingCode,
+      participantId: 's1',
+      transportId: s1Media.sendTransportId!,
+      kind: 'audio',
+      source: 'audio',
+      rtpParameters: {},
+    });
+    await ctx.service.produce({
+      meetingCode,
+      participantId: 's1',
+      transportId: s1Media.sendTransportId!,
+      kind: 'video',
+      source: 'video',
+      rtpParameters: {},
+    });
+    return ctx;
+  };
+
+  it('회의 안의 다른 참가자 producer 들을 NewProducerBroadcast 배열로 반환한다', async () => {
+    const { service } = await setupTwoProducers();
+    const res = await service.listProducers({
+      meetingCode,
+      participantId: 's2',
+    });
+    expect(res.producers).toHaveLength(2);
+    expect(res.producers.map((p) => p.kind).sort()).toEqual(['audio', 'video']);
+    expect(res.producers.every((p) => p.peerSocketId === 's1')).toBe(true);
+  });
+
+  it('자기 자신의 producer 는 제외한다', async () => {
+    const { service } = await setupTwoProducers();
+    const res = await service.listProducers({
+      meetingCode,
+      participantId: 's1',
+    });
+    expect(res.producers).toEqual([]);
+  });
+
+  it('회의에 admit 되지 않은 참가자라도 다른 참가자 producer 목록은 받을 수 있다', async () => {
+    const { service } = await setupTwoProducers();
+    const res = await service.listProducers({
+      meetingCode,
+      participantId: 'unknown-sid',
+    });
+    expect(res.producers).toHaveLength(2);
+  });
+});
