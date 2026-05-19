@@ -4,7 +4,10 @@ import type {
   RemoteParticipant,
   UseMeetingViewModel,
 } from '@/feature/meeting/hooks/useMeetingViewModel';
-import type { UseMediasoupViewModel } from '@/feature/meeting/hooks/useMediasoupViewModel';
+import type {
+  RemoteMediaEntry,
+  UseMediasoupViewModel,
+} from '@/feature/meeting/hooks/useMediasoupViewModel';
 
 import { MeetingScreen } from './MeetingScreen';
 
@@ -13,6 +16,23 @@ const baseMediasoup = (
 ): UseMediasoupViewModel => ({
   status: 'ready',
   errorMessage: null,
+  localStream: null,
+  remoteMedia: [],
+  ...overrides,
+});
+
+const fakeTrack = (kind: 'audio' | 'video'): MediaStreamTrack =>
+  ({ kind } as unknown as MediaStreamTrack);
+
+const fakeStream = (): MediaStream => ({}) as unknown as MediaStream;
+
+const remoteEntry = (
+  overrides: Partial<RemoteMediaEntry> & Pick<RemoteMediaEntry, 'peerSocketId' | 'kind'>,
+): RemoteMediaEntry => ({
+  consumerId: `c-${overrides.peerSocketId}-${overrides.kind}`,
+  producerId: `p-${overrides.peerSocketId}-${overrides.kind}`,
+  source: overrides.kind === 'video' ? 'video' : 'audio',
+  track: fakeTrack(overrides.kind),
   ...overrides,
 });
 
@@ -90,5 +110,79 @@ describe('MeetingScreen View', () => {
     const alerts = screen.getAllByRole('alert');
     expect(alerts.some((el) => el.textContent?.includes('미디어 오류'))).toBe(true);
     expect(alerts.some((el) => el.textContent?.includes('no ice'))).toBe(true);
+  });
+
+  it('localStream + 내 닉네임이 있으면 self video tile 이 닉네임과 함께 렌더된다', () => {
+    const stream = fakeStream();
+    renderScreen({ nickname: '준' }, { localStream: stream });
+    const tile = screen.getByTestId('local-video-tile');
+    expect(tile).toHaveTextContent('준');
+    expect(tile).toHaveTextContent('(나)');
+    const video = tile.querySelector('video') as HTMLVideoElement;
+    expect(video).not.toBeNull();
+    expect(video.srcObject).toBe(stream);
+    expect(video.muted).toBe(true);
+  });
+
+  it('localStream 이 null 이면 self video tile 의 video 는 srcObject 가 비어 있다', () => {
+    renderScreen({ nickname: '준' }, { localStream: null });
+    const tile = screen.getByTestId('local-video-tile');
+    const video = tile.querySelector('video') as HTMLVideoElement;
+    expect(video.srcObject).toBeNull();
+  });
+
+  it('각 remoteParticipant 에 대해 remote video tile 이 닉네임과 함께 렌더된다', () => {
+    const remoteParticipants: RemoteParticipant[] = [
+      { socketId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z' },
+      { socketId: 's3', nickname: '벤', joinedAt: '2026-01-01T00:02:00.000Z' },
+    ];
+    renderScreen(
+      { remoteParticipants },
+      { remoteMedia: [remoteEntry({ peerSocketId: 's2', kind: 'video' })] },
+    );
+    const tiles = screen.getAllByTestId('remote-video-tile');
+    expect(tiles).toHaveLength(2);
+    expect(tiles[0]).toHaveTextContent('아');
+    expect(tiles[1]).toHaveTextContent('벤');
+  });
+
+  it('peerSocketId 와 매칭되는 video track 의 srcObject 가 video 요소에 attach 된다', () => {
+    const track = fakeTrack('video');
+    const remoteParticipants: RemoteParticipant[] = [
+      { socketId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z' },
+    ];
+    renderScreen(
+      { remoteParticipants },
+      {
+        remoteMedia: [
+          { ...remoteEntry({ peerSocketId: 's2', kind: 'video' }), track },
+        ],
+      },
+    );
+    const tile = screen.getByTestId('remote-video-tile');
+    const video = tile.querySelector('video') as HTMLVideoElement;
+    expect(video.srcObject).not.toBeNull();
+    const stream = video.srcObject as MediaStream;
+    expect(stream.getVideoTracks()).toContain(track);
+  });
+
+  it('매칭되는 audio track 이 있으면 audio 요소가 함께 attach 된다', () => {
+    const audioTrack = fakeTrack('audio');
+    const remoteParticipants: RemoteParticipant[] = [
+      { socketId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z' },
+    ];
+    renderScreen(
+      { remoteParticipants },
+      {
+        remoteMedia: [
+          { ...remoteEntry({ peerSocketId: 's2', kind: 'audio' }), track: audioTrack },
+        ],
+      },
+    );
+    const tile = screen.getByTestId('remote-video-tile');
+    const audio = tile.querySelector('audio') as HTMLAudioElement;
+    expect(audio).not.toBeNull();
+    expect(audio.srcObject).not.toBeNull();
+    expect((audio.srcObject as MediaStream).getAudioTracks()).toContain(audioTrack);
   });
 });
