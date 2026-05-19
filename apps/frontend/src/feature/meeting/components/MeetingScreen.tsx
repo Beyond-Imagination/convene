@@ -1,18 +1,34 @@
 'use client';
 
-import type { UseMediasoupViewModel } from '@/feature/meeting/hooks/useMediasoupViewModel';
+import { LocalVideoTile } from '@/feature/meeting/components/LocalVideoTile';
+import { RemoteVideoTile } from '@/feature/meeting/components/RemoteVideoTile';
+import type {
+  RemoteMediaEntry,
+  UseMediasoupViewModel,
+} from '@/feature/meeting/hooks/useMediasoupViewModel';
 import type { UseMeetingViewModel } from '@/feature/meeting/hooks/useMeetingViewModel';
 
 /**
  * 회의 화면의 dumb View.
  *
  * ARCHITECTURE §4.2 — useState/useEffect/fetch/socket 호출 금지. ViewModel hook
- * 반환을 그대로 prop 타입으로 받는다. v1 단계는 채팅/미디어 없이 참가자 목록과
- * 상태 표시만 다룬다.
+ * 반환을 그대로 prop 타입으로 받는다. self + remote video tile 의 srcObject
+ * attach 는 각 tile 컴포넌트의 ref callback 에서 처리.
  */
 export interface MeetingScreenProps extends UseMeetingViewModel {
   readonly mediasoup: UseMediasoupViewModel;
 }
+
+const pickTrack = (
+  remoteMedia: ReadonlyArray<RemoteMediaEntry>,
+  peerSocketId: string,
+  kind: 'audio' | 'video',
+): MediaStreamTrack | null => {
+  for (const m of remoteMedia) {
+    if (m.peerSocketId === peerSocketId && m.kind === kind) return m.track;
+  }
+  return null;
+};
 
 export function MeetingScreen({
   code,
@@ -64,6 +80,18 @@ export function MeetingScreen({
             </li>
           ))}
         </ul>
+      </section>
+      <section aria-labelledby="video-tiles-heading">
+        <h2 id="video-tiles-heading">비디오</h2>
+        <LocalVideoTile nickname={nickname} stream={mediasoup.localStream} />
+        {remoteParticipants.map((p) => (
+          <RemoteVideoTile
+            key={p.socketId}
+            participant={p}
+            videoTrack={pickTrack(mediasoup.remoteMedia, p.socketId, 'video')}
+            audioTrack={pickTrack(mediasoup.remoteMedia, p.socketId, 'audio')}
+          />
+        ))}
       </section>
     </main>
   );
