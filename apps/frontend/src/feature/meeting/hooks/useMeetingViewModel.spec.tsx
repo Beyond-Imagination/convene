@@ -174,4 +174,48 @@ describe('useMeetingViewModel', () => {
     expect(useSessionStore.getState().nickname).toBeNull();
     expect(pushMock).toHaveBeenCalledWith('/');
   });
+
+  it('자동 재연결 시(connect 두 번째 발생) JOIN 을 다시 emit 한다', () => {
+    setup('준');
+    connect(); // 첫 connect
+    fakeSocket.emit.mockClear();
+    act(() => {
+      fakeSocket.trigger('connect'); // 재연결 시뮬
+    });
+    expect(fakeSocket.emit).toHaveBeenCalledWith(MEETING_WS_EVENTS.JOIN, {
+      code,
+      nickname: '준',
+    });
+  });
+
+  it('자동 재연결 시 remoteParticipants 가 초기화되어 stale 항목이 제거된다', () => {
+    const { result } = setup('준');
+    connect();
+    act(() => {
+      fakeSocket.trigger(MEETING_WS_EVENTS.PARTICIPANT_JOINED, {
+        socketId: 's2',
+        nickname: '아',
+        joinedAt: '2026-01-01T00:01:00.000Z',
+      });
+    });
+    expect(result.current.remoteParticipants).toHaveLength(1);
+    act(() => {
+      fakeSocket.trigger('connect'); // 재연결
+    });
+    expect(result.current.remoteParticipants).toEqual([]);
+  });
+
+  it('재연결 후 reconnectGen 이 증가해 외부에 노출된다', () => {
+    const { result } = setup('준');
+    connect();
+    expect(result.current.reconnectGen).toBe(0);
+    act(() => {
+      fakeSocket.trigger('connect');
+    });
+    expect(result.current.reconnectGen).toBe(1);
+    act(() => {
+      fakeSocket.trigger('connect');
+    });
+    expect(result.current.reconnectGen).toBe(2);
+  });
 });
