@@ -10,6 +10,8 @@ import {
   type ConsumerClosedBroadcast,
   type CreateTransportResponse,
   type GetRtpCapabilitiesResponse,
+  type ListProducersRequest,
+  type ListProducersResponse,
   type MediaType,
   MEDIASOUP_WS_EVENTS,
   type NewProducerBroadcast,
@@ -309,6 +311,23 @@ export function useMediasoupViewModel(
     socket.on(MEDIASOUP_WS_EVENTS.NEW_PRODUCER, onNewProducer);
     socket.on(MEDIASOUP_WS_EVENTS.PRODUCER_CLOSED, onProducerClosed);
     socket.on(MEDIASOUP_WS_EVENTS.CONSUMER_CLOSED, onConsumerClosed);
+
+    // 늦게 입장한 클라이언트가 기존 producer 들을 받아오기 위해 한 번 조회.
+    // NEW_PRODUCER 핸들러를 그대로 재사용해 동일한 consume 흐름을 탄다.
+    void (async () => {
+      try {
+        const listReq: ListProducersRequest = { code };
+        const res = (await socket.emitWithAck(
+          MEDIASOUP_WS_EVENTS.LIST_PRODUCERS,
+          listReq,
+        )) as ListProducersResponse;
+        if (cancelled) return;
+        for (const p of res.producers) onNewProducer(p);
+      } catch {
+        // backend 가 LIST_PRODUCERS 를 지원하지 않거나 응답 실패 시 swallow.
+      }
+    })();
+
     return () => {
       cancelled = true;
       socket.off(MEDIASOUP_WS_EVENTS.NEW_PRODUCER, onNewProducer);

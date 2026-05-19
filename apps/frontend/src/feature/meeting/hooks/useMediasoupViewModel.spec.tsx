@@ -169,9 +169,9 @@ describe('useMediasoupViewModel.mount', () => {
     );
     await waitFor(() => expect(result.current.status).toBe('ready'));
 
-    // 호출된 RPC 이름 순서 검증
+    // 호출된 RPC 이름 순서 검증(앞 3개 — ready 도달 후 LIST_PRODUCERS 등 후속 RPC 는 무시)
     const calls = socket.emitWithAck.mock.calls.map((c) => c[0]);
-    expect(calls).toEqual([
+    expect(calls.slice(0, 3)).toEqual([
       MEDIASOUP_WS_EVENTS.GET_RTP_CAPABILITIES,
       MEDIASOUP_WS_EVENTS.CREATE_TRANSPORT,
       MEDIASOUP_WS_EVENTS.CREATE_TRANSPORT,
