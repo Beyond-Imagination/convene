@@ -42,10 +42,17 @@ class FakeSocket {
 
 let fakeSocket: FakeSocket;
 
-const pushMock = vi.fn();
-const replaceMock = vi.fn();
+const { pushMock, replaceMock, routerMock } = vi.hoisted(() => {
+  const pushMock = vi.fn();
+  const replaceMock = vi.fn();
+  return {
+    pushMock,
+    replaceMock,
+    routerMock: { push: pushMock, replace: replaceMock } as const,
+  };
+});
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: pushMock, replace: replaceMock }),
+  useRouter: () => routerMock,
 }));
 
 vi.mock('@/shared/socket/meeting.socket', () => ({

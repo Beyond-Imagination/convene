@@ -46,6 +46,11 @@ export interface UseMeetingViewModel {
    * emit/listen 하도록 노출한다. mount 직후 또는 nickname 없는 redirect 상태에서는 null.
    */
   readonly socket: Socket | null;
+  /**
+   * 자동 재연결 횟수. 0=초기 연결, 1 이상=재연결 횟수.
+   * useMediasoupViewModel 이 본 값을 deps 로 사용해 transport 를 재구축한다.
+   */
+  readonly reconnectGen: number;
   readonly leave: () => void;
 }
 
@@ -58,7 +63,9 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
   const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [reconnectGen, setReconnectGen] = useState(0);
   const socketRef = useRef<Socket | null>(null);
+  const connectCountRef = useRef(0);
 
   useEffect(() => {
     if (nickname === null) {
@@ -69,9 +76,17 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
     const next = connectMeetingSocket();
     socketRef.current = next;
     setSocket(next);
+    connectCountRef.current = 0;
+    setReconnectGen(0);
     const socket = next;
 
     const onConnect = (): void => {
+      connectCountRef.current += 1;
+      if (connectCountRef.current > 1) {
+        // 재연결: 끊긴 동안의 stale 참가자 정보를 버리고 backend 의 새 broadcast 로 다시 채운다.
+        setRemoteParticipants([]);
+        setReconnectGen(connectCountRef.current - 1);
+      }
       socket.emit(MEETING_WS_EVENTS.JOIN, { code, nickname });
       setStatus('joined');
     };
@@ -130,6 +145,7 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
     remoteParticipants,
     errorMessage,
     socket,
+    reconnectGen,
     leave,
   };
 }
