@@ -1,7 +1,7 @@
 'use client';
 
-import type { Device, Transport } from 'mediasoup-client/lib/types';
-import { useEffect, useRef, useState } from 'react';
+import type { Device, Producer, Transport } from 'mediasoup-client/lib/types';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 
 import {
@@ -54,6 +54,15 @@ export interface UseMediasoupViewModel {
   readonly errorMessage: string | null;
   readonly localStream: MediaStream | null;
   readonly remoteMedia: ReadonlyArray<RemoteMediaEntry>;
+  readonly isSharingScreen: boolean;
+  readonly screenStream: MediaStream | null;
+  /**
+   * 사용자의 화면을 mediasoup 으로 produce 한다. getDisplayMedia 권한 거부나
+   * 이미 공유 중인 경우 noop. produce 이벤트는 sendTransport 의 'produce' 핸들러
+   * 가 PRODUCE RPC(source='screen') 로 위임한다.
+   */
+  readonly startScreenShare: () => Promise<void>;
+  readonly stopScreenShare: () => void;
 }
 
 export function useMediasoupViewModel(
@@ -65,10 +74,14 @@ export function useMediasoupViewModel(
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteMedia, setRemoteMedia] = useState<RemoteMediaEntry[]>([]);
   const [reconnectGen, setReconnectGen] = useState(0);
+  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+  const [isSharingScreen, setIsSharingScreen] = useState(false);
   const deviceRef = useRef<Device | null>(null);
   const sendTransportRef = useRef<Transport | null>(null);
   const recvTransportRef = useRef<Transport | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
+  const screenProducerRef = useRef<Producer | null>(null);
   const connectCountRef = useRef(0);
 
   /**
@@ -336,5 +349,62 @@ export function useMediasoupViewModel(
     };
   }, [status, socket, code]);
 
-  return { status, errorMessage, localStream, remoteMedia };
+  const startScreenShare = useCallback(async () => {
+    if (screenProducerRef.current !== null) return;
+    const sendTransport = sendTransportRef.current;
+    if (sendTransport === null) return;
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack === undefined) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      const producer = await sendTransport.produce({
+        track: videoTrack as never,
+        appData: { source: 'screen' as MediaType },
+      });
+      screenStreamRef.current = stream;
+      screenProducerRef.current = producer;
+      setScreenStream(stream);
+      setIsSharingScreen(true);
+      // 사용자가 브라우저 UI 의 '공유 중지' 를 눌렀을 때 트랙이 ended 로 전이된다.
+      videoTrack.addEventListener('ended', () => stopScreenShare());
+    } catch (e) {
+      // 권한 거부 등은 noop — 상태 그대로 둔다.
+      const message = e instanceof Error ? e.message : String(e);
+      setErrorMessage(message);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const stopScreenShare = useCallback(() => {
+    const producer = screenProducerRef.current;
+    const stream = screenStreamRef.current;
+    if (producer !== null) {
+      try {
+        producer.close();
+      } catch {
+        // already closed
+      }
+    }
+    if (stream !== null) {
+      stream.getTracks().forEach((t) => t.stop());
+    }
+    screenProducerRef.current = null;
+    screenStreamRef.current = null;
+    setScreenStream(null);
+    setIsSharingScreen(false);
+  }, []);
+
+  return {
+    status,
+    errorMessage,
+    localStream,
+    remoteMedia,
+    isSharingScreen,
+    screenStream,
+    startScreenShare,
+    stopScreenShare,
+  };
 }

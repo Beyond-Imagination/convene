@@ -2,6 +2,10 @@
 
 import { LocalVideoTile } from '@/feature/meeting/components/LocalVideoTile';
 import { RemoteVideoTile } from '@/feature/meeting/components/RemoteVideoTile';
+import {
+  LocalScreenTile,
+  RemoteScreenTile,
+} from '@/feature/meeting/components/ScreenTile';
 import type {
   RemoteMediaEntry,
   UseMediasoupViewModel,
@@ -25,7 +29,23 @@ const pickTrack = (
   kind: 'audio' | 'video',
 ): MediaStreamTrack | null => {
   for (const m of remoteMedia) {
-    if (m.peerSocketId === peerSocketId && m.kind === kind) return m.track;
+    if (
+      m.peerSocketId === peerSocketId &&
+      m.kind === kind &&
+      m.source !== 'screen'
+    ) {
+      return m.track;
+    }
+  }
+  return null;
+};
+
+const pickScreenTrack = (
+  remoteMedia: ReadonlyArray<RemoteMediaEntry>,
+  peerSocketId: string,
+): MediaStreamTrack | null => {
+  for (const m of remoteMedia) {
+    if (m.peerSocketId === peerSocketId && m.source === 'screen') return m.track;
   }
   return null;
 };
@@ -92,6 +112,35 @@ export function MeetingScreen({
             audioTrack={pickTrack(mediasoup.remoteMedia, p.socketId, 'audio')}
           />
         ))}
+      </section>
+      <section aria-labelledby="screen-share-heading">
+        <h2 id="screen-share-heading">화면 공유</h2>
+        {mediasoup.isSharingScreen ? (
+          <button type="button" onClick={mediasoup.stopScreenShare}>
+            공유 중지
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void mediasoup.startScreenShare()}
+          >
+            화면 공유 시작
+          </button>
+        )}
+        {mediasoup.isSharingScreen && mediasoup.screenStream !== null && (
+          <LocalScreenTile stream={mediasoup.screenStream} />
+        )}
+        {remoteParticipants.map((p) => {
+          const track = pickScreenTrack(mediasoup.remoteMedia, p.socketId);
+          if (track === null) return null;
+          return (
+            <RemoteScreenTile
+              key={`screen-${p.socketId}`}
+              nickname={p.nickname}
+              track={track}
+            />
+          );
+        })}
       </section>
     </main>
   );
