@@ -5,12 +5,16 @@ import { useEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 
 import {
+  type ConsumeRequest,
+  type ConsumeResponse,
   type CreateTransportResponse,
   type GetRtpCapabilitiesResponse,
   type MediaType,
   MEDIASOUP_WS_EVENTS,
+  type NewProducerBroadcast,
   type ProduceRequest,
   type ProduceResponse,
+  type ResumeConsumerRequest,
 } from '@migration/shared-interfaces';
 
 import { createMediasoupDevice } from '@/shared/socket/mediasoup-device.factory';
@@ -32,10 +36,20 @@ import { createMediasoupDevice } from '@/shared/socket/mediasoup-device.factory'
 
 export type MediasoupConnectionStatus = 'idle' | 'preparing' | 'ready' | 'error';
 
+export interface RemoteMediaEntry {
+  readonly consumerId: string;
+  readonly peerSocketId: string;
+  readonly producerId: string;
+  readonly kind: 'audio' | 'video';
+  readonly source: MediaType;
+  readonly track: MediaStreamTrack;
+}
+
 export interface UseMediasoupViewModel {
   readonly status: MediasoupConnectionStatus;
   readonly errorMessage: string | null;
   readonly localStream: MediaStream | null;
+  readonly remoteMedia: ReadonlyArray<RemoteMediaEntry>;
 }
 
 export function useMediasoupViewModel(
@@ -45,6 +59,7 @@ export function useMediasoupViewModel(
   const [status, setStatus] = useState<MediasoupConnectionStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteMedia, setRemoteMedia] = useState<RemoteMediaEntry[]>([]);
   const deviceRef = useRef<Device | null>(null);
   const sendTransportRef = useRef<Transport | null>(null);
   const recvTransportRef = useRef<Transport | null>(null);
@@ -197,5 +212,72 @@ export function useMediasoupViewModel(
     };
   }, [status]);
 
-  return { status, errorMessage, localStream };
+  /**
+   * status='ready' 도달 후 NEW_PRODUCER 브로드캐스트 구독.
+   * 같은 회의의 다른 참가자가 producer 를 만들 때마다:
+   *   1) CONSUME RPC 로 consumer 정보 요청
+   *   2) recvTransport.consume 으로 client 측 Consumer 생성
+   *   3) RESUME_CONSUMER RPC (backend 는 paused 로 시작)
+   *   4) remoteMedia state 에 entry 추가
+   */
+  useEffect(() => {
+    if (status !== 'ready' || socket === null) return undefined;
+    const recvTransport = recvTransportRef.current;
+    const device = deviceRef.current;
+    if (recvTransport === null || device === null) return undefined;
+    let cancelled = false;
+
+    const onNewProducer = (payload: NewProducerBroadcast): void => {
+      void (async () => {
+        try {
+          const consumeRequest: ConsumeRequest = {
+            code,
+            transportId: recvTransport.id,
+            producerId: payload.producerId,
+            rtpCapabilities: device.rtpCapabilities as unknown,
+          };
+          const consumeRes = (await socket.emitWithAck(
+            MEDIASOUP_WS_EVENTS.CONSUME,
+            consumeRequest,
+          )) as ConsumeResponse;
+          if (cancelled) return;
+          const consumer = await recvTransport.consume({
+            id: consumeRes.id,
+            producerId: consumeRes.producerId,
+            kind: consumeRes.kind,
+            rtpParameters: consumeRes.rtpParameters as never,
+          });
+          if (cancelled) return;
+          const resumeRequest: ResumeConsumerRequest = {
+            code,
+            consumerId: consumeRes.id,
+          };
+          await socket.emitWithAck(
+            MEDIASOUP_WS_EVENTS.RESUME_CONSUMER,
+            resumeRequest,
+          );
+          if (cancelled) return;
+          const entry: RemoteMediaEntry = {
+            consumerId: consumeRes.id,
+            peerSocketId: payload.peerSocketId,
+            producerId: payload.producerId,
+            kind: payload.kind,
+            source: payload.source,
+            track: (consumer as unknown as { track: MediaStreamTrack }).track,
+          };
+          setRemoteMedia((prev) => [...prev, entry]);
+        } catch {
+          // 한 개 consumer 실패는 전체 연결을 끊지 않는다.
+        }
+      })();
+    };
+
+    socket.on(MEDIASOUP_WS_EVENTS.NEW_PRODUCER, onNewProducer);
+    return () => {
+      cancelled = true;
+      socket.off(MEDIASOUP_WS_EVENTS.NEW_PRODUCER, onNewProducer);
+    };
+  }, [status, socket, code]);
+
+  return { status, errorMessage, localStream, remoteMedia };
 }
