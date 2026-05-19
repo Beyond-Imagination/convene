@@ -178,8 +178,23 @@ export class MediasoupSignalingService {
     await this.deps.transportPort.resumeConsumer(command.consumerId);
   }
 
-  async listProducers(_command: ParticipantCommand): Promise<ListProducersResponse> {
-    throw new Error('not implemented');
+  async listProducers(command: ParticipantCommand): Promise<ListProducersResponse> {
+    const peers = await this.deps.participantMediaRepository.findByMeetingCode(
+      command.meetingCode,
+    );
+    const producers: ListProducersResponse['producers'] = [];
+    for (const peer of peers) {
+      if (peer.participantId === command.participantId) continue;
+      for (const producer of peer.producers) {
+        producers.push({
+          peerSocketId: peer.participantId,
+          producerId: producer.id,
+          kind: producer.kind,
+          source: producer.source,
+        });
+      }
+    }
+    return { producers };
   }
 
   private async requireParticipantMedia(participantId: string): Promise<ParticipantMedia> {

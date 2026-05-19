@@ -16,6 +16,7 @@ import {
   type ConsumeResponse,
   type CreateTransportResponse,
   type GetRtpCapabilitiesResponse,
+  type ListProducersResponse,
   type MediaType,
   type NewProducerBroadcast,
   type ProduceResponse,
@@ -26,6 +27,7 @@ import { ConnectTransportDto } from '@/mediasoup/interface/dto/connect-transport
 import { ConsumeDto } from '@/mediasoup/interface/dto/consume.dto';
 import { CreateTransportDto } from '@/mediasoup/interface/dto/create-transport.dto';
 import { GetRtpCapabilitiesDto } from '@/mediasoup/interface/dto/get-rtp-capabilities.dto';
+import { ListProducersDto } from '@/mediasoup/interface/dto/list-producers.dto';
 import { ProduceDto } from '@/mediasoup/interface/dto/produce.dto';
 import { ResumeConsumerDto } from '@/mediasoup/interface/dto/resume-consumer.dto';
 
@@ -143,6 +145,17 @@ export class MediasoupGateway {
       meetingCode: dto.code,
       participantId: client.id,
       consumerId: dto.consumerId,
+    });
+  }
+
+  @SubscribeMessage(MEDIASOUP_WS_EVENTS.LIST_PRODUCERS)
+  async handleListProducers(
+    @MessageBody() dto: ListProducersDto,
+    @ConnectedSocket() client: Socket,
+  ): Promise<ListProducersResponse> {
+    return this.service.listProducers({
+      meetingCode: dto.code,
+      participantId: client.id,
     });
   }
 
