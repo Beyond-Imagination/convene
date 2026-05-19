@@ -19,11 +19,7 @@ export default function HomePage() {
   return (
     <main>
       <h1>migration v1.0.0</h1>
-      <CreateMeetingForm
-        status={createVm.status}
-        errorMessage={createVm.errorMessage}
-        onSubmit={createVm.submit}
-      />
+      <CreateMeetingForm {...createVm} />
       <JoinMeetingForm {...joinVm} />
     </main>
   );
