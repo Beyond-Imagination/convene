@@ -1,12 +1,18 @@
 'use client';
 
+import { useCallback, useEffect, useState } from 'react';
+
 import type { ReportListItem } from '@migration/shared-interfaces';
 
-/**
- * /reports 회의록 목록 페이지의 ViewModel — spec 단계 stub.
- * 실제 fetch + 상태 머신은 후속 커밋에서 채운다.
- */
+import { listReports } from '@/shared/api/reports.api';
 
+/**
+ * /reports 회의록 목록 페이지의 ViewModel.
+ *
+ * 책임: mount 시 GET /reports, 상태 머신(loading/loaded/error), refresh() 노출.
+ * 정적 export 빌드에서 server 쪽 fetch 가 없으므로 모든 데이터는 client mount 시
+ * 가져온다(ARCHITECTURE §4.3).
+ */
 export type ReportListStatus = 'loading' | 'loaded' | 'error';
 
 export interface UseReportListViewModel {
@@ -17,5 +23,27 @@ export interface UseReportListViewModel {
 }
 
 export function useReportListViewModel(): UseReportListViewModel {
-  throw new Error('not implemented');
+  const [status, setStatus] = useState<ReportListStatus>('loading');
+  const [items, setItems] = useState<ReportListItem[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setStatus('loading');
+    setErrorMessage(null);
+    try {
+      const next = await listReports();
+      setItems(next);
+      setStatus('loaded');
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      setErrorMessage(message);
+      setStatus('error');
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  return { status, items, errorMessage, refresh };
 }
