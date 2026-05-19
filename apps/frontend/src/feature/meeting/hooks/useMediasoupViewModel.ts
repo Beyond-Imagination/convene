@@ -62,10 +62,32 @@ export function useMediasoupViewModel(
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteMedia, setRemoteMedia] = useState<RemoteMediaEntry[]>([]);
+  const [reconnectGen, setReconnectGen] = useState(0);
   const deviceRef = useRef<Device | null>(null);
   const sendTransportRef = useRef<Transport | null>(null);
   const recvTransportRef = useRef<Transport | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const connectCountRef = useRef(0);
+
+  /**
+   * socket 의 'connect' 이벤트를 감시해 자동 재연결을 감지한다.
+   * 두 번째 이상 'connect' = 재연결 → reconnectGen 증가 → main effect 재실행 →
+   * 기존 transport.close + 새 transport 생성. 첫 'connect' 는 카운트만 올린다.
+   */
+  useEffect(() => {
+    if (socket === null) return undefined;
+    connectCountRef.current = 0;
+    const onConnect = (): void => {
+      connectCountRef.current += 1;
+      if (connectCountRef.current > 1) {
+        setReconnectGen((g) => g + 1);
+      }
+    };
+    socket.on('connect', onConnect);
+    return () => {
+      socket.off('connect', onConnect);
+    };
+  }, [socket]);
 
   useEffect(() => {
     if (socket === null) return undefined;
@@ -157,8 +179,11 @@ export function useMediasoupViewModel(
       sendTransportRef.current = null;
       recvTransportRef.current = null;
       deviceRef.current = null;
+      // 재연결 / unmount 시 stale 미디어를 비운다. localStream 은 [status] effect
+      // 의 cleanup 에서 stop 된다(status 가 'ready'→'preparing' 으로 바뀌면서).
+      setRemoteMedia([]);
     };
-  }, [socket, code]);
+  }, [socket, code, reconnectGen]);
 
   /**
    * status='ready' 도달 후 별도 effect 에서 local 미디어를 produce 한다.
