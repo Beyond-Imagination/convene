@@ -46,6 +46,18 @@ class FakeTransport {
       track: opts.track,
     }),
   );
+  readonly consume = vi.fn(
+    async (opts: {
+      id: string;
+      producerId: string;
+      kind: 'audio' | 'video';
+    }): Promise<{ id: string; producerId: string; kind: string; track: FakeTrack }> => ({
+      id: opts.id,
+      producerId: opts.producerId,
+      kind: opts.kind,
+      track: new FakeTrack(opts.kind),
+    }),
+  );
 
   constructor(id: string) {
     this.id = id;
@@ -106,8 +118,26 @@ const setupSocketAcks = (socket: FakeSocket) => {
       const kind = (_payload as { kind: 'audio' | 'video' }).kind;
       return { producerId: `pr-${kind}` };
     }
+    if (event === MEDIASOUP_WS_EVENTS.CONSUME) {
+      const payload = _payload as { producerId: string };
+      return {
+        id: `c-${payload.producerId}`,
+        producerId: payload.producerId,
+        kind: 'audio',
+        rtpParameters: {},
+      };
+    }
+    if (event === MEDIASOUP_WS_EVENTS.RESUME_CONSUMER) {
+      return undefined;
+    }
     throw new Error(`unexpected RPC ${event}`);
   });
+};
+
+const captureSocketListener = (socket: FakeSocket, event: string) => {
+  const found = socket.on.mock.calls.find((c) => c[0] === event);
+  if (!found) throw new Error(`socket.on('${event}') not registered`);
+  return found[1] as (...args: unknown[]) => void;
 };
 
 describe('useMediasoupViewModel.mount', () => {
@@ -270,5 +300,97 @@ describe('useMediasoupViewModel.mount', () => {
     unmount();
     const tracks = (stream as FakeMediaStream).getTracks();
     for (const t of tracks) expect(t.stop).toHaveBeenCalled();
+  });
+});
+
+describe('useMediasoupViewModel.remoteConsume', () => {
+  beforeEach(() => {
+    fakeDevice = new FakeDevice();
+    getUserMediaMock = vi.fn(async () => new FakeMediaStream());
+    vi.stubGlobal('navigator', {
+      mediaDevices: { getUserMedia: getUserMediaMock },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('NEW_PRODUCER 수신 시 CONSUME RPC + recvTransport.consume + RESUME_CONSUMER 가 차례로 호출된다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    const recv = fakeDevice.createRecvTransport.mock.results[0].value as FakeTransport;
+    const handler = captureSocketListener(socket, MEDIASOUP_WS_EVENTS.NEW_PRODUCER);
+    socket.emitWithAck.mockClear();
+    handler({
+      peerSocketId: 's2',
+      producerId: 'p-remote-audio',
+      kind: 'audio',
+      source: 'audio',
+    });
+
+    await waitFor(() => expect(recv.consume).toHaveBeenCalledTimes(1));
+    const consumeRpc = socket.emitWithAck.mock.calls.find(
+      (c) => c[0] === MEDIASOUP_WS_EVENTS.CONSUME,
+    );
+    expect(consumeRpc?.[1]).toEqual(
+      expect.objectContaining({
+        code,
+        transportId: 't-recv',
+        producerId: 'p-remote-audio',
+      }),
+    );
+    const resumeRpc = socket.emitWithAck.mock.calls.find(
+      (c) => c[0] === MEDIASOUP_WS_EVENTS.RESUME_CONSUMER,
+    );
+    expect(resumeRpc?.[1]).toEqual({ code, consumerId: 'c-p-remote-audio' });
+  });
+
+  it('NEW_PRODUCER 수신 후 result.remoteMedia 에 항목이 추가된다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    const handler = captureSocketListener(socket, MEDIASOUP_WS_EVENTS.NEW_PRODUCER);
+    handler({
+      peerSocketId: 's2',
+      producerId: 'p-remote-audio',
+      kind: 'audio',
+      source: 'audio',
+    });
+
+    await waitFor(() => expect(result.current.remoteMedia).toHaveLength(1));
+    expect(result.current.remoteMedia[0]).toEqual(
+      expect.objectContaining({
+        consumerId: 'c-p-remote-audio',
+        peerSocketId: 's2',
+        producerId: 'p-remote-audio',
+        kind: 'audio',
+        source: 'audio',
+      }),
+    );
+    expect(result.current.remoteMedia[0].track).toBeDefined();
+  });
+
+  it('unmount 시 NEW_PRODUCER 핸들러가 socket.off 로 해제된다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result, unmount } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    unmount();
+    expect(socket.off).toHaveBeenCalledWith(
+      MEDIASOUP_WS_EVENTS.NEW_PRODUCER,
+      expect.any(Function),
+    );
   });
 });
