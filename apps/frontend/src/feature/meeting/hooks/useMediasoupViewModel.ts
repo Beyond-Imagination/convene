@@ -7,7 +7,10 @@ import type { Socket } from 'socket.io-client';
 import {
   type CreateTransportResponse,
   type GetRtpCapabilitiesResponse,
+  type MediaType,
   MEDIASOUP_WS_EVENTS,
+  type ProduceRequest,
+  type ProduceResponse,
 } from '@migration/shared-interfaces';
 
 import { createMediasoupDevice } from '@/shared/socket/mediasoup-device.factory';
@@ -32,6 +35,7 @@ export type MediasoupConnectionStatus = 'idle' | 'preparing' | 'ready' | 'error'
 export interface UseMediasoupViewModel {
   readonly status: MediasoupConnectionStatus;
   readonly errorMessage: string | null;
+  readonly localStream: MediaStream | null;
 }
 
 export function useMediasoupViewModel(
@@ -40,9 +44,11 @@ export function useMediasoupViewModel(
 ): UseMediasoupViewModel {
   const [status, setStatus] = useState<MediasoupConnectionStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const deviceRef = useRef<Device | null>(null);
   const sendTransportRef = useRef<Transport | null>(null);
   const recvTransportRef = useRef<Transport | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     if (socket === null) return undefined;
@@ -79,6 +85,25 @@ export function useMediasoupViewModel(
             .then(() => callback())
             .catch(errback);
         });
+        sendTransport.on(
+          'produce',
+          ({ kind, rtpParameters, appData }, callback, errback) => {
+            const source =
+              (appData as { source?: MediaType } | undefined)?.source ??
+              (kind as MediaType);
+            const request: ProduceRequest = {
+              code,
+              transportId: sendOpts.id,
+              kind: kind as 'audio' | 'video',
+              source,
+              rtpParameters,
+            };
+            socket
+              .emitWithAck(MEDIASOUP_WS_EVENTS.PRODUCE, request)
+              .then((res) => callback({ id: (res as ProduceResponse).producerId }))
+              .catch(errback);
+          },
+        );
         sendTransportRef.current = sendTransport;
 
         const recvOpts = (await socket.emitWithAck(
@@ -118,5 +143,59 @@ export function useMediasoupViewModel(
     };
   }, [socket, code]);
 
-  return { status, errorMessage };
+  /**
+   * status='ready' 도달 후 별도 effect 에서 local 미디어를 produce 한다.
+   * 1) navigator.mediaDevices.getUserMedia({audio, video})
+   * 2) audio/video track 각각 sendTransport.produce → 'produce' 이벤트가
+   *    PRODUCE RPC 로 위임됨(상단 effect 에서 핸들러 등록).
+   * cleanup 에서 local track 들을 stop 해 카메라/마이크를 해제한다.
+   */
+  useEffect(() => {
+    if (status !== 'ready') return undefined;
+    const sendTransport = sendTransportRef.current;
+    if (sendTransport === null) return undefined;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: true,
+        });
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        localStreamRef.current = stream;
+        setLocalStream(stream);
+        for (const track of stream.getAudioTracks()) {
+          await sendTransport.produce({
+            track: track as never,
+            appData: { source: 'audio' as MediaType },
+          });
+          if (cancelled) return;
+        }
+        for (const track of stream.getVideoTracks()) {
+          await sendTransport.produce({
+            track: track as never,
+            appData: { source: 'video' as MediaType },
+          });
+          if (cancelled) return;
+        }
+      } catch (e) {
+        if (cancelled) return;
+        const message = e instanceof Error ? e.message : String(e);
+        setErrorMessage(message);
+        setStatus('error');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      localStreamRef.current?.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = null;
+    };
+  }, [status]);
+
+  return { status, errorMessage, localStream };
 }
