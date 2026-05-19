@@ -1,5 +1,6 @@
 'use client';
 
+import type { UseMediasoupViewModel } from '@/feature/meeting/hooks/useMediasoupViewModel';
 import type { UseMeetingViewModel } from '@/feature/meeting/hooks/useMeetingViewModel';
 
 /**
@@ -9,7 +10,9 @@ import type { UseMeetingViewModel } from '@/feature/meeting/hooks/useMeetingView
  * 반환을 그대로 prop 타입으로 받는다. v1 단계는 채팅/미디어 없이 참가자 목록과
  * 상태 표시만 다룬다.
  */
-export type MeetingScreenProps = UseMeetingViewModel;
+export interface MeetingScreenProps extends UseMeetingViewModel {
+  readonly mediasoup: UseMediasoupViewModel;
+}
 
 export function MeetingScreen({
   code,
