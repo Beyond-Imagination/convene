@@ -21,6 +21,7 @@ export function MeetingScreen({
   remoteParticipants,
   errorMessage,
   leave,
+  mediasoup,
 }: MeetingScreenProps) {
   return (
     <main>
@@ -38,6 +39,18 @@ export function MeetingScreen({
       )}
       {status === 'error' && errorMessage !== null && (
         <p role="alert">연결 실패: {errorMessage}</p>
+      )}
+      {(mediasoup.status === 'idle' || mediasoup.status === 'preparing') && (
+        <p
+          role="status"
+          aria-live="polite"
+          data-testid="mediasoup-status"
+        >
+          미디어 준비 중…
+        </p>
+      )}
+      {mediasoup.status === 'error' && mediasoup.errorMessage !== null && (
+        <p role="alert">미디어 오류: {mediasoup.errorMessage}</p>
       )}
       <section aria-labelledby="participants-heading">
         <h2 id="participants-heading">참가자</h2>
