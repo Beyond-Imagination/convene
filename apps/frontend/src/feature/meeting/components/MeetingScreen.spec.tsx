@@ -18,6 +18,10 @@ const baseMediasoup = (
   errorMessage: null,
   localStream: null,
   remoteMedia: [],
+  isSharingScreen: false,
+  screenStream: null,
+  startScreenShare: vi.fn(async () => {}),
+  stopScreenShare: vi.fn(),
   ...overrides,
 });
 
@@ -184,5 +188,47 @@ describe('MeetingScreen View', () => {
     expect(audio).not.toBeNull();
     expect(audio.srcObject).not.toBeNull();
     expect((audio.srcObject as MediaStream).getAudioTracks()).toContain(audioTrack);
+  });
+
+  it('isSharingScreen=false 면 "화면 공유 시작" 버튼이 노출되고 클릭 시 startScreenShare 호출', () => {
+    const startScreenShare = vi.fn(async () => {});
+    renderScreen({}, { isSharingScreen: false, startScreenShare });
+    const button = screen.getByRole('button', { name: '화면 공유 시작' });
+    fireEvent.click(button);
+    expect(startScreenShare).toHaveBeenCalledTimes(1);
+  });
+
+  it('isSharingScreen=true 면 "공유 중지" 버튼 + screen 비디오 타일이 노출된다', () => {
+    const stopScreenShare = vi.fn();
+    const stream = fakeStream();
+    renderScreen({}, { isSharingScreen: true, screenStream: stream, stopScreenShare });
+    fireEvent.click(screen.getByRole('button', { name: '공유 중지' }));
+    expect(stopScreenShare).toHaveBeenCalledTimes(1);
+    const tile = screen.getByTestId('local-screen-tile');
+    const video = tile.querySelector('video') as HTMLVideoElement;
+    expect(video.srcObject).toBe(stream);
+  });
+
+  it('원격 참가자의 source=screen 트랙이 있으면 별도 remote-screen-tile 이 노출된다', () => {
+    const screenTrack = fakeTrack('video');
+    const remoteParticipants: RemoteParticipant[] = [
+      { socketId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z' },
+    ];
+    renderScreen(
+      { remoteParticipants },
+      {
+        remoteMedia: [
+          {
+            ...remoteEntry({ peerSocketId: 's2', kind: 'video' }),
+            source: 'screen',
+            track: screenTrack,
+          },
+        ],
+      },
+    );
+    const tile = screen.getByTestId('remote-screen-tile');
+    expect(tile).toHaveTextContent('아');
+    const video = tile.querySelector('video') as HTMLVideoElement;
+    expect((video.srcObject as MediaStream).getVideoTracks()).toContain(screenTrack);
   });
 });
