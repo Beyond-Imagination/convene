@@ -130,6 +130,9 @@ const setupSocketAcks = (socket: FakeSocket) => {
     if (event === MEDIASOUP_WS_EVENTS.RESUME_CONSUMER) {
       return undefined;
     }
+    if (event === MEDIASOUP_WS_EVENTS.LIST_PRODUCERS) {
+      return { producers: [] };
+    }
     throw new Error(`unexpected RPC ${event}`);
   });
 };
@@ -534,5 +537,97 @@ describe('useMediasoupViewModel.reconnect', () => {
       onConnect();
     });
     await waitFor(() => expect(result.current.remoteMedia).toEqual([]));
+  });
+});
+
+describe('useMediasoupViewModel.listProducers (기존 producer 합류)', () => {
+  beforeEach(() => {
+    fakeDevice = new FakeDevice();
+    getUserMediaMock = vi.fn(async () => new FakeMediaStream());
+    vi.stubGlobal('navigator', {
+      mediaDevices: { getUserMedia: getUserMediaMock },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('ready 도달 후 LIST_PRODUCERS RPC 가 한 번 호출된다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await waitFor(() =>
+      expect(
+        socket.emitWithAck.mock.calls.some(
+          (c) => c[0] === MEDIASOUP_WS_EVENTS.LIST_PRODUCERS,
+        ),
+      ).toBe(true),
+    );
+    const listCalls = socket.emitWithAck.mock.calls.filter(
+      (c) => c[0] === MEDIASOUP_WS_EVENTS.LIST_PRODUCERS,
+    );
+    expect(listCalls).toHaveLength(1);
+    expect(listCalls[0][1]).toEqual({ code });
+  });
+
+  it('LIST_PRODUCERS 응답의 각 producer 가 NEW_PRODUCER 와 동일 흐름으로 consume 된다', async () => {
+    const socket = new FakeSocket();
+    socket.emitWithAck.mockImplementation(async (event: string, payload: unknown) => {
+      if (event === MEDIASOUP_WS_EVENTS.GET_RTP_CAPABILITIES) {
+        return { rtpCapabilities: { codecs: [] } };
+      }
+      if (event === MEDIASOUP_WS_EVENTS.CREATE_TRANSPORT) {
+        const dir = (payload as { direction: 'send' | 'recv' }).direction;
+        return {
+          id: `t-${dir}`,
+          iceParameters: {},
+          iceCandidates: [],
+          dtlsParameters: {},
+        };
+      }
+      if (event === MEDIASOUP_WS_EVENTS.CONNECT_TRANSPORT) return undefined;
+      if (event === MEDIASOUP_WS_EVENTS.PRODUCE) {
+        return { producerId: 'pr-x' };
+      }
+      if (event === MEDIASOUP_WS_EVENTS.CONSUME) {
+        const p = payload as { producerId: string };
+        return {
+          id: `c-${p.producerId}`,
+          producerId: p.producerId,
+          kind: 'audio',
+          rtpParameters: {},
+        };
+      }
+      if (event === MEDIASOUP_WS_EVENTS.RESUME_CONSUMER) return undefined;
+      if (event === MEDIASOUP_WS_EVENTS.LIST_PRODUCERS) {
+        return {
+          producers: [
+            {
+              peerSocketId: 's2',
+              producerId: 'p-existing-aud',
+              kind: 'audio',
+              source: 'audio',
+            },
+            {
+              peerSocketId: 's2',
+              producerId: 'p-existing-vid',
+              kind: 'video',
+              source: 'video',
+            },
+          ],
+        };
+      }
+      throw new Error(`unexpected RPC ${event}`);
+    });
+    const { result } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.remoteMedia).toHaveLength(2));
+    const producerIds = result.current.remoteMedia.map((m) => m.producerId).sort();
+    expect(producerIds).toEqual(['p-existing-aud', 'p-existing-vid']);
   });
 });
