@@ -7,6 +7,7 @@ import type { Socket } from 'socket.io-client';
 import {
   type ConsumeRequest,
   type ConsumeResponse,
+  type ConsumerClosedBroadcast,
   type CreateTransportResponse,
   type GetRtpCapabilitiesResponse,
   type MediaType,
@@ -14,6 +15,7 @@ import {
   type NewProducerBroadcast,
   type ProduceRequest,
   type ProduceResponse,
+  type ProducerClosedBroadcast,
   type ResumeConsumerRequest,
 } from '@migration/shared-interfaces';
 
@@ -272,10 +274,21 @@ export function useMediasoupViewModel(
       })();
     };
 
+    const onProducerClosed = (payload: ProducerClosedBroadcast): void => {
+      setRemoteMedia((prev) => prev.filter((m) => m.producerId !== payload.producerId));
+    };
+    const onConsumerClosed = (payload: ConsumerClosedBroadcast): void => {
+      setRemoteMedia((prev) => prev.filter((m) => m.consumerId !== payload.consumerId));
+    };
+
     socket.on(MEDIASOUP_WS_EVENTS.NEW_PRODUCER, onNewProducer);
+    socket.on(MEDIASOUP_WS_EVENTS.PRODUCER_CLOSED, onProducerClosed);
+    socket.on(MEDIASOUP_WS_EVENTS.CONSUMER_CLOSED, onConsumerClosed);
     return () => {
       cancelled = true;
       socket.off(MEDIASOUP_WS_EVENTS.NEW_PRODUCER, onNewProducer);
+      socket.off(MEDIASOUP_WS_EVENTS.PRODUCER_CLOSED, onProducerClosed);
+      socket.off(MEDIASOUP_WS_EVENTS.CONSUMER_CLOSED, onConsumerClosed);
     };
   }, [status, socket, code]);
 
