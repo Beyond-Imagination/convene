@@ -10,10 +10,42 @@ import { useMediasoupViewModel } from './useMediasoupViewModel';
  * 실제 RTC peer connection 동작은 검증하지 않고, ViewModel 이 RPC 와 device 호출
  * 순서를 올바르게 수행하는지에 집중한다.
  */
+class FakeTrack {
+  readonly kind: 'audio' | 'video';
+  readonly stop = vi.fn();
+  constructor(kind: 'audio' | 'video') {
+    this.kind = kind;
+  }
+}
+
+class FakeMediaStream {
+  readonly tracks: FakeTrack[];
+  constructor() {
+    this.tracks = [new FakeTrack('audio'), new FakeTrack('video')];
+  }
+  getTracks(): FakeTrack[] {
+    return this.tracks;
+  }
+  getAudioTracks(): FakeTrack[] {
+    return this.tracks.filter((t) => t.kind === 'audio');
+  }
+  getVideoTracks(): FakeTrack[] {
+    return this.tracks.filter((t) => t.kind === 'video');
+  }
+}
+
+let getUserMediaMock: ReturnType<typeof vi.fn>;
+
 class FakeTransport {
   readonly id: string;
   readonly listeners = new Map<string, Array<(...args: unknown[]) => void>>();
   readonly close = vi.fn();
+  readonly produce = vi.fn(
+    async (opts: { track: FakeTrack }): Promise<{ id: string; track: FakeTrack }> => ({
+      id: `producer-${opts.track.kind}`,
+      track: opts.track,
+    }),
+  );
 
   constructor(id: string) {
     this.id = id;
@@ -70,6 +102,10 @@ const setupSocketAcks = (socket: FakeSocket) => {
     if (event === MEDIASOUP_WS_EVENTS.CONNECT_TRANSPORT) {
       return undefined;
     }
+    if (event === MEDIASOUP_WS_EVENTS.PRODUCE) {
+      const kind = (_payload as { kind: 'audio' | 'video' }).kind;
+      return { producerId: `pr-${kind}` };
+    }
     throw new Error(`unexpected RPC ${event}`);
   });
 };
@@ -77,6 +113,14 @@ const setupSocketAcks = (socket: FakeSocket) => {
 describe('useMediasoupViewModel.mount', () => {
   beforeEach(() => {
     fakeDevice = new FakeDevice();
+    getUserMediaMock = vi.fn(async () => new FakeMediaStream());
+    vi.stubGlobal('navigator', {
+      mediaDevices: { getUserMedia: getUserMediaMock },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('socket 이 null 이면 status 는 idle 로 유지된다', () => {
@@ -165,5 +209,66 @@ describe('useMediasoupViewModel.mount', () => {
     unmount();
     expect(send.close).toHaveBeenCalled();
     expect(recv.close).toHaveBeenCalled();
+  });
+
+  it('ready 진입 후 getUserMedia 가 호출되고 audio/video track 으로 sendTransport.produce 가 두 번 호출된다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await waitFor(() => expect(getUserMediaMock).toHaveBeenCalledTimes(1));
+    expect(getUserMediaMock).toHaveBeenCalledWith({ audio: true, video: true });
+
+    const send = fakeDevice.createSendTransport.mock.results[0].value as FakeTransport;
+    await waitFor(() => expect(send.produce).toHaveBeenCalledTimes(2));
+    const producedKinds = send.produce.mock.calls.map((c) => c[0].track.kind).sort();
+    expect(producedKinds).toEqual(['audio', 'video']);
+    expect(result.current.localStream).not.toBeNull();
+  });
+
+  it('sendTransport "produce" 이벤트는 PRODUCE RPC 로 위임되고 callback 에 producerId 를 넘긴다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    const send = fakeDevice.createSendTransport.mock.results[0].value as FakeTransport;
+    const callback = vi.fn();
+    const errback = vi.fn();
+    socket.emitWithAck.mockClear();
+    send.listeners.get('produce')?.[0](
+      { kind: 'audio', rtpParameters: { codecs: [] }, appData: { source: 'audio' } },
+      callback,
+      errback,
+    );
+    await waitFor(() => expect(callback).toHaveBeenCalledWith({ id: 'pr-audio' }));
+    expect(socket.emitWithAck).toHaveBeenCalledWith(
+      MEDIASOUP_WS_EVENTS.PRODUCE,
+      expect.objectContaining({
+        code,
+        transportId: 't-send',
+        kind: 'audio',
+        source: 'audio',
+        rtpParameters: { codecs: [] },
+      }),
+    );
+  });
+
+  it('unmount 시 local stream tracks 가 stop 된다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result, unmount } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await waitFor(() => expect(getUserMediaMock).toHaveBeenCalled());
+    const stream = await getUserMediaMock.mock.results[0].value;
+    unmount();
+    const tracks = (stream as FakeMediaStream).getTracks();
+    for (const t of tracks) expect(t.stop).toHaveBeenCalled();
   });
 });
