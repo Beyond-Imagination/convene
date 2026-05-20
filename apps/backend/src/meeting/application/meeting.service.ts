@@ -91,7 +91,7 @@ export class MeetingService {
       startedAt,
     });
     await this.deps.repository.save(meeting);
-    this.deps.eventPublisher.publish(MEETING_EVENTS.CREATED, {
+    await this.deps.eventPublisher.publish(MEETING_EVENTS.CREATED, {
       code: code.value,
       source: command.source,
       startedAt,
@@ -107,7 +107,7 @@ export class MeetingService {
       this.deps.clock.now(),
     );
     await this.deps.repository.save(meeting);
-    this.deps.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_JOINED, {
+    await this.deps.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_JOINED, {
       code: command.code,
       participantId: participant.id,
       nickname: participant.nickname,
@@ -123,7 +123,7 @@ export class MeetingService {
       this.deps.clock.now(),
     );
     await this.deps.repository.save(meeting);
-    this.deps.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_LEFT, {
+    await this.deps.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_LEFT, {
       code: command.code,
       participantId: participant.id,
       leftAt: participant.leftAt,
@@ -154,7 +154,7 @@ export class MeetingService {
     meeting.close(endedAt);
     await this.deps.repository.save(meeting);
     const payload = await this.buildEndedPayload(meeting, command.code, endedAt, command.reason);
-    this.deps.eventPublisher.publish(MEETING_EVENTS.ENDED, payload);
+    await this.deps.eventPublisher.publish(MEETING_EVENTS.ENDED, payload);
     return meeting;
   }
 
@@ -169,12 +169,12 @@ export class MeetingService {
     if (!meeting.isIdleSince(now)) return false;
     meeting.close(now);
     await this.deps.repository.save(meeting);
-    this.deps.eventPublisher.publish(MEETING_EVENTS.IDLE_DETECTED, {
+    await this.deps.eventPublisher.publish(MEETING_EVENTS.IDLE_DETECTED, {
       code: command.code,
       detectedAt: now,
     });
     const payload = await this.buildEndedPayload(meeting, command.code, now, 'idle');
-    this.deps.eventPublisher.publish(MEETING_EVENTS.ENDED, payload);
+    await this.deps.eventPublisher.publish(MEETING_EVENTS.ENDED, payload);
     return true;
   }
 

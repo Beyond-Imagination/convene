@@ -33,7 +33,7 @@ const makeEventPublisher = () => {
   return {
     events,
     publisher: {
-      publish: (name: string, payload: unknown) => {
+      publish: async (name: string, payload: unknown): Promise<void> => {
         events.push({ name, payload });
       },
     },

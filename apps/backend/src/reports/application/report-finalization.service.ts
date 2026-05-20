@@ -67,7 +67,7 @@ export class ReportFinalizationService {
       chat: command.chat,
     });
     await this.deps.repository.save(report);
-    this.deps.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_REQUESTED, {
+    await this.deps.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_REQUESTED, {
       reportId: report.id,
       meetingId: report.meetingId,
       code: report.code,
@@ -93,7 +93,7 @@ export class ReportFinalizationService {
       });
       report.applySummary(summary);
       await this.deps.repository.save(report);
-      this.deps.eventPublisher.publish(REPORT_EVENTS.SUMMARY_COMPLETED, {
+      await this.deps.eventPublisher.publish(REPORT_EVENTS.SUMMARY_COMPLETED, {
         reportId: report.id,
       });
     } catch (err) {
@@ -103,7 +103,7 @@ export class ReportFinalizationService {
     }
 
     if (report.isFinalized) {
-      this.deps.eventPublisher.publish(REPORT_EVENTS.FINALIZED, {
+      await this.deps.eventPublisher.publish(REPORT_EVENTS.FINALIZED, {
         reportId: report.id,
       });
     }
@@ -127,7 +127,7 @@ export class ReportFinalizationService {
     await this.deps.repository.save(report);
 
     if (report.isFinalized) {
-      this.deps.eventPublisher.publish(REPORT_EVENTS.FINALIZED, {
+      await this.deps.eventPublisher.publish(REPORT_EVENTS.FINALIZED, {
         reportId: report.id,
       });
     }

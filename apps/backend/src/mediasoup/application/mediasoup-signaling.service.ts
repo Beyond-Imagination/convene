@@ -144,7 +144,7 @@ export class MediasoupSignalingService {
     });
     media.addProducer(producerId, { kind: command.kind, source: command.source });
     await this.deps.participantMediaRepository.save(media);
-    this.deps.eventPublisher.publish(MEDIASOUP_EVENTS.PRODUCER_CREATED, {
+    await this.deps.eventPublisher.publish(MEDIASOUP_EVENTS.PRODUCER_CREATED, {
       meetingCode: command.meetingCode,
       participantId: command.participantId,
       producerId,

@@ -11,6 +11,18 @@ import type { DomainEventName } from '@migration/shared-interfaces';
  * `payload` 타입은 v1 단계에선 컨텍스트별로 자유롭게 정의되며, shared 페이로드
  * 인터페이스가 굳어지는 시점에 제네릭으로 좁힐 예정이다.
  */
+/**
+ * publish 는 **async listener 의 완료까지 await** 한다. nest-event-bus 어댑터는
+ * `emitter.emitAsync` 를 사용해 모든 listener 의 Promise 를 Promise.all 로 묶는다.
+ *
+ * 왜 async 가 필요한가:
+ *   - cross-BC lifecycle listener (예: meeting.participant.joined → mediasoup.admitParticipant)
+ *     가 fire-and-forget 으로 호출되면 caller(joinMeeting → handleJoin → ack 응답)가
+ *     return 한 시점에 admit 이 아직 안 끝난 race 가 발생. 곧이은 CREATE_TRANSPORT /
+ *     PRODUCE RPC 가 ParticipantMediaNotFoundError 로 fail 한다.
+ *   - publish 호출이 끝났을 때 **모든 listener 의 동기/비동기 작업도 완료** 되어야
+ *     동등 동작이 보장된다 ([[feedback-mediasoup-no-race]]).
+ */
 export interface DomainEventPublisher {
-  publish(name: DomainEventName, payload: unknown): void;
+  publish(name: DomainEventName, payload: unknown): Promise<void>;
 }

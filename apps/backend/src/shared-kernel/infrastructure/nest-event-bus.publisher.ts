@@ -16,7 +16,13 @@ import type { DomainEventPublisher } from '@/shared-kernel/domain/ports';
 export class NestEventBusDomainEventPublisher implements DomainEventPublisher {
   constructor(private readonly emitter: EventEmitter2) {}
 
-  publish(name: DomainEventName, payload: unknown): void {
-    this.emitter.emit(name, payload);
+  /**
+   * `emitter.emit` 은 listener 의 Promise 를 무시(fire-and-forget) 하므로
+   * cross-BC lifecycle 처리(예: admitParticipant) 가 race 를 만든다.
+   * `emitAsync` 는 모든 listener 의 Promise 를 Promise.all 로 묶어 await 가능.
+   * 본 메서드를 await 하는 호출자는 listener 완료 후 다음 동작을 수행한다.
+   */
+  async publish(name: DomainEventName, payload: unknown): Promise<void> {
+    await this.emitter.emitAsync(name, payload);
   }
 }

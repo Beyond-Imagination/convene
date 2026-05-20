@@ -35,13 +35,13 @@ export class RecordingService {
         meetingCode: command.meetingCode,
         audio,
       });
-      this.deps.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_COMPLETED, {
+      await this.deps.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_COMPLETED, {
         reportId: command.reportId,
         transcript,
       });
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
-      this.deps.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_FAILED, {
+      await this.deps.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_FAILED, {
         reportId: command.reportId,
         error,
       });
