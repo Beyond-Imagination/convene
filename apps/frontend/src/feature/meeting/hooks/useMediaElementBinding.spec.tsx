@@ -121,13 +121,13 @@ describe('useMediaElementBinding', () => {
     const { unmount } = render(
       <VideoProbe stream={new MediaStream()} exposeRef={(el) => (captured = el)} />,
     );
-    const playSpy = vi
-      .spyOn(captured!, 'play')
-      .mockResolvedValue(undefined);
+    // unmount 시 React 가 ref callback 을 null 로 호출하므로 element 참조를 따로 보존.
+    const el = captured!;
+    const playSpy = vi.spyOn(el, 'play').mockResolvedValue(undefined);
     playSpy.mockClear();
     unmount();
     act(() => {
-      fireLoadedData(captured!);
+      fireLoadedData(el);
     });
     expect(playSpy).not.toHaveBeenCalled();
   });
