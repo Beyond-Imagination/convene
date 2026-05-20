@@ -22,4 +22,27 @@ export interface MediaRouterPort {
   assignParticipant(meetingCode: string, participantId: string): Promise<number>;
 
   releaseParticipant(meetingCode: string, participantId: string): Promise<void>;
+
+  /**
+   * 회의의 sourceRouterIndex 에 있는 producer 를 그 회의의 다른 모든 router 로
+   * pipe 한다(eager). routersPerRoom === 1 이면 no-op.
+   *
+   * mediasoup 의 `router.pipeToRouter({ producerId, router: target })` 는 target
+   * 측에 동일 id 의 producer 를 생성해, target router 의 transport 에서도
+   * `transport.consume({ producerId })` 가 동작하게 한다.
+   *
+   * plum `MultiRouterManagerService.pipeProducerToAllRouters` 와 동등 동작 — v1
+   * 회의는 역할 구분이 없어 모든 producer 에 적용한다.
+   */
+  pipeProducerToAllRouters(
+    meetingCode: string,
+    producerId: string,
+    sourceRouterIndex: number,
+  ): Promise<void>;
+
+  /**
+   * producer 종료 시 그에 묶인 모든 pipeProducer 를 close 한다.
+   * close 자체는 idempotent — 호출이 중복돼도 안전.
+   */
+  cleanupPipeProducers(meetingCode: string, producerId: string): Promise<void>;
 }

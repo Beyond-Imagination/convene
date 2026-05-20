@@ -69,6 +69,15 @@ const makeRouterPort = () => {
       calls.push({ name: 'releaseParticipant', args: [code, pid] });
       rooms.get(code)?.assignments.delete(pid);
     },
+    async pipeProducerToAllRouters(code, producerId, sourceRouterIndex) {
+      calls.push({
+        name: 'pipeProducerToAllRouters',
+        args: [code, producerId, sourceRouterIndex],
+      });
+    },
+    async cleanupPipeProducers(code, producerId) {
+      calls.push({ name: 'cleanupPipeProducers', args: [code, producerId] });
+    },
   };
   return { calls, rooms, port };
 };
@@ -357,6 +366,30 @@ describe('MediasoupSignalingService.produce', () => {
         rtpParameters: {},
       }),
     ).rejects.toBeInstanceOf(ParticipantMediaNotFoundError);
+  });
+
+  it('produce 직후 routerPort.pipeProducerToAllRouters 를 자기 routerIndex 로 호출한다 (plum eager pipe)', async () => {
+    const { service, router } = makeService();
+    await service.openRoom({ meetingCode });
+    await service.admitParticipant({ meetingCode, participantId: 's1' });
+    await service.createTransport({ meetingCode, participantId: 's1', direction: 'send' });
+    router.calls.length = 0;
+
+    await service.produce({
+      meetingCode,
+      participantId: 's1',
+      transportId: 't-1',
+      kind: 'video',
+      source: 'video',
+      rtpParameters: {},
+    });
+
+    const pipeCall = router.calls.find((c) => c.name === 'pipeProducerToAllRouters');
+    expect(pipeCall).toBeDefined();
+    expect(pipeCall!.args[0]).toBe(meetingCode);
+    expect(pipeCall!.args[1]).toBe('p-1');
+    // s1 의 routerIndex (assign 시 받은 값) 가 sourceRouterIndex 로 전달되어야 한다.
+    expect(typeof pipeCall!.args[2]).toBe('number');
   });
 });
 

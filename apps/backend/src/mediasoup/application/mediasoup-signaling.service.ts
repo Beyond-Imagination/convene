@@ -144,6 +144,15 @@ export class MediasoupSignalingService {
     });
     media.addProducer(producerId, { kind: command.kind, source: command.source });
     await this.deps.participantMediaRepository.save(media);
+
+    // plum eager pipe — 다른 모든 router 에 동일 producer 가 보이도록 즉시 pipe.
+    // routersPerRoom <= 1 이면 adapter 가 no-op.
+    await this.deps.routerPort.pipeProducerToAllRouters(
+      command.meetingCode,
+      producerId,
+      media.routerIndex,
+    );
+
     await this.deps.eventPublisher.publish(MEDIASOUP_EVENTS.PRODUCER_CREATED, {
       meetingCode: command.meetingCode,
       participantId: command.participantId,
