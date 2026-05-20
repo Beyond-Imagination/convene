@@ -170,25 +170,8 @@ describe('MeetingScreen View', () => {
     expect(stream.getVideoTracks()).toContain(track);
   });
 
-  it('매칭되는 audio track 이 있으면 audio 요소가 함께 attach 된다', () => {
-    const audioTrack = fakeTrack('audio');
-    const remoteParticipants: RemoteParticipant[] = [
-      { socketId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z' },
-    ];
-    renderScreen(
-      { remoteParticipants },
-      {
-        remoteMedia: [
-          { ...remoteEntry({ peerSocketId: 's2', kind: 'audio' }), track: audioTrack },
-        ],
-      },
-    );
-    const tile = screen.getByTestId('remote-video-tile');
-    const audio = tile.querySelector('audio') as HTMLAudioElement;
-    expect(audio).not.toBeNull();
-    expect(audio.srcObject).not.toBeNull();
-    expect((audio.srcObject as MediaStream).getAudioTracks()).toContain(audioTrack);
-  });
+  // NOTE: 원격 audio 출력은 Cycle 2B 의 RemoteAudioPlayer 별도 컴포넌트에서 검증.
+  // RemoteVideoTile 은 video 만 책임지므로 본 spec 에서 audio 케이스는 제거.
 
   it('isSharingScreen=false 면 "화면 공유 시작" 버튼이 노출되고 클릭 시 startScreenShare 호출', () => {
     const startScreenShare = vi.fn(async () => {});

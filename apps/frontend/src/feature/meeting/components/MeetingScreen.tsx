@@ -109,7 +109,6 @@ export function MeetingScreen({
             key={p.socketId}
             participant={p}
             videoTrack={pickTrack(mediasoup.remoteMedia, p.socketId, 'video')}
-            audioTrack={pickTrack(mediasoup.remoteMedia, p.socketId, 'audio')}
           />
         ))}
       </section>

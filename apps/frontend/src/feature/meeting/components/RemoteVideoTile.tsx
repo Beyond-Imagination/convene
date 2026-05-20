@@ -1,54 +1,34 @@
 'use client';
 
+import { useMemo, useRef } from 'react';
+
+import { useMediaElementBinding } from '@/feature/meeting/hooks/useMediaElementBinding';
 import type { RemoteParticipant } from '@/feature/meeting/hooks/useMeetingViewModel';
 
 /**
- * 다른 참가자의 카메라/마이크 스트림을 보여주는 dumb tile.
+ * 다른 참가자의 카메라 스트림을 보여주는 dumb tile.
  *
- * audio/video 트랙은 서로 다른 SFU consumer 에서 오므로, video 와 audio 요소를
- * 분리해 각각 MediaStream 으로 attach 한다(autoplay 정책 차이가 있어 합치는 게
- * 안전한 케이스가 많다).
- *
- * srcObject 는 ref callback 으로 attach 하여 React 외부 DOM property 를 다룬다.
+ * 함정 해결(plum 패턴 도입, [[reference-plum-mediasoup]] §3):
+ *  - `<video muted>` 항상 — autoplay 정책 회피. 원격 오디오는 별도 RemoteAudioPlayer
+ *    가 처리(Cycle 2B). 본 컴포넌트는 video 만 책임.
+ *  - `useMediaElementBinding` 으로 `loadeddata` 후 명시 `.play()` 호출
+ *  - track 변경 시 새 MediaStream 으로 갱신, idempotent
  */
 export interface RemoteVideoTileProps {
   readonly participant: Pick<RemoteParticipant, 'socketId' | 'nickname'>;
   readonly videoTrack: MediaStreamTrack | null;
-  readonly audioTrack: MediaStreamTrack | null;
 }
 
-const attachTrack = (
-  el: HTMLMediaElement | null,
-  track: MediaStreamTrack | null,
-): void => {
-  if (el === null) return;
-  if (track === null) {
-    if (el.srcObject !== null) el.srcObject = null;
-    return;
-  }
-  const current = el.srcObject as MediaStream | null;
-  if (current !== null) {
-    const has = current.getTracks().includes(track);
-    if (has) return;
-  }
-  el.srcObject = new MediaStream([track]);
-};
-
-export function RemoteVideoTile({
-  participant,
-  videoTrack,
-  audioTrack,
-}: RemoteVideoTileProps) {
+export function RemoteVideoTile({ participant, videoTrack }: RemoteVideoTileProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const stream = useMemo(
+    () => (videoTrack === null ? null : new MediaStream([videoTrack])),
+    [videoTrack],
+  );
+  useMediaElementBinding({ ref: videoRef, stream });
   return (
     <figure data-testid="remote-video-tile">
-      <video
-        ref={(el) => attachTrack(el, videoTrack)}
-        autoPlay
-        playsInline
-      />
-      {audioTrack !== null && (
-        <audio ref={(el) => attachTrack(el, audioTrack)} autoPlay />
-      )}
+      <video ref={videoRef} autoPlay muted playsInline />
       <figcaption>{participant.nickname}</figcaption>
     </figure>
   );
