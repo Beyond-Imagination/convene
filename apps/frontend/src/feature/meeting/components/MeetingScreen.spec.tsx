@@ -170,8 +170,24 @@ describe('MeetingScreen View', () => {
     expect(stream.getVideoTracks()).toContain(track);
   });
 
-  // NOTE: 원격 audio 출력은 Cycle 2B 의 RemoteAudioPlayer 별도 컴포넌트에서 검증.
-  // RemoteVideoTile 은 video 만 책임지므로 본 spec 에서 audio 케이스는 제거.
+  // NOTE: 원격 audio 출력은 RemoteAudioPlayer 별도 컴포넌트에서 검증
+  // (RemoteAudioPlayer.spec.tsx). 여기서는 통합만 확인.
+  it('remoteMedia 에 audio 가 있으면 RemoteAudioPlayer 가 audio 요소를 렌더한다', () => {
+    const audioTrack = fakeTrack('audio');
+    const remoteParticipants: RemoteParticipant[] = [
+      { socketId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z' },
+    ];
+    renderScreen(
+      { remoteParticipants },
+      {
+        remoteMedia: [
+          { ...remoteEntry({ peerSocketId: 's2', kind: 'audio' }), track: audioTrack },
+        ],
+      },
+    );
+    const audioPlayer = screen.getByTestId('remote-audio-player');
+    expect(audioPlayer.querySelectorAll('audio')).toHaveLength(1);
+  });
 
   it('isSharingScreen=false 면 "화면 공유 시작" 버튼이 노출되고 클릭 시 startScreenShare 호출', () => {
     const startScreenShare = vi.fn(async () => {});

@@ -1,6 +1,7 @@
 'use client';
 
 import { LocalVideoTile } from '@/feature/meeting/components/LocalVideoTile';
+import { RemoteAudioPlayer } from '@/feature/meeting/components/RemoteAudioPlayer';
 import { RemoteVideoTile } from '@/feature/meeting/components/RemoteVideoTile';
 import {
   LocalScreenTile,
@@ -112,6 +113,8 @@ export function MeetingScreen({
           />
         ))}
       </section>
+      {/* 원격 audio 는 video 와 분리된 별도 `<audio>` 요소로 재생 (plum 패턴) */}
+      <RemoteAudioPlayer remoteMedia={mediasoup.remoteMedia} />
       <section aria-labelledby="screen-share-heading">
         <h2 id="screen-share-heading">화면 공유</h2>
         {mediasoup.isSharingScreen ? (
