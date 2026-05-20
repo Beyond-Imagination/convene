@@ -24,6 +24,40 @@ import {
 import { createMediasoupDevice } from '@/shared/socket/mediasoup-device.factory';
 
 /**
+ * mediasoup signaling RPC 타임아웃. backend handler 가 throw 하면 NestJS WS 가 ACK
+ * callback 을 호출하지 않아 socket.io 의 emitWithAck 가 영원히 대기한다(transport.
+ * connect → 'connect' callback 미호출 → produce 영원 대기). 명시 timeout 으로
+ * 무한 hang 회피 + mediasoup-client transport 의 errback 트리거.
+ */
+const RPC_TIMEOUT_MS = 10_000;
+
+const rpcWithTimeout = async <T>(
+  socket: Socket,
+  event: string,
+  payload: unknown,
+): Promise<T> => {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () =>
+        reject(
+          new Error(`mediasoup RPC '${event}' timeout after ${RPC_TIMEOUT_MS}ms`),
+        ),
+      RPC_TIMEOUT_MS,
+    );
+    socket.emitWithAck(event, payload).then(
+      (res) => {
+        clearTimeout(timer);
+        resolve(res as T);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err instanceof Error ? err : new Error(String(err)));
+      },
+    );
+  });
+};
+
+/**
  * Mediasoup 클라이언트 ViewModel.
  *
  * 회의 페이지 mount 시점에 다음 RPC sequence 를 한 번 수행한다:
@@ -111,10 +145,11 @@ export function useMediasoupViewModel(
     void (async () => {
       try {
         setStatus('preparing');
-        const caps = (await socket.emitWithAck(
+        const caps = await rpcWithTimeout<GetRtpCapabilitiesResponse>(
+          socket,
           MEDIASOUP_WS_EVENTS.GET_RTP_CAPABILITIES,
           { code },
-        )) as GetRtpCapabilitiesResponse;
+        );
         if (cancelled) return;
         const device = await createMediasoupDevice();
         await device.load({
@@ -123,21 +158,24 @@ export function useMediasoupViewModel(
         if (cancelled) return;
         deviceRef.current = device;
 
-        const sendOpts = (await socket.emitWithAck(
+        const sendOpts = await rpcWithTimeout<CreateTransportResponse>(
+          socket,
           MEDIASOUP_WS_EVENTS.CREATE_TRANSPORT,
           { code, direction: 'send' as const },
-        )) as CreateTransportResponse;
+        );
         if (cancelled) return;
         const sendTransport = device.createSendTransport(sendOpts as never);
         sendTransport.on('connect', ({ dtlsParameters }, callback, errback) => {
-          socket
-            .emitWithAck(MEDIASOUP_WS_EVENTS.CONNECT_TRANSPORT, {
-              code,
-              transportId: sendOpts.id,
-              dtlsParameters,
-            })
+          rpcWithTimeout(socket, MEDIASOUP_WS_EVENTS.CONNECT_TRANSPORT, {
+            code,
+            transportId: sendOpts.id,
+            dtlsParameters,
+          })
             .then(() => callback())
-            .catch(errback);
+            .catch((err) => {
+              console.error('[mediasoup] sendTransport connect 실패', err);
+              errback(err instanceof Error ? err : new Error(String(err)));
+            });
         });
         sendTransport.on(
           'produce',
@@ -152,36 +190,50 @@ export function useMediasoupViewModel(
               source,
               rtpParameters,
             };
-            socket
-              .emitWithAck(MEDIASOUP_WS_EVENTS.PRODUCE, request)
-              .then((res) => callback({ id: (res as ProduceResponse).producerId }))
-              .catch(errback);
+            rpcWithTimeout<ProduceResponse>(
+              socket,
+              MEDIASOUP_WS_EVENTS.PRODUCE,
+              request,
+            )
+              .then((res) => callback({ id: res.producerId }))
+              .catch((err) => {
+                console.error('[mediasoup] produce 실패', err);
+                errback(err instanceof Error ? err : new Error(String(err)));
+              });
           },
         );
         sendTransportRef.current = sendTransport;
 
-        const recvOpts = (await socket.emitWithAck(
+        const recvOpts = await rpcWithTimeout<CreateTransportResponse>(
+          socket,
           MEDIASOUP_WS_EVENTS.CREATE_TRANSPORT,
           { code, direction: 'recv' as const },
-        )) as CreateTransportResponse;
+        );
         if (cancelled) return;
         const recvTransport = device.createRecvTransport(recvOpts as never);
         recvTransport.on('connect', ({ dtlsParameters }, callback, errback) => {
-          socket
-            .emitWithAck(MEDIASOUP_WS_EVENTS.CONNECT_TRANSPORT, {
-              code,
-              transportId: recvOpts.id,
-              dtlsParameters,
-            })
+          rpcWithTimeout(socket, MEDIASOUP_WS_EVENTS.CONNECT_TRANSPORT, {
+            code,
+            transportId: recvOpts.id,
+            dtlsParameters,
+          })
             .then(() => callback())
-            .catch(errback);
+            .catch((err) => {
+              console.error('[mediasoup] recvTransport connect 실패', err);
+              errback(err instanceof Error ? err : new Error(String(err)));
+            });
         });
         recvTransportRef.current = recvTransport;
 
         setStatus('ready');
+        console.debug('[mediasoup] ready — transports 준비 완료', {
+          sendId: sendOpts.id,
+          recvId: recvOpts.id,
+        });
       } catch (e) {
         if (cancelled) return;
         const message = e instanceof Error ? e.message : String(e);
+        console.error('[mediasoup] setup 실패', message);
         setErrorMessage(message);
         setStatus('error');
       }
@@ -215,6 +267,7 @@ export function useMediasoupViewModel(
 
     void (async () => {
       try {
+        console.debug('[mediasoup] getUserMedia 시작');
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: true,
           video: true,
@@ -223,25 +276,34 @@ export function useMediasoupViewModel(
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
+        console.debug('[mediasoup] getUserMedia 성공', {
+          audioTracks: stream.getAudioTracks().length,
+          videoTracks: stream.getVideoTracks().length,
+        });
         localStreamRef.current = stream;
         setLocalStream(stream);
         for (const track of stream.getAudioTracks()) {
-          await sendTransport.produce({
+          console.debug('[mediasoup] audio produce 시작', { trackId: track.id });
+          const producer = await sendTransport.produce({
             track: track as never,
             appData: { source: 'audio' as MediaType },
           });
+          console.debug('[mediasoup] audio produce 성공', { producerId: producer.id });
           if (cancelled) return;
         }
         for (const track of stream.getVideoTracks()) {
-          await sendTransport.produce({
+          console.debug('[mediasoup] video produce 시작', { trackId: track.id });
+          const producer = await sendTransport.produce({
             track: track as never,
             appData: { source: 'video' as MediaType },
           });
+          console.debug('[mediasoup] video produce 성공', { producerId: producer.id });
           if (cancelled) return;
         }
       } catch (e) {
         if (cancelled) return;
         const message = e instanceof Error ? e.message : String(e);
+        console.error('[mediasoup] local produce 실패', message);
         setErrorMessage(message);
         setStatus('error');
       }
@@ -272,16 +334,18 @@ export function useMediasoupViewModel(
     const onNewProducer = (payload: NewProducerBroadcast): void => {
       void (async () => {
         try {
+          console.debug('[mediasoup] consume 시작', payload);
           const consumeRequest: ConsumeRequest = {
             code,
             transportId: recvTransport.id,
             producerId: payload.producerId,
             rtpCapabilities: device.rtpCapabilities as unknown,
           };
-          const consumeRes = (await socket.emitWithAck(
+          const consumeRes = await rpcWithTimeout<ConsumeResponse>(
+            socket,
             MEDIASOUP_WS_EVENTS.CONSUME,
             consumeRequest,
-          )) as ConsumeResponse;
+          );
           if (cancelled) return;
           const consumer = await recvTransport.consume({
             id: consumeRes.id,
@@ -294,7 +358,8 @@ export function useMediasoupViewModel(
             code,
             consumerId: consumeRes.id,
           };
-          await socket.emitWithAck(
+          await rpcWithTimeout(
+            socket,
             MEDIASOUP_WS_EVENTS.RESUME_CONSUMER,
             resumeRequest,
           );
@@ -307,8 +372,19 @@ export function useMediasoupViewModel(
             source: payload.source,
             track: (consumer as unknown as { track: MediaStreamTrack }).track,
           };
-          setRemoteMedia((prev) => [...prev, entry]);
-        } catch {
+          // producerId 기준 dedup (LIST_PRODUCERS 응답과 NEW_PRODUCER broadcast 가
+          // 동일 producer 를 두 번 통보할 수 있다 — [[feedback-mediasoup-no-race]] #2)
+          setRemoteMedia((prev) => {
+            if (prev.some((m) => m.producerId === entry.producerId)) return prev;
+            return [...prev, entry];
+          });
+          console.debug('[mediasoup] consume 성공', {
+            consumerId: consumeRes.id,
+            producerId: payload.producerId,
+            source: payload.source,
+          });
+        } catch (err) {
+          console.error('[mediasoup] consume 실패', err);
           // 한 개 consumer 실패는 전체 연결을 끊지 않는다.
         }
       })();
@@ -330,14 +406,18 @@ export function useMediasoupViewModel(
     void (async () => {
       try {
         const listReq: ListProducersRequest = { code };
-        const res = (await socket.emitWithAck(
+        const res = await rpcWithTimeout<ListProducersResponse>(
+          socket,
           MEDIASOUP_WS_EVENTS.LIST_PRODUCERS,
           listReq,
-        )) as ListProducersResponse;
+        );
         if (cancelled) return;
+        console.debug('[mediasoup] listProducers 응답', {
+          count: res.producers.length,
+        });
         for (const p of res.producers) onNewProducer(p);
-      } catch {
-        // backend 가 LIST_PRODUCERS 를 지원하지 않거나 응답 실패 시 swallow.
+      } catch (err) {
+        console.error('[mediasoup] listProducers 실패', err);
       }
     })();
 

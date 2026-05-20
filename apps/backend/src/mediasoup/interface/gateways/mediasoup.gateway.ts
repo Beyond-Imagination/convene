@@ -99,12 +99,23 @@ export class MediasoupGateway {
     @MessageBody() dto: ConnectTransportDto,
     @ConnectedSocket() client: Socket,
   ): Promise<void> {
-    await this.service.connectTransport({
-      meetingCode: dto.code,
-      participantId: client.id,
-      transportId: dto.transportId,
-      dtlsParameters: dto.dtlsParameters,
-    });
+    try {
+      await this.service.connectTransport({
+        meetingCode: dto.code,
+        participantId: client.id,
+        transportId: dto.transportId,
+        dtlsParameters: dto.dtlsParameters,
+      });
+      this.logger.log(
+        `[connectTransport] ok (sid=${client.id}, transportId=${dto.transportId})`,
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(
+        `[connectTransport] FAIL (sid=${client.id}, transportId=${dto.transportId}): ${message}`,
+      );
+      throw err;
+    }
   }
 
   @SubscribeMessage(MEDIASOUP_WS_EVENTS.PRODUCE)
@@ -112,14 +123,26 @@ export class MediasoupGateway {
     @MessageBody() dto: ProduceDto,
     @ConnectedSocket() client: Socket,
   ): Promise<ProduceResponse> {
-    return this.service.produce({
-      meetingCode: dto.code,
-      participantId: client.id,
-      transportId: dto.transportId,
-      kind: dto.kind,
-      source: dto.source,
-      rtpParameters: dto.rtpParameters,
-    });
+    try {
+      const res = await this.service.produce({
+        meetingCode: dto.code,
+        participantId: client.id,
+        transportId: dto.transportId,
+        kind: dto.kind,
+        source: dto.source,
+        rtpParameters: dto.rtpParameters,
+      });
+      this.logger.log(
+        `[produce] ok (sid=${client.id}, kind=${dto.kind}, source=${dto.source}, producerId=${res.producerId})`,
+      );
+      return res;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(
+        `[produce] FAIL (sid=${client.id}, kind=${dto.kind}): ${message}`,
+      );
+      throw err;
+    }
   }
 
   @SubscribeMessage(MEDIASOUP_WS_EVENTS.CONSUME)
@@ -127,13 +150,25 @@ export class MediasoupGateway {
     @MessageBody() dto: ConsumeDto,
     @ConnectedSocket() client: Socket,
   ): Promise<ConsumeResponse> {
-    return this.service.consume({
-      meetingCode: dto.code,
-      participantId: client.id,
-      transportId: dto.transportId,
-      producerId: dto.producerId,
-      rtpCapabilities: dto.rtpCapabilities,
-    });
+    try {
+      const res = await this.service.consume({
+        meetingCode: dto.code,
+        participantId: client.id,
+        transportId: dto.transportId,
+        producerId: dto.producerId,
+        rtpCapabilities: dto.rtpCapabilities,
+      });
+      this.logger.log(
+        `[consume] ok (sid=${client.id}, producerId=${dto.producerId}, consumerId=${res.id})`,
+      );
+      return res;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(
+        `[consume] FAIL (sid=${client.id}, producerId=${dto.producerId}): ${message}`,
+      );
+      throw err;
+    }
   }
 
   @SubscribeMessage(MEDIASOUP_WS_EVENTS.RESUME_CONSUMER)
