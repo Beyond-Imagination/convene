@@ -63,7 +63,8 @@ export class MeetingGateway implements OnGatewayDisconnect {
   async handleJoin(
     @MessageBody() dto: JoinMeetingDto,
     @ConnectedSocket() client: Socket,
-  ): Promise<void> {
+  ): Promise<{ ok: true }> {
+    // Promise<void> 는 NestJS socket.io 가 ack 미호출 → emitWithAck 영원 대기.
     const { meeting, participant } = await this.service.joinMeeting({
       code: dto.code,
       participantId: client.id,
@@ -93,13 +94,14 @@ export class MeetingGateway implements OnGatewayDisconnect {
         })),
     };
     client.emit(MEETING_WS_EVENTS.PARTICIPANTS, existing);
+    return { ok: true };
   }
 
   @SubscribeMessage(MEETING_WS_EVENTS.LEAVE)
   async handleLeave(
     @MessageBody() dto: LeaveMeetingDto,
     @ConnectedSocket() client: Socket,
-  ): Promise<void> {
+  ): Promise<{ ok: true }> {
     const { participant } = await this.service.leaveMeeting({
       code: dto.code,
       participantId: client.id,
@@ -113,6 +115,7 @@ export class MeetingGateway implements OnGatewayDisconnect {
     };
     client.to(room).emit(MEETING_WS_EVENTS.PARTICIPANT_LEFT, broadcast);
     await client.leave(room);
+    return { ok: true };
   }
 
   async handleDisconnect(client: Socket): Promise<void> {
@@ -142,7 +145,7 @@ export class MeetingGateway implements OnGatewayDisconnect {
   async handleChat(
     @MessageBody() dto: ChatDto,
     @ConnectedSocket() client: Socket,
-  ): Promise<void> {
+  ): Promise<{ ok: true }> {
     const entry = await this.service.postChat({
       code: dto.code,
       participantId: client.id,
@@ -156,5 +159,6 @@ export class MeetingGateway implements OnGatewayDisconnect {
     };
     // 자신도 자기 메시지를 받아야 하므로 client.to가 아닌 server.to를 사용.
     this.server.to(room).emit(MEETING_WS_EVENTS.CHAT_POSTED, broadcast);
+    return { ok: true };
   }
 }

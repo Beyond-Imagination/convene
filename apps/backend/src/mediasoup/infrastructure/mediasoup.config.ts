@@ -36,7 +36,12 @@ const numWorkers = (): number => {
 export const mediasoupConfig = {
   numWorkers: numWorkers(),
 
-  routersPerRoom: parseIntEnv('MEDIASOUP_ROUTERS_PER_ROOM', 2),
+  // v1 은 소수 참가자(≤10) 회의가 대상이라 회의 1개당 router 1개로 단순화.
+  // routersPerRoom > 1 로 두면 mediasoup transport 가 자기 router 의 producer 만
+  // consume 가능하므로 별도 pipeToRouter 구현이 필요(plum multi-router-manager 참조).
+  // 그게 미구현인 상태에서 라우터를 여러 개 두면 다른 router 에 있는 producer 를
+  // consume 할 때 "Producer not found" 가 발생. 큰 회의 대응은 추후 도입.
+  routersPerRoom: parseIntEnv('MEDIASOUP_ROUTERS_PER_ROOM', 1),
 
   worker: {
     rtcMinPort: parseIntEnv('RTC_MIN_PORT', 40000),

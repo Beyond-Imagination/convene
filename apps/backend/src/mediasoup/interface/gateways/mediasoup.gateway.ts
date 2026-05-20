@@ -98,7 +98,9 @@ export class MediasoupGateway {
   async handleConnectTransport(
     @MessageBody() dto: ConnectTransportDto,
     @ConnectedSocket() client: Socket,
-  ): Promise<void> {
+  ): Promise<{ ok: true }> {
+    // ⚠️ Promise<void> 반환 시 NestJS+socket.io 가 ack callback 을 호출하지 않아
+    // client emitWithAck 가 영원히 대기한다. 명시 응답 객체 반환 필수.
     try {
       await this.service.connectTransport({
         meetingCode: dto.code,
@@ -109,6 +111,7 @@ export class MediasoupGateway {
       this.logger.log(
         `[connectTransport] ok (sid=${client.id}, transportId=${dto.transportId})`,
       );
+      return { ok: true };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.error(
@@ -175,12 +178,14 @@ export class MediasoupGateway {
   async handleResumeConsumer(
     @MessageBody() dto: ResumeConsumerDto,
     @ConnectedSocket() client: Socket,
-  ): Promise<void> {
+  ): Promise<{ ok: true }> {
+    // Promise<void> 회피 — handleConnectTransport 주석 참조.
     await this.service.resumeConsumer({
       meetingCode: dto.code,
       participantId: client.id,
       consumerId: dto.consumerId,
     });
+    return { ok: true };
   }
 
   @SubscribeMessage(MEDIASOUP_WS_EVENTS.LIST_PRODUCERS)
