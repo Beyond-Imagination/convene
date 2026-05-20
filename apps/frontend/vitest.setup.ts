@@ -44,4 +44,25 @@ if (typeof HTMLMediaElement !== 'undefined') {
       (this as unknown as { _srcObject: MediaStream | null })._srcObject = value;
     },
   });
+  // happy-dom 의 HTMLMediaElement 는 play()/pause() 가 미구현. autoplay 정책 검증을
+  // 위해 stub. 기본은 즉시 resolve, spec 이 mockResolvedValueOnce/mockRejectedValueOnce
+  // 로 케이스별 override.
+  if (!('play' in HTMLMediaElement.prototype) ||
+      typeof (HTMLMediaElement.prototype as unknown as { play?: unknown }).play !== 'function') {
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      writable: true,
+      value: function play(this: HTMLMediaElement): Promise<void> {
+        return Promise.resolve();
+      },
+    });
+  }
+  if (!('pause' in HTMLMediaElement.prototype) ||
+      typeof (HTMLMediaElement.prototype as unknown as { pause?: unknown }).pause !== 'function') {
+    Object.defineProperty(HTMLMediaElement.prototype, 'pause', {
+      configurable: true,
+      writable: true,
+      value: function pause(this: HTMLMediaElement): void {},
+    });
+  }
 }
