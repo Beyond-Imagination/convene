@@ -87,5 +87,25 @@ test.describe('두 참가자 - 시그널링 통합', () => {
 
     // A 에서 B 가 보임 (B 입장 시 server 가 PARTICIPANT_JOINED 를 같은 room 에 broadcast)
     await expect(pageA.getByTestId('remote-participant').first()).toContainText('bob');
+
+    // RemoteVideoTile DOM 이 양쪽에 렌더된다 (mediasoup 시그널링 이후)
+    await expect(pageA.getByTestId('remote-video-tile')).toBeVisible({ timeout: 15_000 });
+    await expect(pageB.getByTestId('remote-video-tile')).toBeVisible({ timeout: 15_000 });
+
+    // 모든 video element 가 muted (autoplay 정책 회피)
+    const aLocalMuted = await pageA
+      .locator('[data-testid="local-video-tile"] video')
+      .first()
+      .evaluate((v) => (v as HTMLVideoElement).muted);
+    const aRemoteMuted = await pageA
+      .locator('[data-testid="remote-video-tile"] video')
+      .first()
+      .evaluate((v) => (v as HTMLVideoElement).muted);
+    expect(aLocalMuted).toBe(true);
+    expect(aRemoteMuted).toBe(true);
+
+    // RemoteAudioPlayer 컨테이너가 존재한다 (audio entry 유무와 무관, 컨테이너 자체)
+    await expect(pageA.getByTestId('remote-audio-player')).toBeAttached();
+    await expect(pageB.getByTestId('remote-audio-player')).toBeAttached();
   });
 });
