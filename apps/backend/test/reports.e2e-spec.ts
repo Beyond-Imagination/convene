@@ -14,6 +14,8 @@ import {
 } from '@migration/shared-interfaces';
 
 import { AppModule } from '@/app.module';
+import { FfmpegAudioCaptureAdapter } from '@/mediasoup/infrastructure/ffmpeg-audio-capture.adapter';
+import { NoopAudioCapture } from '@/mediasoup/infrastructure/noop-audio-capture.adapter';
 import { HttpTranscriber } from '@/recording/infrastructure/http.transcriber';
 import { NoopTranscriber } from '@/recording/infrastructure/noop.transcriber';
 
@@ -71,10 +73,12 @@ describe('Reports e2e', () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
-      // e2e 환경엔 ai-worker 컨테이너가 없다. HttpTranscriber 를 Noop 으로 갈아
-      // 끼워 transcription 흐름이 빈 transcript 로 done 까지 진행되게 한다.
+      // e2e 환경엔 ai-worker / ffmpeg 가 없으므로 외부 의존 어댑터를 모두
+      // Noop 으로 갈아끼운다. transcription 흐름은 빈 transcript 로 done 까지 진행.
       .overrideProvider(HttpTranscriber)
       .useValue(new NoopTranscriber())
+      .overrideProvider(FfmpegAudioCaptureAdapter)
+      .useValue(new NoopAudioCapture())
       .compile();
 
     app = moduleRef.createNestApplication();

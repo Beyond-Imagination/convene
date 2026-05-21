@@ -9,15 +9,6 @@ describe('HttpTranscriber', () => {
       headers: { 'Content-Type': 'application/json' },
     });
 
-  it('audio 가 null 이면 fetch 를 호출하지 않고 빈 transcript 를 반환한다', async () => {
-    const fetchMock = jest.fn();
-    const transcriber = new HttpTranscriber(baseUrl, fetchMock as unknown as typeof fetch);
-
-    const result = await transcriber.transcribe({ meetingCode: 'abc12xyz', audio: null });
-    expect(result).toEqual([]);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
   it('audio Buffer 를 POST {baseUrl}/transcribe 에 octet-stream 으로 전송한다', async () => {
     const fetchMock = jest
       .fn()

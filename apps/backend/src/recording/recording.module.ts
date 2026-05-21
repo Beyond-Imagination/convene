@@ -42,5 +42,9 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
       inject: [RedisAudioBufferRepository, HttpTranscriber, NestEventBusDomainEventPublisher],
     },
   ],
+  // Mediasoup BC 의 audio capture 어댑터(FfmpegAudioCaptureAdapter)가 같은
+  // AudioBufferRepository 인스턴스로 chunk 를 append 하기 위해 export 한다.
+  // cross-BC 결합은 Port 인터페이스 의존 한정 (CLAUDE.md hard rule 7).
+  exports: [RedisAudioBufferRepository],
 })
 export class RecordingModule {}

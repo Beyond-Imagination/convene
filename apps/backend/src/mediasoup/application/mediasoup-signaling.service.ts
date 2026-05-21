@@ -9,6 +9,7 @@ import {
 
 import { ParticipantMedia } from '@/mediasoup/domain/participant-media';
 import {
+  AudioCapturePort,
   MediaRouterPort,
   MediaTransportPort,
   ParticipantMediaRepository,
@@ -32,6 +33,7 @@ export interface MediasoupSignalingServiceDeps {
   routerPort: MediaRouterPort;
   transportPort: MediaTransportPort;
   participantMediaRepository: ParticipantMediaRepository;
+  audioCapture: AudioCapturePort;
   eventPublisher: DomainEventPublisher;
 }
 
@@ -79,6 +81,10 @@ export class MediasoupSignalingService {
   }
 
   async closeRoom(command: RoomCommand): Promise<void> {
+    // 회의 단위로 모든 audio capture 종료(stdin end → SIGTERM 대비). 이후 router
+    // 정리 시 PlainTransport 도 함께 close 되지만 stopAll 이 명시적으로 ffmpeg
+    // subprocess 까지 cleanup 한다.
+    await this.deps.audioCapture.stopAll(command.meetingCode);
     await this.deps.participantMediaRepository.removeAllByMeetingCode(command.meetingCode);
     await this.deps.routerPort.closeRoom(command.meetingCode);
   }
@@ -100,6 +106,8 @@ export class MediasoupSignalingService {
   }
 
   async dismissParticipant(command: ParticipantCommand): Promise<void> {
+    // audio capture 가 진행 중이라면 먼저 정리한다. capture context 가 없으면 no-op.
+    await this.deps.audioCapture.stop(command.meetingCode, command.participantId);
     const existing = await this.deps.participantMediaRepository.findByParticipantId(
       command.participantId,
     );
@@ -152,6 +160,16 @@ export class MediasoupSignalingService {
       producerId,
       media.routerIndex,
     );
+
+    // audio producer 만 STT 용으로 capture. video 는 capture 대상이 아니다.
+    // 같은 (meetingCode, participantId) 에 대한 중복 호출은 어댑터가 dedup.
+    if (command.kind === 'audio') {
+      await this.deps.audioCapture.start({
+        meetingCode: command.meetingCode,
+        participantId: command.participantId,
+        producerId,
+      });
+    }
 
     await this.deps.eventPublisher.publish(MEDIASOUP_EVENTS.PRODUCER_CREATED, {
       meetingCode: command.meetingCode,

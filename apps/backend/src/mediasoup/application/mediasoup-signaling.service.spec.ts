@@ -8,6 +8,8 @@ import {
 
 import { ParticipantMedia } from '@/mediasoup/domain/participant-media';
 import {
+  AudioCapturePort,
+  AudioCaptureStartInput,
   ConsumeInput,
   CreateWebRtcTransportInput,
   MediaRouterPort,
@@ -153,18 +155,36 @@ const makeRepository = () => {
   return { store, repository };
 };
 
+const makeAudioCapture = () => {
+  const calls: CapturedCall[] = [];
+  const port: AudioCapturePort = {
+    async start(input: AudioCaptureStartInput) {
+      calls.push({ name: 'start', args: [input] });
+    },
+    async stop(code, pid) {
+      calls.push({ name: 'stop', args: [code, pid] });
+    },
+    async stopAll(code) {
+      calls.push({ name: 'stopAll', args: [code] });
+    },
+  };
+  return { calls, port };
+};
+
 const makeService = () => {
   const router = makeRouterPort();
   const transport = makeTransportPort();
   const repo = makeRepository();
+  const audioCapture = makeAudioCapture();
   const { events, publisher } = makeEventPublisher();
   const service = new MediasoupSignalingService({
     routerPort: router.port,
     transportPort: transport.port,
     participantMediaRepository: repo.repository,
+    audioCapture: audioCapture.port,
     eventPublisher: publisher,
   });
-  return { service, router, transport, repo, events };
+  return { service, router, transport, repo, audioCapture, events };
 };
 
 const meetingCode = 'ABCDEFGH';
@@ -188,6 +208,13 @@ describe('MediasoupSignalingService.closeRoom', () => {
     expect(router.calls.some((c) => c.name === 'closeRoom' && c.args[0] === meetingCode)).toBe(
       true,
     );
+  });
+
+  it('회의 단위로 audioCapture.stopAll 을 호출한다', async () => {
+    const { service, audioCapture } = makeService();
+    await service.openRoom({ meetingCode });
+    await service.closeRoom({ meetingCode });
+    expect(audioCapture.calls).toEqual([{ name: 'stopAll', args: [meetingCode] }]);
   });
 });
 
@@ -238,6 +265,19 @@ describe('MediasoupSignalingService.dismissParticipant', () => {
     expect(
       router.calls.some(
         (c) => c.name === 'releaseParticipant' && c.args[1] === 's-unknown',
+      ),
+    ).toBe(true);
+  });
+
+  it('audioCapture.stop 도 함께 호출한다(capture 가 없으면 어댑터가 멱등 처리)', async () => {
+    const { service, audioCapture } = makeService();
+    await service.openRoom({ meetingCode });
+    await service.admitParticipant({ meetingCode, participantId: 's1' });
+    audioCapture.calls.length = 0;
+    await service.dismissParticipant({ meetingCode, participantId: 's1' });
+    expect(
+      audioCapture.calls.some(
+        (c) => c.name === 'stop' && c.args[0] === meetingCode && c.args[1] === 's1',
       ),
     ).toBe(true);
   });
@@ -366,6 +406,49 @@ describe('MediasoupSignalingService.produce', () => {
         rtpParameters: {},
       }),
     ).rejects.toBeInstanceOf(ParticipantMediaNotFoundError);
+  });
+
+  it('audio producer 가 생기면 audioCapture.start 를 producerId 와 함께 호출한다', async () => {
+    const { service, audioCapture } = makeService();
+    await service.openRoom({ meetingCode });
+    await service.admitParticipant({ meetingCode, participantId: 's1' });
+    await service.createTransport({ meetingCode, participantId: 's1', direction: 'send' });
+    audioCapture.calls.length = 0;
+
+    await service.produce({
+      meetingCode,
+      participantId: 's1',
+      transportId: 't-1',
+      kind: 'audio',
+      source: 'audio',
+      rtpParameters: {},
+    });
+
+    expect(audioCapture.calls).toEqual([
+      {
+        name: 'start',
+        args: [{ meetingCode, participantId: 's1', producerId: 'p-1' }],
+      },
+    ]);
+  });
+
+  it('video producer 에 대해서는 audioCapture.start 를 호출하지 않는다', async () => {
+    const { service, audioCapture } = makeService();
+    await service.openRoom({ meetingCode });
+    await service.admitParticipant({ meetingCode, participantId: 's1' });
+    await service.createTransport({ meetingCode, participantId: 's1', direction: 'send' });
+    audioCapture.calls.length = 0;
+
+    await service.produce({
+      meetingCode,
+      participantId: 's1',
+      transportId: 't-1',
+      kind: 'video',
+      source: 'video',
+      rtpParameters: {},
+    });
+
+    expect(audioCapture.calls.filter((c) => c.name === 'start')).toEqual([]);
   });
 
   it('produce 직후 routerPort.pipeProducerToAllRouters 를 자기 routerIndex 로 호출한다 (plum eager pipe)', async () => {

@@ -1,18 +1,25 @@
 /**
- * 회의별 임시 오디오 버퍼의 영속/조회 경계.
+ * 회의별·참가자별 임시 오디오 버퍼의 영속/조회 경계.
  *
- * 구현체는 v1 부트스트랩에서 in-memory(테스트/회의 1건 규모) 를 제공하며,
- * 운영에서는 백엔드 임시 디스크로 교체할 수 있다(PLAN.md §3).
+ * Mediasoup BC 의 audio capture 어댑터(FFmpeg) 가 참가자별로 PCM chunk 를
+ * 흘려보내고, 회의 종료 시 RecordingService 가 회의 단위로 한 번에 소비한다.
+ * 같은 `(meetingCode, participantId)` 쌍 안에서는 append 순서가 보장되어야
+ * 한 명의 발화 시간축이 유지된다.
  *
- * 회의 종료 후 STT 가 끝나면 `consume(code)` 는 **반환과 동시에 삭제**한다.
- * PLAN.md §3: "오디오는 STT 후 즉시 폐기, 장기 보존 X, S3 미사용".
+ * `consume(code)` 는 회의의 모든 참가자 버퍼를 한 번에 돌려주고 **즉시 삭제**한다
+ * (PLAN.md §3: "오디오는 STT 후 즉시 폐기, 장기 보존 X, S3 미사용").
  *
- * append 가 한 번도 호출되지 않은 회의(오디오 capture 미구현 상태)는
- * `consume` 이 `null` 을 돌려준다.
+ * 누적된 참가자가 한 명도 없으면 빈 배열을 돌려준다.
  */
 export interface AudioBufferRepository {
-  append(meetingCode: string, chunk: Buffer): Promise<void>;
+  append(meetingCode: string, participantId: string, chunk: Buffer): Promise<void>;
 
-  /** 누적 버퍼를 한 번에 돌려주고 즉시 삭제한다. 누적된 적이 없으면 `null`. */
-  consume(meetingCode: string): Promise<Buffer | null>;
+  /**
+   * 회의의 모든 참가자 누적 버퍼를 `{ participantId, audio }` 배열로 돌려주고
+   * 즉시 삭제한다. 누적된 참가자가 없으면 `[]`.
+   * 결과 배열 안에서 같은 `participantId` 의 chunk 는 시간순으로 concat 된다.
+   */
+  consume(
+    meetingCode: string,
+  ): Promise<ReadonlyArray<{ participantId: string; audio: Buffer }>>;
 }

@@ -1,14 +1,20 @@
 import { REPORT_EVENTS } from '@migration/shared-interfaces';
 
 import { AudioBufferRepository, TranscriberPort } from '@/recording/domain/ports';
+import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events';
 import { DomainEventPublisher } from '@/shared-kernel/domain/ports';
 
 /**
  * Recording Bounded Context의 Application Service.
  *
- * Reports BC 가 발행한 `report.transcription.requested` 를 받아 임시 오디오 버퍼를
- * 소비하고 `TranscriberPort` 로 STT 를 호출한 뒤, 결과를
- * `report.transcription.completed` / `failed` 로 발행한다(ARCHITECTURE §5).
+ * Reports BC 가 발행한 `report.transcription.requested` 를 받아 회의의 참가자별
+ * 누적 오디오 버퍼를 소비하고, 각 참가자 audio 에 대해 `TranscriberPort` 로 STT 를
+ * 호출한다. 각 segment 에는 `speaker = participantId` 를 채워서 시간순으로 merge 한
+ * 결과를 `report.transcription.completed` 로 발행한다.
+ *
+ * 참가자별 audio capture 의 시간축 origin (capture 시작 시각이 회의 시작 시각과
+ * 어긋날 수 있음) 은 v1 에선 보정하지 않는다 — backlog. 참가자가 동시에 발화하는
+ * 구간은 startMs 가 가까운 segment 들이 인접하게 정렬된다.
  *
  * 본 서비스는 throw 하지 않는다. STT 실패는 정상 흐름의 일부이며, 모든 실패를
  * `failed` 이벤트로 표현해 Reports BC 의 Aggregate 가 cascade 처리하게 한다.
@@ -30,14 +36,30 @@ export class RecordingService {
 
   async requestTranscription(command: RequestTranscriptionCommand): Promise<void> {
     try {
-      const audio = await this.deps.audioBufferRepository.consume(command.meetingCode);
-      const transcript = await this.deps.transcriber.transcribe({
-        meetingCode: command.meetingCode,
-        audio,
-      });
+      const audios = await this.deps.audioBufferRepository.consume(command.meetingCode);
+      if (audios.length === 0) {
+        await this.deps.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_COMPLETED, {
+          reportId: command.reportId,
+          transcript: [],
+        });
+        return;
+      }
+
+      const merged: TranscriptionSegmentPayload[] = [];
+      for (const { participantId, audio } of audios) {
+        const segments = await this.deps.transcriber.transcribe({
+          meetingCode: command.meetingCode,
+          audio,
+        });
+        for (const seg of segments) {
+          merged.push({ ...seg, speaker: participantId });
+        }
+      }
+      merged.sort((a, b) => a.startMs - b.startMs);
+
       await this.deps.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_COMPLETED, {
         reportId: command.reportId,
-        transcript,
+        transcript: merged,
       });
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);

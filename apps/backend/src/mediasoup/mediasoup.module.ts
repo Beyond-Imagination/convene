@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 
 import {
   MEDIA_CODECS,
@@ -9,11 +9,14 @@ import {
 } from '@/config/mediasoup.config';
 import { MediasoupMeetingLifecycleListener } from '@/mediasoup/application/mediasoup-meeting-lifecycle.listener';
 import { MediasoupSignalingService } from '@/mediasoup/application/mediasoup-signaling.service';
-import { RedisParticipantMediaRepository } from '@/mediasoup/infrastructure/redis-participant-media.repository';
+import { FfmpegAudioCaptureAdapter } from '@/mediasoup/infrastructure/ffmpeg-audio-capture.adapter';
 import { MediasoupRouterAdapter } from '@/mediasoup/infrastructure/mediasoup-router.adapter';
 import { MediasoupTransportAdapter } from '@/mediasoup/infrastructure/mediasoup-transport.adapter';
 import { MediasoupWorkerPool } from '@/mediasoup/infrastructure/mediasoup-worker.pool';
+import { RedisParticipantMediaRepository } from '@/mediasoup/infrastructure/redis-participant-media.repository';
 import { MediasoupGateway } from '@/mediasoup/interface/gateways/mediasoup.gateway';
+import { RecordingModule } from '@/recording/recording.module';
+import { RedisAudioBufferRepository } from '@/recording/infrastructure/redis-audio-buffer.repository';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 
 /**
@@ -26,8 +29,12 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
  *   RedisModule(@Global) 이 제공하므로 imports 추가 없이 inject 가능.
  * - SharedKernelModule 의 NestEventBusDomainEventPublisher 가 도메인 이벤트 publish
  *   채널 ([[gateway-shared-config]]).
+ * - `FfmpegAudioCaptureAdapter` 는 audio producer 의 RTP 를 PlainTransport + ffmpeg
+ *   pipeline 으로 capture 해 RecordingModule 의 `AudioBufferRepository` 로 흘려보낸다.
+ *   cross-BC 결합은 Port 인터페이스 한정(CLAUDE.md hard rule 7).
  */
 @Module({
+  imports: [forwardRef(() => RecordingModule)],
   providers: [
     MediasoupGateway,
     MediasoupMeetingLifecycleListener,
@@ -46,8 +53,6 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
       provide: MediasoupRouterAdapter,
       useFactory: (workerPool: MediasoupWorkerPool) =>
         new MediasoupRouterAdapter(workerPool, {
-          // 동적 router pool: capacity 초과 시 lazy add. resolveRoutersPerRoom 은
-          // 더 이상 사용하지 않는다(routersPerRoom 고정 N 이 capacity 기반으로 대체).
           participantsPerRouter: resolveParticipantsPerRouter(),
           mediaCodecs: MEDIA_CODECS,
         }),
@@ -60,23 +65,34 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
       inject: [MediasoupRouterAdapter],
     },
     {
+      provide: FfmpegAudioCaptureAdapter,
+      useFactory: (
+        routerAdapter: MediasoupRouterAdapter,
+        audioBufferRepository: RedisAudioBufferRepository,
+      ) => new FfmpegAudioCaptureAdapter(routerAdapter, audioBufferRepository),
+      inject: [MediasoupRouterAdapter, RedisAudioBufferRepository],
+    },
+    {
       provide: MediasoupSignalingService,
       useFactory: (
         routerPort: MediasoupRouterAdapter,
         transportPort: MediasoupTransportAdapter,
         participantMediaRepository: RedisParticipantMediaRepository,
+        audioCapture: FfmpegAudioCaptureAdapter,
         eventPublisher: NestEventBusDomainEventPublisher,
       ) =>
         new MediasoupSignalingService({
           routerPort,
           transportPort,
           participantMediaRepository,
+          audioCapture,
           eventPublisher,
         }),
       inject: [
         MediasoupRouterAdapter,
         MediasoupTransportAdapter,
         RedisParticipantMediaRepository,
+        FfmpegAudioCaptureAdapter,
         NestEventBusDomainEventPublisher,
       ],
     },
