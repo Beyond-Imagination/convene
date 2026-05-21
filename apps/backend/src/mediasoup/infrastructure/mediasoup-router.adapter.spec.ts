@@ -248,6 +248,33 @@ describe('MediasoupRouterAdapter', () => {
     }
   });
 
+  it('한 회의의 router 들은 모두 서로 다른 worker 에 spawn 된다 (다중 방으로 round-robin idx 가 어긋나도)', async () => {
+    // 다중 방 시나리오에서 globally round-robin 인 worker idx 가 어긋나
+    // 같은 회의의 두 router 가 같은 worker 에 들어가면, pipeToRouter 가 같은
+    // producerId 를 한 worker 의 두 router 에 등록하려다 channel handler ID
+    // 충돌로 깨진다. 그래서 회의별 worker affinity 가 필요.
+    const { adapter, pool, cleanup } = await setup(4, 1);
+    try {
+      await adapter.createRoom('CODE1111'); // A0 on workerIdx=0
+      await adapter.createRoom('CODE2222'); // B0 on workerIdx=1
+      await adapter.assignParticipant('CODE1111', 'a1'); // A0 사용
+      await adapter.assignParticipant('CODE1111', 'a2'); // A1 추가 (worker !=0)
+      await adapter.assignParticipant('CODE1111', 'a3'); // A2 추가 (worker !=0, !=A1)
+      await adapter.assignParticipant('CODE1111', 'a4'); // A3 추가 (worker !=0, !=A1, !=A2)
+
+      const usedWorkerIndexes = [0, 1, 2, 3]
+        .map((i) => adapter.getRouterFor('CODE1111', i))
+        .map((r) => (r.appData as { workerIndex?: number }).workerIndex);
+      // 회의 A 의 router 4 개는 모두 다른 worker 에.
+      expect(new Set(usedWorkerIndexes).size).toBe(4);
+      expect(usedWorkerIndexes.every((idx) => typeof idx === 'number')).toBe(true);
+      // pool size 와 동일.
+      expect(pool.size).toBe(4);
+    } finally {
+      await cleanup();
+    }
+  });
+
   it('pipeProducerToAllRouters 는 routersPerRoom === 1 이면 no-op (호출만 swallow)', async () => {
     const { adapter, cleanup } = await setup(1, 1);
     try {

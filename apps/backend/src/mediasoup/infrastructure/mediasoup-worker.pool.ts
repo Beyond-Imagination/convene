@@ -67,4 +67,19 @@ export class MediasoupWorkerPool implements OnModuleInit, OnModuleDestroy {
     this.nextIdx = (this.nextIdx + 1) % this.workers.length;
     return worker;
   }
+
+  /**
+   * 특정 인덱스의 worker 반환. 회의별 worker affinity 를 RouterAdapter 가
+   * 직접 관리할 때 사용 — 한 회의의 두 router 가 같은 worker 에 들어가
+   * pipeToRouter 가 producerId 충돌로 깨지는 것을 막기 위해 호출자가
+   * 직접 idx 를 골라야 한다.
+   */
+  getWorker(idx: number): Worker {
+    if (idx < 0 || idx >= this.workers.length) {
+      throw new Error(
+        `MediasoupWorkerPool: worker index ${idx} out of range (size=${this.workers.length})`,
+      );
+    }
+    return this.workers[idx];
+  }
 }

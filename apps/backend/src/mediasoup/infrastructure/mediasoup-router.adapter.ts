@@ -47,6 +47,12 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
   private readonly routerLoads = new Map<string, Map<number, number>>();
   /** originalProducerId → RouterPipeRegistry (per meeting). */
   private readonly producerPipes = new Map<string, Map<string, RouterPipeRegistry>>();
+  /** 회의별로 점유 중인 worker 인덱스 Set. 같은 회의의 두 router 가 같은 worker
+   *  에 들어가지 않게 하기 위한 affinity tracking. */
+  private readonly workerIdxByRoom = new Map<string, Set<number>>();
+  /** 다음 회의 spawn 시 어느 worker idx 부터 후보를 돌릴지. 회의 간 worker 부하
+   *  분산 — round-robin global pointer. */
+  private nextWorkerIdx = 0;
 
   constructor(
     private readonly workerPool: MediasoupWorkerPool,
@@ -57,8 +63,9 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
     if (this.routers.has(meetingCode)) {
       throw new Error(`MediasoupRouterAdapter: room "${meetingCode}" already exists`);
     }
+    this.workerIdxByRoom.set(meetingCode, new Set());
     // 최초 router 1 개로 시작. 더 필요한 만큼은 assignParticipant 가 lazy add.
-    const first = await this.spawnRouter();
+    const first = await this.spawnRouter(meetingCode);
     this.routers.set(meetingCode, [first]);
     this.assignments.set(meetingCode, new Map());
     this.routerLoads.set(meetingCode, new Map([[0, 0]]));
@@ -83,6 +90,7 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
     this.assignments.delete(meetingCode);
     this.routerLoads.delete(meetingCode);
     this.producerPipes.delete(meetingCode);
+    this.workerIdxByRoom.delete(meetingCode);
   }
 
   async getRtpCapabilities(meetingCode: string): Promise<unknown> {
@@ -113,15 +121,18 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
 
     if (target === -1) {
       // 모든 router 가 가득 참.
-      if (list.length < this.workerPool.size) {
-        // 아직 worker 여유 있음 → 새 router 추가.
+      const usedWorkers = this.workerIdxByRoom.get(meetingCode)!;
+      if (usedWorkers.size < this.workerPool.size) {
+        // 이 회의가 아직 점유하지 않은 worker 가 있음 → 새 router 추가.
+        // (list.length 가 아니라 usedWorkers.size 로 cap 을 정의해야 한다.
+        // 다중 방으로 globally round-robin idx 가 어긋날 때 list.length 기반
+        // cap 은 같은 worker 안에 같은 회의의 두 router 가 들어가는 걸 못 막는다.)
         target = await this.addRouter(meetingCode);
       } else {
-        // worker 수가 router 수의 cap. 새 router 를 같은 worker 에 만들면
-        // pipeToRouter 가 동일 producerId 를 같은 worker 의 별도 router 에
-        // 등록하려 시도해 mediasoup native 가 "Channel request handler with
-        // ID ... already exists" 로 거절한다. 그래서 가장 한가한 기존
-        // router 에 over-allocate.
+        // 이 회의가 모든 worker 를 점유 중. 새 router 를 만들면 같은 worker
+        // 에 두 router 가 생겨 pipeToRouter 가 동일 producerId 를 등록하려다
+        // mediasoup native 가 "Channel request handler with ID ... already
+        // exists" 로 거절한다. 그래서 가장 한가한 기존 router 에 over-allocate.
         let minLoad = Number.POSITIVE_INFINITY;
         let minIdx = 0;
         for (let i = 0; i < list.length; i += 1) {
@@ -133,7 +144,7 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
         }
         target = minIdx;
         this.logger.warn(
-          `router cap reached (code=${meetingCode}, workers=${this.workerPool.size}) — over-allocating participant to router#${target}`,
+          `worker cap reached (code=${meetingCode}, usedWorkers=${usedWorkers.size}/${this.workerPool.size}) — over-allocating participant to router#${target}`,
         );
       }
     }
@@ -261,11 +272,13 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
 
   /**
    * 새 router 를 생성하고 기존 producer 들을 그 새 router 로 pipe 한다.
-   * assignParticipant 가 capacity 초과 시 호출.
+   * assignParticipant 가 capacity 초과 시 호출. 호출 전 회의가 점유하지 않은
+   * worker 가 1 개 이상 남아 있다는 게 보장되어야 한다 (usedWorkers.size <
+   * workerPool.size). 그 보장이 깨지면 spawnRouter 가 throw.
    */
   private async addRouter(meetingCode: string): Promise<number> {
     const list = this.routers.get(meetingCode)!;
-    const newRouter = await this.spawnRouter();
+    const newRouter = await this.spawnRouter(meetingCode);
     const newIndex = list.length;
     list.push(newRouter);
     this.routerLoads.get(meetingCode)!.set(newIndex, 0);
@@ -302,8 +315,39 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
     return newIndex;
   }
 
-  private async spawnRouter(): Promise<Router> {
-    const worker = this.workerPool.getNextWorker();
-    return worker.createRouter({ mediaCodecs: this.options.mediaCodecs });
+  /**
+   * 이 회의가 점유하지 않은 worker 인덱스를 골라 그 worker 에 router 를
+   * 만든다. `nextWorkerIdx` 부터 시계방향으로 후보를 도는 round-robin —
+   * 회의 간 worker 부하 분산 + 회의 내 affinity 동시 달성. router 의 appData
+   * 에 workerIndex 를 심어 검증/디버깅 시 추적 가능.
+   */
+  private async spawnRouter(meetingCode: string): Promise<Router> {
+    const used = this.workerIdxByRoom.get(meetingCode);
+    if (!used) {
+      throw new Error(
+        `MediasoupRouterAdapter: room "${meetingCode}" not initialized for affinity tracking`,
+      );
+    }
+    const size = this.workerPool.size;
+    let pickedIdx = -1;
+    for (let i = 0; i < size; i += 1) {
+      const candidate = (this.nextWorkerIdx + i) % size;
+      if (!used.has(candidate)) {
+        pickedIdx = candidate;
+        break;
+      }
+    }
+    if (pickedIdx === -1) {
+      throw new Error(
+        `MediasoupRouterAdapter: no free worker for room "${meetingCode}" (used=${used.size}/${size})`,
+      );
+    }
+    this.nextWorkerIdx = (pickedIdx + 1) % size;
+    used.add(pickedIdx);
+    const worker = this.workerPool.getWorker(pickedIdx);
+    return worker.createRouter({
+      mediaCodecs: this.options.mediaCodecs,
+      appData: { workerIndex: pickedIdx },
+    });
   }
 }
