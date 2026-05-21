@@ -20,7 +20,10 @@ const setup = async () => {
     },
   });
   await pool.onModuleInit();
-  const routerAdapter = new MediasoupRouterAdapter(pool, { routersPerRoom: 1, mediaCodecs });
+  const routerAdapter = new MediasoupRouterAdapter(pool, {
+    participantsPerRouter: 5,
+    mediaCodecs,
+  });
   const transportAdapter = new MediasoupTransportAdapter(routerAdapter, {
     listenIps: [{ ip: '127.0.0.1', announcedIp: '127.0.0.1' }],
     enableUdp: true,

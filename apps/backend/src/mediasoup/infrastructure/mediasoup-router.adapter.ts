@@ -6,7 +6,8 @@ import { MediaRouterPort } from '@/mediasoup/domain/ports';
 import { MediasoupWorkerPool } from './mediasoup-worker.pool';
 
 export interface MediasoupRouterAdapterOptions {
-  routersPerRoom: number;
+  /** router 1 개의 참가자 capacity. assignParticipant 가 이를 초과하면 lazy add. */
+  participantsPerRouter: number;
   mediaCodecs: RtpCodecCapability[];
 }
 
@@ -15,29 +16,37 @@ interface PipeProducerInfo {
   readonly pipeProducer: Producer;
 }
 
+interface RouterPipeRegistry {
+  /** originalProducerId 가 어느 router 에서 처음 만들어졌는지. 새 router 가 들어왔을 때
+   *  기존 producer 를 그 새 router 로 pipe 하기 위해 필요. */
+  readonly sourceRouterIndex: number;
+  /** 그 producer 가 pipe 된 target router 들. */
+  readonly pipes: PipeProducerInfo[];
+}
+
 /**
  * `MediaRouterPort` 의 mediasoup 어댑터.
  *
- * 회의 1 건 = router N 개 (options.routersPerRoom) 묶음. 각 router 는 다른 worker
- * 에 분산되어 CPU 부하를 균등화한다.
+ * **동적 router pool** — plum 은 회의 생성 시 router 를 사전 N 개 만들지만
+ * migration 회의는 인원 가변이라 capacity 기반 lazy add 전략을 쓴다:
+ *   - createRoom: router 1 개 시작
+ *   - assignParticipant: 빈 자리(capacity 미달) 있는 router 에 할당. 모두 가득
+ *     차면 새 router 추가 + **모든 기존 producer 를 새 router 로 pipe**.
+ *   - releaseParticipant: 그 router 의 참가자 0 명이면 해당 router 정리 (다음 Cycle).
  *
- * 참가자 할당은 plum `MultiRouterManagerService.assignRouterForParticipant` 와
- * 동등 stateless round-robin — `(hash(roomCode) + participantCount-1) % routerCount`
- * 로 방마다 다른 시작점을 갖는다.
- *
- * `pipeProducerToAllRouters` 는 producer 를 다른 모든 router 로 즉시 pipe 해
- * 어떤 router 의 transport 에서도 `transport.consume({producerId})` 가 동작
- * 하게 한다(plum eager loading 패턴). `cleanupPipeProducers` 는 producer 종료
- * 시 묶인 모든 pipeProducer 를 close.
+ * `pipeProducerToAllRouters` 는 produce 시점에 호출되어 다른 모든 router 로 pipe.
+ * `cleanupPipeProducers` 는 producer close 시 호출.
  */
 export class MediasoupRouterAdapter implements MediaRouterPort {
   private readonly logger = new Logger(MediasoupRouterAdapter.name);
   private readonly routers = new Map<string, Router[]>();
+  /** participantId → routerIndex (per meeting). */
   private readonly assignments = new Map<string, Map<string, number>>();
-  /** room 마다 누적된 참가자 수 — plum stateless round-robin 의 입력. */
-  private readonly participantCounts = new Map<string, number>();
-  /** room 마다 originalProducerId → 그 producer 의 모든 pipeProducer 추적. */
-  private readonly pipeProducers = new Map<string, Map<string, PipeProducerInfo[]>>();
+  /** routerIndex → 현재 참가자 수 (per meeting). assignments 와 redundant 하지만
+   *  O(1) capacity 검사를 위해 분리. */
+  private readonly routerLoads = new Map<string, Map<number, number>>();
+  /** originalProducerId → RouterPipeRegistry (per meeting). */
+  private readonly producerPipes = new Map<string, Map<string, RouterPipeRegistry>>();
 
   constructor(
     private readonly workerPool: MediasoupWorkerPool,
@@ -48,22 +57,17 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
     if (this.routers.has(meetingCode)) {
       throw new Error(`MediasoupRouterAdapter: room "${meetingCode}" already exists`);
     }
-    const list: Router[] = [];
-    for (let i = 0; i < this.options.routersPerRoom; i += 1) {
-      const worker = this.workerPool.getNextWorker();
-      const router = await worker.createRouter({ mediaCodecs: this.options.mediaCodecs });
-      list.push(router);
-    }
-    this.routers.set(meetingCode, list);
+    // 최초 router 1 개로 시작. 더 필요한 만큼은 assignParticipant 가 lazy add.
+    const first = await this.spawnRouter();
+    this.routers.set(meetingCode, [first]);
     this.assignments.set(meetingCode, new Map());
-    this.participantCounts.set(meetingCode, 0);
-    this.pipeProducers.set(meetingCode, new Map());
-    this.logger.log(`room created (code=${meetingCode}, routers=${list.length})`);
+    this.routerLoads.set(meetingCode, new Map([[0, 0]]));
+    this.producerPipes.set(meetingCode, new Map());
+    this.logger.log(`room created (code=${meetingCode}, routers=1)`);
   }
 
   async closeRoom(meetingCode: string): Promise<void> {
-    // pipeProducer 먼저 정리 (router close 가 cascade 되지만 명시적으로 stale 제거)
-    const roomPipes = this.pipeProducers.get(meetingCode);
+    const roomPipes = this.producerPipes.get(meetingCode);
     if (roomPipes) {
       for (const producerId of Array.from(roomPipes.keys())) {
         await this.cleanupPipeProducers(meetingCode, producerId);
@@ -77,8 +81,8 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
     }
     this.routers.delete(meetingCode);
     this.assignments.delete(meetingCode);
-    this.participantCounts.delete(meetingCode);
-    this.pipeProducers.delete(meetingCode);
+    this.routerLoads.delete(meetingCode);
+    this.producerPipes.delete(meetingCode);
   }
 
   async getRtpCapabilities(meetingCode: string): Promise<unknown> {
@@ -86,29 +90,74 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
     if (!list || list.length === 0) {
       throw new Error(`MediasoupRouterAdapter: room "${meetingCode}" not opened`);
     }
+    // 같은 회의의 router 들은 동일 mediaCodecs 로 만들어졌으므로 어느 것이든 OK.
     return list[0].rtpCapabilities;
   }
 
   async assignParticipant(meetingCode: string, participantId: string): Promise<number> {
     const list = this.routers.get(meetingCode);
-    if (!list || list.length === 0) {
+    const loads = this.routerLoads.get(meetingCode);
+    if (!list || !loads) {
       throw new Error(`MediasoupRouterAdapter: room "${meetingCode}" not opened`);
     }
-    // plum 동일 알고리즘: hash(roomCode) + participantCount → 방마다 다른 시작점.
-    const prevCount = this.participantCounts.get(meetingCode) ?? 0;
-    const nextCount = prevCount + 1;
-    this.participantCounts.set(meetingCode, nextCount);
+    const capacity = this.options.participantsPerRouter;
 
-    const idx = (this.hashString(meetingCode) + nextCount - 1) % list.length;
-    this.assignments.get(meetingCode)!.set(participantId, idx);
+    // 빈 자리 있는 router 가 있으면 가장 낮은 인덱스 router 에 할당 (균등 분배).
+    let target = -1;
+    for (let i = 0; i < list.length; i += 1) {
+      if ((loads.get(i) ?? 0) < capacity) {
+        target = i;
+        break;
+      }
+    }
+
+    if (target === -1) {
+      // 모든 router 가 가득 참.
+      if (list.length < this.workerPool.size) {
+        // 아직 worker 여유 있음 → 새 router 추가.
+        target = await this.addRouter(meetingCode);
+      } else {
+        // worker 수가 router 수의 cap. 새 router 를 같은 worker 에 만들면
+        // pipeToRouter 가 동일 producerId 를 같은 worker 의 별도 router 에
+        // 등록하려 시도해 mediasoup native 가 "Channel request handler with
+        // ID ... already exists" 로 거절한다. 그래서 가장 한가한 기존
+        // router 에 over-allocate.
+        let minLoad = Number.POSITIVE_INFINITY;
+        let minIdx = 0;
+        for (let i = 0; i < list.length; i += 1) {
+          const load = loads.get(i) ?? 0;
+          if (load < minLoad) {
+            minLoad = load;
+            minIdx = i;
+          }
+        }
+        target = minIdx;
+        this.logger.warn(
+          `router cap reached (code=${meetingCode}, workers=${this.workerPool.size}) — over-allocating participant to router#${target}`,
+        );
+      }
+    }
+
+    loads.set(target, (loads.get(target) ?? 0) + 1);
+    this.assignments.get(meetingCode)!.set(participantId, target);
     this.logger.log(
-      `participant assigned (code=${meetingCode}, pid=${participantId}, routerIndex=${idx})`,
+      `participant assigned (code=${meetingCode}, pid=${participantId}, routerIndex=${target}, load=${loads.get(target)}/${capacity})`,
     );
-    return idx;
+    return target;
   }
 
   async releaseParticipant(meetingCode: string, participantId: string): Promise<void> {
-    this.assignments.get(meetingCode)?.delete(participantId);
+    const assignments = this.assignments.get(meetingCode);
+    const loads = this.routerLoads.get(meetingCode);
+    if (!assignments || !loads) return;
+    const idx = assignments.get(participantId);
+    if (idx === undefined) return;
+    assignments.delete(participantId);
+    const prev = loads.get(idx) ?? 0;
+    loads.set(idx, Math.max(0, prev - 1));
+    this.logger.log(
+      `participant released (code=${meetingCode}, pid=${participantId}, routerIndex=${idx}, load=${loads.get(idx)})`,
+    );
   }
 
   async pipeProducerToAllRouters(
@@ -117,25 +166,31 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
     sourceRouterIndex: number,
   ): Promise<void> {
     const list = this.routers.get(meetingCode);
-    if (!list || list.length <= 1) {
-      // single-router 또는 room 없음 → no-op.
-      return;
-    }
+    if (!list) return;
     const sourceRouter = list[sourceRouterIndex];
     if (!sourceRouter) {
       throw new Error(
         `MediasoupRouterAdapter: sourceRouterIndex ${sourceRouterIndex} out of range for room "${meetingCode}"`,
       );
     }
-    const roomPipes = this.pipeProducers.get(meetingCode)!;
-    const existing = roomPipes.get(producerId) ?? [];
+    const roomPipes = this.producerPipes.get(meetingCode)!;
+    const existing = roomPipes.get(producerId);
 
-    // 이미 pipe 된 target 은 skip (idempotent).
-    const pipedTargets = new Set(existing.map((p) => p.targetRouter));
+    if (list.length <= 1) {
+      // 현재는 single-router 이지만 미래 새 router 가 추가되면 그 시점에 pipe 가
+      // 필요하니, sourceRouterIndex 만 등록해두고 pipes 는 빈 채로 저장.
+      if (!existing) roomPipes.set(producerId, { sourceRouterIndex, pipes: [] });
+      return;
+    }
+
+    const pipedTargets = new Set((existing?.pipes ?? []).map((p) => p.targetRouter));
     const targets = list.filter(
       (r, idx) => idx !== sourceRouterIndex && !pipedTargets.has(r),
     );
-    if (targets.length === 0) return;
+    if (targets.length === 0) {
+      if (!existing) roomPipes.set(producerId, { sourceRouterIndex, pipes: [] });
+      return;
+    }
 
     const results = await Promise.allSettled(
       targets.map(async (targetRouter) => {
@@ -158,18 +213,21 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
           `pipe FAIL (code=${meetingCode}, producerId=${producerId}): ${(r.reason as Error).message}`,
         );
     }
-    roomPipes.set(producerId, [...existing, ...ok]);
+    roomPipes.set(producerId, {
+      sourceRouterIndex,
+      pipes: [...(existing?.pipes ?? []), ...ok],
+    });
     this.logger.log(
       `pipe ok (code=${meetingCode}, producerId=${producerId}, src=#${sourceRouterIndex}, +${ok.length} targets)`,
     );
   }
 
   async cleanupPipeProducers(meetingCode: string, producerId: string): Promise<void> {
-    const roomPipes = this.pipeProducers.get(meetingCode);
+    const roomPipes = this.producerPipes.get(meetingCode);
     if (!roomPipes) return;
-    const infos = roomPipes.get(producerId);
-    if (!infos || infos.length === 0) return;
-    for (const info of infos) {
+    const record = roomPipes.get(producerId);
+    if (!record) return;
+    for (const info of record.pipes) {
       try {
         if (!info.pipeProducer.closed) info.pipeProducer.close();
       } catch (err) {
@@ -191,7 +249,6 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
     return list[routerIndex];
   }
 
-  /** 참가자에게 할당된 router 를 lookup. TransportAdapter 가 transport 를 만들 때 호출. */
   getParticipantRouter(meetingCode: string, participantId: string): Router {
     const assignment = this.assignments.get(meetingCode)?.get(participantId);
     if (assignment === undefined) {
@@ -203,15 +260,50 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
   }
 
   /**
-   * plum `hashString` 동등 — 문자열의 32-bit 해시. assignParticipant 의 stateless
-   * 시작점 계산에 사용.
+   * 새 router 를 생성하고 기존 producer 들을 그 새 router 로 pipe 한다.
+   * assignParticipant 가 capacity 초과 시 호출.
    */
-  private hashString(str: string): number {
-    let hash = 0;
-    for (let i = 0; i < str.length; i += 1) {
-      hash = (hash << 5) - hash + str.charCodeAt(i);
-      hash |= 0;
+  private async addRouter(meetingCode: string): Promise<number> {
+    const list = this.routers.get(meetingCode)!;
+    const newRouter = await this.spawnRouter();
+    const newIndex = list.length;
+    list.push(newRouter);
+    this.routerLoads.get(meetingCode)!.set(newIndex, 0);
+
+    // 기존 모든 producer 를 새 router 로 pipe.
+    const roomPipes = this.producerPipes.get(meetingCode);
+    if (roomPipes && roomPipes.size > 0) {
+      const pipeOps = Array.from(roomPipes.entries()).map(
+        async ([producerId, record]) => {
+          if (record.sourceRouterIndex === newIndex) return; // self
+          if (record.pipes.some((p) => p.targetRouter === newRouter)) return;
+          const sourceRouter = list[record.sourceRouterIndex];
+          if (!sourceRouter) return;
+          try {
+            const { pipeProducer } = await sourceRouter.pipeToRouter({
+              producerId,
+              router: newRouter,
+            });
+            if (!pipeProducer) return;
+            record.pipes.push({ targetRouter: newRouter, pipeProducer });
+          } catch (err) {
+            this.logger.error(
+              `addRouter pipe FAIL (code=${meetingCode}, producerId=${producerId}, newIndex=${newIndex}): ${(err as Error).message}`,
+            );
+          }
+        },
+      );
+      await Promise.allSettled(pipeOps);
     }
-    return Math.abs(hash);
+
+    this.logger.log(
+      `router added (code=${meetingCode}, newIndex=${newIndex}, existing pipes pre-loaded)`,
+    );
+    return newIndex;
+  }
+
+  private async spawnRouter(): Promise<Router> {
+    const worker = this.workerPool.getNextWorker();
+    return worker.createRouter({ mediaCodecs: this.options.mediaCodecs });
   }
 }

@@ -3,7 +3,7 @@ import { Module } from '@nestjs/common';
 import {
   MEDIA_CODECS,
   resolveNumWorkers,
-  resolveRoutersPerRoom,
+  resolveParticipantsPerRouter,
   resolveWebRtcTransportOptions,
   resolveWorkerOptions,
 } from '@/config/mediasoup.config';
@@ -45,7 +45,9 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
       provide: MediasoupRouterAdapter,
       useFactory: (workerPool: MediasoupWorkerPool) =>
         new MediasoupRouterAdapter(workerPool, {
-          routersPerRoom: resolveRoutersPerRoom(),
+          // 동적 router pool: capacity 초과 시 lazy add. resolveRoutersPerRoom 은
+          // 더 이상 사용하지 않는다(routersPerRoom 고정 N 이 capacity 기반으로 대체).
+          participantsPerRouter: resolveParticipantsPerRouter(),
           mediaCodecs: MEDIA_CODECS,
         }),
       inject: [MediasoupWorkerPool],

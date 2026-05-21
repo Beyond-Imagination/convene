@@ -15,6 +15,7 @@ import * as os from 'os';
  */
 
 const DEFAULT_NUM_WORKERS = 1;
+const DEFAULT_PARTICIPANTS_PER_ROUTER = 5;
 const DEFAULT_RTC_MIN_PORT = 40000;
 const DEFAULT_RTC_MAX_PORT = 49999;
 const DEFAULT_LOG_LEVEL: WorkerLogLevel = 'warn';
@@ -42,11 +43,17 @@ export function resolveNumWorkers(env: NodeJS.ProcessEnv = process.env): number 
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_NUM_WORKERS;
 }
 
-export function resolveRoutersPerRoom(env: NodeJS.ProcessEnv = process.env): number {
-  // plum 전략 동등: 기본값은 workers 수 — CPU 부하 분산을 위해 회의마다 worker 수만큼
-  // router 를 묶고 hash(roomCode)+participantCount 기반 stateless round-robin 할당.
-  // 다른 router 의 producer 는 `pipeProducerToAllRouters` 가 eager pipe.
-  return parseIntEnv(env, 'MEDIASOUP_ROUTERS_PER_ROOM', resolveNumWorkers(env));
+/**
+ * router 1 개의 참가자 capacity. assignParticipant 시 모든 기존 router 가 가득 차
+ * 면 새 router 가 lazy 하게 추가된다. plum 은 capacity 무관(workers 수만큼 사전
+ * 생성)이지만 migration 회의는 인원 가변이라 capacity 기반 동적 pool 이 자연스럽다.
+ *
+ * env `MEDIASOUP_PARTICIPANTS_PER_ROUTER` (default 5). 너무 크면 한 router CPU 가
+ * bottleneck 이 되고, 너무 작으면 pipeProducer 오버헤드 증가 — 5 가 시작점.
+ */
+export function resolveParticipantsPerRouter(env: NodeJS.ProcessEnv = process.env): number {
+  const v = parseIntEnv(env, 'MEDIASOUP_PARTICIPANTS_PER_ROUTER', DEFAULT_PARTICIPANTS_PER_ROUTER);
+  return v > 0 ? v : DEFAULT_PARTICIPANTS_PER_ROUTER;
 }
 
 export interface WorkerOptions {
