@@ -90,26 +90,37 @@ export class GeminiSummarizer implements SummarizerPort {
 
 /**
  * 프롬프트는 회의 메타(코드/시각) + transcript 발화별 라인 + chat 라인을
- * 한 묶음으로 모델에 넘긴다. 모델은 응답을 ReportSummary 형상의 JSON 으로만
- * 돌려달라고 명시한다. JSON 형식 강제는 `generationConfig.responseMimeType`
- * 으로도 한 번 더 보강된다.
+ * 한 묶음으로 모델에 넘긴다.
+ *
+ * 지시문/스키마는 모두 영어로 작성하지만 (모델이 영어 지시를 더 안정적으로
+ * 따르는 경향), **응답 본문(title/overview/decisions/actionItems/keyTopics)
+ * 은 모두 한국어로 작성**하라고 명시한다. transcript/chat 원본은 한국어
+ * 그대로 들어가며 번역하지 않는다.
+ *
+ * JSON 형식 강제는 `generationConfig.responseMimeType` 으로도 한 번 더 보강.
  */
 function buildPrompt(input: SummarizerInput): string {
   const { transcript, chat, meta } = input;
   const lines: string[] = [];
   lines.push(
-    '당신은 회의 진행을 정리하는 한국어 회의록 작성 비서입니다. 아래 입력을 바탕으로 회사 회의록 형태로 요약을 작성하세요.',
+    'You are an assistant that produces structured business-meeting minutes.',
+  );
+  lines.push(
+    'Read the meeting inputs below and write a clean, decision-oriented summary.',
+  );
+  lines.push(
+    'IMPORTANT: Even though these instructions are in English, **all output text (title, overview, decisions, actionItems, keyTopics) MUST be written in Korean (한국어)**. Do not translate the transcript or chat; treat them as source material and quote/paraphrase them in Korean.',
   );
   lines.push('');
-  lines.push('## 회의 메타');
+  lines.push('## Meeting metadata');
   lines.push(`- meetingId: ${meta.meetingId}`);
   lines.push(`- code: ${meta.code}`);
   lines.push(`- startedAt: ${meta.startedAt.toISOString()}`);
   lines.push(`- endedAt: ${meta.endedAt.toISOString()}`);
   lines.push('');
-  lines.push('## 발화(transcript)');
+  lines.push('## Transcript (speaker utterances)');
   if (transcript.length === 0) {
-    lines.push('(발화 없음)');
+    lines.push('(no utterances)');
   } else {
     for (const seg of transcript) {
       const speaker = seg.speaker ?? 'unknown';
@@ -117,23 +128,23 @@ function buildPrompt(input: SummarizerInput): string {
     }
   }
   lines.push('');
-  lines.push('## 채팅(chat)');
+  lines.push('## Chat messages');
   if (chat.length === 0) {
-    lines.push('(채팅 없음)');
+    lines.push('(no chat)');
   } else {
     for (const c of chat) {
       lines.push(`- [${c.sentAt.toISOString()}] ${c.nickname}: ${c.text}`);
     }
   }
   lines.push('');
-  lines.push('## 출력 형식');
+  lines.push('## Output format');
   lines.push(
-    '아래 JSON 스키마에 정확히 일치하는 JSON 객체만 출력하세요. 코드블록 마크다운 없이 raw JSON 만 출력합니다.',
+    'Respond with a single raw JSON object that conforms exactly to the schema below. No code fences, no markdown, no commentary — JSON only. All string values must be written in Korean.',
   );
   lines.push('{');
-  lines.push('  "title": string,                       // 회의 제목(1~200자)');
-  lines.push('  "overview": string,                    // 한국어 1~1000자 요약');
-  lines.push('  "decisions": string[],                 // 결정 사항 항목 배열');
+  lines.push('  "title": string,                       // Korean meeting title (1-200 chars)');
+  lines.push('  "overview": string,                    // Korean summary, 1-1000 chars');
+  lines.push('  "decisions": string[],                 // Korean decision statements');
   lines.push(
     '  "actionItems": [{ "owner"?: string, "task": string, "due"?: string }],',
   );

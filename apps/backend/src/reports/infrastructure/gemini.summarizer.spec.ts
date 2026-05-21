@@ -85,6 +85,7 @@ describe('GeminiSummarizer', () => {
     expect(body.contents).toHaveLength(1);
     expect(body.contents[0].role).toBe('user');
     const promptText = body.contents[0].parts[0].text;
+    // 데이터(transcript/chat) 본문은 원본(한국어) 그대로 들어간다.
     expect(promptText).toContain('alice');
     expect(promptText).toContain('OAuth 다음 분기 확정');
     expect(promptText).toContain('bob');
@@ -92,6 +93,10 @@ describe('GeminiSummarizer', () => {
     expect(promptText).toContain('회의록 작성 부탁');
     // 메타데이터(code/시작·종료 시각)도 프롬프트에 포함돼야 한다.
     expect(promptText).toContain('abc12xyz');
+    // 지시문/스키마는 영어로 작성되며, 결과는 한국어로 응답하라고 명시한다.
+    expect(promptText).toContain('Transcript');
+    expect(promptText).toContain('Chat');
+    expect(promptText).toContain('Korean');
   });
 
   it('응답 JSON 을 ReportSummary VO 로 변환해 돌려준다', async () => {
