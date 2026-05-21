@@ -22,6 +22,9 @@ async function bootstrap() {
   app.enableCors({ origin: corsOrigins, credentials: true });
   app.useWebSocketAdapter(new CorsIoAdapter(app, corsOrigins));
 
+  // RedisModule.onApplicationShutdown 에서 quit() 을 호출하므로 hook 활성화.
+  app.enableShutdownHooks();
+
   await app.listen(resolvePort());
 }
 

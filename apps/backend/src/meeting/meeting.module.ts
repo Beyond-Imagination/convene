@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
-import { InMemoryChatRepository } from '@/meeting/infrastructure/in-memory-chat.repository';
-import { InMemoryMeetingRepository } from '@/meeting/infrastructure/in-memory-meeting.repository';
 import { RandomMeetingCodeGenerator } from '@/meeting/infrastructure/random-meeting-code.generator';
+import { RedisChatRepository } from '@/meeting/infrastructure/redis-chat.repository';
+import { RedisMeetingRepository } from '@/meeting/infrastructure/redis-meeting.repository';
 import { MeetingController } from '@/meeting/interface/controllers/meeting.controller';
 import { MeetingGateway } from '@/meeting/interface/gateways/meeting.gateway';
 
@@ -13,8 +13,9 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 /**
  * Meeting bounded context의 NestJS 모듈.
  *
- * v1 마이그레이션 초기에는 in-memory repository를 default provider로 쓰고,
- * Redis 어댑터가 준비되는 즉시 provider 토큰만 교체한다.
+ * 회의 영속 상태(Meeting Aggregate + ChatEntry LIST)는 redis(ioredis) 기반
+ * 어댑터로 저장한다. RedisModule(@Global) 이 ioredis 클라이언트 인스턴스를
+ * 한 번 만들어 두고, 본 모듈의 Repository 가 같은 인스턴스를 inject 한다.
  *
  * SystemClock, NestEventBusDomainEventPublisher는 @Global()인 SharedKernelModule을
  * 통해 주입된다(AppModule에서 1회 import).
@@ -24,15 +25,15 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 @Module({
   controllers: [MeetingController],
   providers: [
-    InMemoryMeetingRepository,
-    InMemoryChatRepository,
+    RedisMeetingRepository,
+    RedisChatRepository,
     RandomMeetingCodeGenerator,
     MeetingGateway,
     {
       provide: MeetingService,
       useFactory: (
-        repository: InMemoryMeetingRepository,
-        chatRepository: InMemoryChatRepository,
+        repository: RedisMeetingRepository,
+        chatRepository: RedisChatRepository,
         codeGenerator: RandomMeetingCodeGenerator,
         clock: SystemClock,
         eventPublisher: NestEventBusDomainEventPublisher,
@@ -45,8 +46,8 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
           eventPublisher,
         }),
       inject: [
-        InMemoryMeetingRepository,
-        InMemoryChatRepository,
+        RedisMeetingRepository,
+        RedisChatRepository,
         RandomMeetingCodeGenerator,
         SystemClock,
         NestEventBusDomainEventPublisher,

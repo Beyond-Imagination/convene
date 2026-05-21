@@ -39,6 +39,22 @@ export class Participant {
     return new Participant(id, trimmed, at);
   }
 
+  /**
+   * snapshot 으로부터 Participant 를 복원한다. Repository 가 영속 저장소(Redis 등)
+   * 로부터 읽어들인 raw 상태를 그대로 도메인 객체로 되살리기 위한 진입점.
+   *
+   * `join` 과 달리 입력에 대한 형식 검증을 하지 않는다(이미 합법한 상태에서
+   * snapshot 된 데이터라는 trust). 검증 책임은 snapshot 생성 시점에 있다.
+   */
+  static fromSnapshot(snapshot: ParticipantSnapshot): Participant {
+    return new Participant(
+      snapshot.id,
+      snapshot.nickname,
+      snapshot.joinedAt,
+      snapshot.leftAt,
+    );
+  }
+
   leave(at: Date): void {
     if (this._leftAt !== null) {
       throw new Error('Participant has already left');

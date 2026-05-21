@@ -172,4 +172,36 @@ describe('ParticipantMedia aggregate', () => {
       });
     });
   });
+
+  describe('fromSnapshot (복원)', () => {
+    it('snapshot → fromSnapshot → snapshot 은 round-trip 동등', () => {
+      const original = baseSpawn();
+      original.attachTransport('send', 't-send');
+      original.attachTransport('recv', 't-recv');
+      original.addProducer('p1', { kind: 'audio', source: 'audio' });
+      original.addProducer('p2', { kind: 'video', source: 'video' });
+      original.addConsumer('c1', { producerId: 'p-other', kind: 'audio', source: 'audio' });
+
+      const restored = ParticipantMedia.fromSnapshot(original.snapshot());
+      expect(restored.snapshot()).toEqual(original.snapshot());
+    });
+
+    it('closed 상태도 그대로 복원하고 mutation 을 거부한다', () => {
+      const original = baseSpawn();
+      original.close();
+      const restored = ParticipantMedia.fromSnapshot(original.snapshot());
+      expect(restored.isClosed).toBe(true);
+      expect(() => restored.attachTransport('send', 't1')).toThrow(/closed/);
+    });
+
+    it('복원된 ParticipantMedia 는 이어서 mutation 가능하다(transport 부착·producer 추가)', () => {
+      const original = baseSpawn();
+      original.attachTransport('send', 't-send');
+      const restored = ParticipantMedia.fromSnapshot(original.snapshot());
+
+      restored.attachTransport('recv', 't-recv');
+      restored.addProducer('p1', { kind: 'audio', source: 'audio' });
+      expect(restored.producers).toEqual([{ id: 'p1', kind: 'audio', source: 'audio' }]);
+    });
+  });
 });

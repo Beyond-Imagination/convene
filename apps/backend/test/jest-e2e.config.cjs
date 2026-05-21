@@ -17,6 +17,7 @@ module.exports = {
   },
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^ioredis$': 'ioredis-mock',
   },
   testEnvironment: 'node',
   testTimeout: 15000,

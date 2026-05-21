@@ -210,4 +210,44 @@ describe('Meeting (Aggregate Root)', () => {
       expect(snap.participants[0].leftAt).toBeNull();
     });
   });
+
+  describe('fromSnapshot (복원)', () => {
+    it('open 상태의 snapshot 으로부터 동일한 Meeting 을 복원한다', () => {
+      const m = newMeeting();
+      m.addParticipant('s1', 'alice', T_30s);
+      m.addParticipant('s2', 'bob', T_30s);
+      const restored = Meeting.fromSnapshot(m.snapshot());
+      expect(restored.snapshot()).toEqual(m.snapshot());
+      expect(restored.isOpen).toBe(true);
+      expect(restored.activeParticipantCount).toBe(2);
+    });
+
+    it('close 된 snapshot 도 ended 상태 그대로 복원한다(다시 mutate 불가)', () => {
+      const m = newMeeting();
+      m.addParticipant('s1', 'alice', T_30s);
+      m.close(T_1m);
+      const restored = Meeting.fromSnapshot(m.snapshot());
+      expect(restored.isOpen).toBe(false);
+      expect(restored.endedAt?.getTime()).toBe(T_1m.getTime());
+      expect(() => restored.addParticipant('s2', 'bob', T_1m)).toThrow(/already closed/);
+    });
+
+    it('leave 한 참가자도 그대로 복원한다(findParticipant 로 조회 가능)', () => {
+      const m = newMeeting();
+      m.addParticipant('s1', 'alice', T_30s);
+      m.removeParticipant('s1', T_1m);
+      const restored = Meeting.fromSnapshot(m.snapshot());
+      const found = restored.findParticipant('s1');
+      expect(found?.isActive).toBe(false);
+      expect(found?.leftAt?.getTime()).toBe(T_1m.getTime());
+    });
+
+    it('복원된 Meeting 에서 동일한 idle 조건이 그대로 평가된다', () => {
+      const m = newMeeting();
+      m.addParticipant('s1', 'alice', T_30s);
+      m.removeParticipant('s1', T_1m);
+      const restored = Meeting.fromSnapshot(m.snapshot());
+      expect(restored.isIdleSince(T_10m_after_T_1m)).toBe(true);
+    });
+  });
 });

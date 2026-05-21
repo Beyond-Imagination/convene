@@ -9,7 +9,7 @@ import {
 } from '@/config/mediasoup.config';
 import { MediasoupMeetingLifecycleListener } from '@/mediasoup/application/mediasoup-meeting-lifecycle.listener';
 import { MediasoupSignalingService } from '@/mediasoup/application/mediasoup-signaling.service';
-import { InMemoryParticipantMediaRepository } from '@/mediasoup/infrastructure/in-memory-participant-media.repository';
+import { RedisParticipantMediaRepository } from '@/mediasoup/infrastructure/redis-participant-media.repository';
 import { MediasoupRouterAdapter } from '@/mediasoup/infrastructure/mediasoup-router.adapter';
 import { MediasoupTransportAdapter } from '@/mediasoup/infrastructure/mediasoup-transport.adapter';
 import { MediasoupWorkerPool } from '@/mediasoup/infrastructure/mediasoup-worker.pool';
@@ -21,8 +21,9 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
  *
  * - WorkerPool / RouterAdapter / TransportAdapter / SignalingService 는 비-Nest
  *   클래스라 useFactory 로 묶는다 (Meeting BC 의 MeetingService 와 동일 패턴).
- * - Gateway / LifecycleListener / InMemoryRepo 는 @Injectable / @WebSocketGateway
- *   데코레이터가 있으므로 클래스 토큰만 등록.
+ * - Gateway / LifecycleListener / RedisParticipantMediaRepository 는 @Injectable
+ *   / @WebSocketGateway 데코레이터가 있으므로 클래스 토큰만 등록한다. Redis 클라이언트는
+ *   RedisModule(@Global) 이 제공하므로 imports 추가 없이 inject 가능.
  * - SharedKernelModule 의 NestEventBusDomainEventPublisher 가 도메인 이벤트 publish
  *   채널 ([[gateway-shared-config]]).
  */
@@ -30,7 +31,7 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
   providers: [
     MediasoupGateway,
     MediasoupMeetingLifecycleListener,
-    InMemoryParticipantMediaRepository,
+    RedisParticipantMediaRepository,
     {
       provide: MediasoupWorkerPool,
       useFactory: () =>
@@ -63,7 +64,7 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
       useFactory: (
         routerPort: MediasoupRouterAdapter,
         transportPort: MediasoupTransportAdapter,
-        participantMediaRepository: InMemoryParticipantMediaRepository,
+        participantMediaRepository: RedisParticipantMediaRepository,
         eventPublisher: NestEventBusDomainEventPublisher,
       ) =>
         new MediasoupSignalingService({
@@ -75,7 +76,7 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
       inject: [
         MediasoupRouterAdapter,
         MediasoupTransportAdapter,
-        InMemoryParticipantMediaRepository,
+        RedisParticipantMediaRepository,
         NestEventBusDomainEventPublisher,
       ],
     },

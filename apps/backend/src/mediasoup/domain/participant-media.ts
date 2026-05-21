@@ -77,6 +77,36 @@ export class ParticipantMedia {
     return new ParticipantMedia(participantId, meetingCode, routerIndex);
   }
 
+  /**
+   * snapshot 으로부터 ParticipantMedia 를 복원한다. Repository(Redis 등) 가
+   * 영속 저장소에서 읽어들인 raw 상태를 그대로 도메인 객체로 되살린다.
+   *
+   * 입력 데이터는 신뢰 가능한 snapshot 이라는 trust 하에 형식 검증은 생략한다
+   * (검증 책임은 snapshot 생성 시점에 있다).
+   */
+  static fromSnapshot(snapshot: ParticipantMediaSnapshot): ParticipantMedia {
+    const pm = new ParticipantMedia(
+      snapshot.participantId,
+      snapshot.meetingCode,
+      snapshot.routerIndex,
+    );
+    pm._sendTransportId = snapshot.sendTransportId;
+    pm._recvTransportId = snapshot.recvTransportId;
+    for (const p of snapshot.producers) {
+      pm._producers.set(p.id, { id: p.id, kind: p.kind, source: p.source });
+    }
+    for (const c of snapshot.consumers) {
+      pm._consumers.set(c.id, {
+        id: c.id,
+        producerId: c.producerId,
+        kind: c.kind,
+        source: c.source,
+      });
+    }
+    pm._closed = snapshot.closed;
+    return pm;
+  }
+
   get sendTransportId(): string | null {
     return this._sendTransportId;
   }

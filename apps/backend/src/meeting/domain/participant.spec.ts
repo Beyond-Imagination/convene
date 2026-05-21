@@ -81,4 +81,39 @@ describe('Participant', () => {
       });
     });
   });
+
+  describe('fromSnapshot', () => {
+    it('active 상태 snapshot 으로부터 동일한 Participant 를 복원한다', () => {
+      const restored = Participant.fromSnapshot({
+        id: 'socket-1',
+        nickname: 'alice',
+        joinedAt: at0,
+        leftAt: null,
+      });
+      expect(restored.id).toBe('socket-1');
+      expect(restored.nickname).toBe('alice');
+      expect(restored.joinedAt).toBe(at0);
+      expect(restored.isActive).toBe(true);
+      expect(restored.leftAt).toBeNull();
+    });
+
+    it('leave 한 snapshot 으로부터 inactive 상태를 그대로 복원한다', () => {
+      const restored = Participant.fromSnapshot({
+        id: 'socket-1',
+        nickname: 'alice',
+        joinedAt: at0,
+        leftAt: at1,
+      });
+      expect(restored.isActive).toBe(false);
+      expect(restored.leftAt).toBe(at1);
+      expect(() => restored.leave(at1)).toThrow(/already left/);
+    });
+
+    it('snapshot → fromSnapshot → snapshot 은 round-trip 동등', () => {
+      const original = Participant.join('socket-1', 'alice', at0);
+      original.leave(at1);
+      const restored = Participant.fromSnapshot(original.snapshot());
+      expect(restored.snapshot()).toEqual(original.snapshot());
+    });
+  });
 });

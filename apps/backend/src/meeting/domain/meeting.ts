@@ -62,6 +62,30 @@ export class Meeting {
     );
   }
 
+  /**
+   * snapshot 으로부터 Meeting Aggregate 를 복원한다. Repository(Redis 등) 가
+   * 영속 저장소에서 읽어들인 raw 상태를 그대로 도메인 객체로 되살린다.
+   *
+   * 입력 데이터는 신뢰 가능한 snapshot 이라는 trust 하에 형식 검증은
+   * `MeetingCode.from` / `IdleTimeout.of` 만 통과하면 그대로 받아들인다.
+   * 참가자도 `Participant.fromSnapshot` 으로 일괄 복원한다.
+   */
+  static fromSnapshot(snapshot: MeetingSnapshot): Meeting {
+    const meeting = new Meeting(
+      MeetingCode.from(snapshot.code),
+      snapshot.source,
+      snapshot.externalReference,
+      IdleTimeout.of(snapshot.idleTimeoutMs),
+      snapshot.startedAt,
+    );
+    meeting._lastActiveAt = snapshot.lastActiveAt;
+    meeting._endedAt = snapshot.endedAt;
+    for (const p of snapshot.participants) {
+      meeting.participants.set(p.id, Participant.fromSnapshot(p));
+    }
+    return meeting;
+  }
+
   // ---------- mutations ----------
 
   addParticipant(id: string, nickname: string, at: Date): Participant {
