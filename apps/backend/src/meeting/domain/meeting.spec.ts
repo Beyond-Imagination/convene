@@ -148,15 +148,15 @@ describe('Meeting (Aggregate Root)', () => {
       const m = newMeeting();
       m.addParticipant('s1', 'alice', T_30s);
       m.removeParticipant('s1', T_1m); // lastActive = T_1m
-      const t9m_59s = new Date('2026-01-01T00:10:59Z'); // 9분 59초 경과
-      expect(m.isIdleSince(t9m_59s)).toBe(false);
+      const t1m_59s = new Date('2026-01-01T00:01:59Z'); // 59초 경과(1분 미만)
+      expect(m.isIdleSince(t1m_59s)).toBe(false);
     });
 
     it('참가자 0 + idleTimeout 이상 경과 → true', () => {
       const m = newMeeting();
       m.addParticipant('s1', 'alice', T_30s);
       m.removeParticipant('s1', T_1m); // lastActive = T_1m
-      expect(m.isIdleSince(T_10m_after_T_1m)).toBe(true);
+      expect(m.isIdleSince(T_10m_after_T_1m)).toBe(true); // 10분 경과(1분 초과)
     });
   });
 

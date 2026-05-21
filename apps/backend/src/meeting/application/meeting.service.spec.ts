@@ -78,7 +78,7 @@ describe('MeetingService.createMeeting', () => {
     expect(result.isOpen).toBe(true);
   });
 
-  it('생성된 Meeting의 idleTimeout은 기본값(10분)을 사용한다', async () => {
+  it('생성된 Meeting의 idleTimeout은 기본값(1분)을 사용한다', async () => {
     const { service } = makeService();
     const result = await service.createMeeting({
       source: 'web',
@@ -451,8 +451,8 @@ describe('MeetingService.detectIdleAndClose', () => {
   const t0 = new Date('2026-01-01T00:00:00Z');
   const tJoin = new Date('2026-01-01T00:01:00Z');
   const tLeave = new Date('2026-01-01T00:02:00Z');
-  const tWithinIdle = new Date('2026-01-01T00:10:00Z'); // tLeave + 8m < 10m
-  const tIdleElapsed = new Date('2026-01-01T00:12:30Z'); // tLeave + 10m30s ≥ 10m
+  const tWithinIdle = new Date('2026-01-01T00:02:30Z'); // tLeave + 30s < 1m
+  const tIdleElapsed = new Date('2026-01-01T00:03:30Z'); // tLeave + 1m30s ≥ 1m
 
   const makeService = (meeting: Meeting | null, now: Date) => {
     const saved: Meeting[] = [];

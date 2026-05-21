@@ -1,9 +1,9 @@
 import { IdleTimeout } from './idle-timeout';
 
 describe('IdleTimeout', () => {
-  it('기본값은 10분(600_000 ms)', () => {
-    expect(IdleTimeout.DEFAULT_MS).toBe(10 * 60 * 1000);
-    expect(IdleTimeout.default().milliseconds).toBe(600_000);
+  it('기본값은 1분(60_000 ms)', () => {
+    expect(IdleTimeout.DEFAULT_MS).toBe(1 * 60 * 1000);
+    expect(IdleTimeout.default().milliseconds).toBe(60_000);
   });
 
   it('of()는 양의 정수 ms를 허용한다', () => {
