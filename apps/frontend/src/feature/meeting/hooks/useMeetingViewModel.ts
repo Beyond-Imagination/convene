@@ -53,6 +53,12 @@ export interface UseMeetingViewModel {
    */
   readonly reconnectGen: number;
   readonly leave: () => void;
+  /**
+   * 명시적 회의 종료 액션. backend `DELETE /meetings/:code` 를 호출해
+   * `meeting.ended` 도메인 이벤트와 회의록 생성 파이프라인을 트리거한다.
+   * 성공/실패 상관없이 닉네임을 clear 하고 회의록 목록(`/reports`)으로 이동한다.
+   */
+  readonly endMeeting: () => Promise<void>;
 }
 
 export function useMeetingViewModel(code: string): UseMeetingViewModel {
@@ -152,6 +158,10 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
     router.push('/');
   }, [code, clearNickname, router]);
 
+  const endMeeting = useCallback(async (): Promise<void> => {
+    throw new Error('not implemented');
+  }, []);
+
   return {
     code,
     status,
@@ -161,5 +171,6 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
     socket,
     reconnectGen,
     leave,
+    endMeeting,
   };
 }

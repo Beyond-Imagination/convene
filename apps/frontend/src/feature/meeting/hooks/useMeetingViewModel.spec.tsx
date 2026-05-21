@@ -59,6 +59,11 @@ vi.mock('@/shared/socket/meeting.socket', () => ({
   connectMeetingSocket: () => fakeSocket,
 }));
 
+const closeMeetingMock = vi.hoisted(() => vi.fn());
+vi.mock('@/shared/api/meeting.api', () => ({
+  closeMeeting: closeMeetingMock,
+}));
+
 const code = 'abc12xyz';
 
 const setup = (nickname: string | null = '준') => {
@@ -66,6 +71,7 @@ const setup = (nickname: string | null = '준') => {
   fakeSocket = new FakeSocket();
   pushMock.mockReset();
   replaceMock.mockReset();
+  closeMeetingMock.mockReset();
   return renderHook(() => useMeetingViewModel(code));
 };
 
@@ -180,6 +186,48 @@ describe('useMeetingViewModel', () => {
     expect(fakeSocket.emit).toHaveBeenCalledWith(MEETING_WS_EVENTS.LEAVE, { code });
     expect(useSessionStore.getState().nickname).toBeNull();
     expect(pushMock).toHaveBeenCalledWith('/');
+  });
+
+  describe('endMeeting()', () => {
+    it('DELETE /meetings/:code 를 호출하고 성공 시 닉네임 clear + /reports 로 push', async () => {
+      closeMeetingMock.mockResolvedValueOnce({
+        code,
+        endedAt: '2026-01-01T00:30:00.000Z',
+      });
+      const { result } = setup('준');
+      connect();
+      fakeSocket.emit.mockClear();
+      await act(async () => {
+        await result.current.endMeeting();
+      });
+      expect(closeMeetingMock).toHaveBeenCalledWith(code);
+      expect(useSessionStore.getState().nickname).toBeNull();
+      expect(pushMock).toHaveBeenCalledWith('/reports');
+    });
+
+    it('성공 시 leave 처럼 socket 도 disconnect 한다(중복 leave 이벤트 차단)', async () => {
+      closeMeetingMock.mockResolvedValueOnce({
+        code,
+        endedAt: '2026-01-01T00:30:00.000Z',
+      });
+      const { result } = setup('준');
+      connect();
+      await act(async () => {
+        await result.current.endMeeting();
+      });
+      expect(fakeSocket.disconnect).toHaveBeenCalled();
+    });
+
+    it('DELETE 가 실패해도 사용자 경험을 깨지 않고 /reports 로 이동한다', async () => {
+      closeMeetingMock.mockRejectedValueOnce(new Error('Meeting is already closed'));
+      const { result } = setup('준');
+      connect();
+      await act(async () => {
+        await result.current.endMeeting();
+      });
+      expect(pushMock).toHaveBeenCalledWith('/reports');
+      expect(useSessionStore.getState().nickname).toBeNull();
+    });
   });
 
   it('자동 재연결 시(connect 두 번째 발생) JOIN 을 다시 emit 한다', () => {

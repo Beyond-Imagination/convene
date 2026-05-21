@@ -1,4 +1,8 @@
-import type { CreateMeetingRequest, CreateMeetingResponse } from '@migration/shared-interfaces';
+import type {
+  CloseMeetingResponse,
+  CreateMeetingRequest,
+  CreateMeetingResponse,
+} from '@migration/shared-interfaces';
 
 import { API_BASE_URL } from './config';
 
@@ -34,4 +38,21 @@ export async function createMeeting(
     );
   }
   return (await res.json()) as CreateMeetingResponse;
+}
+
+/**
+ * 회의를 명시적으로 종료한다(수동 종료, reason='manual').
+ * 성공 시 backend 는 `meeting.ended` 도메인 이벤트를 발행하고 회의록 생성
+ * 파이프라인이 트리거된다.
+ */
+export async function closeMeeting(code: string): Promise<CloseMeetingResponse> {
+  const res = await fetch(`${API_BASE_URL}/meetings/${code}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new MeetingApiError(
+      res.status,
+      text || `DELETE /meetings/${code} failed (${res.status})`,
+    );
+  }
+  return (await res.json()) as CloseMeetingResponse;
 }
