@@ -101,4 +101,30 @@ describe('PipelineState', () => {
       expect(s.isDone).toBe(false);
     });
   });
+
+  describe('fromSnapshot (복원)', () => {
+    it('initial 상태와 동등한 snapshot 으로부터 복원하면 같은 동작', () => {
+      const restored = PipelineState.fromSnapshot({
+        sttStatus: 'pending',
+        summaryStatus: 'pending',
+        failures: [],
+      });
+      expect(restored.sttStatus).toBe('pending');
+      expect(restored.summaryStatus).toBe('pending');
+      expect(restored.failures).toEqual([]);
+      expect(restored.isFinal).toBe(false);
+    });
+
+    it('done + failed 가 섞인 상태도 그대로 복원하고 재전이를 거부한다', () => {
+      const restored = PipelineState.fromSnapshot({
+        sttStatus: 'done',
+        summaryStatus: 'failed',
+        failures: [{ stage: 'summary', error: 'llm boom', at: at1 }],
+      });
+      expect(restored.sttStatus).toBe('done');
+      expect(restored.summaryStatus).toBe('failed');
+      expect(restored.isFinal).toBe(true);
+      expect(() => restored.markSummaryDone()).toThrow(/already/);
+    });
+  });
 });

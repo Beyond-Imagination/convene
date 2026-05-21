@@ -79,6 +79,32 @@ export class MeetingReport {
   }
 
   /**
+   * snapshot 으로부터 MeetingReport Aggregate 를 복원한다.
+   *
+   * Repository(Mongo 등) 가 영속 저장소에서 읽어들인 raw 도큐먼트를 domain
+   * 객체로 되살린다. 입력 데이터는 신뢰 가능한 snapshot 이라는 trust 하에
+   * 형식 검증은 `fromEndedMeeting` 처럼 하지 않는다(검증은 snapshot 생성 시점).
+   */
+  static fromSnapshot(snapshot: MeetingReportSnapshot): MeetingReport {
+    const report = new MeetingReport(
+      snapshot.id,
+      snapshot.meetingId,
+      snapshot.code,
+      snapshot.source,
+      snapshot.externalReference,
+      snapshot.startedAt,
+      snapshot.endedAt,
+      [...snapshot.participants],
+      [...snapshot.chat],
+    );
+    report._transcript = [...snapshot.transcript];
+    report._summary = snapshot.summary;
+    report._pipeline = snapshot.pipeline;
+    report._pushedToNotion = snapshot.pushedToNotion;
+    return report;
+  }
+
+  /**
    * Meeting이 종료된 직후 draft 도큐먼트를 만든다.
    * transcript·summary는 빈 상태이며 pipeline은 두 stage 모두 pending.
    */

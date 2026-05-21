@@ -35,6 +35,20 @@ export class PipelineState {
     return new PipelineState('pending', 'pending', []);
   }
 
+  /**
+   * 영속 저장소(Mongo 등) 의 wire object 로부터 PipelineState 를 복원한다.
+   *
+   * 입력은 신뢰 가능한 snapshot 이라는 trust 하에 형식 검증은 생략한다
+   * (검증 책임은 snapshot 생성 시점에 있다).
+   */
+  static fromSnapshot(input: {
+    sttStatus: PipelineStageStatus;
+    summaryStatus: PipelineStageStatus;
+    failures: ReadonlyArray<PipelineFailure>;
+  }): PipelineState {
+    return new PipelineState(input.sttStatus, input.summaryStatus, [...input.failures]);
+  }
+
   markTranscriptionDone(): PipelineState {
     this.assertPending('stt');
     return new PipelineState('done', this.summaryStatus, this.failures);

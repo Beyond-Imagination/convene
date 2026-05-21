@@ -1,0 +1,56 @@
+import {
+  DEFAULT_MONGO_DB_NAME,
+  DEFAULT_MONGO_URI,
+  resolveMongoDbName,
+  resolveMongoUri,
+} from './mongo.config';
+
+describe('resolveMongoUri', () => {
+  it('MONGO_URI 가 없으면 DEFAULT_MONGO_URI 를 돌려준다', () => {
+    expect(resolveMongoUri({})).toBe(DEFAULT_MONGO_URI);
+  });
+
+  it('MONGO_URI 가 빈 문자열이면 디폴트로 fallback', () => {
+    expect(resolveMongoUri({ MONGO_URI: '' })).toBe(DEFAULT_MONGO_URI);
+    expect(resolveMongoUri({ MONGO_URI: '   ' })).toBe(DEFAULT_MONGO_URI);
+  });
+
+  it('mongodb:// 스킴 URI 를 그대로 돌려준다', () => {
+    expect(resolveMongoUri({ MONGO_URI: 'mongodb://localhost:27017' })).toBe(
+      'mongodb://localhost:27017',
+    );
+  });
+
+  it('mongodb+srv:// 스킴(Atlas) URI 도 허용한다', () => {
+    expect(
+      resolveMongoUri({ MONGO_URI: 'mongodb+srv://user:pw@cluster.example/?retryWrites=true' }),
+    ).toBe('mongodb+srv://user:pw@cluster.example/?retryWrites=true');
+  });
+
+  it('mongodb:// / mongodb+srv:// 스킴이 아니면 throw', () => {
+    expect(() => resolveMongoUri({ MONGO_URI: 'http://localhost:27017' })).toThrow(
+      /MONGO_URI/,
+    );
+    expect(() => resolveMongoUri({ MONGO_URI: 'localhost:27017' })).toThrow(/MONGO_URI/);
+  });
+});
+
+describe('resolveMongoDbName', () => {
+  it('MONGO_DB_NAME 이 없으면 DEFAULT_MONGO_DB_NAME 를 돌려준다', () => {
+    expect(resolveMongoDbName({})).toBe(DEFAULT_MONGO_DB_NAME);
+  });
+
+  it('MONGO_DB_NAME 이 빈 문자열이면 디폴트로 fallback', () => {
+    expect(resolveMongoDbName({ MONGO_DB_NAME: '' })).toBe(DEFAULT_MONGO_DB_NAME);
+    expect(resolveMongoDbName({ MONGO_DB_NAME: '   ' })).toBe(DEFAULT_MONGO_DB_NAME);
+  });
+
+  it('명시된 db name 을 trim 해서 돌려준다(개발/운영 분리용)', () => {
+    expect(resolveMongoDbName({ MONGO_DB_NAME: '  migration-dev  ' })).toBe(
+      'migration-dev',
+    );
+    expect(resolveMongoDbName({ MONGO_DB_NAME: 'migration-prod' })).toBe(
+      'migration-prod',
+    );
+  });
+});
