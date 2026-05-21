@@ -11,6 +11,7 @@ import {
   type ParticipantLeftBroadcast,
 } from '@migration/shared-interfaces';
 
+import { closeMeeting } from '@/shared/api/meeting.api';
 import { connectMeetingSocket } from '@/shared/socket/meeting.socket';
 import { useSessionStore } from '@/shared/stores/session.store';
 
@@ -159,8 +160,21 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
   }, [code, clearNickname, router]);
 
   const endMeeting = useCallback(async (): Promise<void> => {
-    throw new Error('not implemented');
-  }, []);
+    try {
+      await closeMeeting(code);
+    } catch {
+      // backend 가 already-closed 등으로 500 을 줄 수 있다 (idle 자동 종료와 race).
+      // 회의록 생성은 이미 시작/완료된 상태이므로 사용자 흐름은 그대로 회의록 페이지로 보낸다.
+    }
+    const current = socketRef.current;
+    if (current !== null) {
+      current.disconnect();
+      socketRef.current = null;
+      setSocket(null);
+    }
+    clearNickname();
+    router.push('/reports');
+  }, [code, clearNickname, router]);
 
   return {
     code,

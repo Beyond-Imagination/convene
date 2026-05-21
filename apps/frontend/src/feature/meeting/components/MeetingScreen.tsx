@@ -58,6 +58,7 @@ export function MeetingScreen({
   remoteParticipants,
   errorMessage,
   leave,
+  endMeeting,
   mediasoup,
 }: MeetingScreenProps) {
   return (
@@ -67,6 +68,9 @@ export function MeetingScreen({
         <p>내 닉네임: {nickname ?? '(미인증)'}</p>
         <button type="button" onClick={leave}>
           나가기
+        </button>
+        <button type="button" onClick={() => void endMeeting()}>
+          회의 종료
         </button>
       </header>
       {status === 'connecting' && (
