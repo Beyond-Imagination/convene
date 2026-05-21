@@ -14,6 +14,8 @@ import {
 } from '@migration/shared-interfaces';
 
 import { AppModule } from '@/app.module';
+import { HttpTranscriber } from '@/recording/infrastructure/http.transcriber';
+import { NoopTranscriber } from '@/recording/infrastructure/noop.transcriber';
 
 /**
  * Reports bounded context의 e2e 통합 테스트.
@@ -68,7 +70,12 @@ describe('Reports e2e', () => {
   beforeAll(async () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      // e2e 환경엔 ai-worker 컨테이너가 없다. HttpTranscriber 를 Noop 으로 갈아
+      // 끼워 transcription 흐름이 빈 transcript 로 done 까지 진행되게 한다.
+      .overrideProvider(HttpTranscriber)
+      .useValue(new NoopTranscriber())
+      .compile();
 
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(

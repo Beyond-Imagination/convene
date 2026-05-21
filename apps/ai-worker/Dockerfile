@@ -1,9 +1,18 @@
 FROM python:3.11-slim
 
+# faster-whisper 는 ffmpeg 로 audio decode 한다.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ffmpeg \
+ && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# 모델을 빌드 시점에 미리 받아 docker layer 로 캐싱한다. main.py 수정으로 인한
+# layer 재빌드 시에도 모델 다운로드가 다시 일어나지 않게 main.py COPY 위에 둔다.
+RUN python -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8')"
 
 COPY . .
 

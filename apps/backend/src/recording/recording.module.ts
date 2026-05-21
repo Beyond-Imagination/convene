@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
 
+import { resolveAiWorkerBaseUrl } from '@/config/ai-worker.config';
 import { RecordingReportLifecycleListener } from '@/recording/application/recording-report-lifecycle.listener';
 import { RecordingService } from '@/recording/application/recording.service';
-import { NoopTranscriber } from '@/recording/infrastructure/noop.transcriber';
+import { HttpTranscriber } from '@/recording/infrastructure/http.transcriber';
 import { RedisAudioBufferRepository } from '@/recording/infrastructure/redis-audio-buffer.repository';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 
@@ -14,19 +15,23 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
  * - `RecordingReportLifecycleListener` 는 Reports BC 가 발행한
  *   `report.transcription.requested` 를 구독해 STT 호출을 트리거한다.
  * - 오디오 버퍼는 redis(ioredis) LIST 로 누적하고 consume 시점에 즉시 폐기한다
- *   (PLAN.md §3). transcriber 는 ai-worker HTTP 어댑터가 준비되기 전까지
- *   Noop 가 default provider 이다.
+ *   (PLAN.md §3). transcriber 는 ai-worker(FastAPI + faster-whisper) HTTP 어댑터
+ *   `HttpTranscriber` 를 default provider 로 둔다. e2e 에서는 `overrideProvider`
+ *   로 NoopTranscriber 를 주입해 ai-worker 컨테이너 없이도 통과시킨다.
  */
 @Module({
   providers: [
     RedisAudioBufferRepository,
-    NoopTranscriber,
+    {
+      provide: HttpTranscriber,
+      useFactory: () => new HttpTranscriber(resolveAiWorkerBaseUrl()),
+    },
     RecordingReportLifecycleListener,
     {
       provide: RecordingService,
       useFactory: (
         audioBufferRepository: RedisAudioBufferRepository,
-        transcriber: NoopTranscriber,
+        transcriber: HttpTranscriber,
         eventPublisher: NestEventBusDomainEventPublisher,
       ) =>
         new RecordingService({
@@ -34,7 +39,7 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
           transcriber,
           eventPublisher,
         }),
-      inject: [RedisAudioBufferRepository, NoopTranscriber, NestEventBusDomainEventPublisher],
+      inject: [RedisAudioBufferRepository, HttpTranscriber, NestEventBusDomainEventPublisher],
     },
   ],
 })

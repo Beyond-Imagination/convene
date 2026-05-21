@@ -19,6 +19,8 @@ import {
 } from '@migration/shared-interfaces';
 
 import { AppModule } from '@/app.module';
+import { HttpTranscriber } from '@/recording/infrastructure/http.transcriber';
+import { NoopTranscriber } from '@/recording/infrastructure/noop.transcriber';
 
 /**
  * Meeting bounded context의 e2e 통합 테스트.
@@ -47,7 +49,11 @@ describe('Meeting e2e', () => {
   beforeAll(async () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      // e2e 환경엔 ai-worker 컨테이너가 없으므로 HttpTranscriber 를 Noop 으로 교체.
+      .overrideProvider(HttpTranscriber)
+      .useValue(new NoopTranscriber())
+      .compile();
 
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(

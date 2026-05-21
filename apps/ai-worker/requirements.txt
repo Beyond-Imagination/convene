@@ -1,3 +1,3 @@
 fastapi==0.115.5
 uvicorn[standard]==0.32.1
-# faster-whisper and dependencies added in implementation step.
+faster-whisper==1.0.3
