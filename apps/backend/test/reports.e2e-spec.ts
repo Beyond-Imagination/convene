@@ -18,6 +18,8 @@ import { FfmpegAudioCaptureAdapter } from '@/mediasoup/infrastructure/ffmpeg-aud
 import { NoopAudioCapture } from '@/mediasoup/infrastructure/noop-audio-capture.adapter';
 import { HttpTranscriber } from '@/recording/infrastructure/http.transcriber';
 import { NoopTranscriber } from '@/recording/infrastructure/noop.transcriber';
+import { GeminiSummarizer } from '@/reports/infrastructure/gemini.summarizer';
+import { NoopSummarizer } from '@/reports/infrastructure/noop.summarizer';
 
 /**
  * Reports bounded context의 e2e 통합 테스트.
@@ -73,12 +75,15 @@ describe('Reports e2e', () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
-      // e2e 환경엔 ai-worker / ffmpeg 가 없으므로 외부 의존 어댑터를 모두
-      // Noop 으로 갈아끼운다. transcription 흐름은 빈 transcript 로 done 까지 진행.
+      // e2e 환경엔 ai-worker / ffmpeg / Gemini API 키가 없으므로 외부 의존 어댑터를
+      // 모두 Noop 으로 갈아끼운다. transcription 흐름은 빈 transcript 로 done 까지
+      // 진행하고, NoopSummarizer 가 placeholder 요약을 채워 finalize 한다.
       .overrideProvider(HttpTranscriber)
       .useValue(new NoopTranscriber())
       .overrideProvider(FfmpegAudioCaptureAdapter)
       .useValue(new NoopAudioCapture())
+      .overrideProvider(GeminiSummarizer)
+      .useValue(new NoopSummarizer())
       .compile();
 
     app = moduleRef.createNestApplication();

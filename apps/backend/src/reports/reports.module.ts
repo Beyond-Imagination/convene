@@ -1,8 +1,11 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 
+import { resolveGeminiConfig } from '@/config/gemini.config';
 import { ReportFinalizationService } from '@/reports/application/report-finalization.service';
 import { ReportMeetingLifecycleListener } from '@/reports/application/report-meeting-lifecycle.listener';
 import { ReportPipelineListener } from '@/reports/application/report-pipeline.listener';
+import { SummarizerPort } from '@/reports/domain/ports';
+import { GeminiSummarizer } from '@/reports/infrastructure/gemini.summarizer';
 import { MongoReportRepository } from '@/reports/infrastructure/mongo-report.repository';
 import { NoopNotion } from '@/reports/infrastructure/noop.notion';
 import { NoopSummarizer } from '@/reports/infrastructure/noop.summarizer';
@@ -19,23 +22,39 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
  * - `ReportMeetingLifecycleListener` 는 `@OnEvent(meeting.ended)` 데코레이터로
  *   Meeting BC 의 도메인 이벤트를 구독한다.
  * - 회의록 영속화는 mongoose 기반 `MongoReportRepository` 가 책임진다. mongoose
- *   `Connection` 은 `MongoModule(@Global)` 이 제공한다. transcriber/summarizer/
- *   notion 은 실어댑터가 준비되기 전까지 Noop 가 default provider.
+ *   `Connection` 은 `MongoModule(@Global)` 이 제공한다.
+ * - SummarizerPort default 는 `GeminiSummarizer`. `GEMINI_API_KEY` 미설정 시
+ *   `NoopSummarizer` 로 fallback(부트스트랩만 통과시키고 로그 경고). e2e/유닛
+ *   테스트는 `overrideProvider(GeminiSummarizer).useValue(NoopSummarizer)` 로
+ *   외부 호출을 차단한다(reports.e2e-spec / meeting.e2e-spec).
+ * - Notion 은 v2 진입 전까지 NoopNotion default.
  */
 @Module({
   controllers: [ReportsController],
   providers: [
     MongoReportRepository,
-    NoopSummarizer,
     NoopNotion,
     UuidReportIdGenerator,
     ReportMeetingLifecycleListener,
     ReportPipelineListener,
     {
+      provide: GeminiSummarizer,
+      useFactory: (): SummarizerPort => {
+        const config = resolveGeminiConfig();
+        if (config === null) {
+          new Logger('ReportsModule').warn(
+            'GEMINI_API_KEY 미설정 — SummarizerPort 는 NoopSummarizer 로 fallback 됩니다(요약 미적용).',
+          );
+          return new NoopSummarizer();
+        }
+        return new GeminiSummarizer(config);
+      },
+    },
+    {
       provide: ReportFinalizationService,
       useFactory: (
         repository: MongoReportRepository,
-        summarizer: NoopSummarizer,
+        summarizer: GeminiSummarizer,
         notion: NoopNotion,
         idGenerator: UuidReportIdGenerator,
         clock: SystemClock,
@@ -51,7 +70,7 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
         }),
       inject: [
         MongoReportRepository,
-        NoopSummarizer,
+        GeminiSummarizer,
         NoopNotion,
         UuidReportIdGenerator,
         SystemClock,
