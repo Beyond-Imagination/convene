@@ -228,6 +228,65 @@ describe('useMeetingViewModel', () => {
       expect(pushMock).toHaveBeenCalledWith('/reports');
       expect(useSessionStore.getState().nickname).toBeNull();
     });
+
+    it('성공 후 cleanup 에서 meeting:leave 를 다시 emit 하지 않는다(이미 종료된 회의 race 방지)', async () => {
+      closeMeetingMock.mockResolvedValueOnce({
+        code,
+        endedAt: '2026-01-01T00:30:00.000Z',
+      });
+      const { result, unmount } = setup('준');
+      connect();
+      await act(async () => {
+        await result.current.endMeeting();
+      });
+      fakeSocket.emit.mockClear();
+      unmount();
+      expect(fakeSocket.emit).not.toHaveBeenCalledWith(MEETING_WS_EVENTS.LEAVE, { code });
+    });
+  });
+
+  describe('meeting:ended broadcast (자동 종료 브로드캐스트 수신)', () => {
+    it('수신 시 닉네임 clear + socket.disconnect + /reports 로 push', () => {
+      const { result } = setup('준');
+      connect();
+      act(() => {
+        fakeSocket.trigger(MEETING_WS_EVENTS.ENDED, {
+          code,
+          endedAt: '2026-01-01T00:30:00.000Z',
+        });
+      });
+      // result.current 도 함께 갱신됨을 부수적으로 확인
+      void result.current;
+      expect(useSessionStore.getState().nickname).toBeNull();
+      expect(fakeSocket.disconnect).toHaveBeenCalled();
+      expect(pushMock).toHaveBeenCalledWith('/reports');
+    });
+
+    it('수신 후 cleanup 에서 meeting:leave 를 emit 하지 않는다(이미 종료됨)', () => {
+      const { unmount } = setup('준');
+      connect();
+      act(() => {
+        fakeSocket.trigger(MEETING_WS_EVENTS.ENDED, {
+          code,
+          endedAt: '2026-01-01T00:30:00.000Z',
+        });
+      });
+      fakeSocket.emit.mockClear();
+      unmount();
+      expect(fakeSocket.emit).not.toHaveBeenCalledWith(MEETING_WS_EVENTS.LEAVE, { code });
+    });
+
+    it('수신 시 closeMeeting API 는 호출하지 않는다(backend 가 이미 종료한 회의)', () => {
+      setup('준');
+      connect();
+      act(() => {
+        fakeSocket.trigger(MEETING_WS_EVENTS.ENDED, {
+          code,
+          endedAt: '2026-01-01T00:30:00.000Z',
+        });
+      });
+      expect(closeMeetingMock).not.toHaveBeenCalled();
+    });
   });
 
   it('자동 재연결 시(connect 두 번째 발생) JOIN 을 다시 emit 한다', () => {

@@ -6,6 +6,7 @@ import type { Socket } from 'socket.io-client';
 
 import {
   MEETING_WS_EVENTS,
+  type MeetingEndedBroadcast,
   type MeetingParticipantsBroadcast,
   type ParticipantJoinedBroadcast,
   type ParticipantLeftBroadcast,
@@ -74,6 +75,14 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
   const [reconnectGen, setReconnectGen] = useState(0);
   const socketRef = useRef<Socket | null>(null);
   const connectCountRef = useRef(0);
+  /**
+   * 회의가 종료된 상태에서 unmount 가 일어나면 useEffect cleanup 의 leave emit 이
+   * 이미 닫힌 회의에 도달해 backend WS race 가 발생한다. endMeeting 직접 호출과
+   * `meeting:ended` broadcast 수신 둘 다 본 ref 를 true 로 세팅해 cleanup 의
+   * leave emit 을 skip 한다(backend handleLeave 도 swallow 로 방어하지만 frontend
+   * 에서 보내지 않는 게 더 깔끔).
+   */
+  const skipLeaveOnCleanupRef = useRef(false);
 
   useEffect(() => {
     if (nickname === null) {
@@ -81,6 +90,7 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
       return;
     }
 
+    skipLeaveOnCleanupRef.current = false;
     const next = connectMeetingSocket();
     socketRef.current = next;
     setSocket(next);
@@ -122,12 +132,27 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
         })),
       );
     };
+    const onMeetingEnded = (_payload: MeetingEndedBroadcast): void => {
+      // 다른 참가자(또는 idle 자동 종료)에 의해 회의가 닫힘. 본인은 회의 화면을
+      // 떠나 회의록 페이지로 이동한다. 회의가 이미 backend 에서 닫혔으므로
+      // closeMeeting API 는 호출하지 않고, cleanup 의 leave emit 도 skip.
+      skipLeaveOnCleanupRef.current = true;
+      const current = socketRef.current;
+      if (current !== null) {
+        current.disconnect();
+        socketRef.current = null;
+        setSocket(null);
+      }
+      clearNickname();
+      router.push('/reports');
+    };
 
     socket.on('connect', onConnect);
     socket.on('connect_error', onConnectError);
     socket.on(MEETING_WS_EVENTS.PARTICIPANT_JOINED, onParticipantJoined);
     socket.on(MEETING_WS_EVENTS.PARTICIPANT_LEFT, onParticipantLeft);
     socket.on(MEETING_WS_EVENTS.PARTICIPANTS, onParticipants);
+    socket.on(MEETING_WS_EVENTS.ENDED, onMeetingEnded);
 
     if (socket.connected) {
       // 이미 connect 된 fake socket(테스트) 대응.
@@ -135,17 +160,20 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
     }
 
     return () => {
-      socket.emit(MEETING_WS_EVENTS.LEAVE, { code });
+      if (!skipLeaveOnCleanupRef.current) {
+        socket.emit(MEETING_WS_EVENTS.LEAVE, { code });
+      }
       socket.off('connect', onConnect);
       socket.off('connect_error', onConnectError);
       socket.off(MEETING_WS_EVENTS.PARTICIPANT_JOINED, onParticipantJoined);
       socket.off(MEETING_WS_EVENTS.PARTICIPANT_LEFT, onParticipantLeft);
       socket.off(MEETING_WS_EVENTS.PARTICIPANTS, onParticipants);
+      socket.off(MEETING_WS_EVENTS.ENDED, onMeetingEnded);
       socket.disconnect();
       socketRef.current = null;
       setSocket(null);
     };
-  }, [code, nickname, router]);
+  }, [code, nickname, router, clearNickname]);
 
   const leave = useCallback(() => {
     const current = socketRef.current;
@@ -166,6 +194,10 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
       // backend 가 already-closed 등으로 500 을 줄 수 있다 (idle 자동 종료와 race).
       // 회의록 생성은 이미 시작/완료된 상태이므로 사용자 흐름은 그대로 회의록 페이지로 보낸다.
     }
+    // 회의가 이미 backend 에서 닫혔으므로 unmount 시 useEffect cleanup 이 leave 를
+    // 다시 emit 해 race 를 만들지 않도록 차단(backend handleLeave 도 swallow 하지만
+    // 노이즈를 줄이는 게 깔끔).
+    skipLeaveOnCleanupRef.current = true;
     const current = socketRef.current;
     if (current !== null) {
       current.disconnect();
