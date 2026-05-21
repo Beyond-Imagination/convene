@@ -6,6 +6,7 @@ import {
   type CreateMeetingResponse,
   type ExternalReferencePayload,
   MEETING_WS_EVENTS,
+  type MeetingEndedBroadcast,
   type MeetingWsEventName,
   SOURCES,
   type Source,
@@ -54,9 +55,22 @@ describe('meeting wire format', () => {
     }
   });
 
-  it('MEETING_WS_EVENTS는 client→server 3개 + server→client 4개 = 총 7개', () => {
-    expect(Object.values(MEETING_WS_EVENTS)).toHaveLength(7);
-    expect(new Set(Object.values(MEETING_WS_EVENTS)).size).toBe(7);
+  it('MEETING_WS_EVENTS는 client→server 3개 + server→client 5개 = 총 8개', () => {
+    expect(Object.values(MEETING_WS_EVENTS)).toHaveLength(8);
+    expect(new Set(Object.values(MEETING_WS_EVENTS)).size).toBe(8);
+  });
+
+  it('MEETING_WS_EVENTS.ENDED 는 회의 종료 broadcast 의 채널 이름이다', () => {
+    expect(MEETING_WS_EVENTS.ENDED).toBe('meeting:ended');
+  });
+
+  it('MeetingEndedBroadcast 는 code + endedAt(ISO) 필드를 가진다', () => {
+    const b: MeetingEndedBroadcast = {
+      code: 'abc12xyz',
+      endedAt: '2026-01-01T00:30:00.000Z',
+    };
+    expect(b.code).toMatch(/^[a-z0-9]{8}$/);
+    expect(b.endedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
   it('MeetingWsEventName 타입은 MEETING_WS_EVENTS 값들의 literal union이다 (컴파일 체크)', () => {

@@ -1,4 +1,5 @@
 import { Logger, UsePipes, ValidationPipe } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import {
   ConnectedSocket,
   MessageBody,
@@ -11,8 +12,10 @@ import {
 import type { Server, Socket } from 'socket.io';
 
 import {
+  MEETING_EVENTS,
   MEETING_WS_EVENTS,
   type ChatPostedBroadcast,
+  type MeetingEndedBroadcast,
   type MeetingParticipantsBroadcast,
   type ParticipantJoinedBroadcast,
   type ParticipantLeftBroadcast,
@@ -22,6 +25,7 @@ import { MeetingService } from '@/meeting/application/meeting.service';
 import { ChatDto } from '@/meeting/interface/dto/chat.dto';
 import { JoinMeetingDto } from '@/meeting/interface/dto/join-meeting.dto';
 import { LeaveMeetingDto } from '@/meeting/interface/dto/leave-meeting.dto';
+import { MeetingEndedPayload } from '@/shared-kernel/domain/events';
 
 const roomOf = (code: string): string => `meeting:${code}`;
 
@@ -139,6 +143,23 @@ export class MeetingGateway implements OnGatewayDisconnect {
         `handleDisconnect swallow for code=${code} sid=${client.id}: ${(error as Error).message}`,
       );
     }
+  }
+
+  /**
+   * Meeting BC 의 `meeting.ended` 도메인 이벤트(수동 종료/idle 자동 종료 공통)를
+   * 구독해 같은 room 의 모든 참가자에게 WS `meeting:ended` 를 broadcast 한다.
+   *
+   * 종료를 직접 트리거한 본인은 이미 socket.disconnect 한 뒤이므로 본 이벤트를
+   * 받지 않고, 나머지 참가자만 받아 자동으로 회의 화면을 떠난다(frontend
+   * useMeetingViewModel).
+   */
+  @OnEvent(MEETING_EVENTS.ENDED)
+  onMeetingEnded(payload: MeetingEndedPayload): void {
+    const broadcast: MeetingEndedBroadcast = {
+      code: payload.code,
+      endedAt: payload.endedAt.toISOString(),
+    };
+    this.server.to(roomOf(payload.code)).emit(MEETING_WS_EVENTS.ENDED, broadcast);
   }
 
   @SubscribeMessage(MEETING_WS_EVENTS.CHAT)

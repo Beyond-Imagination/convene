@@ -206,6 +206,44 @@ describe('MeetingGateway.handleLeave', () => {
   });
 });
 
+describe('MeetingGateway.onMeetingEnded', () => {
+  const tEnded = new Date('2026-01-01T00:30:00Z');
+
+  const makeGateway = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const gateway = new MeetingGateway({} as any);
+    const { server, broadcasts: serverBroadcasts } = makeServer();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    gateway.server = server as any;
+    return { gateway, serverBroadcasts };
+  };
+
+  // 본 핸들러 검증에는 payload 의 code/endedAt 만 사용된다. 나머지 도메인 필드는
+  // ReportMeetingLifecycleListener 등 다른 구독자가 처리하며 본 spec 의 관심사가 아니다.
+  const payload = {
+    code: 'abc12xyz',
+    source: 'web' as const,
+    externalReference: externalReference(),
+    startedAt: t0,
+    endedAt: tEnded,
+    participants: [],
+    chat: [],
+    reason: 'manual' as const,
+  };
+
+  it('meeting.ended 페이로드를 받아 같은 room 에 meeting:ended 를 broadcast 한다', () => {
+    const { gateway, serverBroadcasts } = makeGateway();
+    gateway.onMeetingEnded(payload);
+    expect(serverBroadcasts).toEqual([
+      {
+        room: 'meeting:abc12xyz',
+        event: MEETING_WS_EVENTS.ENDED,
+        payload: { code: 'abc12xyz', endedAt: tEnded.toISOString() },
+      },
+    ]);
+  });
+});
+
 describe('MeetingGateway.handleChat', () => {
   const tChat = new Date('2026-01-01T00:03:00Z');
 

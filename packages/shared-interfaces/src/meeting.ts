@@ -60,6 +60,13 @@ export const MEETING_WS_EVENTS = {
    */
   PARTICIPANTS: 'meeting:participants',
   CHAT_POSTED: 'meeting:chatPosted',
+  /**
+   * 회의가 종료(수동 / idle 자동)됐음을 같은 room 의 모든 참가자에게 알린다.
+   * 수신 측 frontend 는 회의 화면을 떠나 회의록 페이지로 이동한다.
+   * 회의 종료를 직접 트리거한 본인은 이미 socket.disconnect 했으므로 본 이벤트를
+   * 받지 않고, 나머지 참가자만 받아 자동으로 회의에서 빠진다.
+   */
+  ENDED: 'meeting:ended',
 } as const;
 
 export type MeetingWsEventName = (typeof MEETING_WS_EVENTS)[keyof typeof MEETING_WS_EVENTS];
@@ -104,4 +111,12 @@ export interface ChatPostedBroadcast {
  */
 export interface MeetingParticipantsBroadcast {
   participants: ParticipantJoinedBroadcast[];
+}
+
+/**
+ * 회의가 종료(수동 / idle 자동)됐음을 같은 room 의 모든 참가자에게 알리는 broadcast.
+ */
+export interface MeetingEndedBroadcast {
+  code: string;
+  endedAt: string;
 }
