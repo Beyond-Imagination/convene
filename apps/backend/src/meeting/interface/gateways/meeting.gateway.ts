@@ -106,18 +106,28 @@ export class MeetingGateway implements OnGatewayDisconnect {
     @MessageBody() dto: LeaveMeetingDto,
     @ConnectedSocket() client: Socket,
   ): Promise<{ ok: true }> {
-    const { participant } = await this.service.leaveMeeting({
-      code: dto.code,
-      participantId: client.id,
-    });
     const room = roomOf(dto.code);
-    // broadcast 먼저, 그 뒤 socket.leave — 남은 참가자에게 알림이 가도록 한다.
-    const leftAt = participant.leftAt ?? new Date();
-    const broadcast: ParticipantLeftBroadcast = {
-      socketId: participant.id,
-      leftAt: leftAt.toISOString(),
-    };
-    client.to(room).emit(MEETING_WS_EVENTS.PARTICIPANT_LEFT, broadcast);
+    try {
+      const { participant } = await this.service.leaveMeeting({
+        code: dto.code,
+        participantId: client.id,
+      });
+      // broadcast 먼저, 그 뒤 socket.leave — 남은 참가자에게 알림이 가도록 한다.
+      const leftAt = participant.leftAt ?? new Date();
+      const broadcast: ParticipantLeftBroadcast = {
+        socketId: participant.id,
+        leftAt: leftAt.toISOString(),
+      };
+      client.to(room).emit(MEETING_WS_EVENTS.PARTICIPANT_LEFT, broadcast);
+    } catch (error) {
+      // race: '회의 종료' 직후 다른 탭의 useEffect cleanup 이 leave 를 한 번 더
+      // emit 할 수 있다(또는 idle 자동 종료와 leave 충돌). 이미 종료된 회의나
+      // 이미 leave 한 참가자에 대한 leave 는 best-effort 로 swallow.
+      // handleDisconnect 와 동일 패턴.
+      this.logger.debug(
+        `handleLeave swallow for code=${dto.code} sid=${client.id}: ${(error as Error).message}`,
+      );
+    }
     await client.leave(room);
     return { ok: true };
   }

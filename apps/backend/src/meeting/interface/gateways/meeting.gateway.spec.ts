@@ -204,6 +204,22 @@ describe('MeetingGateway.handleLeave', () => {
       },
     ]);
   });
+
+  it('service.leaveMeeting 이 throw 해도(이미 종료된 회의 등) swallow + socket.leave 진행 + ok 반환', async () => {
+    const service = {
+      leaveMeeting: jest.fn(async () => {
+        throw new Error('Cannot removeParticipant: meeting is already closed');
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const gateway = new MeetingGateway(service as any);
+    const { socket, broadcasts, joined } = makeSocket('s1');
+    joined.add('meeting:abc12xyz');
+    const result = await gateway.handleLeave(leaveDtoOf(), socket as unknown as Socket);
+    expect(result).toEqual({ ok: true });
+    expect(broadcasts).toEqual([]);
+    expect(joined.has('meeting:abc12xyz')).toBe(false);
+  });
 });
 
 describe('MeetingGateway.onMeetingEnded', () => {
