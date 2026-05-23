@@ -39,6 +39,29 @@ export class RedisAudioBufferRepository implements AudioBufferRepository {
       .exec();
   }
 
+  async listActiveMeetings(): Promise<string[]> {
+    const out: string[] = [];
+    let cursor = '0';
+    do {
+      const [next, keys] = await this.redis.scan(
+        cursor,
+        'MATCH',
+        `${MEETING_INDEX_KEY_PREFIX}*`,
+        'COUNT',
+        100,
+      );
+      cursor = next;
+      for (const k of keys) {
+        out.push(k.substring(MEETING_INDEX_KEY_PREFIX.length));
+      }
+    } while (cursor !== '0');
+    return out;
+  }
+
+  async listActiveParticipants(meetingCode: string): Promise<string[]> {
+    return this.redis.smembers(this.meetingIndexKey(meetingCode));
+  }
+
   async markStarted(
     meetingCode: string,
     participantId: string,

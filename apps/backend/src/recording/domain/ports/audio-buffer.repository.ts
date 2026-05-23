@@ -44,6 +44,17 @@ export interface AudioBufferRepository {
   ): Promise<{ pcm: Buffer; startMs: number; startedAtMs?: number }>;
 
   /**
+   * 누적 audio 가 살아있는 active 회의의 meetingCode 목록.
+   * PartialTranscriptionScheduler 가 매 N 초 호출해 enumerate 한다.
+   */
+  listActiveMeetings(): Promise<string[]>;
+
+  /**
+   * 회의의 active participant id 목록. scheduler 가 회의별로 호출해 enumerate.
+   */
+  listActiveParticipants(meetingCode: string): Promise<string[]>;
+
+  /**
    * 회의의 모든 참가자 누적 버퍼를 돌려주고 즉시 삭제한다. 누적된 참가자가
    * 없으면 `[]`. 같은 `participantId` 의 chunk 는 시간순으로 concat 된다.
    *

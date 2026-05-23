@@ -37,6 +37,14 @@ export class InMemoryAudioBufferRepository implements AudioBufferRepository {
     }
   }
 
+  async listActiveMeetings(): Promise<string[]> {
+    return Array.from(this.store.keys());
+  }
+
+  async listActiveParticipants(meetingCode: string): Promise<string[]> {
+    return Array.from(this.store.get(meetingCode)?.keys() ?? []);
+  }
+
   async markStarted(
     meetingCode: string,
     participantId: string,

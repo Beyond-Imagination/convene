@@ -60,6 +60,8 @@ describe('RecordingService.requestTranscription', () => {
         append: async () => {},
         markStarted: async () => {},
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
+        listActiveMeetings: async () => [],
+        listActiveParticipants: async () => [],
         consume: consumeMock,
       },
       transcriber: { transcribe: transcribeMock },
@@ -146,6 +148,8 @@ describe('RecordingService.requestTranscription', () => {
         append: async () => {},
         markStarted: async () => {},
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
+        listActiveMeetings: async () => [],
+        listActiveParticipants: async () => [],
         consume: async () => [
           { participantId: 's1', audio: pcmA },
           { participantId: 's2', audio: pcmB },
@@ -181,6 +185,8 @@ describe('RecordingService.requestTranscription', () => {
         append: async () => {},
         markStarted: async () => {},
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
+        listActiveMeetings: async () => [],
+        listActiveParticipants: async () => [],
         consume: async () => [
           { participantId: 's1', audio: pcmA, startedAtMs: meetingStartedAtMs },
           { participantId: 's2', audio: pcmB, startedAtMs: s2StartedAtMs },
@@ -213,6 +219,8 @@ describe('RecordingService.requestTranscription', () => {
         append: async () => {},
         markStarted: async () => {},
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
+        listActiveMeetings: async () => [],
+        listActiveParticipants: async () => [],
         consume: async () => [{ participantId: 's1', audio: pcm }],
       },
       transcriber: { transcribe: transcribeMock },
@@ -244,6 +252,8 @@ describe('RecordingService.requestTranscription', () => {
         append: async () => {},
         markStarted: async () => {},
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
+        listActiveMeetings: async () => [],
+        listActiveParticipants: async () => [],
         consume: async () => [
           { participantId: 's1', audio: pcm, startedAtMs: s1StartedAtMs },
         ],
@@ -269,6 +279,8 @@ describe('RecordingService.requestTranscription', () => {
         append: async () => {},
         markStarted: async () => {},
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
+        listActiveMeetings: async () => [],
+        listActiveParticipants: async () => [],
         consume: async () => [
           { participantId: 's1', audio: pcmOfSeconds(1) }, // startedAtMs 누락
         ],
@@ -294,6 +306,8 @@ describe('RecordingService.requestTranscription', () => {
         append: async () => {},
         markStarted: async () => {},
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
+        listActiveMeetings: async () => [],
+        listActiveParticipants: async () => [],
         consume: async () => [
           { participantId: 's1', audio: pcmOfSeconds(1), startedAtMs: beforeMeetingMs },
         ],

@@ -92,6 +92,31 @@ describe('InMemoryAudioBufferRepository', () => {
     expect(next[0].startedAtMs).toBeUndefined();
   });
 
+  describe('listActiveMeetings / listActiveParticipants', () => {
+    it('append 한 적 없으면 빈 배열', async () => {
+      const repo = new InMemoryAudioBufferRepository();
+      expect(await repo.listActiveMeetings()).toEqual([]);
+      expect(await repo.listActiveParticipants('abc12xyz')).toEqual([]);
+    });
+
+    it('append 한 회의 코드와 participant 가 enumerate 된다', async () => {
+      const repo = new InMemoryAudioBufferRepository();
+      await repo.append('aaa11aaa', 's1', Buffer.from('A'));
+      await repo.append('aaa11aaa', 's2', Buffer.from('B'));
+      await repo.append('bbb22bbb', 's3', Buffer.from('C'));
+      expect((await repo.listActiveMeetings()).sort()).toEqual(['aaa11aaa', 'bbb22bbb']);
+      expect((await repo.listActiveParticipants('aaa11aaa')).sort()).toEqual(['s1', 's2']);
+      expect(await repo.listActiveParticipants('bbb22bbb')).toEqual(['s3']);
+    });
+
+    it('consume 한 회의는 active 목록에서 사라진다', async () => {
+      const repo = new InMemoryAudioBufferRepository();
+      await repo.append('abc12xyz', 's1', Buffer.from('A'));
+      await repo.consume('abc12xyz');
+      expect(await repo.listActiveMeetings()).toEqual([]);
+    });
+  });
+
   describe('drainAvailable', () => {
     const KEEP_LAST = 32_000; // 16kHz pcm_s16le 의 1초 분량
 

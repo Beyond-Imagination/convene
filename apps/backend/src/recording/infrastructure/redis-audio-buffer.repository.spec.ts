@@ -85,6 +85,21 @@ describe('RedisAudioBufferRepository', () => {
     expect(next[0].startedAtMs).toBeUndefined();
   });
 
+  describe('listActiveMeetings / listActiveParticipants', () => {
+    it('append 한 적 없으면 빈 배열', async () => {
+      expect(await repo.listActiveMeetings()).toEqual([]);
+      expect(await repo.listActiveParticipants('abc12xyz')).toEqual([]);
+    });
+
+    it('append 한 회의 코드와 participant 가 enumerate 된다', async () => {
+      await repo.append('aaa11aaa', 's1', Buffer.from('A'));
+      await repo.append('aaa11aaa', 's2', Buffer.from('B'));
+      await repo.append('bbb22bbb', 's3', Buffer.from('C'));
+      expect((await repo.listActiveMeetings()).sort()).toEqual(['aaa11aaa', 'bbb22bbb']);
+      expect((await repo.listActiveParticipants('aaa11aaa')).sort()).toEqual(['s1', 's2']);
+    });
+  });
+
   describe('drainAvailable', () => {
     const KEEP_LAST = 32_000;
 
