@@ -1,6 +1,10 @@
 import { REPORT_EVENTS } from '@migration/shared-interfaces';
 
-import { AudioBufferRepository, TranscriberPort } from '@/recording/domain/ports';
+import {
+  AudioBufferRepository,
+  PartialTranscriptStore,
+  TranscriberPort,
+} from '@/recording/domain/ports';
 import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events';
 import { DomainEventPublisher } from '@/shared-kernel/domain/ports';
 
@@ -35,6 +39,7 @@ export interface RequestTranscriptionCommand {
 
 export interface RecordingServiceDeps {
   audioBufferRepository: AudioBufferRepository;
+  partialTranscriptStore: PartialTranscriptStore;
   transcriber: TranscriberPort;
   eventPublisher: DomainEventPublisher;
 }

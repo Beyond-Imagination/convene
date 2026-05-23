@@ -64,6 +64,10 @@ describe('RecordingService.requestTranscription', () => {
         listActiveParticipants: async () => [],
         consume: consumeMock,
       },
+      partialTranscriptStore: {
+        append: async () => {},
+        consume: async () => [],
+      },
       transcriber: { transcribe: transcribeMock },
       eventPublisher: publisher,
     });
@@ -155,6 +159,7 @@ describe('RecordingService.requestTranscription', () => {
           { participantId: 's2', audio: pcmB },
         ],
       },
+      partialTranscriptStore: { append: async () => {}, consume: async () => [] },
       transcriber: { transcribe: transcribeMock },
       eventPublisher: publisher,
     });
@@ -192,6 +197,7 @@ describe('RecordingService.requestTranscription', () => {
           { participantId: 's2', audio: pcmB, startedAtMs: s2StartedAtMs },
         ],
       },
+      partialTranscriptStore: { append: async () => {}, consume: async () => [] },
       transcriber: { transcribe: transcribeMock },
       eventPublisher: publisher,
     });
@@ -223,6 +229,7 @@ describe('RecordingService.requestTranscription', () => {
         listActiveParticipants: async () => [],
         consume: async () => [{ participantId: 's1', audio: pcm }],
       },
+      partialTranscriptStore: { append: async () => {}, consume: async () => [] },
       transcriber: { transcribe: transcribeMock },
       eventPublisher: publisher,
     });
@@ -258,6 +265,7 @@ describe('RecordingService.requestTranscription', () => {
           { participantId: 's1', audio: pcm, startedAtMs: s1StartedAtMs },
         ],
       },
+      partialTranscriptStore: { append: async () => {}, consume: async () => [] },
       transcriber: { transcribe: transcribeMock },
       eventPublisher: publisher,
     });
@@ -285,6 +293,7 @@ describe('RecordingService.requestTranscription', () => {
           { participantId: 's1', audio: pcmOfSeconds(1) }, // startedAtMs 누락
         ],
       },
+      partialTranscriptStore: { append: async () => {}, consume: async () => [] },
       transcriber: {
         transcribe: async () => [{ text: 'a0', startMs: 100, endMs: 400 }],
       },
@@ -312,6 +321,7 @@ describe('RecordingService.requestTranscription', () => {
           { participantId: 's1', audio: pcmOfSeconds(1), startedAtMs: beforeMeetingMs },
         ],
       },
+      partialTranscriptStore: { append: async () => {}, consume: async () => [] },
       transcriber: {
         transcribe: async () => [{ text: 'a0', startMs: 0, endMs: 500 }],
       },
@@ -321,6 +331,93 @@ describe('RecordingService.requestTranscription', () => {
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
     expect(payload.transcript).toEqual([
       { speaker: 's1', text: 'a0', startMs: 0, endMs: 500 },
+    ]);
+  });
+
+  it('PartialTranscriptStore 의 누적 segments 가 (absolute - meetingStartedAtMs) 로 정규화되어 결과에 포함된다', async () => {
+    const meetingStartedAtMs = 1_000_000_000_000;
+    const { events, publisher } = makeEventPublisher();
+    const service = new RecordingService({
+      audioBufferRepository: {
+        append: async () => {},
+        markStarted: async () => {},
+        drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
+        listActiveMeetings: async () => [],
+        listActiveParticipants: async () => [],
+        consume: async () => [],
+      },
+      partialTranscriptStore: {
+        append: async () => {},
+        consume: async () => [
+          {
+            speaker: 's1',
+            text: 'p0',
+            absoluteStartMs: meetingStartedAtMs + 5_000,
+            absoluteEndMs: meetingStartedAtMs + 5_500,
+          },
+          {
+            speaker: 's2',
+            text: 'p1',
+            absoluteStartMs: meetingStartedAtMs + 8_000,
+            absoluteEndMs: meetingStartedAtMs + 8_400,
+          },
+        ],
+      },
+      transcriber: { transcribe: async () => [] },
+      eventPublisher: publisher,
+    });
+    await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs });
+    const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
+    expect(payload.transcript).toEqual([
+      { speaker: 's1', text: 'p0', startMs: 5_000, endMs: 5_500 },
+      { speaker: 's2', text: 'p1', startMs: 8_000, endMs: 8_400 },
+    ]);
+  });
+
+  it('partial store segments 와 잔여 audio segments 가 시간순으로 merge 된다', async () => {
+    const meetingStartedAtMs = 1_000_000_000_000;
+    const participantStartedAtMs = meetingStartedAtMs; // 회의 시작과 동시
+    const partialSeg = {
+      speaker: 's1',
+      text: 'p_early',
+      absoluteStartMs: meetingStartedAtMs + 10_000,
+      absoluteEndMs: meetingStartedAtMs + 10_500,
+    };
+    const { events, publisher } = makeEventPublisher();
+    const service = new RecordingService({
+      audioBufferRepository: {
+        append: async () => {},
+        markStarted: async () => {},
+        drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
+        listActiveMeetings: async () => [],
+        listActiveParticipants: async () => [],
+        consume: async () => [
+          {
+            participantId: 's1',
+            audio: pcmOfSeconds(1),
+            startedAtMs: participantStartedAtMs,
+            // 잔여 audio 시작 위치 = scheduler 가 사전 drain 한 양 = 25000ms
+            startMs: 25_000,
+          },
+        ],
+      },
+      partialTranscriptStore: {
+        append: async () => {},
+        consume: async () => [partialSeg],
+      },
+      transcriber: {
+        // 잔여 chunk 의 STT 결과 — chunk audio 0ms 지점에 발화
+        transcribe: async () => [{ text: 'tail', startMs: 100, endMs: 600 }],
+      },
+      eventPublisher: publisher,
+    });
+    await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs });
+    const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
+    expect(payload.transcript).toEqual([
+      // partial: absoluteStartMs - meetingStartedAtMs = 10000
+      { speaker: 's1', text: 'p_early', startMs: 10_000, endMs: 10_500 },
+      // 잔여: startedAt + consume.startMs + chunk0.startMs + seg.startMs = 0 + 25000 + 0 + 100 = 25100
+      { speaker: 's1', text: 'tail', startMs: 25_100, endMs: 25_600 },
     ]);
   });
 
