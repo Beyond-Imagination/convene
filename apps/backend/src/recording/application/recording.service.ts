@@ -1,6 +1,7 @@
 import { REPORT_EVENTS } from '@migration/shared-interfaces';
 
 import {
+  AbsoluteTranscriptSegment,
   AudioBufferRepository,
   PartialTranscriptStore,
   TranscriberPort,
@@ -49,8 +50,13 @@ export class RecordingService {
 
   async requestTranscription(command: RequestTranscriptionCommand): Promise<void> {
     try {
+      // 1) Phase 2 partial scheduler 가 누적해 둔 segments 를 가져온다(절대 epoch ms).
+      const partial = await this.deps.partialTranscriptStore.consume(command.meetingCode);
+      // 2) 회의 종료 시점의 잔여 audio 를 consume. scheduler 가 사전 drain 한 만큼은
+      //    `startMs`(시간축 위치) 로 표현된다.
       const audios = await this.deps.audioBufferRepository.consume(command.meetingCode);
-      if (audios.length === 0) {
+
+      if (partial.length === 0 && audios.length === 0) {
         await this.deps.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_COMPLETED, {
           reportId: command.reportId,
           transcript: [],
@@ -58,36 +64,48 @@ export class RecordingService {
         return;
       }
 
-      const merged: TranscriptionSegmentPayload[] = [];
-      for (const { participantId, audio, startedAtMs } of audios) {
-        // 1) 참가자 capture 시작 시각이 회의 시작보다 늦으면 그 차이만큼 가산해
-        //    회의 시간축으로 normalize. 누락/음수 는 0 으로 clamp.
-        const participantOffsetMs =
-          startedAtMs !== undefined
-            ? Math.max(0, startedAtMs - command.meetingStartedAtMs)
-            : 0;
+      // 3) partial + 잔여 STT 결과를 모두 절대 시간축(epoch ms) 으로 모은 뒤,
+      //    회의 종료 시 한 번에 회의 시작 origin 기준 relative ms 로 정규화한다.
+      const absolute: AbsoluteTranscriptSegment[] = [...partial];
 
-        // 2) raw PCM 을 30s + 2s overlap chunk 로 split → 각 chunk 마다 ai-worker
-        //    호출. chunk.startMs(PCM 시간축 내 위치) 도 누적해 segment 시간축을
-        //    회의 시간축으로 정렬한다.
+      for (const { participantId, audio, startedAtMs, startMs: consumeStartMs } of audios) {
+        // 회의 시간축 origin(절대 시각). 두 가지 clamp:
+        // - startedAtMs 누락 → 회의 시작 시각 사용(participant offset = 0).
+        // - startedAtMs 가 회의 시작보다 이전 → 회의 시작 시각으로 clamp(음수 offset
+        //   방지). 이 경우 segment 의 endMs 까지 깎이지 않도록 normalize 단계가 아니
+        //   라 origin 자체를 미리 clamp 한다.
+        const originMs =
+          startedAtMs !== undefined
+            ? Math.max(startedAtMs, command.meetingStartedAtMs)
+            : command.meetingStartedAtMs;
+        // scheduler 가 사전 drain 한 시간축 위치. drain 없었으면 0.
+        const baseAudioMs = consumeStartMs ?? 0;
         const chunks = splitPcmIntoWavChunks(audio);
         for (const chunk of chunks) {
           const segments = await this.deps.transcriber.transcribe({
             meetingCode: command.meetingCode,
             audio: chunk.wav,
           });
-          const offsetMs = participantOffsetMs + chunk.startMs;
           for (const seg of segments) {
-            merged.push({
-              ...seg,
-              startMs: seg.startMs + offsetMs,
-              endMs: seg.endMs + offsetMs,
+            absolute.push({
               speaker: participantId,
+              text: seg.text,
+              absoluteStartMs: originMs + baseAudioMs + chunk.startMs + seg.startMs,
+              absoluteEndMs: originMs + baseAudioMs + chunk.startMs + seg.endMs,
             });
           }
         }
       }
-      merged.sort((a, b) => a.startMs - b.startMs);
+
+      // 4) absolute → meetingStartedAtMs 기준 relative + clamp 0 + 시간순 sort.
+      const merged: TranscriptionSegmentPayload[] = absolute
+        .map((s) => ({
+          speaker: s.speaker,
+          text: s.text,
+          startMs: Math.max(0, s.absoluteStartMs - command.meetingStartedAtMs),
+          endMs: Math.max(0, s.absoluteEndMs - command.meetingStartedAtMs),
+        }))
+        .sort((a, b) => a.startMs - b.startMs);
 
       await this.deps.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_COMPLETED, {
         reportId: command.reportId,
