@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 
 import { resolveAiWorkerBaseUrl } from '@/config/ai-worker.config';
+import { PartialTranscriptionScheduler } from '@/recording/application/partial-transcription.scheduler';
 import { RecordingReportLifecycleListener } from '@/recording/application/recording-report-lifecycle.listener';
 import { RecordingService } from '@/recording/application/recording.service';
 import { HttpTranscriber } from '@/recording/infrastructure/http.transcriber';
 import { RedisAudioBufferRepository } from '@/recording/infrastructure/redis-audio-buffer.repository';
+import { RedisPartialTranscriptStore } from '@/recording/infrastructure/redis-partial-transcript.store';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 
 /**
@@ -22,6 +24,7 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
 @Module({
   providers: [
     RedisAudioBufferRepository,
+    RedisPartialTranscriptStore,
     {
       provide: HttpTranscriber,
       useFactory: () => new HttpTranscriber(resolveAiWorkerBaseUrl()),
@@ -31,15 +34,36 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
       provide: RecordingService,
       useFactory: (
         audioBufferRepository: RedisAudioBufferRepository,
+        partialTranscriptStore: RedisPartialTranscriptStore,
         transcriber: HttpTranscriber,
         eventPublisher: NestEventBusDomainEventPublisher,
       ) =>
         new RecordingService({
           audioBufferRepository,
+          partialTranscriptStore,
           transcriber,
           eventPublisher,
         }),
-      inject: [RedisAudioBufferRepository, HttpTranscriber, NestEventBusDomainEventPublisher],
+      inject: [
+        RedisAudioBufferRepository,
+        RedisPartialTranscriptStore,
+        HttpTranscriber,
+        NestEventBusDomainEventPublisher,
+      ],
+    },
+    {
+      provide: PartialTranscriptionScheduler,
+      useFactory: (
+        audioBufferRepository: RedisAudioBufferRepository,
+        transcriber: HttpTranscriber,
+        partialTranscriptStore: RedisPartialTranscriptStore,
+      ) =>
+        new PartialTranscriptionScheduler({
+          audioBufferRepository,
+          transcriber,
+          partialTranscriptStore,
+        }),
+      inject: [RedisAudioBufferRepository, HttpTranscriber, RedisPartialTranscriptStore],
     },
   ],
   // Mediasoup BC 의 audio capture 어댑터(FfmpegAudioCaptureAdapter)가 같은
