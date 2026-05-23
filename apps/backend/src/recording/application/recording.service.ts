@@ -4,6 +4,8 @@ import { AudioBufferRepository, TranscriberPort } from '@/recording/domain/ports
 import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events';
 import { DomainEventPublisher } from '@/shared-kernel/domain/ports';
 
+import { splitPcmIntoWavChunks } from '../infrastructure/audio-chunker';
+
 /**
  * Recording Bounded Context의 Application Service.
  *
@@ -53,25 +55,31 @@ export class RecordingService {
 
       const merged: TranscriptionSegmentPayload[] = [];
       for (const { participantId, audio, startedAtMs } of audios) {
-        // 참가자의 capture 시작 시각이 회의 시작보다 늦으면 그 차이만큼 segment
-        // startMs/endMs 를 가산해 회의 시간축으로 normalize 한다. 누락 또는 음수
-        // (회의 시작보다 이전) 는 0 으로 clamp — segment startMs 가 음수가 되지
-        // 않도록 한다.
-        const offset =
+        // 1) 참가자 capture 시작 시각이 회의 시작보다 늦으면 그 차이만큼 가산해
+        //    회의 시간축으로 normalize. 누락/음수 는 0 으로 clamp.
+        const participantOffsetMs =
           startedAtMs !== undefined
             ? Math.max(0, startedAtMs - command.meetingStartedAtMs)
             : 0;
-        const segments = await this.deps.transcriber.transcribe({
-          meetingCode: command.meetingCode,
-          audio,
-        });
-        for (const seg of segments) {
-          merged.push({
-            ...seg,
-            startMs: seg.startMs + offset,
-            endMs: seg.endMs + offset,
-            speaker: participantId,
+
+        // 2) raw PCM 을 30s + 2s overlap chunk 로 split → 각 chunk 마다 ai-worker
+        //    호출. chunk.startMs(PCM 시간축 내 위치) 도 누적해 segment 시간축을
+        //    회의 시간축으로 정렬한다.
+        const chunks = splitPcmIntoWavChunks(audio);
+        for (const chunk of chunks) {
+          const segments = await this.deps.transcriber.transcribe({
+            meetingCode: command.meetingCode,
+            audio: chunk.wav,
           });
+          const offsetMs = participantOffsetMs + chunk.startMs;
+          for (const seg of segments) {
+            merged.push({
+              ...seg,
+              startMs: seg.startMs + offsetMs,
+              endMs: seg.endMs + offsetMs,
+              speaker: participantId,
+            });
+          }
         }
       }
       merged.sort((a, b) => a.startMs - b.startMs);
