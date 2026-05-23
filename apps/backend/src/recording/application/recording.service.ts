@@ -9,7 +9,10 @@ import {
 import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events';
 import { DomainEventPublisher } from '@/shared-kernel/domain/ports';
 
-import { splitPcmIntoWavChunks } from '../infrastructure/audio-chunker';
+import {
+  dropOverlapHeadSegments,
+  splitPcmIntoWavChunks,
+} from '../infrastructure/audio-chunker';
 
 /**
  * Recording Bounded Context의 Application Service.
@@ -81,11 +84,17 @@ export class RecordingService {
         // scheduler 가 사전 drain 한 시간축 위치. drain 없었으면 0.
         const baseAudioMs = consumeStartMs ?? 0;
         const chunks = splitPcmIntoWavChunks(audio);
-        for (const chunk of chunks) {
-          const segments = await this.deps.transcriber.transcribe({
+        const hadPriorPartial = baseAudioMs > 0;
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i];
+          const rawSegments = await this.deps.transcriber.transcribe({
             meetingCode: command.meetingCode,
             audio: chunk.wav,
           });
+          // chunk 경계 dedup — 첫 chunk(i=0) 라도 직전에 partial scheduler 가 사전
+          // drain 한 적이 있으면(baseAudioMs > 0) 그 끝과 overlap 으로 중복 가능.
+          const isFirstChunk = i === 0 && !hadPriorPartial;
+          const segments = dropOverlapHeadSegments(rawSegments, isFirstChunk);
           for (const seg of segments) {
             absolute.push({
               speaker: participantId,

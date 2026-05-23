@@ -211,12 +211,13 @@ describe('RecordingService.requestTranscription', () => {
 
   it('30s 이상 PCM 은 30s+2s overlap 으로 chunk 가 나뉘어 transcribe 가 N 번 호출되고 segment 에 chunk startMs 가 가산된다', async () => {
     // 58s PCM → chunk0=[0..30], chunk1=[28..58]
+    // chunk1 의 segment startMs 는 dedup 임계(2000ms) 보다 커야 keep 된다.
     const pcm = pcmOfSeconds(58);
     let call = 0;
     const transcribeMock = jest.fn(async () => {
       call += 1;
       if (call === 1) return [{ text: 'c0', startMs: 1000, endMs: 1500 }];
-      if (call === 2) return [{ text: 'c1', startMs: 500, endMs: 900 }];
+      if (call === 2) return [{ text: 'c1', startMs: 2500, endMs: 2900 }];
       return [];
     });
     const { events, publisher } = makeEventPublisher();
@@ -238,7 +239,112 @@ describe('RecordingService.requestTranscription', () => {
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
     expect(payload.transcript).toEqual([
       { speaker: 's1', text: 'c0', startMs: 1000, endMs: 1500 },
-      { speaker: 's1', text: 'c1', startMs: 28_500, endMs: 28_900 },
+      { speaker: 's1', text: 'c1', startMs: 30_500, endMs: 30_900 },
+    ]);
+  });
+
+  it('잔여 audio 가 여러 chunk 로 split 될 때 2번째 chunk 부터 첫 2초 안 segments 는 dedup 으로 skip', async () => {
+    // 58s PCM → 2 chunks. chunk0 의 모든 segment 유지, chunk1 의 chunk-local
+    // startMs < 2000ms segment 는 chunk0 의 마지막 overlap 과 중복으로 보고 skip.
+    const pcm = pcmOfSeconds(58);
+    let call = 0;
+    const transcribeMock = jest.fn(async () => {
+      call += 1;
+      if (call === 1) {
+        return [
+          { text: 'c0_a', startMs: 1_000, endMs: 1_500 },
+          { text: 'c0_last', startMs: 27_000, endMs: 29_500 },
+        ];
+      }
+      if (call === 2) {
+        return [
+          { text: 'c1_dup', startMs: 100, endMs: 1_800 }, // overlap 안 → skip
+          { text: 'c1_keep', startMs: 2_500, endMs: 3_500 },
+        ];
+      }
+      return [];
+    });
+    const { events, publisher } = makeEventPublisher();
+    const service = new RecordingService({
+      audioBufferRepository: {
+        append: async () => {},
+        markStarted: async () => {},
+        drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
+        listActiveMeetings: async () => [],
+        listActiveParticipants: async () => [],
+        consume: async () => [{ participantId: 's1', audio: pcm }],
+      },
+      partialTranscriptStore: { append: async () => {}, consume: async () => [] },
+      transcriber: { transcribe: transcribeMock },
+      eventPublisher: publisher,
+    });
+    await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
+    const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
+    expect(payload.transcript).toEqual([
+      { speaker: 's1', text: 'c0_a', startMs: 1_000, endMs: 1_500 },
+      { speaker: 's1', text: 'c0_last', startMs: 27_000, endMs: 29_500 },
+      // c1_dup 은 chunk-local startMs=100 < 2000 → dedup. c1_keep 만 유지(absolute=28000+2500=30500).
+      { speaker: 's1', text: 'c1_keep', startMs: 30_500, endMs: 31_500 },
+    ]);
+  });
+
+  it('잔여 audio 의 첫 chunk(consume.startMs=0) 는 partial 누적이 없었다고 보고 dedup 없이 모든 segment 유지', async () => {
+    const pcm = pcmOfSeconds(1);
+    const transcribeMock = jest.fn(async () => [
+      { text: 'a', startMs: 100, endMs: 500 },
+      { text: 'b', startMs: 1_500, endMs: 1_900 },
+    ]);
+    const { events, publisher } = makeEventPublisher();
+    const service = new RecordingService({
+      audioBufferRepository: {
+        append: async () => {},
+        markStarted: async () => {},
+        drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
+        listActiveMeetings: async () => [],
+        listActiveParticipants: async () => [],
+        consume: async () => [{ participantId: 's1', audio: pcm }], // startMs 누락 = 0
+      },
+      partialTranscriptStore: { append: async () => {}, consume: async () => [] },
+      transcriber: { transcribe: transcribeMock },
+      eventPublisher: publisher,
+    });
+    await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
+    const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
+    expect(payload.transcript).toEqual([
+      { speaker: 's1', text: 'a', startMs: 100, endMs: 500 },
+      { speaker: 's1', text: 'b', startMs: 1_500, endMs: 1_900 },
+    ]);
+  });
+
+  it('잔여 audio.startMs>0 (partial scheduler 가 사전 drain 함) 이면 첫 chunk 도 overlap dedup 적용', async () => {
+    // partial scheduler 가 이미 처리한 마지막의 끝 2초가 잔여 audio 의 첫 2초.
+    // → 잔여 audio 첫 chunk 의 chunk-local startMs < 2000ms segment 는 skip.
+    const pcm = pcmOfSeconds(1);
+    const transcribeMock = jest.fn(async () => [
+      { text: 'dup', startMs: 500, endMs: 1_500 },
+      { text: 'keep', startMs: 2_500, endMs: 3_500 },
+    ]);
+    const { events, publisher } = makeEventPublisher();
+    const service = new RecordingService({
+      audioBufferRepository: {
+        append: async () => {},
+        markStarted: async () => {},
+        drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
+        listActiveMeetings: async () => [],
+        listActiveParticipants: async () => [],
+        consume: async () => [
+          { participantId: 's1', audio: pcm, startMs: 28_000 }, // scheduler 가 처리 후 잔여
+        ],
+      },
+      partialTranscriptStore: { append: async () => {}, consume: async () => [] },
+      transcriber: { transcribe: transcribeMock },
+      eventPublisher: publisher,
+    });
+    await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
+    const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
+    // dup 은 28000+500=28500 위치인데 dedup. keep 은 28000+2500=30500.
+    expect(payload.transcript).toEqual([
+      { speaker: 's1', text: 'keep', startMs: 30_500, endMs: 31_500 },
     ]);
   });
 
@@ -250,7 +356,8 @@ describe('RecordingService.requestTranscription', () => {
     const transcribeMock = jest.fn(async () => {
       call += 1;
       if (call === 1) return [{ text: 'c0', startMs: 0, endMs: 100 }];
-      if (call === 2) return [{ text: 'c1', startMs: 0, endMs: 100 }];
+      // chunk1 의 startMs 는 dedup 임계(2000ms) 보다 커야 한다.
+      if (call === 2) return [{ text: 'c1', startMs: 2500, endMs: 2600 }];
       return [];
     });
     const { events, publisher } = makeEventPublisher();
@@ -275,7 +382,7 @@ describe('RecordingService.requestTranscription', () => {
     // chunk1 startMs=28_000 + participant offset 10_000 → 38000
     expect(payload.transcript).toEqual([
       { speaker: 's1', text: 'c0', startMs: 10_000, endMs: 10_100 },
-      { speaker: 's1', text: 'c1', startMs: 38_000, endMs: 38_100 },
+      { speaker: 's1', text: 'c1', startMs: 40_500, endMs: 40_600 },
     ]);
   });
 
@@ -406,8 +513,9 @@ describe('RecordingService.requestTranscription', () => {
         consume: async () => [partialSeg],
       },
       transcriber: {
-        // 잔여 chunk 의 STT 결과 — chunk audio 0ms 지점에 발화
-        transcribe: async () => [{ text: 'tail', startMs: 100, endMs: 600 }],
+        // 잔여 chunk 의 STT 결과. partial scheduler 가 사전 drain 했으므로 첫 chunk
+        // 라도 chunk-local startMs<2000 segment 는 dedup. tail 은 2000 이상이라 keep.
+        transcribe: async () => [{ text: 'tail', startMs: 2500, endMs: 3000 }],
       },
       eventPublisher: publisher,
     });
@@ -416,8 +524,8 @@ describe('RecordingService.requestTranscription', () => {
     expect(payload.transcript).toEqual([
       // partial: absoluteStartMs - meetingStartedAtMs = 10000
       { speaker: 's1', text: 'p_early', startMs: 10_000, endMs: 10_500 },
-      // 잔여: startedAt + consume.startMs + chunk0.startMs + seg.startMs = 0 + 25000 + 0 + 100 = 25100
-      { speaker: 's1', text: 'tail', startMs: 25_100, endMs: 25_600 },
+      // 잔여: startedAt + consume.startMs + chunk0.startMs + seg.startMs = 0 + 25000 + 0 + 2500 = 27500
+      { speaker: 's1', text: 'tail', startMs: 27_500, endMs: 28_000 },
     ]);
   });
 

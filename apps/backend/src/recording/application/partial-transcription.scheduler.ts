@@ -8,6 +8,7 @@ import {
 } from '@/recording/domain/ports';
 
 import {
+  dropOverlapHeadSegments,
   PCM_BYTES_PER_SECOND,
   wrapPcmAsWav,
 } from '../infrastructure/audio-chunker';
@@ -89,10 +90,13 @@ export class PartialTranscriptionScheduler implements OnModuleInit, OnModuleDest
       // 은 redis 에 다시 못 넣으니 origin 을 0(=epoch) 으로 두고 일단 진행한다.
       const originMs = startedAtMs ?? 0;
       const wav = wrapPcmAsWav(pcm);
-      const segments = await this.deps.transcriber.transcribe({
+      const rawSegments = await this.deps.transcriber.transcribe({
         meetingCode,
         audio: wav,
       });
+      // 첫 partial(chunk.startMs === 0) 이 아니면 chunk-local startMs < overlapMs
+      // 안 segments 는 이전 partial 끝과 중복 가능성 → skip.
+      const segments = dropOverlapHeadSegments(rawSegments, startMs === 0);
       const absolute: AbsoluteTranscriptSegment[] = segments.map((s) => ({
         speaker: participantId,
         text: s.text,

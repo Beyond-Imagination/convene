@@ -1,4 +1,6 @@
 import {
+  DEFAULT_OVERLAP_MS,
+  dropOverlapHeadSegments,
   PCM_BYTES_PER_SECOND,
   splitPcmIntoWavChunks,
   WAV_HEADER_BYTES,
@@ -115,5 +117,35 @@ describe('splitPcmIntoWavChunks', () => {
     const pcm = makePcm(90);
     const chunks = splitPcmIntoWavChunks(pcm, { chunkMs: 30_000, overlapMs: 0 });
     expect(chunks.map((c) => c.startMs)).toEqual([0, 30_000, 60_000]);
+  });
+});
+
+describe('dropOverlapHeadSegments', () => {
+  const seg = (startMs: number, text = '') => ({ startMs, endMs: startMs + 100, text });
+
+  it('isFirstChunk=true 면 그대로 보존', () => {
+    const input = [seg(0), seg(500), seg(2500)];
+    expect(dropOverlapHeadSegments(input, true)).toEqual(input);
+  });
+
+  it('isFirstChunk=false 면 startMs < overlapMs 인 segment 를 skip', () => {
+    const input = [seg(0), seg(500), seg(2500), seg(5000)];
+    expect(dropOverlapHeadSegments(input, false)).toEqual([seg(2500), seg(5000)]);
+  });
+
+  it('overlapMs 를 override 할 수 있다', () => {
+    const input = [seg(0), seg(900), seg(1500)];
+    expect(dropOverlapHeadSegments(input, false, 1_000)).toEqual([seg(1500)]);
+  });
+
+  it('default overlapMs 는 2000ms', () => {
+    expect(DEFAULT_OVERLAP_MS).toBe(2_000);
+    const input = [seg(1_999), seg(2_000), seg(2_001)];
+    expect(dropOverlapHeadSegments(input, false)).toEqual([seg(2_000), seg(2_001)]);
+  });
+
+  it('빈 입력은 빈 배열', () => {
+    expect(dropOverlapHeadSegments([], false)).toEqual([]);
+    expect(dropOverlapHeadSegments([], true)).toEqual([]);
   });
 });

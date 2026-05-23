@@ -123,9 +123,10 @@ describe('PartialTranscriptionScheduler.tick', () => {
         startedAtMs,
       }),
     });
+    // chunkStartMs > 0 → 첫 partial 이 아니므로 dedup 적용. startMs >= 2000 만 keep.
     const transcriber = makeTranscriber(() => [
-      { text: 'hi', startMs: 500, endMs: 1500 },
-      { text: 'bye', startMs: 2000, endMs: 2500 },
+      { text: 'hi', startMs: 2500, endMs: 3000 },
+      { text: 'bye', startMs: 4000, endMs: 4500 },
     ]);
     const store = makeStore();
     const scheduler = new PartialTranscriptionScheduler({
@@ -141,14 +142,14 @@ describe('PartialTranscriptionScheduler.tick', () => {
           {
             speaker: 's1',
             text: 'hi',
-            absoluteStartMs: startedAtMs + chunkStartMs + 500,
-            absoluteEndMs: startedAtMs + chunkStartMs + 1500,
+            absoluteStartMs: startedAtMs + chunkStartMs + 2500,
+            absoluteEndMs: startedAtMs + chunkStartMs + 3000,
           },
           {
             speaker: 's1',
             text: 'bye',
-            absoluteStartMs: startedAtMs + chunkStartMs + 2000,
-            absoluteEndMs: startedAtMs + chunkStartMs + 2500,
+            absoluteStartMs: startedAtMs + chunkStartMs + 4000,
+            absoluteEndMs: startedAtMs + chunkStartMs + 4500,
           },
         ],
       },
@@ -209,13 +210,62 @@ describe('PartialTranscriptionScheduler.tick', () => {
     expect(store.appended[0].segments[0].speaker).toBe('s2');
   });
 
+  it('첫 partial(startMs=0) 이 아니면 transcribe 결과의 chunk-local startMs<2000ms segments 는 dedup 으로 skip 된다', async () => {
+    const startedAtMs = 1_000_000_000_000;
+    const chunkStartMs = 28_000; // 두 번째 이상 partial 호출
+    const repo = makeRepo({
+      activeMeetings: ['abc12xyz'],
+      participantsByMeeting: { abc12xyz: ['s1'] },
+      drainImpl: async () => ({ pcm: Buffer.alloc(100), startMs: chunkStartMs, startedAtMs }),
+    });
+    const transcriber = makeTranscriber(() => [
+      // chunk-local startMs 가 overlap 구간 안 — 이전 partial 끝과 중복 가능성
+      { text: 'overlap_dup', startMs: 500, endMs: 1_500 },
+      { text: 'overlap_dup2', startMs: 1_999, endMs: 2_000 },
+      // 2000ms 이상 — 정상
+      { text: 'keep', startMs: 2_000, endMs: 3_000 },
+      { text: 'keep2', startMs: 5_000, endMs: 6_000 },
+    ]);
+    const store = makeStore();
+    const scheduler = new PartialTranscriptionScheduler({
+      audioBufferRepository: repo,
+      transcriber,
+      partialTranscriptStore: store,
+    });
+    await scheduler.tick();
+    expect(store.appended[0].segments.map((s) => s.text)).toEqual(['keep', 'keep2']);
+  });
+
+  it('첫 partial(startMs=0) 은 dedup 없이 모든 segment 유지', async () => {
+    const startedAtMs = 1_000_000_000_000;
+    const repo = makeRepo({
+      activeMeetings: ['abc12xyz'],
+      participantsByMeeting: { abc12xyz: ['s1'] },
+      drainImpl: async () => ({ pcm: Buffer.alloc(100), startMs: 0, startedAtMs }),
+    });
+    const transcriber = makeTranscriber(() => [
+      { text: 'first', startMs: 500, endMs: 1_500 },
+      { text: 'second', startMs: 1_999, endMs: 2_000 },
+      { text: 'third', startMs: 2_000, endMs: 3_000 },
+    ]);
+    const store = makeStore();
+    const scheduler = new PartialTranscriptionScheduler({
+      audioBufferRepository: repo,
+      transcriber,
+      partialTranscriptStore: store,
+    });
+    await scheduler.tick();
+    expect(store.appended[0].segments.map((s) => s.text)).toEqual(['first', 'second', 'third']);
+  });
+
   it('startedAtMs 가 누락된 경우 originMs=0 으로 처리(epoch ms 기준)', async () => {
     const repo = makeRepo({
       activeMeetings: ['abc12xyz'],
       participantsByMeeting: { abc12xyz: ['s1'] },
       drainImpl: async () => ({ pcm: Buffer.alloc(100), startMs: 5_000 }),
     });
-    const transcriber = makeTranscriber(() => [{ text: 'x', startMs: 100, endMs: 500 }]);
+    // chunk.startMs=5000 → 첫 partial 아님 → dedup. startMs >= 2000 만 keep.
+    const transcriber = makeTranscriber(() => [{ text: 'x', startMs: 2_500, endMs: 3_000 }]);
     const store = makeStore();
     const scheduler = new PartialTranscriptionScheduler({
       audioBufferRepository: repo,
@@ -226,8 +276,8 @@ describe('PartialTranscriptionScheduler.tick', () => {
     expect(store.appended[0].segments[0]).toEqual({
       speaker: 's1',
       text: 'x',
-      absoluteStartMs: 5_100,
-      absoluteEndMs: 5_500,
+      absoluteStartMs: 7_500,
+      absoluteEndMs: 8_000,
     });
   });
 });

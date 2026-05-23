@@ -95,3 +95,24 @@ function msToBytes(ms: number): number {
 function bytesToMs(bytes: number): number {
   return Math.floor((bytes / PCM_BYTES_PER_SECOND) * 1000);
 }
+
+interface HasStartMs {
+  readonly startMs: number;
+}
+
+/**
+ * chunk 경계 dedup — chunk N+1 의 첫 `overlapMs` 구간 안에 시작하는 segment 들은
+ * chunk N 의 마지막에서도 잡혔다고 가정해 skip 한다. 첫 chunk(`isFirstChunk=true`)
+ * 는 그 이전 chunk 가 없으므로 그대로 보존한다.
+ *
+ * 입력 segment 의 `startMs` 는 chunk-local 시각(transcribe 직접 반환). 호출자가
+ * 이후 chunk offset / participant offset 등을 가산한다.
+ */
+export function dropOverlapHeadSegments<T extends HasStartMs>(
+  segments: ReadonlyArray<T>,
+  isFirstChunk: boolean,
+  overlapMs: number = DEFAULT_OVERLAP_MS,
+): T[] {
+  if (isFirstChunk) return [...segments];
+  return segments.filter((s) => s.startMs >= overlapMs);
+}
