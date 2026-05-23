@@ -231,9 +231,11 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
       '-ac', '1',
       '-ar', '16000',
       '-flush_packets', '1',
-      // wav 컨테이너로 stdout 출력. RIFF length 는 unknown 으로 기록되지만
-      // ffmpeg/faster-whisper 디코더는 stream 끝까지 읽는다.
-      '-f', 'wav',
+      // raw PCM s16le 로 stdout 출력 — RIFF header 없음. Redis 에는 raw PCM 만
+      // 누적되고, RecordingService 가 audio-chunker 로 30s+2s overlap chunk 를
+      // 만들 때 각 chunk 에 WAV header 를 prepend 해 ai-worker 로 보낸다(Phase 1).
+      // wav 컨테이너 출력보다 chunk 단위 자르기가 자유롭다(중간을 잘라도 valid).
+      '-f', 's16le',
       'pipe:1',
     ]);
     ffmpeg.on('error', (err) => {
