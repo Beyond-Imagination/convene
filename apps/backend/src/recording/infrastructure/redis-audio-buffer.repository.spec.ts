@@ -85,6 +85,49 @@ describe('RedisAudioBufferRepository', () => {
     expect(next[0].startedAtMs).toBeUndefined();
   });
 
+  describe('drainAvailable', () => {
+    const KEEP_LAST = 32_000;
+
+    it('누적된 chunk 가 없으면 빈 pcm + startMs=0', async () => {
+      const res = await repo.drainAvailable('abc12xyz', 's1', KEEP_LAST);
+      expect(res.pcm.length).toBe(0);
+      expect(res.startMs).toBe(0);
+    });
+
+    it('누적량이 keepLastBytes 보다 크면 (누적-keepLast) bytes 만큼 drain, 끝은 남는다', async () => {
+      await repo.append('abc12xyz', 's1', Buffer.alloc(KEEP_LAST + 5_000, 0xab));
+      const res = await repo.drainAvailable('abc12xyz', 's1', KEEP_LAST);
+      expect(res.pcm.length).toBe(5_000);
+      expect(res.startMs).toBe(0);
+    });
+
+    it('두번째 drain 의 startMs 는 이전 drain 끝 위치(byte) 를 ms 로 환산한 값', async () => {
+      await repo.append('abc12xyz', 's1', Buffer.alloc(64_000));
+      const first = await repo.drainAvailable('abc12xyz', 's1', KEEP_LAST);
+      expect(first.startMs).toBe(0);
+      expect(first.pcm.length).toBe(32_000);
+      await repo.append('abc12xyz', 's1', Buffer.alloc(32_000));
+      const second = await repo.drainAvailable('abc12xyz', 's1', KEEP_LAST);
+      expect(second.startMs).toBe(1_000);
+      expect(second.pcm.length).toBe(32_000);
+    });
+
+    it('markStarted 후 drain 의 결과에 startedAtMs 가 포함된다', async () => {
+      await repo.append('abc12xyz', 's1', Buffer.alloc(KEEP_LAST + 1_000));
+      await repo.markStarted('abc12xyz', 's1', 1_700_000_000_000);
+      const res = await repo.drainAvailable('abc12xyz', 's1', KEEP_LAST);
+      expect(res.startedAtMs).toBe(1_700_000_000_000);
+    });
+
+    it('drain 후 consume 은 잔여 KEEP_LAST 분만 audio 로, startMs 는 drain 끝 위치를 가리킨다', async () => {
+      await repo.append('abc12xyz', 's1', Buffer.alloc(KEEP_LAST + 5_000));
+      await repo.drainAvailable('abc12xyz', 's1', KEEP_LAST);
+      const consumed = await repo.consume('abc12xyz');
+      expect(consumed[0].audio.length).toBe(KEEP_LAST);
+      expect(consumed[0].startMs).toBe(156); // 5000 byte / 32000 byte/s
+    });
+  });
+
   it('UTF-8 비호환 binary chunk 도 그대로 round-trip 된다', async () => {
     const binary = Buffer.from([0x00, 0xff, 0x80, 0x7f, 0x10, 0xab]);
     await repo.append('abc12xyz', 's1', binary);

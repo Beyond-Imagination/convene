@@ -46,9 +46,24 @@ export class RedisAudioBufferRepository implements AudioBufferRepository {
     );
   }
 
+  async drainAvailable(
+    _meetingCode: string,
+    _participantId: string,
+    _keepLastBytes: number,
+  ): Promise<{ pcm: Buffer; startMs: number; startedAtMs?: number }> {
+    throw new Error('not implemented');
+  }
+
   async consume(
     meetingCode: string,
-  ): Promise<ReadonlyArray<{ participantId: string; audio: Buffer; startedAtMs?: number }>> {
+  ): Promise<
+    ReadonlyArray<{
+      participantId: string;
+      audio: Buffer;
+      startedAtMs?: number;
+      startMs?: number;
+    }>
+  > {
     const indexKey = this.meetingIndexKey(meetingCode);
     const pids = await this.redis.smembers(indexKey);
     if (pids.length === 0) {

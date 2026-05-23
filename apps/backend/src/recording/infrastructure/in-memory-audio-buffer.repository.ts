@@ -46,9 +46,24 @@ export class InMemoryAudioBufferRepository implements AudioBufferRepository {
     }
   }
 
+  async drainAvailable(
+    _meetingCode: string,
+    _participantId: string,
+    _keepLastBytes: number,
+  ): Promise<{ pcm: Buffer; startMs: number; startedAtMs?: number }> {
+    throw new Error('not implemented');
+  }
+
   async consume(
     meetingCode: string,
-  ): Promise<ReadonlyArray<{ participantId: string; audio: Buffer; startedAtMs?: number }>> {
+  ): Promise<
+    ReadonlyArray<{
+      participantId: string;
+      audio: Buffer;
+      startedAtMs?: number;
+      startMs?: number;
+    }>
+  > {
     const perMeeting = this.store.get(meetingCode);
     const startedAtsForMeeting = this.startedAts.get(meetingCode);
     if (!perMeeting || perMeeting.size === 0) {
