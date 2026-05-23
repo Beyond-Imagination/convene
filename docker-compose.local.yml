@@ -30,6 +30,43 @@ services:
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
 
+  # NestJS backend (운영 이미지 검증용). 평상시 dev 는 호스트에서 `nest start --watch`
+  # 를 그대로 쓴다 — docker desktop(Windows/Mac) 의 NAT 환경에서는 mediasoup UDP
+  # 미디어 경로가 매끄럽지 않다. EC2 단일 인스턴스 배포 시뮬레이션 / 운영 이미지
+  # smoke 테스트가 본 서비스의 주 용도.
+  #
+  # mediasoup RTC 포트는 RTC_MIN_PORT..RTC_MAX_PORT(여기선 40000-40020) 만 매핑한다.
+  # 운영에서는 ANNOUNCED_IP 를 EC2 의 public IP 로, 같은 범위를 보안그룹에 열어준다.
+  #
+  # apps/backend/.env (MONGO_URI / MONGO_DB_NAME / GEMINI_API_KEY 등) 를 env_file 로
+  # 끌어온다. 컨테이너 간 통신용 URL(REDIS_URL, AI_WORKER_BASE_URL) 은 아래 environment
+  # 에서 .env 를 덮어쓴다.
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: migration-backend
+    depends_on:
+      - redis
+      - ai-worker
+    env_file:
+      - ./apps/backend/.env
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - REDIS_URL=redis://redis:6379
+      - AI_WORKER_BASE_URL=http://ai-worker:8000
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
+      - ANNOUNCED_IP=${ANNOUNCED_IP:-127.0.0.1}
+      - RTC_MIN_PORT=${RTC_MIN_PORT:-40000}
+      - RTC_MAX_PORT=${RTC_MAX_PORT:-40020}
+      - MEDIASOUP_WORKER_NUM=${MEDIASOUP_WORKER_NUM:-1}
+    ports:
+      - '5000:5000'
+      - '40000-40020:40000-40020/udp'
+      - '40000-40020:40000-40020/tcp'
+    restart: unless-stopped
+
 volumes:
   redis-data:
     driver: local
