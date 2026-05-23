@@ -13,6 +13,7 @@ export interface ReportTranscriptionRequestedPayload {
   readonly reportId: string;
   readonly meetingId: string;
   readonly code: string;
+  readonly meetingStartedAtMs: number;
 }
 
 export interface TranscriptionSegmentPayload {

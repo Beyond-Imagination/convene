@@ -71,6 +71,7 @@ export class ReportFinalizationService {
       reportId: report.id,
       meetingId: report.meetingId,
       code: report.code,
+      meetingStartedAtMs: report.startedAt.getTime(),
     });
     return report;
   }

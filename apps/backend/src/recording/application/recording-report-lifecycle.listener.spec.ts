@@ -19,6 +19,7 @@ describe('RecordingReportLifecycleListener', () => {
     reportId: 'rep-1',
     meetingId: 'abc12xyz',
     code: 'abc12xyz',
+    meetingStartedAtMs: Date.UTC(2026, 0, 1, 0, 0, 0),
   };
 
   it('report.transcription.requested → RecordingService.requestTranscription 한 번 위임', async () => {
@@ -27,9 +28,13 @@ describe('RecordingReportLifecycleListener', () => {
     expect(service.requestTranscription).toHaveBeenCalledTimes(1);
   });
 
-  it('payload.code를 RecordingService 입력의 meetingCode로 매핑한다', async () => {
+  it('payload.code 와 meetingStartedAtMs 를 RecordingService 입력에 그대로 매핑한다', async () => {
     const { listener, calls } = makeListener();
     await listener.onTranscriptionRequested(payload);
-    expect(calls[0]).toEqual({ reportId: 'rep-1', meetingCode: 'abc12xyz' });
+    expect(calls[0]).toEqual({
+      reportId: 'rep-1',
+      meetingCode: 'abc12xyz',
+      meetingStartedAtMs: payload.meetingStartedAtMs,
+    });
   });
 });

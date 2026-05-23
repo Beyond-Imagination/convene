@@ -133,7 +133,12 @@ describe('ReportFinalizationService.createDraft', () => {
     expect(events).toEqual([
       {
         name: REPORT_EVENTS.TRANSCRIPTION_REQUESTED,
-        payload: { reportId: generatedId, meetingId: 'mtg_001', code: 'abc12xyz' },
+        payload: {
+          reportId: generatedId,
+          meetingId: 'mtg_001',
+          code: 'abc12xyz',
+          meetingStartedAtMs: startedAt.getTime(),
+        },
       },
     ]);
   });

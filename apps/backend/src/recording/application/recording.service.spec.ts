@@ -50,13 +50,13 @@ describe('RecordingService.requestTranscription', () => {
 
   it('AudioBuffer.consume 을 meetingCode 로 호출한다', async () => {
     const { service, consumeMock } = makeService();
-    await service.requestTranscription({ reportId, meetingCode });
+    await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
     expect(consumeMock).toHaveBeenCalledWith(meetingCode);
   });
 
   it('consume 결과가 빈 배열이면 transcribe 호출 없이 빈 transcript 로 completed', async () => {
     const { service, transcribeMock, events } = makeService({ audios: [] });
-    await service.requestTranscription({ reportId, meetingCode });
+    await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
     expect(transcribeMock).not.toHaveBeenCalled();
     expect(events).toEqual([
       {
@@ -74,7 +74,7 @@ describe('RecordingService.requestTranscription', () => {
         { text: '잘 부탁드립니다', startMs: 1000, endMs: 2500 },
       ],
     });
-    await service.requestTranscription({ reportId, meetingCode });
+    await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
     expect(transcribeMock).toHaveBeenCalledWith({
       meetingCode,
       audio: Buffer.from('A'),
@@ -119,7 +119,7 @@ describe('RecordingService.requestTranscription', () => {
       transcriber: { transcribe: transcribeMock },
       eventPublisher: publisher,
     });
-    await service.requestTranscription({ reportId, meetingCode });
+    await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
     const payload = events[0].payload as {
       transcript: TranscriptionSegmentPayload[];
     };
@@ -138,7 +138,7 @@ describe('RecordingService.requestTranscription', () => {
         throw new Error('ai-worker 503');
       },
     });
-    await service.requestTranscription({ reportId, meetingCode });
+    await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
     expect(events).toEqual([
       {
         name: REPORT_EVENTS.TRANSCRIPTION_FAILED,
@@ -155,7 +155,7 @@ describe('RecordingService.requestTranscription', () => {
       },
     });
     await expect(
-      service.requestTranscription({ reportId, meetingCode }),
+      service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 }),
     ).resolves.toBeUndefined();
   });
 });

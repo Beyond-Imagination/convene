@@ -25,6 +25,7 @@ export class RecordingReportLifecycleListener {
     await this.service.requestTranscription({
       reportId: payload.reportId,
       meetingCode: payload.code,
+      meetingStartedAtMs: payload.meetingStartedAtMs,
     });
   }
 }

@@ -23,6 +23,12 @@ import { DomainEventPublisher } from '@/shared-kernel/domain/ports';
 export interface RequestTranscriptionCommand {
   reportId: string;
   meetingCode: string;
+  /**
+   * 회의 시작 시각(epoch ms). 참가자별 capture 시작 시각을 본 origin 으로
+   * normalize 해 segment.startMs/endMs 를 회의 시간축으로 보정한다.
+   * 중간 join 한 참가자도 회의 시작점 기준으로 정렬된다.
+   */
+  meetingStartedAtMs: number;
 }
 
 export interface RecordingServiceDeps {
