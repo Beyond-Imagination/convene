@@ -2,6 +2,11 @@ import { Injectable } from '@nestjs/common';
 
 import { AudioBufferRepository } from '@/recording/domain/ports';
 
+import { PCM_BYTES_PER_SECOND } from './audio-chunker';
+
+const bytesToMs = (bytes: number): number =>
+  Math.floor((bytes / PCM_BYTES_PER_SECOND) * 1000);
+
 /**
  * AudioBufferRepository 의 in-memory 구현체.
  *
@@ -15,6 +20,8 @@ export class InMemoryAudioBufferRepository implements AudioBufferRepository {
   private readonly store = new Map<string, Map<string, Buffer[]>>();
   // meetingCode → (participantId → 첫 markStarted 시 epoch ms)
   private readonly startedAts = new Map<string, Map<string, number>>();
+  // meetingCode → (participantId → drainAvailable 으로 빠져나간 누적 byte)
+  private readonly cursors = new Map<string, Map<string, number>>();
 
   async append(meetingCode: string, participantId: string, chunk: Buffer): Promise<void> {
     let perMeeting = this.store.get(meetingCode);
@@ -47,11 +54,39 @@ export class InMemoryAudioBufferRepository implements AudioBufferRepository {
   }
 
   async drainAvailable(
-    _meetingCode: string,
-    _participantId: string,
-    _keepLastBytes: number,
+    meetingCode: string,
+    participantId: string,
+    keepLastBytes: number,
   ): Promise<{ pcm: Buffer; startMs: number; startedAtMs?: number }> {
-    throw new Error('not implemented');
+    const cursorsForMeeting = this.cursors.get(meetingCode);
+    const cursorBefore = cursorsForMeeting?.get(participantId) ?? 0;
+    const startedAtMs = this.startedAts.get(meetingCode)?.get(participantId);
+
+    const perMeeting = this.store.get(meetingCode);
+    const chunks = perMeeting?.get(participantId);
+    const total = chunks ? Buffer.concat(chunks) : Buffer.alloc(0);
+    if (total.length <= keepLastBytes) {
+      return { pcm: Buffer.alloc(0), startMs: bytesToMs(cursorBefore), startedAtMs };
+    }
+    const drainLen = total.length - keepLastBytes;
+    const drainedPcm = total.subarray(0, drainLen);
+    const remaining = total.subarray(drainLen);
+
+    // store 의 chunk list 를 remaining 단일 chunk 로 교체
+    if (perMeeting) perMeeting.set(participantId, [Buffer.from(remaining)]);
+    // cursor 갱신
+    let cm = this.cursors.get(meetingCode);
+    if (!cm) {
+      cm = new Map();
+      this.cursors.set(meetingCode, cm);
+    }
+    cm.set(participantId, cursorBefore + drainLen);
+
+    return {
+      pcm: Buffer.from(drainedPcm),
+      startMs: bytesToMs(cursorBefore),
+      startedAtMs,
+    };
   }
 
   async consume(
@@ -66,19 +101,33 @@ export class InMemoryAudioBufferRepository implements AudioBufferRepository {
   > {
     const perMeeting = this.store.get(meetingCode);
     const startedAtsForMeeting = this.startedAts.get(meetingCode);
+    const cursorsForMeeting = this.cursors.get(meetingCode);
     if (!perMeeting || perMeeting.size === 0) {
       this.store.delete(meetingCode);
       this.startedAts.delete(meetingCode);
+      this.cursors.delete(meetingCode);
       return [];
     }
-    const result: { participantId: string; audio: Buffer; startedAtMs?: number }[] = [];
+    const result: {
+      participantId: string;
+      audio: Buffer;
+      startedAtMs?: number;
+      startMs?: number;
+    }[] = [];
     for (const [participantId, chunks] of perMeeting) {
       if (chunks.length === 0) continue;
       const startedAtMs = startedAtsForMeeting?.get(participantId);
-      result.push({ participantId, audio: Buffer.concat(chunks), startedAtMs });
+      const cursorBytes = cursorsForMeeting?.get(participantId);
+      result.push({
+        participantId,
+        audio: Buffer.concat(chunks),
+        startedAtMs,
+        startMs: cursorBytes !== undefined ? bytesToMs(cursorBytes) : undefined,
+      });
     }
     this.store.delete(meetingCode);
     this.startedAts.delete(meetingCode);
+    this.cursors.delete(meetingCode);
     return result;
   }
 }
