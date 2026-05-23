@@ -24,13 +24,13 @@ services:
       context: ./apps/ai-worker
       dockerfile: Dockerfile
       args:
-        STT_MODEL_SIZE: ${STT_MODEL_SIZE:-medium}
+        STT_MODEL_SIZE: ${STT_MODEL_SIZE:-small}
     container_name: migration-ai-worker
     ports:
       - '8000:8000'
     environment:
       - PYTHONUNBUFFERED=1
-      - STT_MODEL_SIZE=${STT_MODEL_SIZE:-medium}
+      - STT_MODEL_SIZE=${STT_MODEL_SIZE:-small}
     restart: unless-stopped
 
   # NestJS backend (운영 이미지 검증용). 평상시 dev 는 호스트에서 `nest start --watch`
