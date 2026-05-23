@@ -32,9 +32,17 @@ export class RedisAudioBufferRepository implements AudioBufferRepository {
       .exec();
   }
 
+  async markStarted(
+    _meetingCode: string,
+    _participantId: string,
+    _startedAtMs: number,
+  ): Promise<void> {
+    throw new Error('not implemented');
+  }
+
   async consume(
     meetingCode: string,
-  ): Promise<ReadonlyArray<{ participantId: string; audio: Buffer }>> {
+  ): Promise<ReadonlyArray<{ participantId: string; audio: Buffer; startedAtMs?: number }>> {
     const indexKey = this.meetingIndexKey(meetingCode);
     const pids = await this.redis.smembers(indexKey);
     if (pids.length === 0) {
@@ -52,7 +60,7 @@ export class RedisAudioBufferRepository implements AudioBufferRepository {
     const results = await pipeline.exec();
     if (!results) return [];
 
-    const out: { participantId: string; audio: Buffer }[] = [];
+    const out: { participantId: string; audio: Buffer; startedAtMs?: number }[] = [];
     // 각 pid 당 두 명령(lrangeBuffer, del) 이 순서대로 push 됐다. 마지막 del(indexKey)
     // 은 results 의 가장 끝에 있어 무시한다.
     for (let i = 0; i < pids.length; i++) {

@@ -15,11 +15,24 @@ export interface AudioBufferRepository {
   append(meetingCode: string, participantId: string, chunk: Buffer): Promise<void>;
 
   /**
-   * 회의의 모든 참가자 누적 버퍼를 `{ participantId, audio }` 배열로 돌려주고
-   * 즉시 삭제한다. 누적된 참가자가 없으면 `[]`.
-   * 결과 배열 안에서 같은 `participantId` 의 chunk 는 시간순으로 concat 된다.
+   * 참가자의 capture 시작 시각(epoch ms)을 1회만 기록한다.
+   * 같은 (code, pid) 에 대한 두 번째 호출은 무시(SETNX 의미) — RecordingService 가
+   * 회의 시작 시각을 origin 으로 잡고 segment offset 을 normalize 할 때 본 값과
+   * `command.meetingStartedAtMs` 의 차이를 더한다(중간 join 참가자 보정).
+   */
+  markStarted(
+    meetingCode: string,
+    participantId: string,
+    startedAtMs: number,
+  ): Promise<void>;
+
+  /**
+   * 회의의 모든 참가자 누적 버퍼를 돌려주고 즉시 삭제한다. 누적된 참가자가
+   * 없으면 `[]`. 같은 `participantId` 의 chunk 는 시간순으로 concat 된다.
+   *
+   * `startedAtMs` 는 `markStarted` 가 호출된 적이 있으면 그 값, 없으면 undefined.
    */
   consume(
     meetingCode: string,
-  ): Promise<ReadonlyArray<{ participantId: string; audio: Buffer }>>;
+  ): Promise<ReadonlyArray<{ participantId: string; audio: Buffer; startedAtMs?: number }>>;
 }

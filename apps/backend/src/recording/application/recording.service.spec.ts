@@ -27,7 +27,11 @@ describe('RecordingService.requestTranscription', () => {
 
   const makeService = (
     opts: {
-      audios?: ReadonlyArray<{ participantId: string; audio: Buffer }>;
+      audios?: ReadonlyArray<{
+        participantId: string;
+        audio: Buffer;
+        startedAtMs?: number;
+      }>;
       transcribeImpl?: (input: {
         meetingCode: string;
         audio: Buffer;
@@ -40,6 +44,7 @@ describe('RecordingService.requestTranscription', () => {
     const service = new RecordingService({
       audioBufferRepository: {
         append: async () => {},
+        markStarted: async () => {},
         consume: consumeMock,
       },
       transcriber: { transcribe: transcribeMock },
@@ -111,6 +116,7 @@ describe('RecordingService.requestTranscription', () => {
     const service = new RecordingService({
       audioBufferRepository: {
         append: async () => {},
+        markStarted: async () => {},
         consume: async () => [
           { participantId: 's1', audio: Buffer.from('A') },
           { participantId: 's2', audio: Buffer.from('B') },
@@ -128,6 +134,90 @@ describe('RecordingService.requestTranscription', () => {
       { speaker: 's2', text: 'b1', startMs: 1000, endMs: 1500 },
       { speaker: 's1', text: 'a2', startMs: 2000, endMs: 2500 },
       { speaker: 's2', text: 'b3', startMs: 3000, endMs: 3500 },
+    ]);
+  });
+
+  it('participant 의 startedAtMs 가 회의 시작 시각보다 늦으면 segment offset 이 +(startedAtMs - meetingStartedAtMs) 만큼 가산된다', async () => {
+    // 회의 시작: t=1000_000_000_000 ms
+    // s1: 회의 시작과 동시에 capture → offset 0
+    // s2: 회의 시작 30초 후 capture → segment 들이 +30000ms 만큼 밀려서 정렬돼야 한다.
+    const meetingStartedAtMs = 1_000_000_000_000;
+    const s2StartedAtMs = meetingStartedAtMs + 30_000;
+    const transcribeMock = jest.fn(async ({ audio }: { audio: Buffer }) => {
+      if (audio.toString() === 'A') {
+        return [{ text: 'a0', startMs: 0, endMs: 500 }];
+      }
+      if (audio.toString() === 'B') {
+        // B 입장 직후 발화 → audio 시간축으로는 0 ms 부터지만 회의 시간축에선 30000ms.
+        return [{ text: 'b0', startMs: 0, endMs: 800 }];
+      }
+      return [];
+    });
+    const { events, publisher } = makeEventPublisher();
+    const service = new RecordingService({
+      audioBufferRepository: {
+        append: async () => {},
+        markStarted: async () => {},
+        consume: async () => [
+          { participantId: 's1', audio: Buffer.from('A'), startedAtMs: meetingStartedAtMs },
+          { participantId: 's2', audio: Buffer.from('B'), startedAtMs: s2StartedAtMs },
+        ],
+      },
+      transcriber: { transcribe: transcribeMock },
+      eventPublisher: publisher,
+    });
+    await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs });
+    const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
+    expect(payload.transcript).toEqual([
+      { speaker: 's1', text: 'a0', startMs: 0, endMs: 500 },
+      { speaker: 's2', text: 'b0', startMs: 30_000, endMs: 30_800 },
+    ]);
+  });
+
+  it('participant 의 startedAtMs 가 누락되면 보정 없이 0 offset 으로 취급한다(레거시 호환)', async () => {
+    const meetingStartedAtMs = 1_000_000_000_000;
+    const { events, publisher } = makeEventPublisher();
+    const service = new RecordingService({
+      audioBufferRepository: {
+        append: async () => {},
+        markStarted: async () => {},
+        consume: async () => [
+          { participantId: 's1', audio: Buffer.from('A') }, // startedAtMs 누락
+        ],
+      },
+      transcriber: {
+        transcribe: async () => [{ text: 'a0', startMs: 100, endMs: 400 }],
+      },
+      eventPublisher: publisher,
+    });
+    await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs });
+    const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
+    expect(payload.transcript).toEqual([
+      { speaker: 's1', text: 'a0', startMs: 100, endMs: 400 },
+    ]);
+  });
+
+  it('startedAtMs 가 회의 시작보다 이전이면 0 으로 clamp 한다(음수 startMs 방지)', async () => {
+    const meetingStartedAtMs = 1_000_000_000_000;
+    const beforeMeetingMs = meetingStartedAtMs - 5_000;
+    const { events, publisher } = makeEventPublisher();
+    const service = new RecordingService({
+      audioBufferRepository: {
+        append: async () => {},
+        markStarted: async () => {},
+        consume: async () => [
+          { participantId: 's1', audio: Buffer.from('A'), startedAtMs: beforeMeetingMs },
+        ],
+      },
+      transcriber: {
+        transcribe: async () => [{ text: 'a0', startMs: 0, endMs: 500 }],
+      },
+      eventPublisher: publisher,
+    });
+    await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs });
+    const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
+    expect(payload.transcript).toEqual([
+      { speaker: 's1', text: 'a0', startMs: 0, endMs: 500 },
     ]);
   });
 

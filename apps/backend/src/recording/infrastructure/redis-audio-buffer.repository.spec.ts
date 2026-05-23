@@ -55,6 +55,36 @@ describe('RedisAudioBufferRepository', () => {
     expect(await repo.consume('abc12xyz')).toEqual([]);
   });
 
+  it('markStarted 후 consume 결과에 startedAtMs 가 포함된다', async () => {
+    await repo.append('abc12xyz', 's1', Buffer.from('A'));
+    await repo.markStarted('abc12xyz', 's1', 1_700_000_000_000);
+    const result = await repo.consume('abc12xyz');
+    expect(result[0].startedAtMs).toBe(1_700_000_000_000);
+  });
+
+  it('markStarted 가 같은 (code, pid) 에 중복 호출되어도 첫 호출 값만 유지된다', async () => {
+    await repo.append('abc12xyz', 's1', Buffer.from('A'));
+    await repo.markStarted('abc12xyz', 's1', 1000);
+    await repo.markStarted('abc12xyz', 's1', 2000);
+    const result = await repo.consume('abc12xyz');
+    expect(result[0].startedAtMs).toBe(1000);
+  });
+
+  it('markStarted 없이 consume 한 경우 startedAtMs 는 undefined', async () => {
+    await repo.append('abc12xyz', 's1', Buffer.from('A'));
+    const result = await repo.consume('abc12xyz');
+    expect(result[0].startedAtMs).toBeUndefined();
+  });
+
+  it('consume 이 markStarted 키도 함께 폐기한다(다음 consume 에 잔존 X)', async () => {
+    await repo.append('abc12xyz', 's1', Buffer.from('A'));
+    await repo.markStarted('abc12xyz', 's1', 1000);
+    await repo.consume('abc12xyz');
+    await repo.append('abc12xyz', 's1', Buffer.from('B'));
+    const next = await repo.consume('abc12xyz');
+    expect(next[0].startedAtMs).toBeUndefined();
+  });
+
   it('UTF-8 비호환 binary chunk 도 그대로 round-trip 된다', async () => {
     const binary = Buffer.from([0x00, 0xff, 0x80, 0x7f, 0x10, 0xab]);
     await repo.append('abc12xyz', 's1', binary);

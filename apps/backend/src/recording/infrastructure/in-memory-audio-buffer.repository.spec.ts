@@ -44,6 +44,54 @@ describe('InMemoryAudioBufferRepository', () => {
     expect(await repo.consume('abc12xyz')).toEqual([]);
   });
 
+  it('markStarted 후 consume 결과에 startedAtMs 가 포함된다', async () => {
+    const repo = new InMemoryAudioBufferRepository();
+    await repo.append('abc12xyz', 's1', Buffer.from('A'));
+    await repo.markStarted('abc12xyz', 's1', 1_700_000_000_000);
+    const result = await repo.consume('abc12xyz');
+    expect(result).toEqual([
+      { participantId: 's1', audio: Buffer.from('A'), startedAtMs: 1_700_000_000_000 },
+    ]);
+  });
+
+  it('markStarted 가 같은 (code, pid) 에 중복 호출되어도 첫 호출 값만 유지된다', async () => {
+    const repo = new InMemoryAudioBufferRepository();
+    await repo.append('abc12xyz', 's1', Buffer.from('A'));
+    await repo.markStarted('abc12xyz', 's1', 1000);
+    await repo.markStarted('abc12xyz', 's1', 2000);
+    const result = await repo.consume('abc12xyz');
+    expect(result[0].startedAtMs).toBe(1000);
+  });
+
+  it('markStarted 없이 consume 한 경우 startedAtMs 는 undefined', async () => {
+    const repo = new InMemoryAudioBufferRepository();
+    await repo.append('abc12xyz', 's1', Buffer.from('A'));
+    const result = await repo.consume('abc12xyz');
+    expect(result[0].startedAtMs).toBeUndefined();
+  });
+
+  it('서로 다른 participant 의 startedAtMs 는 독립적으로 기록된다', async () => {
+    const repo = new InMemoryAudioBufferRepository();
+    await repo.append('abc12xyz', 's1', Buffer.from('A'));
+    await repo.append('abc12xyz', 's2', Buffer.from('B'));
+    await repo.markStarted('abc12xyz', 's1', 1000);
+    await repo.markStarted('abc12xyz', 's2', 31_000);
+    const result = await repo.consume('abc12xyz');
+    const byPid = new Map(result.map((e) => [e.participantId, e.startedAtMs]));
+    expect(byPid.get('s1')).toBe(1000);
+    expect(byPid.get('s2')).toBe(31_000);
+  });
+
+  it('consume 후 markStarted 기록도 폐기 — 다음 consume 에 startedAtMs 가 남지 않는다', async () => {
+    const repo = new InMemoryAudioBufferRepository();
+    await repo.append('abc12xyz', 's1', Buffer.from('A'));
+    await repo.markStarted('abc12xyz', 's1', 1000);
+    await repo.consume('abc12xyz');
+    await repo.append('abc12xyz', 's1', Buffer.from('B'));
+    const next = await repo.consume('abc12xyz');
+    expect(next[0].startedAtMs).toBeUndefined();
+  });
+
   it('서로 다른 회의의 버퍼는 독립적이다', async () => {
     const repo = new InMemoryAudioBufferRepository();
     await repo.append('aaa11aaa', 's1', Buffer.from('A'));

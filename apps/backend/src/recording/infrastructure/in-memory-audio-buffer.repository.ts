@@ -28,15 +28,23 @@ export class InMemoryAudioBufferRepository implements AudioBufferRepository {
     }
   }
 
+  async markStarted(
+    _meetingCode: string,
+    _participantId: string,
+    _startedAtMs: number,
+  ): Promise<void> {
+    throw new Error('not implemented');
+  }
+
   async consume(
     meetingCode: string,
-  ): Promise<ReadonlyArray<{ participantId: string; audio: Buffer }>> {
+  ): Promise<ReadonlyArray<{ participantId: string; audio: Buffer; startedAtMs?: number }>> {
     const perMeeting = this.store.get(meetingCode);
     if (!perMeeting || perMeeting.size === 0) {
       this.store.delete(meetingCode);
       return [];
     }
-    const result: { participantId: string; audio: Buffer }[] = [];
+    const result: { participantId: string; audio: Buffer; startedAtMs?: number }[] = [];
     for (const [participantId, chunks] of perMeeting) {
       if (chunks.length === 0) continue;
       result.push({ participantId, audio: Buffer.concat(chunks) });
