@@ -37,7 +37,7 @@ logging.basicConfig(level=logging.INFO)
 
 CPU_THREADS = int(os.getenv("STT_CPU_THREADS", "1"))
 BEAM_SIZE = int(os.getenv("STT_BEAM_SIZE", "1"))
-MODEL_SIZE = os.getenv("STT_MODEL_SIZE", "small")
+MODEL_SIZE = os.getenv("STT_MODEL_SIZE", "medium")
 LANGUAGE = os.getenv("STT_LANGUAGE", "ko")
 
 # 모듈 import 시점에 모델을 1회 로드(warm-start). 컨테이너 부팅 시 cold-load 비용
