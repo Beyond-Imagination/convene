@@ -5,6 +5,7 @@ import { AudioBufferRepository } from '@/recording/domain/ports';
 
 const PARTICIPANT_KEY_PREFIX = 'audio-buffer:';
 const MEETING_INDEX_KEY_PREFIX = 'audio-buffer:meeting:';
+const STARTED_AT_KEY_PREFIX = 'audio-buffer:startedAt:';
 
 /**
  * AudioBufferRepository 의 redis(ioredis) 구현체.
@@ -33,11 +34,16 @@ export class RedisAudioBufferRepository implements AudioBufferRepository {
   }
 
   async markStarted(
-    _meetingCode: string,
-    _participantId: string,
-    _startedAtMs: number,
+    meetingCode: string,
+    participantId: string,
+    startedAtMs: number,
   ): Promise<void> {
-    throw new Error('not implemented');
+    // SET ... NX 로 첫 호출만 기록한다 — 같은 (code, pid) 두 번째 호출은 무시.
+    await this.redis.set(
+      this.startedAtKey(meetingCode, participantId),
+      startedAtMs.toString(),
+      'NX',
+    );
   }
 
   async consume(
@@ -52,24 +58,38 @@ export class RedisAudioBufferRepository implements AudioBufferRepository {
 
     const pipeline = this.redis.pipeline();
     for (const pid of pids) {
-      const key = this.participantKey(meetingCode, pid);
-      pipeline.lrangeBuffer(key, 0, -1);
-      pipeline.del(key);
+      pipeline.lrangeBuffer(this.participantKey(meetingCode, pid), 0, -1);
+      pipeline.del(this.participantKey(meetingCode, pid));
+      pipeline.get(this.startedAtKey(meetingCode, pid));
+      pipeline.del(this.startedAtKey(meetingCode, pid));
     }
     pipeline.del(indexKey);
     const results = await pipeline.exec();
     if (!results) return [];
 
     const out: { participantId: string; audio: Buffer; startedAtMs?: number }[] = [];
-    // 각 pid 당 두 명령(lrangeBuffer, del) 이 순서대로 push 됐다. 마지막 del(indexKey)
-    // 은 results 의 가장 끝에 있어 무시한다.
+    // pid 당 4명령(lrangeBuffer, del, get, del) 이 순서대로 push 됐다. 마지막
+    // del(indexKey) 은 results 의 가장 끝에 있어 무시한다.
+    const COMMANDS_PER_PID = 4;
     for (let i = 0; i < pids.length; i++) {
-      const lrangeRes = results[i * 2];
+      const lrangeRes = results[i * COMMANDS_PER_PID];
+      const startedAtRes = results[i * COMMANDS_PER_PID + 2];
       if (!lrangeRes) continue;
       const [err, chunks] = lrangeRes as [Error | null, Buffer[]];
       if (err) throw err;
       if (!chunks || chunks.length === 0) continue;
-      out.push({ participantId: pids[i], audio: Buffer.concat(chunks) });
+      const startedAtRaw = startedAtRes
+        ? (startedAtRes as [Error | null, string | null])[1]
+        : null;
+      const startedAtMs =
+        startedAtRaw !== null && startedAtRaw !== undefined
+          ? Number(startedAtRaw)
+          : undefined;
+      out.push({
+        participantId: pids[i],
+        audio: Buffer.concat(chunks),
+        startedAtMs,
+      });
     }
     return out;
   }
@@ -80,5 +100,9 @@ export class RedisAudioBufferRepository implements AudioBufferRepository {
 
   private meetingIndexKey(meetingCode: string): string {
     return `${MEETING_INDEX_KEY_PREFIX}${meetingCode}`;
+  }
+
+  private startedAtKey(meetingCode: string, participantId: string): string {
+    return `${STARTED_AT_KEY_PREFIX}${meetingCode}:${participantId}`;
   }
 }

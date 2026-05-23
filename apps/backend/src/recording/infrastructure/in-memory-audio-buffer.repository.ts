@@ -13,6 +13,8 @@ import { AudioBufferRepository } from '@/recording/domain/ports';
 export class InMemoryAudioBufferRepository implements AudioBufferRepository {
   // meetingCode → (participantId → chunk list)
   private readonly store = new Map<string, Map<string, Buffer[]>>();
+  // meetingCode → (participantId → 첫 markStarted 시 epoch ms)
+  private readonly startedAts = new Map<string, Map<string, number>>();
 
   async append(meetingCode: string, participantId: string, chunk: Buffer): Promise<void> {
     let perMeeting = this.store.get(meetingCode);
@@ -29,27 +31,39 @@ export class InMemoryAudioBufferRepository implements AudioBufferRepository {
   }
 
   async markStarted(
-    _meetingCode: string,
-    _participantId: string,
-    _startedAtMs: number,
+    meetingCode: string,
+    participantId: string,
+    startedAtMs: number,
   ): Promise<void> {
-    throw new Error('not implemented');
+    let perMeeting = this.startedAts.get(meetingCode);
+    if (!perMeeting) {
+      perMeeting = new Map();
+      this.startedAts.set(meetingCode, perMeeting);
+    }
+    // SETNX 의미 — 첫 호출만 기록한다. 동일 (code, pid) 의 두 번째 호출은 무시.
+    if (!perMeeting.has(participantId)) {
+      perMeeting.set(participantId, startedAtMs);
+    }
   }
 
   async consume(
     meetingCode: string,
   ): Promise<ReadonlyArray<{ participantId: string; audio: Buffer; startedAtMs?: number }>> {
     const perMeeting = this.store.get(meetingCode);
+    const startedAtsForMeeting = this.startedAts.get(meetingCode);
     if (!perMeeting || perMeeting.size === 0) {
       this.store.delete(meetingCode);
+      this.startedAts.delete(meetingCode);
       return [];
     }
     const result: { participantId: string; audio: Buffer; startedAtMs?: number }[] = [];
     for (const [participantId, chunks] of perMeeting) {
       if (chunks.length === 0) continue;
-      result.push({ participantId, audio: Buffer.concat(chunks) });
+      const startedAtMs = startedAtsForMeeting?.get(participantId);
+      result.push({ participantId, audio: Buffer.concat(chunks), startedAtMs });
     }
     this.store.delete(meetingCode);
+    this.startedAts.delete(meetingCode);
     return result;
   }
 }

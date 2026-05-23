@@ -52,13 +52,26 @@ export class RecordingService {
       }
 
       const merged: TranscriptionSegmentPayload[] = [];
-      for (const { participantId, audio } of audios) {
+      for (const { participantId, audio, startedAtMs } of audios) {
+        // 참가자의 capture 시작 시각이 회의 시작보다 늦으면 그 차이만큼 segment
+        // startMs/endMs 를 가산해 회의 시간축으로 normalize 한다. 누락 또는 음수
+        // (회의 시작보다 이전) 는 0 으로 clamp — segment startMs 가 음수가 되지
+        // 않도록 한다.
+        const offset =
+          startedAtMs !== undefined
+            ? Math.max(0, startedAtMs - command.meetingStartedAtMs)
+            : 0;
         const segments = await this.deps.transcriber.transcribe({
           meetingCode: command.meetingCode,
           audio,
         });
         for (const seg of segments) {
-          merged.push({ ...seg, speaker: participantId });
+          merged.push({
+            ...seg,
+            startMs: seg.startMs + offset,
+            endMs: seg.endMs + offset,
+            speaker: participantId,
+          });
         }
       }
       merged.sort((a, b) => a.startMs - b.startMs);
