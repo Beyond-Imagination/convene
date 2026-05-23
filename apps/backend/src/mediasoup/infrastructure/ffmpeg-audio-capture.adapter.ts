@@ -164,6 +164,18 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
         );
     }, RESUME_DELAY_MS);
 
+    // 참가자의 capture 시작 시각을 1회만 기록한다. RecordingService 가 회의
+    // 시작 시각을 origin 으로 잡고 본 값과의 차이를 segment.startMs/endMs 에
+    // 가산해 시간축을 회의 기준으로 normalize 한다. SETNX 성격이라 두 번째
+    // capture 가 들어와도 첫 호출 값만 유효.
+    this.audioBufferRepository
+      .markStarted(input.meetingCode, input.participantId, Date.now())
+      .catch((err) =>
+        this.logger.error(
+          `markStarted failed (${input.meetingCode}/${input.participantId}): ${(err as Error).message}`,
+        ),
+      );
+
     return {
       meetingCode: input.meetingCode,
       participantId: input.participantId,
