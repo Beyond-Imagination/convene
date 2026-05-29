@@ -26,4 +26,10 @@ test.describe('home page', () => {
       .toBeVisible();
     await expect(page).toHaveURL(/\/$/);
   });
+
+  test('회의록 보기 링크를 누르면 /reports 로 이동한다', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('link', { name: '회의록 보기' }).click();
+    await expect(page).toHaveURL(/\/reports\/?$/);
+  });
 });
