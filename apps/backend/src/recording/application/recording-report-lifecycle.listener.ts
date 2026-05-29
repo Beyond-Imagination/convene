@@ -26,6 +26,7 @@ export class RecordingReportLifecycleListener {
       reportId: payload.reportId,
       meetingCode: payload.code,
       meetingStartedAtMs: payload.meetingStartedAtMs,
+      participantNames: payload.participantNames,
     });
   }
 }
