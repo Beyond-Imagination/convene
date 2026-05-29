@@ -18,6 +18,7 @@ import {
   type ProduceRequest,
   type ProduceResponse,
   type ProducerClosedBroadcast,
+  type CloseProducerRequest,
   type ProducerToggledBroadcast,
   type ResumeConsumerRequest,
   type ToggleProducerRequest,
@@ -538,6 +539,13 @@ export function useMediasoupViewModel(
       } catch {
         // already closed
       }
+      // 서버에도 종료를 알려 ParticipantMedia 에서 제거 + 다른 참가자에게
+      // PRODUCER_CLOSED broadcast 하게 한다. 이게 없으면 서버는 화면 공유가
+      // 끝난 줄 모르고 동시 1인 제약이 풀리지 않는다(다른 사람이 공유 불가).
+      if (socket !== null) {
+        const request: CloseProducerRequest = { code, producerId: producer.id };
+        socket.emit(MEDIASOUP_WS_EVENTS.CLOSE_PRODUCER, request);
+      }
     }
     if (stream !== null) {
       stream.getTracks().forEach((t) => t.stop());
@@ -546,7 +554,7 @@ export function useMediasoupViewModel(
     screenStreamRef.current = null;
     setScreenStream(null);
     setIsSharingScreen(false);
-  }, []);
+  }, [socket, code]);
 
   const isRemoteSharingScreen = remoteMedia.some((m) => m.source === 'screen');
 

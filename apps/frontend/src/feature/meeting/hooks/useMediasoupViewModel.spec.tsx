@@ -677,6 +677,7 @@ describe('useMediasoupViewModel.screenShare', () => {
     const stream = result.current.screenStream as unknown as FakeMediaStream;
     expect(stream).not.toBeNull();
 
+    socket.emit.mockClear();
     await act(async () => {
       result.current.stopScreenShare();
     });
@@ -684,6 +685,11 @@ describe('useMediasoupViewModel.screenShare', () => {
     expect(result.current.isSharingScreen).toBe(false);
     expect(result.current.screenStream).toBeNull();
     for (const t of stream.getTracks()) expect(t.stop).toHaveBeenCalled();
+    // 서버에도 종료를 알려야 동시 1인 제약이 풀린다.
+    expect(socket.emit).toHaveBeenCalledWith(MEDIASOUP_WS_EVENTS.CLOSE_PRODUCER, {
+      code,
+      producerId: 'producer-video',
+    });
   });
 
   it('이미 공유 중이면 startScreenShare 는 getDisplayMedia 를 두 번 호출하지 않는다', async () => {
