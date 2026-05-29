@@ -126,6 +126,79 @@ describe('RecordingService.requestTranscription', () => {
     });
   });
 
+  it('participantNames 가 주어지면 segment 의 speaker 가 participantId 대신 nickname 으로 채워진다', async () => {
+    const { service, events } = makeService({
+      audios: [{ participantId: 's1', audio: pcmOfSeconds(1) }],
+      transcribeImpl: async () => [{ text: '안녕하세요', startMs: 0, endMs: 1000 }],
+    });
+    await service.requestTranscription({
+      reportId,
+      meetingCode,
+      meetingStartedAtMs: 0,
+      participantNames: { s1: '준' },
+    });
+    expect(events[0]).toEqual({
+      name: REPORT_EVENTS.TRANSCRIPTION_COMPLETED,
+      payload: {
+        reportId,
+        transcript: [{ speaker: '준', text: '안녕하세요', startMs: 0, endMs: 1000 }],
+      },
+    });
+  });
+
+  it('participantNames 에 매칭되는 항목이 없으면 speaker 는 원본 participantId 를 유지한다', async () => {
+    const { service, events } = makeService({
+      audios: [{ participantId: 's1', audio: pcmOfSeconds(1) }],
+      transcribeImpl: async () => [{ text: '안녕', startMs: 0, endMs: 1000 }],
+    });
+    await service.requestTranscription({
+      reportId,
+      meetingCode,
+      meetingStartedAtMs: 0,
+      participantNames: { other: '다른사람' },
+    });
+    const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
+    expect(payload.transcript[0].speaker).toBe('s1');
+  });
+
+  it('partial store 의 segment speaker 도 participantNames 로 nickname 변환된다', async () => {
+    const meetingStartedAtMs = 1_000_000_000_000;
+    const { events, publisher } = makeEventPublisher();
+    const service = new RecordingService({
+      audioBufferRepository: {
+        append: async () => {},
+        markStarted: async () => {},
+        drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
+        listActiveMeetings: async () => [],
+        listActiveParticipants: async () => [],
+        consume: async () => [],
+      },
+      partialTranscriptStore: {
+        append: async () => {},
+        consume: async () => [
+          {
+            speaker: 's2',
+            text: 'p0',
+            absoluteStartMs: meetingStartedAtMs + 5_000,
+            absoluteEndMs: meetingStartedAtMs + 5_500,
+          },
+        ],
+      },
+      transcriber: { transcribe: async () => [] },
+      eventPublisher: publisher,
+    });
+    await service.requestTranscription({
+      reportId,
+      meetingCode,
+      meetingStartedAtMs,
+      participantNames: { s2: '벤' },
+    });
+    const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
+    expect(payload.transcript).toEqual([
+      { speaker: '벤', text: 'p0', startMs: 5_000, endMs: 5_500 },
+    ]);
+  });
+
   it('여러 participant 의 segment 가 startMs 기준 오름차순으로 merge 된다', async () => {
     // 짧은 PCM(1초) 은 단일 chunk → chunk offset 0. participant 식별을 fill byte 로.
     const pcmA = pcmOfSeconds(1, 0xa1);
