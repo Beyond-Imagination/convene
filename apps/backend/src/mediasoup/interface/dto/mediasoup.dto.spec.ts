@@ -6,6 +6,7 @@ import { CreateTransportDto } from './create-transport.dto';
 import { GetRtpCapabilitiesDto } from './get-rtp-capabilities.dto';
 import { ProduceDto } from './produce.dto';
 import { ResumeConsumerDto } from './resume-consumer.dto';
+import { ToggleProducerDto } from './toggle-producer.dto';
 
 const makePipe = () =>
   new ValidationPipe({
@@ -138,6 +139,36 @@ describe('ResumeConsumerDto', () => {
     await expect(
       run(ResumeConsumerDto, { code, consumerId: 'x'.repeat(65) }),
     ).rejects.toThrow(/consumerId/i);
+  });
+});
+
+describe('ToggleProducerDto', () => {
+  it('정상 통과 (paused true/false)', async () => {
+    const on = await run<ToggleProducerDto>(ToggleProducerDto, {
+      code,
+      producerId: 'p-1',
+      paused: true,
+    });
+    expect(on.producerId).toBe('p-1');
+    expect(on.paused).toBe(true);
+    const off = await run<ToggleProducerDto>(ToggleProducerDto, {
+      code,
+      producerId: 'p-1',
+      paused: false,
+    });
+    expect(off.paused).toBe(false);
+  });
+
+  it('paused 가 boolean 이 아니면 거부', async () => {
+    await expect(
+      run(ToggleProducerDto, { code, producerId: 'p-1', paused: 'yes' }),
+    ).rejects.toThrow(/paused/i);
+  });
+
+  it('producerId 가 너무 길면 거부', async () => {
+    await expect(
+      run(ToggleProducerDto, { code, producerId: 'x'.repeat(65), paused: true }),
+    ).rejects.toThrow(/producerId/i);
   });
 });
 

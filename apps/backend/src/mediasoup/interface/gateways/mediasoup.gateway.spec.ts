@@ -9,6 +9,7 @@ import { CreateTransportDto } from '@/mediasoup/interface/dto/create-transport.d
 import { GetRtpCapabilitiesDto } from '@/mediasoup/interface/dto/get-rtp-capabilities.dto';
 import { ProduceDto } from '@/mediasoup/interface/dto/produce.dto';
 import { ResumeConsumerDto } from '@/mediasoup/interface/dto/resume-consumer.dto';
+import { ToggleProducerDto } from '@/mediasoup/interface/dto/toggle-producer.dto';
 
 import { MediasoupGateway } from './mediasoup.gateway';
 
@@ -64,6 +65,9 @@ const makeService = () => {
     },
     resumeConsumer: async (cmd: unknown) => {
       calls.push({ name: 'resumeConsumer', args: [cmd] });
+    },
+    toggleProducer: async (cmd: unknown) => {
+      calls.push({ name: 'toggleProducer', args: [cmd] });
     },
   };
   return { calls, service: service as unknown as MediasoupSignalingService };
@@ -192,6 +196,31 @@ describe('MediasoupGateway.handleResumeConsumer', () => {
       name: 'resumeConsumer',
       args: [{ meetingCode: codeStr, participantId: 's1', consumerId: 'c-1' }],
     });
+  });
+});
+
+describe('MediasoupGateway.handleToggleProducer', () => {
+  it('dto + client.id 를 service.toggleProducer 에 위임하고 PRODUCER_TOGGLED 를 본인 제외 broadcast 한다', async () => {
+    const { gateway, calls, emits } = setup();
+    const dto = Object.assign(new ToggleProducerDto(), {
+      code: codeStr,
+      producerId: 'p-1',
+      paused: true,
+    });
+    const res = await gateway.handleToggleProducer(dto, makeClient('s1'));
+    expect(calls[0]).toEqual({
+      name: 'toggleProducer',
+      args: [{ meetingCode: codeStr, participantId: 's1', producerId: 'p-1', paused: true }],
+    });
+    expect(emits).toEqual([
+      {
+        room: `meeting:${codeStr}`,
+        except: 's1',
+        event: MEDIASOUP_WS_EVENTS.PRODUCER_TOGGLED,
+        payload: { producerId: 'p-1', paused: true },
+      },
+    ]);
+    expect(res).toEqual({ ok: true });
   });
 });
 
