@@ -17,4 +17,10 @@ test.describe('/reports', () => {
     await expect(page.getByRole('heading', { name: '회의록' })).toBeVisible();
     await expect(page.getByTestId('report-list-empty')).toBeVisible();
   });
+
+  test('홈으로 링크를 누르면 메인 페이지로 이동한다', async ({ page }) => {
+    await page.goto('/reports');
+    await page.getByRole('link', { name: '홈으로' }).click();
+    await expect(page).toHaveURL(/\/$/);
+  });
 });

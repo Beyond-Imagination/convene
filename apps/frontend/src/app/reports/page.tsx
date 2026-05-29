@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 import { ReportList } from '@/feature/reports/components/ReportList';
 import { useReportListViewModel } from '@/feature/reports/hooks/useReportListViewModel';
 
@@ -16,6 +18,9 @@ export default function ReportListPage() {
     <main>
       <h1>회의록</h1>
       <ReportList {...vm} />
+      <nav>
+        <Link href="/">홈으로</Link>
+      </nav>
     </main>
   );
 }
