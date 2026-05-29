@@ -18,7 +18,9 @@ import {
   type ProduceRequest,
   type ProduceResponse,
   type ProducerClosedBroadcast,
+  type ProducerToggledBroadcast,
   type ResumeConsumerRequest,
+  type ToggleProducerRequest,
 } from '@migration/shared-interfaces';
 
 import { createMediasoupDevice } from '@/shared/socket/mediasoup-device.factory';
@@ -81,6 +83,8 @@ export interface RemoteMediaEntry {
   readonly kind: 'audio' | 'video';
   readonly source: MediaType;
   readonly track: MediaStreamTrack;
+  /** 상대가 이 producer 를 mute(paused) 했는지. 원격 PRODUCER_TOGGLED 로 갱신. */
+  readonly paused: boolean;
 }
 
 export interface UseMediasoupViewModel {
@@ -90,6 +94,14 @@ export interface UseMediasoupViewModel {
   readonly remoteMedia: ReadonlyArray<RemoteMediaEntry>;
   readonly isSharingScreen: boolean;
   readonly screenStream: MediaStream | null;
+  /** 내 마이크가 mute(paused) 상태인지. */
+  readonly isAudioMuted: boolean;
+  /** 내 카메라가 mute(paused) 상태인지. */
+  readonly isVideoMuted: boolean;
+  /** 내 audio producer 를 mute/unmute 토글. local pause/resume + TOGGLE_PRODUCER RPC. */
+  readonly toggleAudio: () => void;
+  /** 내 video producer 를 mute/unmute 토글. */
+  readonly toggleVideo: () => void;
   /**
    * 사용자의 화면을 mediasoup 으로 produce 한다. getDisplayMedia 권한 거부나
    * 이미 공유 중인 경우 noop. produce 이벤트는 sendTransport 의 'produce' 핸들러
@@ -110,10 +122,14 @@ export function useMediasoupViewModel(
   const [reconnectGen, setReconnectGen] = useState(0);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [isSharingScreen, setIsSharingScreen] = useState(false);
+  const [isAudioMuted, setIsAudioMuted] = useState(false);
+  const [isVideoMuted, setIsVideoMuted] = useState(false);
   const deviceRef = useRef<Device | null>(null);
   const sendTransportRef = useRef<Transport | null>(null);
   const recvTransportRef = useRef<Transport | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const audioProducerRef = useRef<Producer | null>(null);
+  const videoProducerRef = useRef<Producer | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const screenProducerRef = useRef<Producer | null>(null);
   const connectCountRef = useRef(0);
@@ -289,6 +305,7 @@ export function useMediasoupViewModel(
             appData: { source: 'audio' as MediaType },
           });
           console.debug('[mediasoup] audio produce 성공', { producerId: producer.id });
+          audioProducerRef.current = producer;
           if (cancelled) return;
         }
         for (const track of stream.getVideoTracks()) {
@@ -298,6 +315,7 @@ export function useMediasoupViewModel(
             appData: { source: 'video' as MediaType },
           });
           console.debug('[mediasoup] video produce 성공', { producerId: producer.id });
+          videoProducerRef.current = producer;
           if (cancelled) return;
         }
       } catch (e) {
@@ -313,6 +331,11 @@ export function useMediasoupViewModel(
       cancelled = true;
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
+      // 재연결/unmount 시 producer ref + mute 상태를 초기화한다(새 producer 로 교체됨).
+      audioProducerRef.current = null;
+      videoProducerRef.current = null;
+      setIsAudioMuted(false);
+      setIsVideoMuted(false);
     };
   }, [status]);
 
@@ -371,6 +394,7 @@ export function useMediasoupViewModel(
             kind: payload.kind,
             source: payload.source,
             track: (consumer as unknown as { track: MediaStreamTrack }).track,
+            paused: false,
           };
           // producerId 기준 dedup (LIST_PRODUCERS 응답과 NEW_PRODUCER broadcast 가
           // 동일 producer 를 두 번 통보할 수 있다 — [[feedback-mediasoup-no-race]] #2)
@@ -396,10 +420,18 @@ export function useMediasoupViewModel(
     const onConsumerClosed = (payload: ConsumerClosedBroadcast): void => {
       setRemoteMedia((prev) => prev.filter((m) => m.consumerId !== payload.consumerId));
     };
+    const onProducerToggled = (payload: ProducerToggledBroadcast): void => {
+      setRemoteMedia((prev) =>
+        prev.map((m) =>
+          m.producerId === payload.producerId ? { ...m, paused: payload.paused } : m,
+        ),
+      );
+    };
 
     socket.on(MEDIASOUP_WS_EVENTS.NEW_PRODUCER, onNewProducer);
     socket.on(MEDIASOUP_WS_EVENTS.PRODUCER_CLOSED, onProducerClosed);
     socket.on(MEDIASOUP_WS_EVENTS.CONSUMER_CLOSED, onConsumerClosed);
+    socket.on(MEDIASOUP_WS_EVENTS.PRODUCER_TOGGLED, onProducerToggled);
 
     // 늦게 입장한 클라이언트가 기존 producer 들을 받아오기 위해 한 번 조회.
     // NEW_PRODUCER 핸들러를 그대로 재사용해 동일한 consume 흐름을 탄다.
@@ -426,8 +458,41 @@ export function useMediasoupViewModel(
       socket.off(MEDIASOUP_WS_EVENTS.NEW_PRODUCER, onNewProducer);
       socket.off(MEDIASOUP_WS_EVENTS.PRODUCER_CLOSED, onProducerClosed);
       socket.off(MEDIASOUP_WS_EVENTS.CONSUMER_CLOSED, onConsumerClosed);
+      socket.off(MEDIASOUP_WS_EVENTS.PRODUCER_TOGGLED, onProducerToggled);
     };
   }, [status, socket, code]);
+
+  /**
+   * 로컬 producer 를 mute/unmute 토글한다. mediasoup-client producer.pause()/resume()
+   * 로 RTP 송출을 멈추고, 같은 의도를 backend 에 TOGGLE_PRODUCER RPC 로 알려
+   * server-side producer 도 pause + 다른 참가자에게 broadcast 하게 한다.
+   * ack 는 대기하지 않는다(local 은 이미 반영됨 — fire & forget).
+   */
+  const toggleProducer = useCallback(
+    (producerRef: typeof audioProducerRef, setMuted: (v: boolean) => void) => {
+      const producer = producerRef.current;
+      if (producer === null || socket === null) return;
+      const nextPaused = !producer.paused;
+      if (nextPaused) producer.pause();
+      else producer.resume();
+      const request: ToggleProducerRequest = {
+        code,
+        producerId: producer.id,
+        paused: nextPaused,
+      };
+      socket.emit(MEDIASOUP_WS_EVENTS.TOGGLE_PRODUCER, request);
+      setMuted(nextPaused);
+    },
+    [socket, code],
+  );
+
+  const toggleAudio = useCallback(() => {
+    toggleProducer(audioProducerRef, setIsAudioMuted);
+  }, [toggleProducer]);
+
+  const toggleVideo = useCallback(() => {
+    toggleProducer(videoProducerRef, setIsVideoMuted);
+  }, [toggleProducer]);
 
   const startScreenShare = useCallback(async () => {
     if (screenProducerRef.current !== null) return;
@@ -484,6 +549,10 @@ export function useMediasoupViewModel(
     remoteMedia,
     isSharingScreen,
     screenStream,
+    isAudioMuted,
+    isVideoMuted,
+    toggleAudio,
+    toggleVideo,
     startScreenShare,
     stopScreenShare,
   };
