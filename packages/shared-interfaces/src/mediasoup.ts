@@ -30,6 +30,7 @@ export const MEDIASOUP_WS_EVENTS = {
   RESUME_CONSUMER: 'mediasoup:resumeConsumer',
   LIST_PRODUCERS: 'mediasoup:listProducers',
   TOGGLE_PRODUCER: 'mediasoup:toggleProducer',
+  CLOSE_PRODUCER: 'mediasoup:closeProducer',
   NEW_PRODUCER: 'mediasoup:newProducer',
   PRODUCER_CLOSED: 'mediasoup:producerClosed',
   CONSUMER_CLOSED: 'mediasoup:consumerClosed',
@@ -130,6 +131,16 @@ export interface ToggleProducerRequest {
 
 export interface ToggleProducerResponse {
   ok: true;
+}
+
+/**
+ * 자기 producer 를 닫는다(예: 화면 공유 중지). 서버가 producer 를 제거하고
+ * 같은 회의에 `PRODUCER_CLOSED` 를 broadcast 해 다른 참가자가 정리하게 한다.
+ * 화면 공유 동시 1인 제약을 서버가 정확히 강제하려면 중지도 서버가 알아야 한다.
+ */
+export interface CloseProducerRequest {
+  code: string;
+  producerId: string;
 }
 
 // ---------- server → client: 브로드캐스트 ----------

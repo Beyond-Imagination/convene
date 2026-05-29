@@ -20,6 +20,7 @@ import {
   type ProduceRequest,
   type ProduceResponse,
   type ProducerClosedBroadcast,
+  type CloseProducerRequest,
   type ProducerToggledBroadcast,
   type ResumeConsumerRequest,
   type ToggleProducerRequest,
@@ -34,9 +35,9 @@ describe('Mediasoup wire format', () => {
     }
   });
 
-  it('WS 이벤트 이름은 모두 서로 다르고 12개다 (RPC 8 + 브로드캐스트 4)', () => {
+  it('WS 이벤트 이름은 모두 서로 다르고 13개다 (RPC 9 + 브로드캐스트 4)', () => {
     const all = Object.values(MEDIASOUP_WS_EVENTS);
-    expect(all).toHaveLength(12);
+    expect(all).toHaveLength(13);
     expect(new Set(all).size).toBe(all.length);
   });
 
@@ -112,7 +113,8 @@ describe('Mediasoup wire format', () => {
     };
     const q: ToggleProducerResponse = { ok: true };
     const r: ProducerToggledBroadcast = { producerId: 'p1', paused: true };
+    const s: CloseProducerRequest = { code: 'ABCDEFGH', producerId: 'p1' };
 
-    expect([a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r]).toHaveLength(18);
+    expect([a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s]).toHaveLength(19);
   });
 });
