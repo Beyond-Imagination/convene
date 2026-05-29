@@ -94,6 +94,12 @@ export interface UseMediasoupViewModel {
   readonly remoteMedia: ReadonlyArray<RemoteMediaEntry>;
   readonly isSharingScreen: boolean;
   readonly screenStream: MediaStream | null;
+  /**
+   * 같은 회의의 다른 참가자가 화면을 공유 중인지. 화면 공유는 동시 1인 제약이라
+   * true 면 View 가 "화면 공유 시작" 버튼을 disabled 한다(backend 도 produce 를
+   * 거부하지만 UX 상 1차 차단).
+   */
+  readonly isRemoteSharingScreen: boolean;
   /** 내 마이크가 mute(paused) 상태인지. */
   readonly isAudioMuted: boolean;
   /** 내 카메라가 mute(paused) 상태인지. */
@@ -542,6 +548,8 @@ export function useMediasoupViewModel(
     setIsSharingScreen(false);
   }, []);
 
+  const isRemoteSharingScreen = remoteMedia.some((m) => m.source === 'screen');
+
   return {
     status,
     errorMessage,
@@ -549,6 +557,7 @@ export function useMediasoupViewModel(
     remoteMedia,
     isSharingScreen,
     screenStream,
+    isRemoteSharingScreen,
     isAudioMuted,
     isVideoMuted,
     toggleAudio,

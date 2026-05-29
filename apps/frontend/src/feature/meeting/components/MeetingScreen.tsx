@@ -143,6 +143,8 @@ export function MeetingScreen({
           <button
             type="button"
             onClick={() => void mediasoup.startScreenShare()}
+            // 화면 공유는 동시 1인. 다른 참가자가 공유 중이면 비활성화.
+            disabled={mediasoup.isRemoteSharingScreen}
           >
             화면 공유 시작
           </button>
