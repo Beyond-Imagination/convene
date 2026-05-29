@@ -119,7 +119,7 @@ describe('MeetingController.closeMeeting', () => {
     ]);
   });
 
-  it('hostToken 쿼리가 없으면 빈 문자열로 위임한다(서버가 host 아님으로 거부)', async () => {
+  it('hostToken 헤더가 없으면 빈 문자열로 위임한다(서버가 host 아님으로 거부)', async () => {
     const { controller, calls } = makeController();
     await controller.closeMeeting('abc12xyz');
     expect(calls).toEqual([{ code: 'abc12xyz', reason: 'manual', hostToken: '' }]);

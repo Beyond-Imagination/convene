@@ -46,14 +46,18 @@ export async function createMeeting(
  * 파이프라인이 트리거된다.
  *
  * `hostToken` 은 회의 생성자만 보유하며, backend 가 이를 검증해 host 가 아니면
- * 403(ForbiddenException) 으로 거부한다. 토큰이 없으면 쿼리를 붙이지 않는다.
+ * 403(ForbiddenException) 으로 거부한다. 비밀 토큰이므로 URL query 가 아니라
+ * `x-host-token` 헤더로 전달한다(query 는 서버 로그·브라우저 히스토리·Referer 로
+ * 새기 때문). 토큰이 없으면 헤더를 붙이지 않는다.
  */
 export async function closeMeeting(
   code: string,
   hostToken?: string,
 ): Promise<CloseMeetingResponse> {
-  const query = hostToken ? `?hostToken=${encodeURIComponent(hostToken)}` : '';
-  const res = await fetch(`${API_BASE_URL}/meetings/${code}${query}`, { method: 'DELETE' });
+  const res = await fetch(`${API_BASE_URL}/meetings/${code}`, {
+    method: 'DELETE',
+    headers: hostToken ? { 'x-host-token': hostToken } : undefined,
+  });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new MeetingApiError(

@@ -145,9 +145,10 @@ describe('Meeting e2e', () => {
       bob.disconnect();
     }
 
-    // 7) 회의 종료 (host 토큰 제시).
+    // 7) 회의 종료 (host 토큰을 헤더로 제시).
     const closed = await request(httpServer)
-      .delete(`/meetings/${code}?hostToken=${createBody.hostToken}`)
+      .delete(`/meetings/${code}`)
+      .set('x-host-token', createBody.hostToken)
       .expect(200);
     const closeBody = closed.body as CloseMeetingResponse;
     expect(closeBody.code).toBe(code);
@@ -198,7 +199,8 @@ describe('Meeting e2e', () => {
     }
 
     await request(httpServer)
-      .delete(`/meetings/${code}?hostToken=${createdBody.hostToken}`)
+      .delete(`/meetings/${code}`)
+      .set('x-host-token', createdBody.hostToken)
       .expect(200);
   });
 

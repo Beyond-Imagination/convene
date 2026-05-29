@@ -4,12 +4,12 @@ import {
   Controller,
   Delete,
   ForbiddenException,
+  Headers,
   HttpCode,
   HttpStatus,
   NotFoundException,
   Param,
   Post,
-  Query,
 } from '@nestjs/common';
 
 import type { CloseMeetingResponse, CreateMeetingResponse } from '@migration/shared-interfaces';
@@ -49,7 +49,8 @@ export class MeetingController {
   @HttpCode(HttpStatus.OK)
   async closeMeeting(
     @Param('code') code: string,
-    @Query('hostToken') hostToken?: string,
+    // 비밀 토큰은 query 가 아니라 헤더로 받는다(query 는 로그/히스토리 노출 위험).
+    @Headers('x-host-token') hostToken?: string,
   ): Promise<CloseMeetingResponse> {
     // 형식 위반은 도메인 에러가 아니라 클라이언트 요청 오류이므로 BadRequestException으로 매핑.
     try {

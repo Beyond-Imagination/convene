@@ -93,7 +93,7 @@ describe('closeMeeting', () => {
     vi.unstubAllGlobals();
   });
 
-  it('DELETE {API_BASE_URL}/meetings/:code 로 호출한다', async () => {
+  it('DELETE {API_BASE_URL}/meetings/:code 로 호출하고 hostToken 없으면 헤더도 없다', async () => {
     fetchMock.mockResolvedValueOnce(
       okResponse(
         { code: 'abc12xyz', endedAt: '2026-01-01T00:30:00.000Z' },
@@ -105,11 +105,13 @@ describe('closeMeeting', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
+    // 토큰은 URL 이 아니라 헤더로 전달한다(query 는 로그/히스토리에 노출되므로 금지).
     expect(url).toBe(`${API_BASE_URL}/meetings/abc12xyz`);
     expect(init).toMatchObject({ method: 'DELETE' });
+    expect((init.headers ?? {})['x-host-token']).toBeUndefined();
   });
 
-  it('hostToken 을 주면 ?hostToken= 쿼리로 전달한다', async () => {
+  it('hostToken 을 주면 x-host-token 헤더로 전달한다(URL 에는 노출하지 않는다)', async () => {
     fetchMock.mockResolvedValueOnce(
       okResponse(
         { code: 'abc12xyz', endedAt: '2026-01-01T00:30:00.000Z' },
@@ -118,8 +120,8 @@ describe('closeMeeting', () => {
     );
     await closeMeeting('abc12xyz', 'tok-1');
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe(`${API_BASE_URL}/meetings/abc12xyz?hostToken=tok-1`);
-    expect(init).toMatchObject({ method: 'DELETE' });
+    expect(url).toBe(`${API_BASE_URL}/meetings/abc12xyz`);
+    expect(init.headers).toMatchObject({ 'x-host-token': 'tok-1' });
   });
 
   it('응답을 CloseMeetingResponse 그대로 돌려준다', async () => {

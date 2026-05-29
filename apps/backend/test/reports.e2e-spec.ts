@@ -127,7 +127,8 @@ describe('Reports e2e', () => {
 
     // 3) 회의 종료(이 시점에 meeting.ended 이벤트가 발행되고 listener 가 createDraft 를 호출).
     await request(httpServer)
-      .delete(`/meetings/${code}?hostToken=${createdBody.hostToken}`)
+      .delete(`/meetings/${code}`)
+      .set('x-host-token', createdBody.hostToken)
       .expect(200);
 
     // 4) Recording → Reports 파이프라인이 done/done 으로 finalize 될 때까지 폴링.
