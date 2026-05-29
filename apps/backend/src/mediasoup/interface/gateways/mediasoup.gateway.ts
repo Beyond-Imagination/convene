@@ -20,6 +20,7 @@ import {
   type MediaType,
   type NewProducerBroadcast,
   type ProduceResponse,
+  type ProducerClosedBroadcast,
   type ProducerToggledBroadcast,
   type ToggleProducerResponse,
 } from '@migration/shared-interfaces';
@@ -31,6 +32,7 @@ import { CreateTransportDto } from '@/mediasoup/interface/dto/create-transport.d
 import { GetRtpCapabilitiesDto } from '@/mediasoup/interface/dto/get-rtp-capabilities.dto';
 import { ListProducersDto } from '@/mediasoup/interface/dto/list-producers.dto';
 import { ProduceDto } from '@/mediasoup/interface/dto/produce.dto';
+import { CloseProducerDto } from '@/mediasoup/interface/dto/close-producer.dto';
 import { ResumeConsumerDto } from '@/mediasoup/interface/dto/resume-consumer.dto';
 import { ToggleProducerDto } from '@/mediasoup/interface/dto/toggle-producer.dto';
 
@@ -223,6 +225,25 @@ export class MediasoupGateway {
       .to(roomOf(dto.code))
       .except(client.id)
       .emit(MEDIASOUP_WS_EVENTS.PRODUCER_TOGGLED, broadcast);
+    return { ok: true };
+  }
+
+  @SubscribeMessage(MEDIASOUP_WS_EVENTS.CLOSE_PRODUCER)
+  async handleCloseProducer(
+    @MessageBody() dto: CloseProducerDto,
+    @ConnectedSocket() client: Socket,
+  ): Promise<{ ok: true }> {
+    await this.service.closeProducer({
+      meetingCode: dto.code,
+      participantId: client.id,
+      producerId: dto.producerId,
+    });
+    // 같은 회의의 다른 참가자에게 producer 종료를 알린다(본인은 이미 닫음).
+    const broadcast: ProducerClosedBroadcast = { producerId: dto.producerId };
+    this.server
+      .to(roomOf(dto.code))
+      .except(client.id)
+      .emit(MEDIASOUP_WS_EVENTS.PRODUCER_CLOSED, broadcast);
     return { ok: true };
   }
 

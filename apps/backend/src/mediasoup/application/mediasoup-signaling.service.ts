@@ -76,6 +76,10 @@ export interface ToggleProducerCommand extends ParticipantCommand {
   paused: boolean;
 }
 
+export interface CloseProducerCommand extends ParticipantCommand {
+  producerId: string;
+}
+
 export class MediasoupSignalingService {
   constructor(private readonly deps: MediasoupSignalingServiceDeps) {}
 
@@ -244,6 +248,25 @@ export class MediasoupSignalingService {
     } else {
       await this.deps.transportPort.resumeProducer(command.producerId);
     }
+  }
+
+  /**
+   * 자기 producer 를 닫는다(예: 화면 공유 중지). 서버 측 producer/pipe 를 정리하고
+   * ParticipantMedia 에서도 제거해, 화면 공유 동시 1인 제약(produce 충돌 체크)이
+   * 중지 후 정확히 풀리도록 한다. 소유하지 않은 producerId 는 거부한다.
+   */
+  async closeProducer(command: CloseProducerCommand): Promise<void> {
+    const media = await this.requireParticipantMedia(command.participantId);
+    const owns = media.producers.some((p) => p.id === command.producerId);
+    if (!owns) {
+      throw new Error(
+        `Producer "${command.producerId}" is not owned by participant "${command.participantId}"`,
+      );
+    }
+    await this.deps.transportPort.closeProducer(command.producerId);
+    await this.deps.routerPort.cleanupPipeProducers(command.meetingCode, command.producerId);
+    media.removeProducer(command.producerId);
+    await this.deps.participantMediaRepository.save(media);
   }
 
   async listProducers(command: ParticipantCommand): Promise<ListProducersResponse> {
