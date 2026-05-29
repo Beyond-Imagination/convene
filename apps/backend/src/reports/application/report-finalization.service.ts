@@ -67,11 +67,18 @@ export class ReportFinalizationService {
       chat: command.chat,
     });
     await this.deps.repository.save(report);
+    // STT 가 speaker 를 nickname 으로 채울 수 있도록 participantId→nickname 매핑을
+    // 함께 발행한다(소비처에서 ID 를 재매핑하지 않도록 생산 시점에 전달).
+    const participantNames: Record<string, string> = {};
+    for (const p of report.participants) {
+      participantNames[p.id] = p.nickname;
+    }
     await this.deps.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_REQUESTED, {
       reportId: report.id,
       meetingId: report.meetingId,
       code: report.code,
       meetingStartedAtMs: report.startedAt.getTime(),
+      participantNames,
     });
     return report;
   }
