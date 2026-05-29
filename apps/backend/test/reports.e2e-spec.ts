@@ -111,7 +111,8 @@ describe('Reports e2e', () => {
       .post('/meetings')
       .send({ source: 'web' })
       .expect(201);
-    const code = (created.body as CreateMeetingResponse).code;
+    const createdBody = created.body as CreateMeetingResponse;
+    const code = createdBody.code;
 
     // 2) WS 입장 + 채팅.
     const alice = await connectClient(baseUrl);
@@ -125,7 +126,9 @@ describe('Reports e2e', () => {
     }
 
     // 3) 회의 종료(이 시점에 meeting.ended 이벤트가 발행되고 listener 가 createDraft 를 호출).
-    await request(httpServer).delete(`/meetings/${code}`).expect(200);
+    await request(httpServer)
+      .delete(`/meetings/${code}?hostToken=${createdBody.hostToken}`)
+      .expect(200);
 
     // 4) Recording → Reports 파이프라인이 done/done 으로 finalize 될 때까지 폴링.
     const listItem = await waitForFinalizedReport(httpServer, code);

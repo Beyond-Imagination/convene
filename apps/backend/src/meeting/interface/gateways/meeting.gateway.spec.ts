@@ -26,6 +26,7 @@ const makeMeeting = () =>
     externalReference: externalReference(),
     idleTimeout: IdleTimeout.default(),
     startedAt: t0,
+    hostToken: 'host-token-1',
   });
 
 interface Broadcast {

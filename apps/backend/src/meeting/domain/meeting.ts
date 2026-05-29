@@ -27,6 +27,8 @@ export interface MeetingSnapshot {
   readonly endedAt: Date | null;
   readonly lastActiveAt: Date;
   readonly participants: ReadonlyArray<ParticipantSnapshot>;
+  /** 회의 종료 권한자(host) 식별용 비밀 토큰. 생성자만 보관한다. */
+  readonly hostToken: string;
 }
 
 export interface CreateMeetingInput {
@@ -35,6 +37,12 @@ export interface CreateMeetingInput {
   externalReference: ExternalReference;
   idleTimeout: IdleTimeout;
   startedAt: Date;
+  /**
+   * 회의 종료 권한자(host) 식별용 비밀 토큰. 회의 생성 시 서버가 발급해
+   * 생성자에게만 전달하며, 회의 종료 요청 시 이 토큰을 제시한 요청자만 통과시킨다.
+   * socket id 와 달리 새로고침/재접속해도 유지된다.
+   */
+  hostToken: string;
 }
 
 export class Meeting {
@@ -48,6 +56,7 @@ export class Meeting {
     public readonly externalReference: ExternalReference,
     public readonly idleTimeout: IdleTimeout,
     public readonly startedAt: Date,
+    public readonly hostToken: string,
   ) {
     this._lastActiveAt = startedAt;
   }
@@ -59,6 +68,7 @@ export class Meeting {
       input.externalReference,
       input.idleTimeout,
       input.startedAt,
+      input.hostToken,
     );
   }
 
@@ -77,6 +87,7 @@ export class Meeting {
       snapshot.externalReference,
       IdleTimeout.of(snapshot.idleTimeoutMs),
       snapshot.startedAt,
+      snapshot.hostToken,
     );
     meeting._lastActiveAt = snapshot.lastActiveAt;
     meeting._endedAt = snapshot.endedAt;
@@ -149,6 +160,11 @@ export class Meeting {
     return this._endedAt === null;
   }
 
+  /** 제시한 토큰이 이 회의의 hostToken 과 일치하면 host. 빈 토큰은 항상 거부. */
+  isHost(token: string): boolean {
+    return token.length > 0 && token === this.hostToken;
+  }
+
   /** 닉네임 조회 등 read-only 용도. leave한 Participant도 반환한다. */
   findParticipant(id: string): Participant | undefined {
     return this.participants.get(id);
@@ -184,6 +200,7 @@ export class Meeting {
       endedAt: this._endedAt,
       lastActiveAt: this._lastActiveAt,
       participants: Array.from(this.participants.values()).map((p) => p.snapshot()),
+      hostToken: this.hostToken,
     };
   }
 

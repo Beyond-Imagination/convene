@@ -9,7 +9,7 @@ import {
   NO_EXTERNAL_REFERENCE,
 } from '@/shared-kernel/domain/value-objects';
 
-import { MeetingNotFoundError } from './meeting.errors';
+import { MeetingNotFoundError, NotHostError } from './meeting.errors';
 import { MeetingService } from './meeting.service';
 
 interface CapturedEvent {
@@ -38,6 +38,7 @@ const makeMeeting = (startedAt: Date) =>
     externalReference: externalReference(),
     idleTimeout: IdleTimeout.default(),
     startedAt,
+    hostToken: 'host-token-1',
   });
 
 const noopChatRepository = () => ({
@@ -60,6 +61,7 @@ describe('MeetingService.createMeeting', () => {
       },
       chatRepository: noopChatRepository(),
       codeGenerator: { next: () => code },
+      hostTokenGenerator: { next: () => 'host-token-generated' },
       clock: { now: () => fakeNow },
       eventPublisher: publisher,
     });
@@ -118,6 +120,15 @@ describe('MeetingService.createMeeting', () => {
       },
     ]);
   });
+
+  it('HostTokenGenerator 가 발급한 hostToken 을 Meeting 에 부여한다', async () => {
+    const { service } = makeService();
+    const result = await service.createMeeting({
+      source: 'web',
+      externalReference: externalReference(),
+    });
+    expect(result.hostToken).toBe('host-token-generated');
+  });
 });
 
 describe('MeetingService.joinMeeting', () => {
@@ -136,6 +147,7 @@ describe('MeetingService.joinMeeting', () => {
       },
       chatRepository: noopChatRepository(),
       codeGenerator: { next: () => code },
+      hostTokenGenerator: { next: () => 'host-token-generated' },
       clock: { now: () => t1 },
       eventPublisher: publisher,
     });
@@ -217,6 +229,7 @@ describe('MeetingService.leaveMeeting', () => {
       },
       chatRepository: noopChatRepository(),
       codeGenerator: { next: () => code },
+      hostTokenGenerator: { next: () => 'host-token-generated' },
       clock: { now: () => t2 },
       eventPublisher: publisher,
     });
@@ -292,6 +305,7 @@ describe('MeetingService.postChat', () => {
         listByCode: async () => appended.map((a) => a.entry),
       },
       codeGenerator: { next: () => code },
+      hostTokenGenerator: { next: () => 'host-token-generated' },
       clock: { now: () => t2 },
       eventPublisher: publisher,
     });
@@ -368,6 +382,7 @@ describe('MeetingService.closeMeeting', () => {
       },
       chatRepository: noopChatRepository(),
       codeGenerator: { next: () => code },
+      hostTokenGenerator: { next: () => 'host-token-generated' },
       clock: { now: () => tClose },
       eventPublisher: publisher,
     });
@@ -378,7 +393,7 @@ describe('MeetingService.closeMeeting', () => {
     const meeting = makeMeeting(t0);
     meeting.addParticipant('s1', 'alice', t1);
     const { service, saved, events } = makeService(meeting);
-    const result = await service.closeMeeting({ code: 'abc12xyz', reason: 'manual' });
+    const result = await service.closeMeeting({ code: 'abc12xyz', reason: 'manual', hostToken: 'host-token-1' });
     expect(result).toBe(meeting);
     expect(meeting.isOpen).toBe(false);
     expect(meeting.endedAt).toBe(tClose);
@@ -420,10 +435,11 @@ describe('MeetingService.closeMeeting', () => {
         listByCode: async () => accumulated,
       },
       codeGenerator: { next: () => code },
+      hostTokenGenerator: { next: () => 'host-token-generated' },
       clock: { now: () => tClose },
       eventPublisher: publisher,
     });
-    await service.closeMeeting({ code: 'abc12xyz', reason: 'manual' });
+    await service.closeMeeting({ code: 'abc12xyz', reason: 'manual', hostToken: 'host-token-1' });
     const endedEvent = events.find((e) => e.name === MEETING_EVENTS.ENDED);
     expect(endedEvent?.payload).toMatchObject({ chat: accumulated });
   });
@@ -431,7 +447,7 @@ describe('MeetingService.closeMeeting', () => {
   it('Repository에 없는 code면 throw, 이벤트 발행 안 됨', async () => {
     const { service, events } = makeService(null);
     await expect(
-      service.closeMeeting({ code: 'abc12xyz', reason: 'manual' }),
+      service.closeMeeting({ code: 'abc12xyz', reason: 'manual', hostToken: 'host-token-1' }),
     ).rejects.toThrow(/not found/);
     expect(events).toHaveLength(0);
   });
@@ -441,8 +457,20 @@ describe('MeetingService.closeMeeting', () => {
     meeting.close(t1);
     const { service, events } = makeService(meeting);
     await expect(
-      service.closeMeeting({ code: 'abc12xyz', reason: 'manual' }),
+      service.closeMeeting({ code: 'abc12xyz', reason: 'manual', hostToken: 'host-token-1' }),
     ).rejects.toThrow(/already closed/);
+    expect(events).toHaveLength(0);
+  });
+
+  it('hostToken 이 회의 host 와 일치하지 않으면 NotHostError, close/이벤트 없음', async () => {
+    const meeting = makeMeeting(t0);
+    meeting.addParticipant('s1', 'alice', t1);
+    const { service, saved, events } = makeService(meeting);
+    await expect(
+      service.closeMeeting({ code: 'abc12xyz', reason: 'manual', hostToken: 'wrong-token' }),
+    ).rejects.toBeInstanceOf(NotHostError);
+    expect(meeting.isOpen).toBe(true);
+    expect(saved).toHaveLength(0);
     expect(events).toHaveLength(0);
   });
 });
@@ -466,6 +494,7 @@ describe('MeetingService.detectIdleAndClose', () => {
       },
       chatRepository: noopChatRepository(),
       codeGenerator: { next: () => code },
+      hostTokenGenerator: { next: () => 'host-token-generated' },
       clock: { now: () => now },
       eventPublisher: publisher,
     });

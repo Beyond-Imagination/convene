@@ -1,10 +1,11 @@
 import { MEETING_EVENTS } from '@migration/shared-interfaces';
 
-import { MeetingNotFoundError } from '@/meeting/application/meeting.errors';
+import { MeetingNotFoundError, NotHostError } from '@/meeting/application/meeting.errors';
 import { Meeting } from '@/meeting/domain/meeting';
 import { Participant } from '@/meeting/domain/participant';
 import {
   ChatRepository,
+  HostTokenGenerator,
   MeetingCodeGenerator,
   MeetingRepository,
 } from '@/meeting/domain/ports';
@@ -63,6 +64,8 @@ export type CloseMeetingReason = 'manual' | 'idle';
 export interface CloseMeetingCommand {
   code: string;
   reason: CloseMeetingReason;
+  /** 수동 종료 요청자가 제시한 host 토큰. host 가 아니면 NotHostError. */
+  hostToken: string;
 }
 
 export interface DetectIdleAndCloseCommand {
@@ -73,6 +76,7 @@ export interface MeetingServiceDeps {
   repository: MeetingRepository;
   chatRepository: ChatRepository;
   codeGenerator: MeetingCodeGenerator;
+  hostTokenGenerator: HostTokenGenerator;
   clock: Clock;
   eventPublisher: DomainEventPublisher;
 }
@@ -89,6 +93,7 @@ export class MeetingService {
       externalReference: command.externalReference,
       idleTimeout: IdleTimeout.default(),
       startedAt,
+      hostToken: this.deps.hostTokenGenerator.next(),
     });
     await this.deps.repository.save(meeting);
     await this.deps.eventPublisher.publish(MEETING_EVENTS.CREATED, {
@@ -150,6 +155,11 @@ export class MeetingService {
 
   async closeMeeting(command: CloseMeetingCommand): Promise<Meeting> {
     const meeting = await this.requireMeeting(command.code);
+    // 수동 종료는 host 토큰을 제시한 요청자만 가능하다. idle 자동 종료는
+    // detectIdleAndClose 가 별도 경로로 처리하므로 본 검증을 거치지 않는다.
+    if (!meeting.isHost(command.hostToken)) {
+      throw new NotHostError(command.code);
+    }
     const endedAt = this.deps.clock.now();
     meeting.close(endedAt);
     await this.deps.repository.save(meeting);

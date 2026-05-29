@@ -3,16 +3,18 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   HttpCode,
   HttpStatus,
   NotFoundException,
   Param,
   Post,
+  Query,
 } from '@nestjs/common';
 
 import type { CloseMeetingResponse, CreateMeetingResponse } from '@migration/shared-interfaces';
 
-import { MeetingNotFoundError } from '@/meeting/application/meeting.errors';
+import { MeetingNotFoundError, NotHostError } from '@/meeting/application/meeting.errors';
 import { MeetingService } from '@/meeting/application/meeting.service';
 import { CreateMeetingDto } from '@/meeting/interface/dto/create-meeting.dto';
 import { MeetingCode } from '@/meeting/domain/value-objects';
@@ -39,12 +41,16 @@ export class MeetingController {
       code: meeting.code.value,
       source: meeting.source,
       startedAt: meeting.startedAt.toISOString(),
+      hostToken: meeting.hostToken,
     };
   }
 
   @Delete(':code')
   @HttpCode(HttpStatus.OK)
-  async closeMeeting(@Param('code') code: string): Promise<CloseMeetingResponse> {
+  async closeMeeting(
+    @Param('code') code: string,
+    @Query('hostToken') hostToken?: string,
+  ): Promise<CloseMeetingResponse> {
     // 형식 위반은 도메인 에러가 아니라 클라이언트 요청 오류이므로 BadRequestException으로 매핑.
     try {
       MeetingCode.from(code);
@@ -52,7 +58,11 @@ export class MeetingController {
       throw new BadRequestException((e as Error).message);
     }
     try {
-      const meeting = await this.service.closeMeeting({ code, reason: 'manual' });
+      const meeting = await this.service.closeMeeting({
+        code,
+        reason: 'manual',
+        hostToken: hostToken ?? '',
+      });
       return {
         code: meeting.code.value,
         endedAt: meeting.endedAt!.toISOString(),
@@ -60,6 +70,9 @@ export class MeetingController {
     } catch (e) {
       if (e instanceof MeetingNotFoundError) {
         throw new NotFoundException(e.message);
+      }
+      if (e instanceof NotHostError) {
+        throw new ForbiddenException(e.message);
       }
       throw e;
     }

@@ -1,6 +1,6 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 
-import { MeetingNotFoundError } from '@/meeting/application/meeting.errors';
+import { MeetingNotFoundError, NotHostError } from '@/meeting/application/meeting.errors';
 import { Meeting } from '@/meeting/domain/meeting';
 import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';
 import { externalReference } from '@/shared-kernel/domain/value-objects';
@@ -20,6 +20,7 @@ const fakeMeeting = () =>
     externalReference: externalReference(),
     idleTimeout: IdleTimeout.default(),
     startedAt: fakeStartedAt,
+    hostToken: 'host-token-1',
   });
 
 interface ServiceCall {
@@ -67,13 +68,14 @@ describe('MeetingController.createMeeting', () => {
     expect(calls[0].externalReference).toEqual({ issueId: 'NTN-1' });
   });
 
-  it('응답은 CreateMeetingResponse 형식(code/source/startedAt ISO)으로 직렬화된다', async () => {
+  it('응답은 CreateMeetingResponse 형식(code/source/startedAt ISO/hostToken)으로 직렬화된다', async () => {
     const { controller } = makeController();
     const result = await controller.createMeeting(dtoOf('web'));
     expect(result).toEqual({
       code: 'abc12xyz',
       source: 'web',
       startedAt: '2026-01-01T00:00:00.000Z',
+      hostToken: 'host-token-1',
     });
   });
 });
@@ -88,37 +90,61 @@ describe('MeetingController.closeMeeting', () => {
       externalReference: externalReference(),
       idleTimeout: IdleTimeout.default(),
       startedAt: fakeStartedAt,
+      hostToken: 'host-token-1',
     });
     m.close(endedAt);
     return m;
   };
 
   const makeController = () => {
-    const calls: Array<{ code: string; reason: string }> = [];
+    const calls: Array<{ code: string; reason: string; hostToken: string }> = [];
     const service = {
-      closeMeeting: jest.fn(async (cmd: { code: string; reason: string }) => {
-        calls.push(cmd);
-        return makeClosed();
-      }),
+      closeMeeting: jest.fn(
+        async (cmd: { code: string; reason: string; hostToken: string }) => {
+          calls.push(cmd);
+          return makeClosed();
+        },
+      ),
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const controller = new MeetingController(service as any);
     return { controller, service, calls };
   };
 
-  it('service.closeMeeting을 code + reason="manual"로 호출한다', async () => {
+  it('service.closeMeeting을 code + reason="manual" + 전달받은 hostToken으로 호출한다', async () => {
+    const { controller, calls } = makeController();
+    await controller.closeMeeting('abc12xyz', 'host-token-1');
+    expect(calls).toEqual([
+      { code: 'abc12xyz', reason: 'manual', hostToken: 'host-token-1' },
+    ]);
+  });
+
+  it('hostToken 쿼리가 없으면 빈 문자열로 위임한다(서버가 host 아님으로 거부)', async () => {
     const { controller, calls } = makeController();
     await controller.closeMeeting('abc12xyz');
-    expect(calls).toEqual([{ code: 'abc12xyz', reason: 'manual' }]);
+    expect(calls).toEqual([{ code: 'abc12xyz', reason: 'manual', hostToken: '' }]);
   });
 
   it('응답은 CloseMeetingResponse 형식(code/endedAt ISO)으로 직렬화된다', async () => {
     const { controller } = makeController();
-    const result = await controller.closeMeeting('abc12xyz');
+    const result = await controller.closeMeeting('abc12xyz', 'host-token-1');
     expect(result).toEqual({
       code: 'abc12xyz',
       endedAt: '2026-01-01T00:30:00.000Z',
     });
+  });
+
+  it('service가 NotHostError를 던지면 ForbiddenException(403)으로 매핑된다', async () => {
+    const service = {
+      closeMeeting: jest.fn(async () => {
+        throw new NotHostError('abc12xyz');
+      }),
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const controller = new MeetingController(service as any);
+    await expect(controller.closeMeeting('abc12xyz', 'wrong')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
   });
 
   it('잘못된 code 형식(대문자·길이 등)은 BadRequestException으로 거부하고 service를 호출하지 않는다', async () => {

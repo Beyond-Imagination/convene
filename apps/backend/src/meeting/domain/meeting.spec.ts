@@ -17,6 +17,7 @@ describe('Meeting (Aggregate Root)', () => {
       externalReference: externalReference(),
       idleTimeout: IdleTimeout.default(),
       startedAt: T_0,
+      hostToken: 'host-token-1',
     });
 
   describe('create', () => {
@@ -26,6 +27,17 @@ describe('Meeting (Aggregate Root)', () => {
       expect(m.endedAt).toBeNull();
       expect(m.activeParticipantCount).toBe(0);
       expect(m.lastActiveAt).toBe(T_0);
+    });
+
+    it('생성 시 받은 hostToken 을 보유한다 (회의 종료 권한 식별용)', () => {
+      const m = newMeeting();
+      expect(m.hostToken).toBe('host-token-1');
+    });
+
+    it('hostToken 이 주어진 토큰과 일치하는지 isHost 로 검증한다', () => {
+      const m = newMeeting();
+      expect(m.isHost('host-token-1')).toBe(true);
+      expect(m.isHost('wrong-token')).toBe(false);
     });
   });
 
@@ -220,6 +232,7 @@ describe('Meeting (Aggregate Root)', () => {
       expect(restored.snapshot()).toEqual(m.snapshot());
       expect(restored.isOpen).toBe(true);
       expect(restored.activeParticipantCount).toBe(2);
+      expect(restored.hostToken).toBe('host-token-1');
     });
 
     it('close 된 snapshot 도 ended 상태 그대로 복원한다(다시 mutate 불가)', () => {

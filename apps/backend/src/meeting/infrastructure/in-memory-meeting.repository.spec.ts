@@ -13,6 +13,7 @@ const makeMeeting = (codeStr: string) =>
     externalReference: externalReference(),
     idleTimeout: IdleTimeout.default(),
     startedAt: t0,
+    hostToken: 'host-token-1',
   });
 
 describe('InMemoryMeetingRepository', () => {

@@ -145,9 +145,9 @@ describe('Meeting e2e', () => {
       bob.disconnect();
     }
 
-    // 7) 회의 종료.
+    // 7) 회의 종료 (host 토큰 제시).
     const closed = await request(httpServer)
-      .delete(`/meetings/${code}`)
+      .delete(`/meetings/${code}?hostToken=${createBody.hostToken}`)
       .expect(200);
     const closeBody = closed.body as CloseMeetingResponse;
     expect(closeBody.code).toBe(code);
@@ -167,7 +167,8 @@ describe('Meeting e2e', () => {
       .post('/meetings')
       .send({ source: 'web' })
       .expect(201);
-    const code = (created.body as CreateMeetingResponse).code;
+    const createdBody = created.body as CreateMeetingResponse;
+    const code = createdBody.code;
 
     const alice = await connectClient(baseUrl);
     try {
@@ -196,7 +197,9 @@ describe('Meeting e2e', () => {
       alice.disconnect();
     }
 
-    await request(httpServer).delete(`/meetings/${code}`).expect(200);
+    await request(httpServer)
+      .delete(`/meetings/${code}?hostToken=${createdBody.hostToken}`)
+      .expect(200);
   });
 
   it('잘못된 WS payload는 exception 이벤트로 client에 전달되고 broadcast는 발생하지 않는다', async () => {

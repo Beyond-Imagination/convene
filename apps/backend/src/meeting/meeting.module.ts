@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
+import { RandomHostTokenGenerator } from '@/meeting/infrastructure/random-host-token.generator';
 import { RandomMeetingCodeGenerator } from '@/meeting/infrastructure/random-meeting-code.generator';
 import { RedisChatRepository } from '@/meeting/infrastructure/redis-chat.repository';
 import { RedisMeetingRepository } from '@/meeting/infrastructure/redis-meeting.repository';
@@ -28,6 +29,7 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
     RedisMeetingRepository,
     RedisChatRepository,
     RandomMeetingCodeGenerator,
+    RandomHostTokenGenerator,
     MeetingGateway,
     {
       provide: MeetingService,
@@ -35,6 +37,7 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
         repository: RedisMeetingRepository,
         chatRepository: RedisChatRepository,
         codeGenerator: RandomMeetingCodeGenerator,
+        hostTokenGenerator: RandomHostTokenGenerator,
         clock: SystemClock,
         eventPublisher: NestEventBusDomainEventPublisher,
       ) =>
@@ -42,6 +45,7 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
           repository,
           chatRepository,
           codeGenerator,
+          hostTokenGenerator,
           clock,
           eventPublisher,
         }),
@@ -49,6 +53,7 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
         RedisMeetingRepository,
         RedisChatRepository,
         RandomMeetingCodeGenerator,
+        RandomHostTokenGenerator,
         SystemClock,
         NestEventBusDomainEventPublisher,
       ],
