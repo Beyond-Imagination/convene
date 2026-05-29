@@ -20,6 +20,10 @@ const baseMediasoup = (
   remoteMedia: [],
   isSharingScreen: false,
   screenStream: null,
+  isAudioMuted: false,
+  isVideoMuted: false,
+  toggleAudio: vi.fn(),
+  toggleVideo: vi.fn(),
   startScreenShare: vi.fn(async () => {}),
   stopScreenShare: vi.fn(),
   ...overrides,
@@ -195,6 +199,30 @@ describe('MeetingScreen View', () => {
     );
     const audioPlayer = screen.getByTestId('remote-audio-player');
     expect(audioPlayer.querySelectorAll('audio')).toHaveLength(1);
+  });
+
+  it('isAudioMuted=false 면 "마이크 끄기" 버튼이 노출되고 클릭 시 toggleAudio 호출', () => {
+    const toggleAudio = vi.fn();
+    renderScreen({}, { isAudioMuted: false, toggleAudio });
+    fireEvent.click(screen.getByRole('button', { name: '마이크 끄기' }));
+    expect(toggleAudio).toHaveBeenCalledTimes(1);
+  });
+
+  it('isAudioMuted=true 면 "마이크 켜기" 버튼이 노출된다', () => {
+    renderScreen({}, { isAudioMuted: true });
+    expect(screen.getByRole('button', { name: '마이크 켜기' })).toBeInTheDocument();
+  });
+
+  it('isVideoMuted=false 면 "카메라 끄기" 버튼이 노출되고 클릭 시 toggleVideo 호출', () => {
+    const toggleVideo = vi.fn();
+    renderScreen({}, { isVideoMuted: false, toggleVideo });
+    fireEvent.click(screen.getByRole('button', { name: '카메라 끄기' }));
+    expect(toggleVideo).toHaveBeenCalledTimes(1);
+  });
+
+  it('isVideoMuted=true 면 "카메라 켜기" 버튼이 노출된다', () => {
+    renderScreen({}, { isVideoMuted: true });
+    expect(screen.getByRole('button', { name: '카메라 켜기' })).toBeInTheDocument();
   });
 
   it('isSharingScreen=false 면 "화면 공유 시작" 버튼이 노출되고 클릭 시 startScreenShare 호출', () => {
