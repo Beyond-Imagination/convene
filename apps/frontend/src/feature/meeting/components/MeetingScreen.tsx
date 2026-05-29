@@ -106,6 +106,16 @@ export function MeetingScreen({
           ))}
         </ul>
       </section>
+      <section aria-labelledby="media-controls-heading">
+        <h2 id="media-controls-heading">미디어 컨트롤</h2>
+        {/* 임시 버튼 — 컨트롤 바 레이아웃은 회의 페이지 UI 개편 단계에서 정리한다. */}
+        <button type="button" onClick={mediasoup.toggleAudio}>
+          {mediasoup.isAudioMuted ? '마이크 켜기' : '마이크 끄기'}
+        </button>
+        <button type="button" onClick={mediasoup.toggleVideo}>
+          {mediasoup.isVideoMuted ? '카메라 켜기' : '카메라 끄기'}
+        </button>
+      </section>
       <section aria-labelledby="video-tiles-heading">
         <h2 id="video-tiles-heading">비디오</h2>
         <LocalVideoTile nickname={nickname} stream={mediasoup.localStream} />
