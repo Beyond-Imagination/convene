@@ -590,6 +590,25 @@ describe('useMediasoupViewModel.screenShare', () => {
     await waitFor(() => expect(result.current.status).toBe('ready'));
     expect(result.current.isSharingScreen).toBe(false);
     expect(result.current.screenStream).toBeNull();
+    expect(result.current.isRemoteSharingScreen).toBe(false);
+  });
+
+  it('원격 참가자가 screen source producer 를 만들면 isRemoteSharingScreen=true', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    const onNewProducer = captureSocketListener(socket, MEDIASOUP_WS_EVENTS.NEW_PRODUCER);
+    onNewProducer({
+      peerSocketId: 's2',
+      producerId: 'p-remote-screen',
+      kind: 'video',
+      source: 'screen',
+    });
+    await waitFor(() => expect(result.current.isRemoteSharingScreen).toBe(true));
   });
 
   it('startScreenShare() 호출 시 getDisplayMedia 가 호출되고 sendTransport.produce({source:screen}) 으로 produce 된다', async () => {

@@ -20,6 +20,7 @@ const baseMediasoup = (
   remoteMedia: [],
   isSharingScreen: false,
   screenStream: null,
+  isRemoteSharingScreen: false,
   isAudioMuted: false,
   isVideoMuted: false,
   toggleAudio: vi.fn(),
@@ -239,6 +240,20 @@ describe('MeetingScreen View', () => {
     const button = screen.getByRole('button', { name: '화면 공유 시작' });
     fireEvent.click(button);
     expect(startScreenShare).toHaveBeenCalledTimes(1);
+  });
+
+  it('다른 사람이 공유 중(isRemoteSharingScreen=true)이면 "화면 공유 시작" 버튼이 disabled 된다', () => {
+    renderScreen({}, { isSharingScreen: false, isRemoteSharingScreen: true });
+    const button = screen.getByRole('button', { name: '화면 공유 시작' });
+    expect(button).toBeDisabled();
+  });
+
+  it('내가 공유 중일 때는 다른 사람 공유 여부와 무관하게 "공유 중지" 버튼이 보인다', () => {
+    renderScreen(
+      {},
+      { isSharingScreen: true, screenStream: fakeStream(), isRemoteSharingScreen: false },
+    );
+    expect(screen.getByRole('button', { name: '공유 중지' })).toBeInTheDocument();
   });
 
   it('isSharingScreen=true 면 "공유 중지" 버튼 + screen 비디오 타일이 노출된다', () => {
