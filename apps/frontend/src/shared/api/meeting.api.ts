@@ -44,9 +44,16 @@ export async function createMeeting(
  * 회의를 명시적으로 종료한다(수동 종료, reason='manual').
  * 성공 시 backend 는 `meeting.ended` 도메인 이벤트를 발행하고 회의록 생성
  * 파이프라인이 트리거된다.
+ *
+ * `hostToken` 은 회의 생성자만 보유하며, backend 가 이를 검증해 host 가 아니면
+ * 403(ForbiddenException) 으로 거부한다. 토큰이 없으면 쿼리를 붙이지 않는다.
  */
-export async function closeMeeting(code: string): Promise<CloseMeetingResponse> {
-  const res = await fetch(`${API_BASE_URL}/meetings/${code}`, { method: 'DELETE' });
+export async function closeMeeting(
+  code: string,
+  hostToken?: string,
+): Promise<CloseMeetingResponse> {
+  const query = hostToken ? `?hostToken=${encodeURIComponent(hostToken)}` : '';
+  const res = await fetch(`${API_BASE_URL}/meetings/${code}${query}`, { method: 'DELETE' });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new MeetingApiError(

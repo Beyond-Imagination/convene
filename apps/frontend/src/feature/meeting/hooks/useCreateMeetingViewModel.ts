@@ -9,6 +9,7 @@ import {
 } from 'react-hook-form';
 
 import { createMeeting, MeetingApiError } from '@/shared/api/meeting.api';
+import { saveHostToken } from '@/shared/stores/host-token.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
 /**
@@ -66,6 +67,8 @@ export function useCreateMeetingViewModel(): UseCreateMeetingViewModel {
     const trimmed = values.nickname.trim();
     try {
       const res = await createMeeting({ source: 'web' });
+      // 생성자는 host. 회의 종료 권한 식별용 토큰을 회의 code 로 보관한다.
+      saveHostToken(res.code, res.hostToken);
       setNickname(trimmed);
       router.push(`/meetings/${res.code}`);
     } catch (e) {

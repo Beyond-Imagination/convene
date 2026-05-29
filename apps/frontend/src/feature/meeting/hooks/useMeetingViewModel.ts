@@ -13,6 +13,7 @@ import {
 } from '@migration/shared-interfaces';
 
 import { closeMeeting } from '@/shared/api/meeting.api';
+import { getHostToken } from '@/shared/stores/host-token.storage';
 import { connectMeetingSocket } from '@/shared/socket/meeting.socket';
 import { useSessionStore } from '@/shared/stores/session.store';
 
@@ -54,6 +55,11 @@ export interface UseMeetingViewModel {
    * useMediasoupViewModel 이 본 값을 deps 로 사용해 transport 를 재구축한다.
    */
   readonly reconnectGen: number;
+  /**
+   * 이 회의의 host(회의 종료 권한자) 여부. 회의 생성자만 저장된 hostToken 을
+   * 보유하므로 true. View 는 이 값으로 "회의 종료" 버튼 노출을 결정한다.
+   */
+  readonly isHost: boolean;
   readonly leave: () => void;
   /**
    * 명시적 회의 종료 액션. backend `DELETE /meetings/:code` 를 호출해
@@ -73,6 +79,8 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [reconnectGen, setReconnectGen] = useState(0);
+  // host 여부는 회의 진입 시점의 저장된 토큰으로 1회 판정한다(렌더 중 안정적).
+  const [isHost] = useState(() => getHostToken(code) !== null);
   const socketRef = useRef<Socket | null>(null);
   const connectCountRef = useRef(0);
   /**
@@ -189,7 +197,9 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
 
   const endMeeting = useCallback(async (): Promise<void> => {
     try {
-      await closeMeeting(code);
+      // 저장된 hostToken 을 함께 보낸다. host 가 아니면 backend 가 403 으로 거부하고
+      // 아래 catch 가 swallow 한다(버튼은 host 에게만 보이지만 방어적으로 전달).
+      await closeMeeting(code, getHostToken(code) ?? undefined);
     } catch {
       // backend 가 already-closed 등으로 500 을 줄 수 있다 (idle 자동 종료와 race).
       // 회의록 생성은 이미 시작/완료된 상태이므로 사용자 흐름은 그대로 회의록 페이지로 보낸다.
@@ -216,6 +226,7 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
     errorMessage,
     socket,
     reconnectGen,
+    isHost,
     leave,
     endMeeting,
   };

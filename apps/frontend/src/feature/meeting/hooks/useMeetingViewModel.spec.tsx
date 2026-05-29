@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 
 import { MEETING_WS_EVENTS } from '@migration/shared-interfaces';
 
+import { saveHostToken } from '@/shared/stores/host-token.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
 import { useMeetingViewModel } from './useMeetingViewModel';
@@ -83,6 +84,10 @@ const connect = (): void => {
 };
 
 describe('useMeetingViewModel', () => {
+  beforeEach(() => {
+    window.sessionStorage.clear();
+  });
+
   it('닉네임이 store에 없으면 / 로 redirect 한다', () => {
     setup(null);
     expect(replaceMock).toHaveBeenCalledWith('/');
@@ -188,6 +193,19 @@ describe('useMeetingViewModel', () => {
     expect(pushMock).toHaveBeenCalledWith('/');
   });
 
+  describe('isHost', () => {
+    it('회의 code 에 대한 hostToken 이 저장돼 있으면 isHost=true', () => {
+      saveHostToken(code, 'tok-host');
+      const { result } = setup('준');
+      expect(result.current.isHost).toBe(true);
+    });
+
+    it('hostToken 이 없으면 isHost=false(회의 입장자/비-host)', () => {
+      const { result } = setup('준');
+      expect(result.current.isHost).toBe(false);
+    });
+  });
+
   describe('endMeeting()', () => {
     it('DELETE /meetings/:code 를 호출하고 성공 시 닉네임 clear + /reports 로 push', async () => {
       closeMeetingMock.mockResolvedValueOnce({
@@ -200,9 +218,24 @@ describe('useMeetingViewModel', () => {
       await act(async () => {
         await result.current.endMeeting();
       });
-      expect(closeMeetingMock).toHaveBeenCalledWith(code);
+      // hostToken 저장이 없으면 undefined 로 호출(backend 가 host 아님으로 거부).
+      expect(closeMeetingMock).toHaveBeenCalledWith(code, undefined);
       expect(useSessionStore.getState().nickname).toBeNull();
       expect(pushMock).toHaveBeenCalledWith('/reports');
+    });
+
+    it('저장된 hostToken 을 closeMeeting 에 함께 전달한다', async () => {
+      saveHostToken(code, 'tok-host');
+      closeMeetingMock.mockResolvedValueOnce({
+        code,
+        endedAt: '2026-01-01T00:30:00.000Z',
+      });
+      const { result } = setup('준');
+      connect();
+      await act(async () => {
+        await result.current.endMeeting();
+      });
+      expect(closeMeetingMock).toHaveBeenCalledWith(code, 'tok-host');
     });
 
     it('성공 시 leave 처럼 socket 도 disconnect 한다(중복 leave 이벤트 차단)', async () => {

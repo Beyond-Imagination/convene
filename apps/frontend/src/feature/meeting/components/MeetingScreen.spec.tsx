@@ -50,6 +50,9 @@ const baseVm = (overrides: Partial<UseMeetingViewModel> = {}): UseMeetingViewMod
   nickname: '준',
   remoteParticipants: [],
   errorMessage: null,
+  socket: null,
+  reconnectGen: 0,
+  isHost: false,
   leave: vi.fn(),
   endMeeting: vi.fn(async () => {}),
   ...overrides,
@@ -104,11 +107,16 @@ describe('MeetingScreen View', () => {
     expect(leave).toHaveBeenCalledTimes(1);
   });
 
-  it('회의 종료 버튼 클릭 시 vm.endMeeting 이 호출된다', () => {
+  it('host 면 회의 종료 버튼 클릭 시 vm.endMeeting 이 호출된다', () => {
     const endMeeting = vi.fn(async () => {});
-    renderScreen({ endMeeting });
+    renderScreen({ endMeeting, isHost: true });
     fireEvent.click(screen.getByRole('button', { name: '회의 종료' }));
     expect(endMeeting).toHaveBeenCalledTimes(1);
+  });
+
+  it('host 가 아니면 회의 종료 버튼이 노출되지 않는다', () => {
+    renderScreen({ isHost: false });
+    expect(screen.queryByRole('button', { name: '회의 종료' })).toBeNull();
   });
 
   it('mediasoup.status="preparing" 이면 미디어 준비 중 안내가 노출된다', () => {

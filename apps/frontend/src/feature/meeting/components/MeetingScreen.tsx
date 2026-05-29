@@ -57,6 +57,7 @@ export function MeetingScreen({
   nickname,
   remoteParticipants,
   errorMessage,
+  isHost,
   leave,
   endMeeting,
   mediasoup,
@@ -69,9 +70,12 @@ export function MeetingScreen({
         <button type="button" onClick={leave}>
           나가기
         </button>
-        <button type="button" onClick={() => void endMeeting()}>
-          회의 종료
-        </button>
+        {/* 회의 종료는 host(생성자)만. 비-host 에게는 노출하지 않는다. */}
+        {isHost && (
+          <button type="button" onClick={() => void endMeeting()}>
+            회의 종료
+          </button>
+        )}
       </header>
       {status === 'connecting' && (
         <p role="status" aria-live="polite">

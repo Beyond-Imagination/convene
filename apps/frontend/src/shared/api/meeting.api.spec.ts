@@ -109,6 +109,19 @@ describe('closeMeeting', () => {
     expect(init).toMatchObject({ method: 'DELETE' });
   });
 
+  it('hostToken 을 주면 ?hostToken= 쿼리로 전달한다', async () => {
+    fetchMock.mockResolvedValueOnce(
+      okResponse(
+        { code: 'abc12xyz', endedAt: '2026-01-01T00:30:00.000Z' },
+        { status: 200 },
+      ),
+    );
+    await closeMeeting('abc12xyz', 'tok-1');
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(`${API_BASE_URL}/meetings/abc12xyz?hostToken=tok-1`);
+    expect(init).toMatchObject({ method: 'DELETE' });
+  });
+
   it('응답을 CloseMeetingResponse 그대로 돌려준다', async () => {
     fetchMock.mockResolvedValueOnce(
       okResponse(

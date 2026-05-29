@@ -2,6 +2,7 @@ import { act, fireEvent, renderHook, waitFor } from '@testing-library/react';
 import { render } from '@testing-library/react';
 
 import { MeetingApiError } from '@/shared/api/meeting.api';
+import { getHostToken } from '@/shared/stores/host-token.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
 import { useCreateMeetingViewModel } from './useCreateMeetingViewModel';
@@ -48,6 +49,7 @@ describe('useCreateMeetingViewModel', () => {
     pushMock.mockReset();
     createMeetingMock.mockReset();
     useSessionStore.setState({ nickname: null });
+    window.sessionStorage.clear();
   });
 
   it('초기 status 는 idle, errorMessage 는 null 이다', () => {
@@ -96,6 +98,23 @@ describe('useCreateMeetingViewModel', () => {
     });
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/meetings/abc12xyz'));
     expect(useSessionStore.getState().nickname).toBe('준');
+  });
+
+  it('성공 시 응답의 hostToken 이 회의 code 로 저장된다(host 식별용)', async () => {
+    createMeetingMock.mockResolvedValueOnce({
+      code: 'abc12xyz',
+      source: 'web',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      hostToken: 'tok-xyz',
+    });
+    const { result } = renderHook(() => useCreateMeetingViewModel());
+    const { getByTestId, getByRole } = makeForm(result.current);
+    fireEvent.input(getByTestId('nickname-input'), { target: { value: '준' } });
+    await act(async () => {
+      fireEvent.click(getByRole('button', { name: 'submit' }));
+    });
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith('/meetings/abc12xyz'));
+    expect(getHostToken('abc12xyz')).toBe('tok-xyz');
   });
 
   it('MeetingApiError 가 던져지면 status="error" + 해당 메시지', async () => {
