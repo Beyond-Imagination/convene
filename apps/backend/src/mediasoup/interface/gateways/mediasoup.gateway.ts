@@ -20,6 +20,8 @@ import {
   type MediaType,
   type NewProducerBroadcast,
   type ProduceResponse,
+  type ProducerToggledBroadcast,
+  type ToggleProducerResponse,
 } from '@migration/shared-interfaces';
 
 import { MediasoupSignalingService } from '@/mediasoup/application/mediasoup-signaling.service';
@@ -30,6 +32,7 @@ import { GetRtpCapabilitiesDto } from '@/mediasoup/interface/dto/get-rtp-capabil
 import { ListProducersDto } from '@/mediasoup/interface/dto/list-producers.dto';
 import { ProduceDto } from '@/mediasoup/interface/dto/produce.dto';
 import { ResumeConsumerDto } from '@/mediasoup/interface/dto/resume-consumer.dto';
+import { ToggleProducerDto } from '@/mediasoup/interface/dto/toggle-producer.dto';
 
 const roomOf = (code: string): string => `meeting:${code}`;
 
@@ -197,6 +200,30 @@ export class MediasoupGateway {
       meetingCode: dto.code,
       participantId: client.id,
     });
+  }
+
+  @SubscribeMessage(MEDIASOUP_WS_EVENTS.TOGGLE_PRODUCER)
+  async handleToggleProducer(
+    @MessageBody() dto: ToggleProducerDto,
+    @ConnectedSocket() client: Socket,
+  ): Promise<ToggleProducerResponse> {
+    // 소유 검증 + pause/resume 위임. 남의 producerId 면 service 가 throw.
+    await this.service.toggleProducer({
+      meetingCode: dto.code,
+      participantId: client.id,
+      producerId: dto.producerId,
+      paused: dto.paused,
+    });
+    // 같은 회의의 다른 참가자에게 mute 상태 변경을 broadcast (본인 제외).
+    const broadcast: ProducerToggledBroadcast = {
+      producerId: dto.producerId,
+      paused: dto.paused,
+    };
+    this.server
+      .to(roomOf(dto.code))
+      .except(client.id)
+      .emit(MEDIASOUP_WS_EVENTS.PRODUCER_TOGGLED, broadcast);
+    return { ok: true };
   }
 
   @OnEvent(MEDIASOUP_EVENTS.PRODUCER_CREATED)
