@@ -16,7 +16,7 @@ import {
 } from '@/mediasoup/domain/ports';
 import { DomainEventPublisher } from '@/shared-kernel/domain/ports';
 
-import { ParticipantMediaNotFoundError } from './mediasoup.errors';
+import { ParticipantMediaNotFoundError, ScreenShareConflictError } from './mediasoup.errors';
 
 /**
  * Mediasoup Bounded Context 의 Application Service.
@@ -147,6 +147,22 @@ export class MediasoupSignalingService {
 
   async produce(command: ProduceCommand): Promise<{ producerId: string }> {
     const media = await this.requireParticipantMedia(command.participantId);
+    // 화면 공유는 회의당 동시 1인. 다른 참가자가 이미 screen producer 를 갖고 있으면
+    // 거부한다(자기 자신 제외). produce RPC 는 순차 처리되고 frontend 가 버튼을
+    // disabled 로 1차 차단하므로, 본 체크가 사실상의 단일 공유 보장점이다.
+    if (command.source === 'screen') {
+      const peers = await this.deps.participantMediaRepository.findByMeetingCode(
+        command.meetingCode,
+      );
+      const otherSharing = peers.some(
+        (p) =>
+          p.participantId !== command.participantId &&
+          p.producers.some((pr) => pr.source === 'screen'),
+      );
+      if (otherSharing) {
+        throw new ScreenShareConflictError(command.meetingCode);
+      }
+    }
     const { producerId } = await this.deps.transportPort.produce({
       meetingCode: command.meetingCode,
       participantId: command.participantId,
