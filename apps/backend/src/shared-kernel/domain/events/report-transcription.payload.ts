@@ -14,6 +14,12 @@ export interface ReportTranscriptionRequestedPayload {
   readonly meetingId: string;
   readonly code: string;
   readonly meetingStartedAtMs: number;
+  /**
+   * participantId(socket id) → 표시용 nickname 매핑. Recording BC 가 STT
+   * transcript 의 speaker 를 내부 id 대신 nickname 으로 채우는 데 사용한다.
+   * 회의록 소비처(Reports)가 id 를 다시 매핑하지 않도록 생산 시점에 전달한다.
+   */
+  readonly participantNames?: Readonly<Record<string, string>>;
 }
 
 export interface TranscriptionSegmentPayload {
