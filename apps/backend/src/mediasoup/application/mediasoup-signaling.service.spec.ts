@@ -121,6 +121,12 @@ const makeTransportPort = () => {
     async resumeConsumer(consumerId) {
       calls.push({ name: 'resumeConsumer', args: [consumerId] });
     },
+    async pauseProducer(producerId) {
+      calls.push({ name: 'pauseProducer', args: [producerId] });
+    },
+    async resumeProducer(producerId) {
+      calls.push({ name: 'resumeProducer', args: [producerId] });
+    },
     async closeProducer(producerId) {
       calls.push({ name: 'closeProducer', args: [producerId] });
     },

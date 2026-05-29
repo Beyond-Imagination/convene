@@ -120,6 +120,22 @@ export class MediasoupTransportAdapter implements MediaTransportPort {
     await consumer.resume();
   }
 
+  async pauseProducer(producerId: string): Promise<void> {
+    const producer = this.producers.get(producerId);
+    if (!producer || producer.closed) {
+      throw new Error(`MediasoupTransportAdapter: producer "${producerId}" not found`);
+    }
+    await producer.pause();
+  }
+
+  async resumeProducer(producerId: string): Promise<void> {
+    const producer = this.producers.get(producerId);
+    if (!producer || producer.closed) {
+      throw new Error(`MediasoupTransportAdapter: producer "${producerId}" not found`);
+    }
+    await producer.resume();
+  }
+
   async closeProducer(producerId: string): Promise<void> {
     const producer = this.producers.get(producerId);
     if (producer && !producer.closed) producer.close();

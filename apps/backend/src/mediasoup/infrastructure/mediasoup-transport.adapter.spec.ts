@@ -142,4 +142,22 @@ describe('MediasoupTransportAdapter', () => {
       await cleanup();
     }
   });
+
+  it('알 수 없는 producerId 로 pauseProducer 를 호출하면 throw 한다', async () => {
+    const { transportAdapter, cleanup } = await setup();
+    try {
+      await expect(transportAdapter.pauseProducer('p-unknown')).rejects.toThrow();
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('알 수 없는 producerId 로 resumeProducer 를 호출하면 throw 한다', async () => {
+    const { transportAdapter, cleanup } = await setup();
+    try {
+      await expect(transportAdapter.resumeProducer('p-unknown')).rejects.toThrow();
+    } finally {
+      await cleanup();
+    }
+  });
 });
