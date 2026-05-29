@@ -6,6 +6,7 @@ import { CreateTransportDto } from './create-transport.dto';
 import { GetRtpCapabilitiesDto } from './get-rtp-capabilities.dto';
 import { ProduceDto } from './produce.dto';
 import { ResumeConsumerDto } from './resume-consumer.dto';
+import { CloseProducerDto } from './close-producer.dto';
 import { ToggleProducerDto } from './toggle-producer.dto';
 
 const makePipe = () =>
@@ -168,6 +169,19 @@ describe('ToggleProducerDto', () => {
   it('producerId 가 너무 길면 거부', async () => {
     await expect(
       run(ToggleProducerDto, { code, producerId: 'x'.repeat(65), paused: true }),
+    ).rejects.toThrow(/producerId/i);
+  });
+});
+
+describe('CloseProducerDto', () => {
+  it('정상 통과', async () => {
+    const dto = await run<CloseProducerDto>(CloseProducerDto, { code, producerId: 'p-1' });
+    expect(dto.producerId).toBe('p-1');
+  });
+
+  it('producerId 가 너무 길면 거부', async () => {
+    await expect(
+      run(CloseProducerDto, { code, producerId: 'x'.repeat(65) }),
     ).rejects.toThrow(/producerId/i);
   });
 });

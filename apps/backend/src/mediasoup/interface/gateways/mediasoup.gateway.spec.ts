@@ -9,6 +9,7 @@ import { CreateTransportDto } from '@/mediasoup/interface/dto/create-transport.d
 import { GetRtpCapabilitiesDto } from '@/mediasoup/interface/dto/get-rtp-capabilities.dto';
 import { ProduceDto } from '@/mediasoup/interface/dto/produce.dto';
 import { ResumeConsumerDto } from '@/mediasoup/interface/dto/resume-consumer.dto';
+import { CloseProducerDto } from '@/mediasoup/interface/dto/close-producer.dto';
 import { ToggleProducerDto } from '@/mediasoup/interface/dto/toggle-producer.dto';
 
 import { MediasoupGateway } from './mediasoup.gateway';
@@ -68,6 +69,9 @@ const makeService = () => {
     },
     toggleProducer: async (cmd: unknown) => {
       calls.push({ name: 'toggleProducer', args: [cmd] });
+    },
+    closeProducer: async (cmd: unknown) => {
+      calls.push({ name: 'closeProducer', args: [cmd] });
     },
   };
   return { calls, service: service as unknown as MediasoupSignalingService };
@@ -218,6 +222,30 @@ describe('MediasoupGateway.handleToggleProducer', () => {
         except: 's1',
         event: MEDIASOUP_WS_EVENTS.PRODUCER_TOGGLED,
         payload: { producerId: 'p-1', paused: true },
+      },
+    ]);
+    expect(res).toEqual({ ok: true });
+  });
+});
+
+describe('MediasoupGateway.handleCloseProducer', () => {
+  it('dto + client.id 를 service.closeProducer 에 위임하고 PRODUCER_CLOSED 를 본인 제외 broadcast 한다', async () => {
+    const { gateway, calls, emits } = setup();
+    const dto = Object.assign(new CloseProducerDto(), {
+      code: codeStr,
+      producerId: 'p-1',
+    });
+    const res = await gateway.handleCloseProducer(dto, makeClient('s1'));
+    expect(calls[0]).toEqual({
+      name: 'closeProducer',
+      args: [{ meetingCode: codeStr, participantId: 's1', producerId: 'p-1' }],
+    });
+    expect(emits).toEqual([
+      {
+        room: `meeting:${codeStr}`,
+        except: 's1',
+        event: MEDIASOUP_WS_EVENTS.PRODUCER_CLOSED,
+        payload: { producerId: 'p-1' },
       },
     ]);
     expect(res).toEqual({ ok: true });

@@ -566,6 +566,68 @@ describe('MediasoupSignalingService.produce', () => {
   });
 });
 
+describe('MediasoupSignalingService.closeProducer', () => {
+  const setupWithScreenProducer = async (participantId = 's1') => {
+    const ctx = makeService();
+    await ctx.service.openRoom({ meetingCode });
+    await ctx.service.admitParticipant({ meetingCode, participantId });
+    await ctx.service.createTransport({ meetingCode, participantId, direction: 'send' });
+    const produced = await ctx.service.produce({
+      meetingCode,
+      participantId,
+      transportId: 't-1',
+      kind: 'video',
+      source: 'screen',
+      rtpParameters: {},
+    });
+    return { ...ctx, producerId: produced.producerId, participantId };
+  };
+
+  it('transportPort.closeProducer 위임 + ParticipantMedia 에서 producer 제거 + pipe 정리', async () => {
+    const { service, transport, router, repo, producerId } = await setupWithScreenProducer();
+    transport.calls.length = 0;
+    router.calls.length = 0;
+
+    await service.closeProducer({ meetingCode, participantId: 's1', producerId });
+
+    expect(transport.calls).toContainEqual({ name: 'closeProducer', args: [producerId] });
+    expect(router.calls).toContainEqual({
+      name: 'cleanupPipeProducers',
+      args: [meetingCode, producerId],
+    });
+    const media = await repo.repository.findByParticipantId('s1');
+    expect(media?.producers.some((p) => p.id === producerId)).toBe(false);
+  });
+
+  it('자기 소유가 아닌 producerId 의 close 는 거부하고 transport 를 건드리지 않는다', async () => {
+    const { service, transport, producerId } = await setupWithScreenProducer();
+    await service.admitParticipant({ meetingCode, participantId: 's2' });
+    transport.calls.length = 0;
+    await expect(
+      service.closeProducer({ meetingCode, participantId: 's2', producerId }),
+    ).rejects.toThrow();
+    expect(transport.calls).toEqual([]);
+  });
+
+  it('producer 를 close 하면 같은 source 로 다시 produce 할 수 있다(제약 해제 검증)', async () => {
+    const { service, producerId } = await setupWithScreenProducer();
+    await service.closeProducer({ meetingCode, participantId: 's1', producerId });
+    // s2 가 이제 화면 공유 가능(s1 이 점유 해제).
+    await service.admitParticipant({ meetingCode, participantId: 's2' });
+    await service.createTransport({ meetingCode, participantId: 's2', direction: 'send' });
+    await expect(
+      service.produce({
+        meetingCode,
+        participantId: 's2',
+        transportId: 't-2',
+        kind: 'video',
+        source: 'screen',
+        rtpParameters: {},
+      }),
+    ).resolves.toBeDefined();
+  });
+});
+
 describe('MediasoupSignalingService.consume', () => {
   const setupTwoPeersWithS2Producer = async () => {
     const ctx = makeService();
