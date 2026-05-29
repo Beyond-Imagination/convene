@@ -71,6 +71,11 @@ export interface ResumeConsumerCommand extends ParticipantCommand {
   consumerId: string;
 }
 
+export interface ToggleProducerCommand extends ParticipantCommand {
+  producerId: string;
+  paused: boolean;
+}
+
 export class MediasoupSignalingService {
   constructor(private readonly deps: MediasoupSignalingServiceDeps) {}
 
@@ -203,6 +208,26 @@ export class MediasoupSignalingService {
 
   async resumeConsumer(command: ResumeConsumerCommand): Promise<void> {
     await this.deps.transportPort.resumeConsumer(command.consumerId);
+  }
+
+  /**
+   * 자기 producer 를 mute(paused:true)/unmute(paused:false) 한다.
+   * 소유 검증: 호출자의 ParticipantMedia 에 없는 producerId 면 거부해
+   * 남의 producer 를 toggle 하지 못하게 막는다(plum `toggle_media` 와 동등).
+   */
+  async toggleProducer(command: ToggleProducerCommand): Promise<void> {
+    const media = await this.requireParticipantMedia(command.participantId);
+    const owns = media.producers.some((p) => p.id === command.producerId);
+    if (!owns) {
+      throw new Error(
+        `Producer "${command.producerId}" is not owned by participant "${command.participantId}"`,
+      );
+    }
+    if (command.paused) {
+      await this.deps.transportPort.pauseProducer(command.producerId);
+    } else {
+      await this.deps.transportPort.resumeProducer(command.producerId);
+    }
   }
 
   async listProducers(command: ParticipantCommand): Promise<ListProducersResponse> {
