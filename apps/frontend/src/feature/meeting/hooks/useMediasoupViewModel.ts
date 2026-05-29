@@ -19,9 +19,11 @@ import {
   type ProduceResponse,
   type ProducerClosedBroadcast,
   type CloseProducerRequest,
+  type ParticipantLeftBroadcast,
   type ProducerToggledBroadcast,
   type ResumeConsumerRequest,
   type ToggleProducerRequest,
+  MEETING_WS_EVENTS,
 } from '@migration/shared-interfaces';
 
 import { createMediasoupDevice } from '@/shared/socket/mediasoup-device.factory';
@@ -434,11 +436,19 @@ export function useMediasoupViewModel(
         ),
       );
     };
+    // 참가자가 떠나면(정상 leave / 비정상 종료 모두 서버가 PARTICIPANT_LEFT 발행)
+    // 그 사람의 모든 remoteMedia 를 제거한다. 비정상 종료 시 producer 단위
+    // PRODUCER_CLOSED 가 오지 않으므로, 이 정리가 없으면 검은 타일이 잔존하고
+    // 그가 화면 공유 중이었다면 isRemoteSharingScreen 이 영영 true 로 남는다.
+    const onParticipantLeft = (payload: ParticipantLeftBroadcast): void => {
+      setRemoteMedia((prev) => prev.filter((m) => m.peerSocketId !== payload.socketId));
+    };
 
     socket.on(MEDIASOUP_WS_EVENTS.NEW_PRODUCER, onNewProducer);
     socket.on(MEDIASOUP_WS_EVENTS.PRODUCER_CLOSED, onProducerClosed);
     socket.on(MEDIASOUP_WS_EVENTS.CONSUMER_CLOSED, onConsumerClosed);
     socket.on(MEDIASOUP_WS_EVENTS.PRODUCER_TOGGLED, onProducerToggled);
+    socket.on(MEETING_WS_EVENTS.PARTICIPANT_LEFT, onParticipantLeft);
 
     // 늦게 입장한 클라이언트가 기존 producer 들을 받아오기 위해 한 번 조회.
     // NEW_PRODUCER 핸들러를 그대로 재사용해 동일한 consume 흐름을 탄다.
@@ -466,6 +476,7 @@ export function useMediasoupViewModel(
       socket.off(MEDIASOUP_WS_EVENTS.PRODUCER_CLOSED, onProducerClosed);
       socket.off(MEDIASOUP_WS_EVENTS.CONSUMER_CLOSED, onConsumerClosed);
       socket.off(MEDIASOUP_WS_EVENTS.PRODUCER_TOGGLED, onProducerToggled);
+      socket.off(MEETING_WS_EVENTS.PARTICIPANT_LEFT, onParticipantLeft);
     };
   }, [status, socket, code]);
 

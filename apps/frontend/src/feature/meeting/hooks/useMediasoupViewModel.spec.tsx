@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 
-import { MEDIASOUP_WS_EVENTS } from '@migration/shared-interfaces';
+import { MEDIASOUP_WS_EVENTS, MEETING_WS_EVENTS } from '@migration/shared-interfaces';
 
 import { useMediasoupViewModel } from './useMediasoupViewModel';
 
@@ -468,6 +468,48 @@ describe('useMediasoupViewModel.remoteConsume', () => {
     );
     onConsumerClosed({ consumerId: 'c-p-remote-audio' });
     await waitFor(() => expect(result.current.remoteMedia).toHaveLength(0));
+  });
+
+  it('PARTICIPANT_LEFT 수신 시 그 참가자의 remoteMedia 가 모두 제거된다(비정상 종료 포함)', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    const onNewProducer = captureSocketListener(socket, MEDIASOUP_WS_EVENTS.NEW_PRODUCER);
+    // s2 가 화면 공유 중인 상태.
+    onNewProducer({
+      peerSocketId: 's2',
+      producerId: 'p-remote-screen',
+      kind: 'video',
+      source: 'screen',
+    });
+    await waitFor(() => expect(result.current.remoteMedia).toHaveLength(1));
+    expect(result.current.isRemoteSharingScreen).toBe(true);
+
+    // s2 가 비정상 종료(탭 닫기 등) → 서버가 PARTICIPANT_LEFT broadcast.
+    const onLeft = captureSocketListener(socket, MEETING_WS_EVENTS.PARTICIPANT_LEFT);
+    act(() => onLeft({ socketId: 's2', leftAt: '2026-01-01T00:05:00.000Z' }));
+
+    await waitFor(() => expect(result.current.remoteMedia).toHaveLength(0));
+    // 떠난 사람의 screen 이 사라졌으니 제약이 풀린다.
+    expect(result.current.isRemoteSharingScreen).toBe(false);
+  });
+
+  it('unmount 시 PARTICIPANT_LEFT 핸들러도 socket.off 로 해제된다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result, unmount } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    unmount();
+    expect(socket.off).toHaveBeenCalledWith(
+      MEETING_WS_EVENTS.PARTICIPANT_LEFT,
+      expect.any(Function),
+    );
   });
 
   it('unmount 시 PRODUCER_CLOSED / CONSUMER_CLOSED 핸들러도 socket.off 로 해제된다', async () => {
