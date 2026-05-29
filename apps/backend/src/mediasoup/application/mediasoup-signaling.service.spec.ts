@@ -615,3 +615,80 @@ describe('MediasoupSignalingService.listProducers', () => {
     expect(res.producers).toHaveLength(2);
   });
 });
+
+describe('MediasoupSignalingService.toggleProducer', () => {
+  const setupWithProducer = async () => {
+    const ctx = makeService();
+    await ctx.service.openRoom({ meetingCode });
+    await ctx.service.admitParticipant({ meetingCode, participantId: 's1' });
+    await ctx.service.createTransport({
+      meetingCode,
+      participantId: 's1',
+      direction: 'send',
+    });
+    const s1Media = (await ctx.repo.repository.findByMeetingCode(meetingCode)).find(
+      (p) => p.participantId === 's1',
+    )!;
+    const produced = await ctx.service.produce({
+      meetingCode,
+      participantId: 's1',
+      transportId: s1Media.sendTransportId!,
+      kind: 'audio',
+      source: 'audio',
+      rtpParameters: {},
+    });
+    return { ...ctx, producerId: produced.producerId };
+  };
+
+  it('paused:true 면 transportPort.pauseProducer 에 위임한다', async () => {
+    const { service, transport, producerId } = await setupWithProducer();
+    transport.calls.length = 0;
+    await service.toggleProducer({
+      meetingCode,
+      participantId: 's1',
+      producerId,
+      paused: true,
+    });
+    expect(transport.calls).toEqual([{ name: 'pauseProducer', args: [producerId] }]);
+  });
+
+  it('paused:false 면 transportPort.resumeProducer 에 위임한다', async () => {
+    const { service, transport, producerId } = await setupWithProducer();
+    transport.calls.length = 0;
+    await service.toggleProducer({
+      meetingCode,
+      participantId: 's1',
+      producerId,
+      paused: false,
+    });
+    expect(transport.calls).toEqual([{ name: 'resumeProducer', args: [producerId] }]);
+  });
+
+  it('자기 소유가 아닌 producerId 는 거부하고 transport 를 건드리지 않는다', async () => {
+    const { service, transport, producerId } = await setupWithProducer();
+    await service.admitParticipant({ meetingCode, participantId: 's2' });
+    transport.calls.length = 0;
+    await expect(
+      service.toggleProducer({
+        meetingCode,
+        participantId: 's2',
+        producerId,
+        paused: true,
+      }),
+    ).rejects.toThrow();
+    expect(transport.calls).toEqual([]);
+  });
+
+  it('admit 안 된 참가자의 toggleProducer 는 거부한다', async () => {
+    const { service } = makeService();
+    await service.openRoom({ meetingCode });
+    await expect(
+      service.toggleProducer({
+        meetingCode,
+        participantId: 's-no',
+        producerId: 'p-x',
+        paused: true,
+      }),
+    ).rejects.toBeInstanceOf(ParticipantMediaNotFoundError);
+  });
+});
