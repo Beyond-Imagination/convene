@@ -29,9 +29,11 @@ export const MEDIASOUP_WS_EVENTS = {
   CONSUME: 'mediasoup:consume',
   RESUME_CONSUMER: 'mediasoup:resumeConsumer',
   LIST_PRODUCERS: 'mediasoup:listProducers',
+  TOGGLE_PRODUCER: 'mediasoup:toggleProducer',
   NEW_PRODUCER: 'mediasoup:newProducer',
   PRODUCER_CLOSED: 'mediasoup:producerClosed',
   CONSUMER_CLOSED: 'mediasoup:consumerClosed',
+  PRODUCER_TOGGLED: 'mediasoup:producerToggled',
 } as const;
 
 export type MediasoupWsEventName = (typeof MEDIASOUP_WS_EVENTS)[keyof typeof MEDIASOUP_WS_EVENTS];
@@ -115,6 +117,21 @@ export interface ListProducersResponse {
   producers: NewProducerBroadcast[];
 }
 
+/**
+ * 자기 자신의 producer 를 일시정지(mute)/재개(unmute)하는 RPC.
+ * `paused: true` 면 mediasoup `producer.pause()`, `false` 면 `producer.resume()`.
+ * 처리 후 server 가 같은 회의의 다른 참가자에게 `PRODUCER_TOGGLED` 를 broadcast 한다.
+ */
+export interface ToggleProducerRequest {
+  code: string;
+  producerId: string;
+  paused: boolean;
+}
+
+export interface ToggleProducerResponse {
+  ok: true;
+}
+
 // ---------- server → client: 브로드캐스트 ----------
 
 /**
@@ -134,4 +151,13 @@ export interface ProducerClosedBroadcast {
 
 export interface ConsumerClosedBroadcast {
   consumerId: string;
+}
+
+/**
+ * 같은 회의의 다른 참가자가 자기 producer 를 mute/unmute 했음을 알린다.
+ * 수신 측은 해당 producerId 의 remote tile 에 mute 상태를 반영한다.
+ */
+export interface ProducerToggledBroadcast {
+  producerId: string;
+  paused: boolean;
 }

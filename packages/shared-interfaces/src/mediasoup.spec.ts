@@ -20,7 +20,10 @@ import {
   type ProduceRequest,
   type ProduceResponse,
   type ProducerClosedBroadcast,
+  type ProducerToggledBroadcast,
   type ResumeConsumerRequest,
+  type ToggleProducerRequest,
+  type ToggleProducerResponse,
   type TransportDirection,
 } from './mediasoup.js';
 
@@ -31,9 +34,9 @@ describe('Mediasoup wire format', () => {
     }
   });
 
-  it('WS 이벤트 이름은 모두 서로 다르고 10개다 (RPC 7 + 브로드캐스트 3)', () => {
+  it('WS 이벤트 이름은 모두 서로 다르고 12개다 (RPC 8 + 브로드캐스트 4)', () => {
     const all = Object.values(MEDIASOUP_WS_EVENTS);
-    expect(all).toHaveLength(10);
+    expect(all).toHaveLength(12);
     expect(new Set(all).size).toBe(all.length);
   });
 
@@ -102,7 +105,14 @@ describe('Mediasoup wire format', () => {
     const m: ConsumerClosedBroadcast = { consumerId: 'c1' };
     const n: ListProducersRequest = { code: 'ABCDEFGH' };
     const o: ListProducersResponse = { producers: [k] };
+    const p: ToggleProducerRequest = {
+      code: 'ABCDEFGH',
+      producerId: 'p1',
+      paused: true,
+    };
+    const q: ToggleProducerResponse = { ok: true };
+    const r: ProducerToggledBroadcast = { producerId: 'p1', paused: true };
 
-    expect([a, b, c, d, e, f, g, h, i, j, k, l, m, n, o]).toHaveLength(15);
+    expect([a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r]).toHaveLength(18);
   });
 });
