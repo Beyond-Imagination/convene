@@ -27,6 +27,12 @@ export interface CreateMeetingResponse {
   code: string;
   source: Source;
   startedAt: string;
+  /**
+   * 회의 종료 권한자(host) 식별용 비밀 토큰. 생성자만 받아 보관하며
+   * 회의 종료 요청(`DELETE /meetings/:code?hostToken=...`) 시 제시한다.
+   * 다른 참가자(회의 입장자)에게는 노출되지 않는다.
+   */
+  hostToken: string;
 }
 
 /**

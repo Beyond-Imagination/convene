@@ -32,13 +32,15 @@ describe('meeting wire format', () => {
     expect([r1.source, r2.externalReference?.issueId]).toEqual(['web', 'NTN-1']);
   });
 
-  it('CreateMeetingResponse는 code / source / startedAt(ISO)을 가진다', () => {
+  it('CreateMeetingResponse는 code / source / startedAt(ISO) / hostToken을 가진다', () => {
     const r: CreateMeetingResponse = {
       code: 'abc12xyz',
       source: 'web',
       startedAt: '2026-01-01T00:00:00.000Z',
+      hostToken: 'host-token-uuid',
     };
     expect(r.code).toMatch(/^[a-z0-9]{8}$/);
+    expect(r.hostToken).toBe('host-token-uuid');
   });
 
   it('CloseMeetingResponse는 code / endedAt(ISO)을 가진다', () => {
