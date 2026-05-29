@@ -18,7 +18,7 @@ import {
   ProduceInput,
 } from '@/mediasoup/domain/ports';
 
-import { ParticipantMediaNotFoundError } from './mediasoup.errors';
+import { ParticipantMediaNotFoundError, ScreenShareConflictError } from './mediasoup.errors';
 import { MediasoupSignalingService } from './mediasoup-signaling.service';
 
 interface CapturedEvent {
@@ -479,6 +479,90 @@ describe('MediasoupSignalingService.produce', () => {
     expect(pipeCall!.args[1]).toBe('p-1');
     // s1 의 routerIndex (assign 시 받은 값) 가 sourceRouterIndex 로 전달되어야 한다.
     expect(typeof pipeCall!.args[2]).toBe('number');
+  });
+
+  it('이미 다른 참가자가 screen 공유 중이면 screen produce 를 ScreenShareConflictError 로 거부한다', async () => {
+    const { service } = makeService();
+    await service.openRoom({ meetingCode });
+    await service.admitParticipant({ meetingCode, participantId: 's1' });
+    await service.admitParticipant({ meetingCode, participantId: 's2' });
+    await service.createTransport({ meetingCode, participantId: 's1', direction: 'send' });
+    await service.createTransport({ meetingCode, participantId: 's2', direction: 'send' });
+    // s1 이 먼저 화면 공유.
+    await service.produce({
+      meetingCode,
+      participantId: 's1',
+      transportId: 't-1',
+      kind: 'video',
+      source: 'screen',
+      rtpParameters: {},
+    });
+    // s2 가 화면 공유 시도 → 동시 1인 제약 위반으로 거부.
+    await expect(
+      service.produce({
+        meetingCode,
+        participantId: 's2',
+        transportId: 't-2',
+        kind: 'video',
+        source: 'screen',
+        rtpParameters: {},
+      }),
+    ).rejects.toBeInstanceOf(ScreenShareConflictError);
+  });
+
+  it('다른 참가자가 screen 공유 중이어도 일반 video/audio produce 는 허용한다', async () => {
+    const { service, repo } = makeService();
+    await service.openRoom({ meetingCode });
+    await service.admitParticipant({ meetingCode, participantId: 's1' });
+    await service.admitParticipant({ meetingCode, participantId: 's2' });
+    await service.createTransport({ meetingCode, participantId: 's1', direction: 'send' });
+    await service.createTransport({ meetingCode, participantId: 's2', direction: 'send' });
+    await service.produce({
+      meetingCode,
+      participantId: 's1',
+      transportId: 't-1',
+      kind: 'video',
+      source: 'screen',
+      rtpParameters: {},
+    });
+    const res = await service.produce({
+      meetingCode,
+      participantId: 's2',
+      transportId: 't-2',
+      kind: 'video',
+      source: 'video',
+      rtpParameters: {},
+    });
+    expect(res.producerId).toBeDefined();
+    const s2 = await repo.repository.findByParticipantId('s2');
+    expect(s2?.producers.some((p) => p.source === 'video')).toBe(true);
+  });
+
+  it('같은 참가자가 자기 screen producer 를 (정리 후) 다시 만드는 것은 막지 않는다', async () => {
+    // backend 는 "자기 자신을 제외한" 다른 참가자의 screen 만 충돌로 본다.
+    const { service } = makeService();
+    await service.openRoom({ meetingCode });
+    await service.admitParticipant({ meetingCode, participantId: 's1' });
+    await service.createTransport({ meetingCode, participantId: 's1', direction: 'send' });
+    await service.produce({
+      meetingCode,
+      participantId: 's1',
+      transportId: 't-1',
+      kind: 'video',
+      source: 'screen',
+      rtpParameters: {},
+    });
+    // 같은 s1 의 추가 screen produce 는 conflict 가 아니다(자기 자신 제외).
+    await expect(
+      service.produce({
+        meetingCode,
+        participantId: 's1',
+        transportId: 't-1',
+        kind: 'video',
+        source: 'screen',
+        rtpParameters: {},
+      }),
+    ).resolves.toBeDefined();
   });
 });
 
