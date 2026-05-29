@@ -36,15 +36,32 @@ class FakeMediaStream {
 
 let getUserMediaMock: ReturnType<typeof vi.fn>;
 
+/**
+ * mediasoup-client `Producer` 의 최소 fake. mute toggle 이 pause/resume 을 호출하고
+ * paused getter 를 읽는지 검증하기 위해 상태를 들고 있는다.
+ */
+class FakeProducer {
+  paused = false;
+  readonly pause = vi.fn(() => {
+    this.paused = true;
+  });
+  readonly resume = vi.fn(() => {
+    this.paused = false;
+  });
+  readonly close = vi.fn();
+  constructor(
+    readonly id: string,
+    readonly track: FakeTrack,
+  ) {}
+}
+
 class FakeTransport {
   readonly id: string;
   readonly listeners = new Map<string, Array<(...args: unknown[]) => void>>();
   readonly close = vi.fn();
   readonly produce = vi.fn(
-    async (opts: { track: FakeTrack }): Promise<{ id: string; track: FakeTrack }> => ({
-      id: `producer-${opts.track.kind}`,
-      track: opts.track,
-    }),
+    async (opts: { track: FakeTrack }): Promise<FakeProducer> =>
+      new FakeProducer(`producer-${opts.track.kind}`, opts.track),
   );
   readonly consume = vi.fn(
     async (opts: {
@@ -757,5 +774,106 @@ describe('useMediasoupViewModel.listProducers (기존 producer 합류)', () => {
     await waitFor(() => expect(result.current.remoteMedia).toHaveLength(2));
     const producerIds = result.current.remoteMedia.map((m) => m.producerId).sort();
     expect(producerIds).toEqual(['p-existing-aud', 'p-existing-vid']);
+  });
+});
+
+describe('useMediasoupViewModel.muteToggle', () => {
+  beforeEach(() => {
+    fakeDevice = new FakeDevice();
+    getUserMediaMock = vi.fn(async () => new FakeMediaStream());
+    vi.stubGlobal('navigator', {
+      mediaDevices: { getUserMedia: getUserMediaMock },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const setupReady = async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const hook = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(hook.result.current.status).toBe('ready'));
+    const send = fakeDevice.createSendTransport.mock.results[0].value as FakeTransport;
+    // local audio/video producer 가 모두 생성될 때까지 대기.
+    await waitFor(() => expect(send.produce).toHaveBeenCalledTimes(2));
+    const audioProducer = (await send.produce.mock.results[0].value) as FakeProducer;
+    const videoProducer = (await send.produce.mock.results[1].value) as FakeProducer;
+    return { socket, send, audioProducer, videoProducer, ...hook };
+  };
+
+  it('초기 isAudioMuted / isVideoMuted 는 false 다', async () => {
+    const { result } = await setupReady();
+    expect(result.current.isAudioMuted).toBe(false);
+    expect(result.current.isVideoMuted).toBe(false);
+  });
+
+  it('toggleAudio 는 audio producer.pause + isAudioMuted=true + TOGGLE_PRODUCER emit(paused:true)', async () => {
+    const { socket, audioProducer, result } = await setupReady();
+    socket.emit.mockClear();
+    act(() => result.current.toggleAudio());
+    expect(audioProducer.pause).toHaveBeenCalledTimes(1);
+    expect(result.current.isAudioMuted).toBe(true);
+    expect(socket.emit).toHaveBeenCalledWith(MEDIASOUP_WS_EVENTS.TOGGLE_PRODUCER, {
+      code,
+      producerId: 'producer-audio',
+      paused: true,
+    });
+  });
+
+  it('toggleAudio 를 두 번 호출하면 resume + isAudioMuted=false + emit(paused:false)', async () => {
+    const { socket, audioProducer, result } = await setupReady();
+    act(() => result.current.toggleAudio());
+    socket.emit.mockClear();
+    act(() => result.current.toggleAudio());
+    expect(audioProducer.resume).toHaveBeenCalledTimes(1);
+    expect(result.current.isAudioMuted).toBe(false);
+    expect(socket.emit).toHaveBeenCalledWith(MEDIASOUP_WS_EVENTS.TOGGLE_PRODUCER, {
+      code,
+      producerId: 'producer-audio',
+      paused: false,
+    });
+  });
+
+  it('toggleVideo 는 video producer.pause + isVideoMuted=true + TOGGLE_PRODUCER emit(paused:true)', async () => {
+    const { socket, videoProducer, result } = await setupReady();
+    socket.emit.mockClear();
+    act(() => result.current.toggleVideo());
+    expect(videoProducer.pause).toHaveBeenCalledTimes(1);
+    expect(result.current.isVideoMuted).toBe(true);
+    expect(socket.emit).toHaveBeenCalledWith(MEDIASOUP_WS_EVENTS.TOGGLE_PRODUCER, {
+      code,
+      producerId: 'producer-video',
+      paused: true,
+    });
+  });
+
+  it('원격 PRODUCER_TOGGLED 수신 시 remoteMedia 의 해당 producer paused 가 갱신된다', async () => {
+    const { socket, result } = await setupReady();
+    const onNewProducer = captureSocketListener(socket, MEDIASOUP_WS_EVENTS.NEW_PRODUCER);
+    onNewProducer({
+      peerSocketId: 's2',
+      producerId: 'p-remote-audio',
+      kind: 'audio',
+      source: 'audio',
+    });
+    await waitFor(() => expect(result.current.remoteMedia).toHaveLength(1));
+    expect(result.current.remoteMedia[0].paused).toBe(false);
+
+    const onToggled = captureSocketListener(socket, MEDIASOUP_WS_EVENTS.PRODUCER_TOGGLED);
+    act(() => onToggled({ producerId: 'p-remote-audio', paused: true }));
+    await waitFor(() => expect(result.current.remoteMedia[0].paused).toBe(true));
+  });
+
+  it('unmount 시 PRODUCER_TOGGLED 핸들러가 socket.off 로 해제된다', async () => {
+    const { socket, unmount } = await setupReady();
+    unmount();
+    expect(socket.off).toHaveBeenCalledWith(
+      MEDIASOUP_WS_EVENTS.PRODUCER_TOGGLED,
+      expect.any(Function),
+    );
   });
 });
