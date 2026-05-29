@@ -127,7 +127,7 @@ describe('ReportFinalizationService.createDraft', () => {
     expect(report.externalReference).toEqual({ issueId: 'NTN-7' });
   });
 
-  it('draft 저장 후 report.transcription.requested 이벤트를 발행한다', async () => {
+  it('draft 저장 후 report.transcription.requested 이벤트를 participantNames 와 함께 발행한다', async () => {
     const { service, events } = makeService();
     await service.createDraft(validCommand());
     expect(events).toEqual([
@@ -138,6 +138,8 @@ describe('ReportFinalizationService.createDraft', () => {
           meetingId: 'mtg_001',
           code: 'abc12xyz',
           meetingStartedAtMs: startedAt.getTime(),
+          // STT speaker 를 nickname 으로 채우도록 participantId→nickname 매핑 전달.
+          participantNames: { p1: '준' },
         },
       },
     ]);
