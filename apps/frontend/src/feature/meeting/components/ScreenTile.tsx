@@ -20,9 +20,20 @@ export function LocalScreenTile({ stream }: LocalScreenTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   useMediaElementBinding({ ref: videoRef, stream });
   return (
-    <figure data-testid="local-screen-tile">
-      <video ref={videoRef} autoPlay muted playsInline />
-      <figcaption>내 화면 (공유 중)</figcaption>
+    <figure
+      data-testid="local-screen-tile"
+      className="relative m-0 max-h-[60vh] overflow-hidden rounded-lg border border-accent/40 bg-black"
+    >
+      <video
+        ref={videoRef}
+        autoPlay
+        muted
+        playsInline
+        className="max-h-[60vh] w-full object-contain"
+      />
+      <figcaption className="absolute bottom-2 left-2 rounded-md bg-accent/80 px-2 py-0.5 text-xs font-medium text-white">
+        내 화면 (공유 중)
+      </figcaption>
     </figure>
   );
 }
@@ -37,9 +48,20 @@ export function RemoteScreenTile({ nickname, track }: RemoteScreenTileProps) {
   const stream = useMemo(() => new MediaStream([track]), [track]);
   useMediaElementBinding({ ref: videoRef, stream });
   return (
-    <figure data-testid="remote-screen-tile">
-      <video ref={videoRef} autoPlay muted playsInline />
-      <figcaption>{nickname} 의 화면</figcaption>
+    <figure
+      data-testid="remote-screen-tile"
+      className="relative m-0 max-h-[60vh] overflow-hidden rounded-lg border border-accent/40 bg-black"
+    >
+      <video
+        ref={videoRef}
+        autoPlay
+        muted
+        playsInline
+        className="max-h-[60vh] w-full object-contain"
+      />
+      <figcaption className="absolute bottom-2 left-2 rounded-md bg-accent/80 px-2 py-0.5 text-xs font-medium text-white">
+        {nickname} 의 화면
+      </figcaption>
     </figure>
   );
 }

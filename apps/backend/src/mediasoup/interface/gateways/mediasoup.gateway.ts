@@ -1,3 +1,17 @@
+import {
+  type ConsumeResponse,
+  type CreateTransportResponse,
+  type GetRtpCapabilitiesResponse,
+  type ListProducersResponse,
+  MEDIASOUP_EVENTS,
+  MEDIASOUP_WS_EVENTS,
+  type MediaType,
+  type NewProducerBroadcast,
+  type ProducerClosedBroadcast,
+  type ProduceResponse,
+  type ProducerToggledBroadcast,
+  type ToggleProducerResponse,
+} from '@migration/shared-interfaces';
 import { Logger, UsePipes, ValidationPipe } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
@@ -10,29 +24,14 @@ import {
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
 
-import {
-  MEDIASOUP_EVENTS,
-  MEDIASOUP_WS_EVENTS,
-  type ConsumeResponse,
-  type CreateTransportResponse,
-  type GetRtpCapabilitiesResponse,
-  type ListProducersResponse,
-  type MediaType,
-  type NewProducerBroadcast,
-  type ProduceResponse,
-  type ProducerClosedBroadcast,
-  type ProducerToggledBroadcast,
-  type ToggleProducerResponse,
-} from '@migration/shared-interfaces';
-
 import { MediasoupSignalingService } from '@/mediasoup/application/mediasoup-signaling.service';
+import { CloseProducerDto } from '@/mediasoup/interface/dto/close-producer.dto';
 import { ConnectTransportDto } from '@/mediasoup/interface/dto/connect-transport.dto';
 import { ConsumeDto } from '@/mediasoup/interface/dto/consume.dto';
 import { CreateTransportDto } from '@/mediasoup/interface/dto/create-transport.dto';
 import { GetRtpCapabilitiesDto } from '@/mediasoup/interface/dto/get-rtp-capabilities.dto';
 import { ListProducersDto } from '@/mediasoup/interface/dto/list-producers.dto';
 import { ProduceDto } from '@/mediasoup/interface/dto/produce.dto';
-import { CloseProducerDto } from '@/mediasoup/interface/dto/close-producer.dto';
 import { ResumeConsumerDto } from '@/mediasoup/interface/dto/resume-consumer.dto';
 import { ToggleProducerDto } from '@/mediasoup/interface/dto/toggle-producer.dto';
 
@@ -44,6 +43,7 @@ interface ProducerCreatedPayload {
   producerId: string;
   kind: 'audio' | 'video';
   source: MediaType;
+  paused?: boolean;
 }
 
 /**
@@ -139,6 +139,7 @@ export class MediasoupGateway {
         kind: dto.kind,
         source: dto.source,
         rtpParameters: dto.rtpParameters,
+        paused: dto.paused,
       });
       this.logger.log(
         `[produce] ok (sid=${client.id}, kind=${dto.kind}, source=${dto.source}, producerId=${res.producerId})`,
@@ -255,6 +256,9 @@ export class MediasoupGateway {
       producerId: payload.producerId,
       kind: payload.kind,
       source: payload.source,
+      // produce 시점의 mute 상태를 그대로 전파(기본 OFF 입장이면 true). 이후 mute 변경은
+      // PRODUCER_TOGGLED 로 전파한다.
+      paused: payload.paused ?? false,
     };
     this.server
       .to(room)

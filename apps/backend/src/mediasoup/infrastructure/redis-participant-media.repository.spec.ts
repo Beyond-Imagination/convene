@@ -106,7 +106,9 @@ describe('RedisParticipantMediaRepository', () => {
 
     const found = await repo.findByParticipantId('s1');
     expect(found!.isClosed).toBe(true);
-    expect(found!.producers).toEqual([{ id: 'p1', kind: 'audio', source: 'audio' }]);
+    expect(found!.producers).toEqual([
+      { id: 'p1', kind: 'audio', source: 'audio', paused: false },
+    ]);
     expect(found!.consumers).toEqual([
       { id: 'c1', producerId: 'p-other', kind: 'video', source: 'video' },
     ]);

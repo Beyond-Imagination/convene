@@ -1,6 +1,5 @@
-import { act, renderHook } from '@testing-library/react';
-
 import { MEETING_WS_EVENTS } from '@migration/shared-interfaces';
+import { act, renderHook } from '@testing-library/react';
 
 import { useChatViewModel } from './useChatViewModel';
 

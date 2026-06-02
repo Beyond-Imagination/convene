@@ -59,6 +59,8 @@ export interface ProduceCommand extends ParticipantCommand {
   kind: 'audio' | 'video';
   source: MediaType;
   rtpParameters: unknown;
+  /** producer 를 paused(mute) 상태로 생성할지. 기본 OFF 입장 시 true. 생략하면 false. */
+  paused?: boolean;
 }
 
 export interface ConsumeCommand extends ParticipantCommand {
@@ -174,8 +176,13 @@ export class MediasoupSignalingService {
       kind: command.kind,
       source: command.source,
       rtpParameters: command.rtpParameters,
+      paused: command.paused,
     });
-    media.addProducer(producerId, { kind: command.kind, source: command.source });
+    media.addProducer(producerId, {
+      kind: command.kind,
+      source: command.source,
+      paused: command.paused,
+    });
     await this.deps.participantMediaRepository.save(media);
 
     // plum eager pipe — 다른 모든 router 에 동일 producer 가 보이도록 즉시 pipe.
@@ -202,6 +209,8 @@ export class MediasoupSignalingService {
       producerId,
       kind: command.kind,
       source: command.source,
+      // NEW_PRODUCER 브로드캐스트가 처음부터 정확한 mute 상태로 나가게 한다.
+      paused: command.paused ?? false,
     });
     return { producerId };
   }
@@ -248,6 +257,10 @@ export class MediasoupSignalingService {
     } else {
       await this.deps.transportPort.resumeProducer(command.producerId);
     }
+    // 도메인에도 mute 상태를 반영·저장해, 늦게 입장한 참가자의 LIST_PRODUCERS 응답에
+    // 정확한 paused 가 실리도록 한다(검은 화면 방지).
+    media.setProducerPaused(command.producerId, command.paused);
+    await this.deps.participantMediaRepository.save(media);
   }
 
   /**
@@ -282,6 +295,7 @@ export class MediasoupSignalingService {
           producerId: producer.id,
           kind: producer.kind,
           source: producer.source,
+          paused: producer.paused,
         });
       }
     }

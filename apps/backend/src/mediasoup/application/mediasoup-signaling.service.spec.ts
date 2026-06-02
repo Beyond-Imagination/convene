@@ -383,7 +383,9 @@ describe('MediasoupSignalingService.produce', () => {
     expect(res.producerId).toBe('p-1');
 
     const media = await repo.repository.findByParticipantId('s1');
-    expect(media?.producers).toEqual([{ id: 'p-1', kind: 'audio', source: 'audio' }]);
+    expect(media?.producers).toEqual([
+      { id: 'p-1', kind: 'audio', source: 'audio', paused: false },
+    ]);
 
     expect(events).toEqual([
       {
@@ -394,9 +396,41 @@ describe('MediasoupSignalingService.produce', () => {
           producerId: 'p-1',
           kind: 'audio',
           source: 'audio',
+          paused: false,
         },
       },
     ]);
+  });
+
+  it('paused:true 로 produce 하면 transportPort.produce·addProducer·PRODUCER_CREATED 에 모두 실린다', async () => {
+    const { service, repo, events, transport } = makeService();
+    await service.openRoom({ meetingCode });
+    await service.admitParticipant({ meetingCode, participantId: 's1' });
+    await service.createTransport({ meetingCode, participantId: 's1', direction: 'send' });
+
+    await service.produce({
+      meetingCode,
+      participantId: 's1',
+      transportId: 't-1',
+      kind: 'video',
+      source: 'video',
+      rtpParameters: { codecs: [] },
+      paused: true,
+    });
+
+    // 1) transport 어댑터에 paused 가 전달돼 paused producer 로 생성된다.
+    const produceCall = transport.calls.find((c) => c.name === 'produce');
+    expect(produceCall?.args[0]).toMatchObject({ paused: true });
+
+    // 2) 도메인에도 paused 가 반영된다(늦은 입장자 LIST_PRODUCERS 정확성).
+    const media = await repo.repository.findByParticipantId('s1');
+    expect(media?.producers[0].paused).toBe(true);
+
+    // 3) NEW_PRODUCER 로 나갈 payload 에도 paused 가 실린다.
+    expect(events[0]).toMatchObject({
+      name: MEDIASOUP_EVENTS.PRODUCER_CREATED,
+      payload: { producerId: 'p-1', paused: true },
+    });
   });
 
   it('admit 안 된 참가자의 produce 는 거부한다', async () => {

@@ -1,10 +1,18 @@
-import { IsDefined, IsIn, IsObject, IsString, Length, MaxLength } from 'class-validator';
-
 import {
   MEDIA_TYPES,
   type MediaType,
   type ProduceRequest,
 } from '@migration/shared-interfaces';
+import {
+  IsBoolean,
+  IsDefined,
+  IsIn,
+  IsObject,
+  IsOptional,
+  IsString,
+  Length,
+  MaxLength,
+} from 'class-validator';
 
 import { MeetingCode } from '@/meeting/domain/value-objects';
 
@@ -28,4 +36,8 @@ export class ProduceDto implements ProduceRequest {
   @IsDefined()
   @IsObject()
   rtpParameters!: unknown;
+
+  @IsOptional()
+  @IsBoolean()
+  paused?: boolean;
 }

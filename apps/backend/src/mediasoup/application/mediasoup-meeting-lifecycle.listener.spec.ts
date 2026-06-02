@@ -1,5 +1,5 @@
-import { MediasoupSignalingService } from './mediasoup-signaling.service';
 import { MediasoupMeetingLifecycleListener } from './mediasoup-meeting-lifecycle.listener';
+import { MediasoupSignalingService } from './mediasoup-signaling.service';
 
 interface CapturedCall {
   name: string;

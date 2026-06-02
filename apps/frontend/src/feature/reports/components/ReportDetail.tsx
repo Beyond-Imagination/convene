@@ -26,14 +26,19 @@ const formatDate = (iso: string): string => {
 
 function SummarySection({ summary }: { readonly summary: ReportSummaryWire }) {
   return (
-    <section data-testid="report-summary">
-      <h2>{summary.title}</h2>
-      <p>{summary.overview}</p>
+    <section
+      data-testid="report-summary"
+      className="rounded-xl border border-border bg-surface p-6"
+    >
+      <h2 className="text-xl font-bold text-text">{summary.title}</h2>
+      <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-text">
+        {summary.overview}
+      </p>
 
       {summary.decisions.length > 0 && (
-        <section>
-          <h3>결정 사항</h3>
-          <ul>
+        <section className="mt-5">
+          <h3 className="mb-2 text-sm font-bold text-muted">결정 사항</h3>
+          <ul className="list-disc space-y-1 pl-5 text-sm text-text">
             {summary.decisions.map((d, i) => (
               <li key={i}>{d}</li>
             ))}
@@ -42,14 +47,16 @@ function SummarySection({ summary }: { readonly summary: ReportSummaryWire }) {
       )}
 
       {summary.actionItems.length > 0 && (
-        <section>
-          <h3>액션 아이템</h3>
-          <ul>
+        <section className="mt-5">
+          <h3 className="mb-2 text-sm font-bold text-muted">액션 아이템</h3>
+          <ul className="space-y-1.5 text-sm text-text">
             {summary.actionItems.map((a, i) => (
-              <li key={i}>
-                {a.owner !== undefined && <strong>{a.owner}: </strong>}
+              <li key={i} className="flex flex-wrap items-baseline gap-1">
+                {a.owner !== undefined && (
+                  <strong className="text-accent">{a.owner}</strong>
+                )}
                 <span>{a.task}</span>
-                {a.due !== undefined && <em> ({a.due})</em>}
+                {a.due !== undefined && <em className="text-muted"> ({a.due})</em>}
               </li>
             ))}
           </ul>
@@ -57,13 +64,13 @@ function SummarySection({ summary }: { readonly summary: ReportSummaryWire }) {
       )}
 
       {summary.keyTopics.length > 0 && (
-        <section>
-          <h3>핵심 토픽</h3>
-          <ul>
+        <section className="mt-5">
+          <h3 className="mb-2 text-sm font-bold text-muted">핵심 토픽</h3>
+          <ul className="space-y-3 text-sm text-text">
             {summary.keyTopics.map((t, i) => (
               <li key={i}>
-                <strong>{t.topic}</strong>
-                <ul>
+                <strong className="text-text">{t.topic}</strong>
+                <ul className="mt-1 list-disc space-y-1 pl-5 text-muted">
                   {t.points.map((p, j) => (
                     <li key={j}>{p}</li>
                   ))}
@@ -79,10 +86,12 @@ function SummarySection({ summary }: { readonly summary: ReportSummaryWire }) {
 
 function Body({ report }: { readonly report: ReportDetailResponse }) {
   return (
-    <article>
+    <article className="flex flex-col gap-5">
       <header>
-        <h1>회의록 {report.code}</h1>
-        <p>
+        <h1 className="text-2xl font-bold tracking-tight text-text">
+          회의록 {report.code}
+        </h1>
+        <p className="mt-1 text-sm text-muted">
           {formatDate(report.startedAt)} ~ {formatDate(report.endedAt)}
         </p>
       </header>
@@ -90,26 +99,50 @@ function Body({ report }: { readonly report: ReportDetailResponse }) {
       {report.summary !== null ? (
         <SummarySection summary={report.summary} />
       ) : (
-        <p data-testid="summary-pending" role="status" aria-live="polite">
+        <p
+          data-testid="summary-pending"
+          role="status"
+          aria-live="polite"
+          className="rounded-xl border border-dashed border-border bg-surface py-10 text-center text-muted"
+        >
           요약이 진행 중입니다…
         </p>
       )}
 
-      <section data-testid="report-participants" aria-labelledby="participants-heading">
-        <h2 id="participants-heading">참가자</h2>
-        <ul>
+      <section
+        data-testid="report-participants"
+        aria-labelledby="participants-heading"
+        className="rounded-xl border border-border bg-surface p-6"
+      >
+        <h2 id="participants-heading" className="mb-3 text-sm font-bold text-muted">
+          참가자
+        </h2>
+        <ul className="flex flex-wrap gap-2">
           {report.participants.map((p) => (
-            <li key={p.id}>{p.nickname}</li>
+            <li
+              key={p.id}
+              className="rounded-full bg-bg px-3 py-1 text-sm font-medium text-text"
+            >
+              {p.nickname}
+            </li>
           ))}
         </ul>
       </section>
 
-      <section data-testid="report-chat" aria-labelledby="chat-heading">
-        <h2 id="chat-heading">채팅 로그</h2>
-        <ul>
+      <section
+        data-testid="report-chat"
+        aria-labelledby="chat-heading"
+        className="rounded-xl border border-border bg-surface p-6"
+      >
+        <h2 id="chat-heading" className="mb-3 text-sm font-bold text-muted">
+          채팅 로그
+        </h2>
+        <ul className="space-y-1.5 text-sm">
           {report.chat.map((c, i) => (
             <li key={i} data-testid="report-chat-entry">
-              <strong>{c.nickname}</strong>: <span>{c.text}</span>
+              <strong className="text-text">{c.nickname}</strong>
+              <span className="text-muted">: </span>
+              <span className="text-text">{c.text}</span>
             </li>
           ))}
         </ul>
@@ -121,7 +154,7 @@ function Body({ report }: { readonly report: ReportDetailResponse }) {
 export function ReportDetail({ status, report, errorMessage }: ReportDetailProps) {
   if (status === 'loading' || status === 'idle') {
     return (
-      <p role="status" aria-live="polite">
+      <p role="status" aria-live="polite" className="py-12 text-center text-muted">
         불러오는 중…
       </p>
     );
@@ -129,13 +162,23 @@ export function ReportDetail({ status, report, errorMessage }: ReportDetailProps
 
   if (status === 'not-found') {
     return (
-      <p data-testid="report-not-found">회의록을 찾을 수 없습니다.</p>
+      <p
+        data-testid="report-not-found"
+        className="rounded-xl border border-dashed border-border bg-surface py-16 text-center text-muted"
+      >
+        회의록을 찾을 수 없습니다.
+      </p>
     );
   }
 
   if (status === 'error' || report === null) {
     return (
-      <p role="alert">{errorMessage ?? '오류가 발생했습니다.'}</p>
+      <p
+        role="alert"
+        className="rounded-xl border border-border bg-surface py-12 text-center text-sm text-danger"
+      >
+        {errorMessage ?? '오류가 발생했습니다.'}
+      </p>
     );
   }
 

@@ -167,7 +167,7 @@ describe('MediasoupRouterAdapter', () => {
     // 실제 mediasoup native worker 두 개로 router 2 개를 묶고, router#0 에 만든
     // producer 를 router#1 로 pipe → router#1 의 transport.consume 이 같은 id 로
     // 동작하는지 검증. plum eager pipe 의 핵심 효과.
-    const { adapter, pool, cleanup } = await setup(2, 1);
+    const { adapter, cleanup } = await setup(2, 1);
     try {
       await adapter.createRoom('CODE1111');
       // capacity=1 이라 두 명 입장하면 router 2 개가 자동 생성된다.

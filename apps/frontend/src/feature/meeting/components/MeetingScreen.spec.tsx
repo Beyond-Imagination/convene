@@ -1,13 +1,13 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import type {
-  RemoteParticipant,
-  UseMeetingViewModel,
-} from '@/feature/meeting/hooks/useMeetingViewModel';
-import type {
   RemoteMediaEntry,
   UseMediasoupViewModel,
 } from '@/feature/meeting/hooks/useMediasoupViewModel';
+import type {
+  RemoteParticipant,
+  UseMeetingViewModel,
+} from '@/feature/meeting/hooks/useMeetingViewModel';
 
 import { MeetingScreen } from './MeetingScreen';
 

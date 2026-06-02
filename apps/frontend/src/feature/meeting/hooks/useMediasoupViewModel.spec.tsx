@@ -1,6 +1,5 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
-
 import { MEDIASOUP_WS_EVENTS, MEETING_WS_EVENTS } from '@migration/shared-interfaces';
+import { act, renderHook, waitFor } from '@testing-library/react';
 
 import { useMediasoupViewModel } from './useMediasoupViewModel';
 
@@ -13,6 +12,17 @@ import { useMediasoupViewModel } from './useMediasoupViewModel';
 class FakeTrack {
   readonly kind: 'audio' | 'video';
   readonly stop = vi.fn();
+  enabled = true;
+  private readonly handlers = new Map<string, Array<() => void>>();
+  readonly addEventListener = vi.fn((event: string, cb: () => void) => {
+    const arr = this.handlers.get(event) ?? [];
+    arr.push(cb);
+    this.handlers.set(event, arr);
+  });
+  /** 브라우저가 발화하는 이벤트(예: 화면 공유 native '공유 중지' 의 'ended')를 흉내낸다. */
+  emit(event: string): void {
+    for (const cb of this.handlers.get(event) ?? []) cb();
+  }
   constructor(kind: 'audio' | 'video') {
     this.kind = kind;
   }
@@ -291,7 +301,11 @@ describe('useMediasoupViewModel.mount', () => {
     const errback = vi.fn();
     socket.emitWithAck.mockClear();
     send.listeners.get('produce')?.[0](
-      { kind: 'audio', rtpParameters: { codecs: [] }, appData: { source: 'audio' } },
+      {
+        kind: 'audio',
+        rtpParameters: { codecs: [] },
+        appData: { source: 'audio', paused: true },
+      },
       callback,
       errback,
     );
@@ -304,6 +318,8 @@ describe('useMediasoupViewModel.mount', () => {
         kind: 'audio',
         source: 'audio',
         rtpParameters: { codecs: [] },
+        // appData.paused 가 PRODUCE RPC 의 paused 로 위임된다(기본 OFF 입장).
+        paused: true,
       }),
     );
   });
@@ -734,6 +750,63 @@ describe('useMediasoupViewModel.screenShare', () => {
     });
   });
 
+  it('브라우저 native "공유 중지"(track ended)에도 closeProducer 가 서버에 전달되고 상태가 초기화된다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderHook(() =>
+      useMediasoupViewModel(socket as unknown as never, code),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => {
+      await result.current.startScreenShare();
+    });
+    const stream = result.current.screenStream as unknown as FakeMediaStream;
+    const videoTrack = stream.getVideoTracks()[0];
+
+    socket.emit.mockClear();
+    await act(async () => {
+      videoTrack.emit('ended');
+    });
+
+    expect(result.current.isSharingScreen).toBe(false);
+    expect(result.current.screenStream).toBeNull();
+    expect(socket.emit).toHaveBeenCalledWith(MEDIASOUP_WS_EVENTS.CLOSE_PRODUCER, {
+      code,
+      producerId: 'producer-video',
+    });
+  });
+
+  it('socket 이 null→연결로 늦게 바뀐 뒤 native stop 에도 최신 socket 으로 closeProducer 가 전달된다', async () => {
+    // 실제 앱에서 socket 은 처음 null 이었다가 연결되므로, 'ended' 핸들러가 옛
+    // (socket=null) 클로저를 잡으면 closeProducer emit 이 누락된다(stale closure).
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result, rerender } = renderHook(
+      ({ s }: { s: FakeSocket | null }) =>
+        useMediasoupViewModel(s as unknown as never, code),
+      { initialProps: { s: null as FakeSocket | null } },
+    );
+    await act(async () => {
+      rerender({ s: socket });
+    });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => {
+      await result.current.startScreenShare();
+    });
+    const stream = result.current.screenStream as unknown as FakeMediaStream;
+    const videoTrack = stream.getVideoTracks()[0];
+
+    socket.emit.mockClear();
+    await act(async () => {
+      videoTrack.emit('ended');
+    });
+
+    expect(socket.emit).toHaveBeenCalledWith(MEDIASOUP_WS_EVENTS.CLOSE_PRODUCER, {
+      code,
+      producerId: 'producer-video',
+    });
+  });
+
   it('이미 공유 중이면 startScreenShare 는 getDisplayMedia 를 두 번 호출하지 않는다', async () => {
     const socket = new FakeSocket();
     setupSocketAcks(socket);
@@ -872,28 +945,37 @@ describe('useMediasoupViewModel.muteToggle', () => {
     return { socket, send, audioProducer, videoProducer, ...hook };
   };
 
-  it('초기 isAudioMuted / isVideoMuted 는 false 다', async () => {
+  it('입장 직후 isAudioMuted / isVideoMuted 가 모두 true 다 (마이크·카메라 기본 OFF)', async () => {
     const { result } = await setupReady();
-    expect(result.current.isAudioMuted).toBe(false);
-    expect(result.current.isVideoMuted).toBe(false);
+    await waitFor(() => expect(result.current.isAudioMuted).toBe(true));
+    await waitFor(() => expect(result.current.isVideoMuted).toBe(true));
   });
 
-  it('toggleAudio 는 audio producer.pause + isAudioMuted=true + TOGGLE_PRODUCER emit(paused:true)', async () => {
-    const { socket, audioProducer, result } = await setupReady();
-    socket.emit.mockClear();
-    act(() => result.current.toggleAudio());
+  it('입장 시 produce 자체에 paused:true 가 실리고(기본 OFF) producer 는 로컬에서 pause 된다 — 별도 TOGGLE_PRODUCER race 없음', async () => {
+    const { socket, send, audioProducer, videoProducer, result } = await setupReady();
+    await waitFor(() => expect(result.current.isVideoMuted).toBe(true));
+    // 로컬 RTP 송출 정지.
     expect(audioProducer.pause).toHaveBeenCalledTimes(1);
-    expect(result.current.isAudioMuted).toBe(true);
-    expect(socket.emit).toHaveBeenCalledWith(MEDIASOUP_WS_EVENTS.TOGGLE_PRODUCER, {
-      code,
-      producerId: 'producer-audio',
-      paused: true,
-    });
+    expect(videoProducer.pause).toHaveBeenCalledTimes(1);
+    // produce 시점에 paused:true 를 실어 NEW_PRODUCER 가 처음부터 mute 로 나가게 한다.
+    const audioCall = send.produce.mock.calls.find(
+      (c) => c[0].appData?.source === 'audio',
+    );
+    const videoCall = send.produce.mock.calls.find(
+      (c) => c[0].appData?.source === 'video',
+    );
+    expect(audioCall?.[0].appData).toMatchObject({ paused: true });
+    expect(videoCall?.[0].appData).toMatchObject({ paused: true });
+    // 기본 OFF 를 produce 직후 TOGGLE_PRODUCER 로 전파하지 않는다(race 제거).
+    expect(socket.emit).not.toHaveBeenCalledWith(
+      MEDIASOUP_WS_EVENTS.TOGGLE_PRODUCER,
+      expect.anything(),
+    );
   });
 
-  it('toggleAudio 를 두 번 호출하면 resume + isAudioMuted=false + emit(paused:false)', async () => {
+  it('toggleAudio 는 기본 OFF 상태에서 audio producer.resume + isAudioMuted=false + emit(paused:false)', async () => {
     const { socket, audioProducer, result } = await setupReady();
-    act(() => result.current.toggleAudio());
+    await waitFor(() => expect(result.current.isAudioMuted).toBe(true));
     socket.emit.mockClear();
     act(() => result.current.toggleAudio());
     expect(audioProducer.resume).toHaveBeenCalledTimes(1);
@@ -905,16 +987,33 @@ describe('useMediasoupViewModel.muteToggle', () => {
     });
   });
 
-  it('toggleVideo 는 video producer.pause + isVideoMuted=true + TOGGLE_PRODUCER emit(paused:true)', async () => {
+  it('toggleAudio 를 두 번 호출하면 다시 pause + isAudioMuted=true + emit(paused:true)', async () => {
+    const { socket, audioProducer, result } = await setupReady();
+    await waitFor(() => expect(result.current.isAudioMuted).toBe(true));
+    act(() => result.current.toggleAudio()); // 켜기(resume)
+    audioProducer.pause.mockClear(); // 입장 시 1회 호출분 제거
+    socket.emit.mockClear();
+    act(() => result.current.toggleAudio()); // 다시 끄기(pause)
+    expect(audioProducer.pause).toHaveBeenCalledTimes(1);
+    expect(result.current.isAudioMuted).toBe(true);
+    expect(socket.emit).toHaveBeenCalledWith(MEDIASOUP_WS_EVENTS.TOGGLE_PRODUCER, {
+      code,
+      producerId: 'producer-audio',
+      paused: true,
+    });
+  });
+
+  it('toggleVideo 는 기본 OFF 상태에서 video producer.resume + isVideoMuted=false + emit(paused:false)', async () => {
     const { socket, videoProducer, result } = await setupReady();
+    await waitFor(() => expect(result.current.isVideoMuted).toBe(true));
     socket.emit.mockClear();
     act(() => result.current.toggleVideo());
-    expect(videoProducer.pause).toHaveBeenCalledTimes(1);
-    expect(result.current.isVideoMuted).toBe(true);
+    expect(videoProducer.resume).toHaveBeenCalledTimes(1);
+    expect(result.current.isVideoMuted).toBe(false);
     expect(socket.emit).toHaveBeenCalledWith(MEDIASOUP_WS_EVENTS.TOGGLE_PRODUCER, {
       code,
       producerId: 'producer-video',
-      paused: true,
+      paused: false,
     });
   });
 

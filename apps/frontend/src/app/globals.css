@@ -1,11 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * migration v1 의미 컬러 토큰.
+ * :root = 라이트(메인·입장·reports). .theme-dark = 회의 화면 컨테이너.
+ * Tailwind 의 bg-surface / text-muted 등이 이 변수를 읽는다.
+ */
+:root {
+  --bg: #ffffff;
+  --surface: #f5f5f5;
+  --border: #e5e5e5;
+  --text: #171717;
+  --muted: #737373;
+}
+
+.theme-dark {
+  --bg: #0a0a0a;
+  --surface: #171717;
+  --border: #262626;
+  --text: #fafafa;
+  --muted: #a3a3a3;
+}
+
 html,
 body {
   margin: 0;
   padding: 0;
+  background: var(--bg);
+  color: var(--text);
   font-family:
     system-ui,
     -apple-system,
     Segoe UI,
     Roboto,
     sans-serif;
+}
+
+/**
+ * 재사용 UI 프리미티브. 메인·입장·reports·회의 컨트롤 바가 공유한다.
+ * 의미 토큰(bg/surface/border/text/muted)을 쓰므로 .theme-dark 안에서도 동작한다.
+ */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-accent text-white hover:bg-accent-hover active:bg-accent-active;
+  }
+  .btn-ghost {
+    @apply btn border border-border bg-transparent text-text hover:bg-surface;
+  }
+  .btn-danger {
+    @apply btn bg-danger text-white hover:bg-danger-hover;
+  }
+  .field-label {
+    @apply mb-1.5 block text-sm font-medium text-muted;
+  }
+  .field-input {
+    @apply w-full rounded-lg border border-border bg-bg px-3.5 py-2.5 text-sm text-text outline-none transition placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/30 aria-[invalid=true]:border-danger;
+  }
+  .field-error {
+    @apply mt-1.5 text-sm text-danger;
+  }
 }

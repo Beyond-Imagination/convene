@@ -1,6 +1,5 @@
-import { IsString, Length, MaxLength } from 'class-validator';
-
 import type { ResumeConsumerRequest } from '@migration/shared-interfaces';
+import { IsString, Length, MaxLength } from 'class-validator';
 
 import { MeetingCode } from '@/meeting/domain/value-objects';
 

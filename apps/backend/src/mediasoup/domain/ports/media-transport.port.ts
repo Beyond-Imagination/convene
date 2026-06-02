@@ -26,6 +26,8 @@ export interface ProduceInput {
   kind: 'audio' | 'video';
   source: MediaType;
   rtpParameters: unknown;
+  /** producer 를 paused(mute) 상태로 생성할지. 생략하면 false. */
+  paused?: boolean;
 }
 
 export interface ConsumeInput {

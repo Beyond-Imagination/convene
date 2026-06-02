@@ -15,8 +15,8 @@ import { MediasoupTransportAdapter } from '@/mediasoup/infrastructure/mediasoup-
 import { MediasoupWorkerPool } from '@/mediasoup/infrastructure/mediasoup-worker.pool';
 import { RedisParticipantMediaRepository } from '@/mediasoup/infrastructure/redis-participant-media.repository';
 import { MediasoupGateway } from '@/mediasoup/interface/gateways/mediasoup.gateway';
-import { RecordingModule } from '@/recording/recording.module';
 import { RedisAudioBufferRepository } from '@/recording/infrastructure/redis-audio-buffer.repository';
+import { RecordingModule } from '@/recording/recording.module';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 
 /**

@@ -24,7 +24,7 @@ const formatDate = (iso: string): string => {
 export function ReportList({ status, items, errorMessage, refresh }: ReportListProps) {
   if (status === 'loading') {
     return (
-      <p role="status" aria-live="polite">
+      <p role="status" aria-live="polite" className="py-12 text-center text-muted">
         불러오는 중…
       </p>
     );
@@ -32,9 +32,15 @@ export function ReportList({ status, items, errorMessage, refresh }: ReportListP
 
   if (status === 'error') {
     return (
-      <section>
-        <p role="alert">{errorMessage ?? '오류가 발생했습니다.'}</p>
-        <button type="button" onClick={() => void refresh()}>
+      <section className="rounded-xl border border-border bg-surface p-6 text-center">
+        <p role="alert" className="text-sm text-danger">
+          {errorMessage ?? '오류가 발생했습니다.'}
+        </p>
+        <button
+          type="button"
+          onClick={() => void refresh()}
+          className="btn-ghost mt-4"
+        >
           다시 시도
         </button>
       </section>
@@ -43,19 +49,34 @@ export function ReportList({ status, items, errorMessage, refresh }: ReportListP
 
   if (items.length === 0) {
     return (
-      <p data-testid="report-list-empty">아직 회의록이 없습니다.</p>
+      <p
+        data-testid="report-list-empty"
+        className="rounded-xl border border-dashed border-border bg-surface py-16 text-center text-muted"
+      >
+        아직 회의록이 없습니다.
+      </p>
     );
   }
 
   return (
-    <ul>
+    <ul className="flex flex-col gap-3">
       {items.map((report) => (
         <li key={report.id}>
-          <Link href={`/reports/${report.id}`} data-testid="report-list-item">
-            <span>{report.title ?? '(제목 없음)'}</span>
-            <span>코드 {report.code}</span>
-            <span>참가자 {report.participantCount}명</span>
-            <span>{formatDate(report.endedAt)}</span>
+          <Link
+            href={`/reports/${report.id}`}
+            data-testid="report-list-item"
+            className="flex flex-col gap-1 rounded-xl border border-border bg-surface p-4 transition-colors hover:border-accent hover:bg-bg"
+          >
+            <span className="text-base font-semibold text-text">
+              {report.title ?? '(제목 없음)'}
+            </span>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+              <span className="rounded bg-bg px-2 py-0.5 font-medium">
+                코드 {report.code}
+              </span>
+              <span>참가자 {report.participantCount}명</span>
+              <span>{formatDate(report.endedAt)}</span>
+            </div>
           </Link>
         </li>
       ))}

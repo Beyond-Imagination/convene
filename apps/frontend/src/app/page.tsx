@@ -20,13 +20,43 @@ export default function HomePage() {
   const createVm = useCreateMeetingViewModel();
   const joinVm = useJoinMeetingViewModel();
   return (
-    <main>
-      <h1>migration v1.0.0</h1>
-      <CreateMeetingForm {...createVm} />
-      <JoinMeetingForm {...joinVm} />
-      <nav>
-        <Link href="/reports">회의록 보기</Link>
-      </nav>
+    <main className="flex min-h-screen flex-col items-center justify-center bg-bg px-4 py-12">
+      <div className="w-full max-w-md">
+        <header className="mb-8 text-center">
+          <div className="inline-flex items-center gap-2">
+            <span className="inline-block h-7 w-7 rounded-full bg-accent" aria-hidden />
+            <span className="text-2xl font-extrabold tracking-tight text-text">
+              migration
+            </span>
+          </div>
+          <p className="mt-2 text-sm text-muted">
+            링크 하나로 시작하는 화상회의 · 채팅 · 회의록
+          </p>
+        </header>
+
+        <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+          <CreateMeetingForm {...createVm} />
+        </section>
+
+        <div className="my-6 flex items-center gap-3 text-xs text-muted">
+          <span className="h-px flex-1 bg-border" />
+          또는
+          <span className="h-px flex-1 bg-border" />
+        </div>
+
+        <section className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+          <JoinMeetingForm {...joinVm} />
+        </section>
+
+        <nav className="mt-8 text-center">
+          <Link
+            href="/reports"
+            className="text-sm font-medium text-muted transition-colors hover:text-accent"
+          >
+            지난 회의록 보기 →
+          </Link>
+        </nav>
+      </div>
     </main>
   );
 }

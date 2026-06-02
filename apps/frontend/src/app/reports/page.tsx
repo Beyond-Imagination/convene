@@ -15,12 +15,19 @@ import { useReportListViewModel } from '@/feature/reports/hooks/useReportListVie
 export default function ReportListPage() {
   const vm = useReportListViewModel();
   return (
-    <main>
-      <h1>회의록</h1>
-      <ReportList {...vm} />
-      <nav>
-        <Link href="/">홈으로</Link>
-      </nav>
+    <main className="min-h-screen bg-bg px-4 py-10">
+      <div className="mx-auto max-w-3xl">
+        <header className="mb-6 flex items-center justify-between">
+          <h1 className="text-2xl font-bold tracking-tight text-text">회의록</h1>
+          <Link
+            href="/"
+            className="text-sm font-medium text-muted transition-colors hover:text-accent"
+          >
+            ← 홈으로
+          </Link>
+        </header>
+        <ReportList {...vm} />
+      </div>
     </main>
   );
 }

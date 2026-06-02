@@ -1,4 +1,4 @@
-import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { type BrowserContext, expect, type Page,test } from '@playwright/test';
 
 /**
  * 두 명의 참가자 시나리오 (실제 socket.io broadcast + mediasoup pipeline 까지 검증).

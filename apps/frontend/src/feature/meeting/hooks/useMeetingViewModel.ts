@@ -1,9 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Socket } from 'socket.io-client';
-
 import {
   MEETING_WS_EVENTS,
   type MeetingEndedBroadcast,
@@ -11,10 +7,13 @@ import {
   type ParticipantJoinedBroadcast,
   type ParticipantLeftBroadcast,
 } from '@migration/shared-interfaces';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Socket } from 'socket.io-client';
 
 import { closeMeeting } from '@/shared/api/meeting.api';
-import { getHostToken } from '@/shared/stores/host-token.storage';
 import { connectMeetingSocket } from '@/shared/socket/meeting.socket';
+import { getHostToken } from '@/shared/stores/host-token.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
 /**

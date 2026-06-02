@@ -80,6 +80,13 @@ export interface ProduceRequest {
   kind: 'audio' | 'video';
   source: MediaType;
   rtpParameters: unknown;
+  /**
+   * 이 producer 를 일시정지(mute) 상태로 만들지. audio/video 는 기본 OFF 로 입장하므로
+   * true 로 produce 한다. 서버가 paused producer 를 생성하고 NEW_PRODUCER 브로드캐스트에
+   * 그대로 실어, 다른 참가자가 처음부터 mute(placeholder) 로 인지한다(produce 직후
+   * 별도 TOGGLE_PRODUCER 로 paused 를 전파할 때 생기던 race 를 제거). 생략하면 false.
+   */
+  paused?: boolean;
 }
 
 export interface ProduceResponse {
@@ -154,6 +161,12 @@ export interface NewProducerBroadcast {
   producerId: string;
   kind: 'audio' | 'video';
   source: MediaType;
+  /**
+   * 이 producer 가 현재 일시정지(mute) 상태인지. produce 시점의 paused 를 그대로
+   * 실어, 늦게 입장한 참가자(LIST_PRODUCERS)든 새 producer 알림(NEW_PRODUCER)이든
+   * 처음부터 정확한 mute 상태로 인지해 검은 화면 대신 placeholder 를 보여주게 한다.
+   */
+  paused?: boolean;
 }
 
 export interface ProducerClosedBroadcast {

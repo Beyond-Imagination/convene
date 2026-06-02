@@ -1,15 +1,14 @@
+import { MEDIASOUP_WS_EVENTS } from '@migration/shared-interfaces';
 import type { Socket } from 'socket.io';
 
-import { MEDIASOUP_WS_EVENTS } from '@migration/shared-interfaces';
-
 import { MediasoupSignalingService } from '@/mediasoup/application/mediasoup-signaling.service';
+import { CloseProducerDto } from '@/mediasoup/interface/dto/close-producer.dto';
 import { ConnectTransportDto } from '@/mediasoup/interface/dto/connect-transport.dto';
 import { ConsumeDto } from '@/mediasoup/interface/dto/consume.dto';
 import { CreateTransportDto } from '@/mediasoup/interface/dto/create-transport.dto';
 import { GetRtpCapabilitiesDto } from '@/mediasoup/interface/dto/get-rtp-capabilities.dto';
 import { ProduceDto } from '@/mediasoup/interface/dto/produce.dto';
 import { ResumeConsumerDto } from '@/mediasoup/interface/dto/resume-consumer.dto';
-import { CloseProducerDto } from '@/mediasoup/interface/dto/close-producer.dto';
 import { ToggleProducerDto } from '@/mediasoup/interface/dto/toggle-producer.dto';
 
 import { MediasoupGateway } from './mediasoup.gateway';
@@ -163,6 +162,20 @@ describe('MediasoupGateway.handleProduce', () => {
     });
     expect(res).toEqual({ producerId: 'p-1' });
   });
+
+  it('dto.paused 를 service.produce 에 전달한다(기본 OFF 로 입장하는 경우)', async () => {
+    const { gateway, calls } = setup();
+    const dto = Object.assign(new ProduceDto(), {
+      code: codeStr,
+      transportId: 't-1',
+      kind: 'video',
+      source: 'video',
+      rtpParameters: { codecs: [] },
+      paused: true,
+    });
+    await gateway.handleProduce(dto, makeClient('s1'));
+    expect(calls[0].args[0]).toMatchObject({ paused: true });
+  });
 });
 
 describe('MediasoupGateway.handleConsume', () => {
@@ -272,8 +285,22 @@ describe('MediasoupGateway.onProducerCreated', () => {
           producerId: 'p-1',
           kind: 'audio',
           source: 'audio',
+          paused: false,
         },
       },
     ]);
+  });
+
+  it('payload.paused=true 면 newProducer 브로드캐스트에도 paused:true 가 실린다', () => {
+    const { gateway, emits } = setup();
+    gateway.onProducerCreated({
+      meetingCode: codeStr,
+      participantId: 's2',
+      producerId: 'p-9',
+      kind: 'video',
+      source: 'video',
+      paused: true,
+    });
+    expect(emits[0].payload).toMatchObject({ producerId: 'p-9', paused: true });
   });
 });

@@ -1,10 +1,9 @@
-import { IsIn, IsString, Length } from 'class-validator';
-
 import {
   type CreateTransportRequest,
-  type TransportDirection,
   TRANSPORT_DIRECTIONS,
+  type TransportDirection,
 } from '@migration/shared-interfaces';
+import { IsIn, IsString, Length } from 'class-validator';
 
 import { MeetingCode } from '@/meeting/domain/value-objects';
 

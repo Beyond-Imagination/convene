@@ -19,40 +19,49 @@ export function JoinMeetingForm({
   const submitting = status === 'submitting';
   return (
     <form aria-label="join-form" onSubmit={handleSubmit}>
-      <h2>회의 입장</h2>
-      <p>
-        <label>
+      <h2 className="text-lg font-bold text-text">회의 입장</h2>
+      <p className="mt-1 text-sm text-muted">
+        받은 회의 코드와 닉네임으로 기존 회의에 참여합니다.
+      </p>
+      <div className="mt-4">
+        <label htmlFor="join-code" className="field-label">
           회의 코드
-          <input
-            type="text"
-            autoComplete="off"
-            aria-invalid={errors.code !== undefined}
-            {...register('code')}
-          />
         </label>
-      </p>
-      {errors.code !== undefined && (
-        <p role="alert" data-field="code">
-          {errors.code.message}
-        </p>
-      )}
-      <p>
-        <label>
+        <input
+          id="join-code"
+          type="text"
+          autoComplete="off"
+          placeholder="예: abc-defg-hij"
+          className="field-input"
+          aria-invalid={errors.code !== undefined}
+          {...register('code')}
+        />
+        {errors.code !== undefined && (
+          <p role="alert" data-field="code" className="field-error">
+            {errors.code.message}
+          </p>
+        )}
+      </div>
+      <div className="mt-3">
+        <label htmlFor="join-nickname" className="field-label">
           닉네임
-          <input
-            type="text"
-            autoComplete="off"
-            aria-invalid={errors.nickname !== undefined}
-            {...register('nickname')}
-          />
         </label>
-      </p>
-      {errors.nickname !== undefined && (
-        <p role="alert" data-field="nickname">
-          {errors.nickname.message}
-        </p>
-      )}
-      <button type="submit" disabled={submitting}>
+        <input
+          id="join-nickname"
+          type="text"
+          autoComplete="off"
+          placeholder="예: 홍길동"
+          className="field-input"
+          aria-invalid={errors.nickname !== undefined}
+          {...register('nickname')}
+        />
+        {errors.nickname !== undefined && (
+          <p role="alert" data-field="nickname" className="field-error">
+            {errors.nickname.message}
+          </p>
+        )}
+      </div>
+      <button type="submit" disabled={submitting} className="btn-ghost mt-4 w-full">
         {submitting ? '입장 중…' : '입장'}
       </button>
     </form>

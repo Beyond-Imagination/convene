@@ -1,30 +1,29 @@
 'use client';
 
-import type { Device, Producer, Transport } from 'mediasoup-client/lib/types';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Socket } from 'socket.io-client';
-
 import {
+  type CloseProducerRequest,
+  type ConsumerClosedBroadcast,
   type ConsumeRequest,
   type ConsumeResponse,
-  type ConsumerClosedBroadcast,
   type CreateTransportResponse,
   type GetRtpCapabilitiesResponse,
   type ListProducersRequest,
   type ListProducersResponse,
-  type MediaType,
   MEDIASOUP_WS_EVENTS,
+  type MediaType,
+  MEETING_WS_EVENTS,
   type NewProducerBroadcast,
+  type ParticipantLeftBroadcast,
+  type ProducerClosedBroadcast,
   type ProduceRequest,
   type ProduceResponse,
-  type ProducerClosedBroadcast,
-  type CloseProducerRequest,
-  type ParticipantLeftBroadcast,
   type ProducerToggledBroadcast,
   type ResumeConsumerRequest,
   type ToggleProducerRequest,
-  MEETING_WS_EVENTS,
 } from '@migration/shared-interfaces';
+import type { Device, Producer, Transport } from 'mediasoup-client/types';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Socket } from 'socket.io-client';
 
 import { createMediasoupDevice } from '@/shared/socket/mediasoup-device.factory';
 
@@ -142,6 +141,11 @@ export function useMediasoupViewModel(
   const screenStreamRef = useRef<MediaStream | null>(null);
   const screenProducerRef = useRef<Producer | null>(null);
   const connectCountRef = useRef(0);
+  // 'ended' 리스너가 항상 최신 stopScreenShare 를 부르도록 ref 로 들고 있는다.
+  // startScreenShare 는 deps [] 라 첫 렌더(socket=null) 클로저를 고정하는데,
+  // 그 안의 stopScreenShare 직접 참조는 socket=null 버전이라 closeProducer emit 이
+  // 누락된다(stale closure). ref 우회로 socket 연결 이후 버전을 호출한다.
+  const stopScreenShareRef = useRef<() => void>(() => {});
 
   /**
    * socket 의 'connect' 이벤트를 감시해 자동 재연결을 감지한다.
@@ -205,15 +209,19 @@ export function useMediasoupViewModel(
         sendTransport.on(
           'produce',
           ({ kind, rtpParameters, appData }, callback, errback) => {
-            const source =
-              (appData as { source?: MediaType } | undefined)?.source ??
-              (kind as MediaType);
+            const ad = appData as
+              | { source?: MediaType; paused?: boolean }
+              | undefined;
+            const source = ad?.source ?? (kind as MediaType);
             const request: ProduceRequest = {
               code,
               transportId: sendOpts.id,
               kind: kind as 'audio' | 'video',
               source,
               rtpParameters,
+              // 기본 OFF 입장은 appData.paused 로 의도를 싣는다 → 서버가 paused producer
+              // 생성 + NEW_PRODUCER 에 paused 전파(produce 후 별도 TOGGLE race 제거).
+              paused: ad?.paused ?? false,
             };
             rpcWithTimeout<ProduceResponse>(
               socket,
@@ -309,23 +317,35 @@ export function useMediasoupViewModel(
         setLocalStream(stream);
         for (const track of stream.getAudioTracks()) {
           console.debug('[mediasoup] audio produce 시작', { trackId: track.id });
+          // 마이크 기본 OFF: produce 전에 track 을 비활성화해 무음 프레임도 안 나가게 하고,
+          // appData.paused 로 서버가 paused producer 를 생성하게 한다(NEW_PRODUCER 가
+          // 처음부터 mute 로 나가 race 없음). 사용자가 "마이크 켜기" 시 toggleAudio 가 resume.
+          track.enabled = false;
           const producer = await sendTransport.produce({
             track: track as never,
-            appData: { source: 'audio' as MediaType },
+            appData: { source: 'audio' as MediaType, paused: true },
           });
           console.debug('[mediasoup] audio produce 성공', { producerId: producer.id });
           audioProducerRef.current = producer;
           if (cancelled) return;
+          // 로컬 producer 도 pause 해 RTP 송출을 멈춘다(서버는 이미 paused 로 생성됨).
+          producer.pause();
+          setIsAudioMuted(true);
         }
         for (const track of stream.getVideoTracks()) {
           console.debug('[mediasoup] video produce 시작', { trackId: track.id });
+          // 비디오 기본 OFF: produce 전에 track 을 비활성화해 검은 프레임도 안 나가게 하고,
+          // appData.paused 로 서버가 paused producer 를 생성하게 한다.
+          track.enabled = false;
           const producer = await sendTransport.produce({
             track: track as never,
-            appData: { source: 'video' as MediaType },
+            appData: { source: 'video' as MediaType, paused: true },
           });
           console.debug('[mediasoup] video produce 성공', { producerId: producer.id });
           videoProducerRef.current = producer;
           if (cancelled) return;
+          producer.pause();
+          setIsVideoMuted(true);
         }
       } catch (e) {
         if (cancelled) return;
@@ -403,7 +423,9 @@ export function useMediasoupViewModel(
             kind: payload.kind,
             source: payload.source,
             track: (consumer as unknown as { track: MediaStreamTrack }).track,
-            paused: false,
+            // 기존 producer 가 이미 mute 상태일 수 있으므로 broadcast 의 paused 를 반영
+            // 한다(늦게 입장 시 검은 화면 대신 placeholder 표시).
+            paused: payload.paused ?? false,
           };
           // producerId 기준 dedup (LIST_PRODUCERS 응답과 NEW_PRODUCER broadcast 가
           // 동일 producer 를 두 번 통보할 수 있다 — [[feedback-mediasoup-no-race]] #2)
@@ -493,6 +515,10 @@ export function useMediasoupViewModel(
       const nextPaused = !producer.paused;
       if (nextPaused) producer.pause();
       else producer.resume();
+      // RTP pause/resume 과 함께 로컬 track 의 활성 상태도 맞춘다(카메라 LED·
+      // self tile 미리보기까지 일관되게 on/off).
+      const t = (producer as { track?: { enabled: boolean } | null }).track;
+      if (t) t.enabled = !nextPaused;
       const request: ToggleProducerRequest = {
         code,
         producerId: producer.id,
@@ -532,13 +558,13 @@ export function useMediasoupViewModel(
       setScreenStream(stream);
       setIsSharingScreen(true);
       // 사용자가 브라우저 UI 의 '공유 중지' 를 눌렀을 때 트랙이 ended 로 전이된다.
-      videoTrack.addEventListener('ended', () => stopScreenShare());
+      // ref 경유로 최신 stopScreenShare 를 호출(stale closure 회피 — 위 ref 주석 참조).
+      videoTrack.addEventListener('ended', () => stopScreenShareRef.current());
     } catch (e) {
       // 권한 거부 등은 noop — 상태 그대로 둔다.
       const message = e instanceof Error ? e.message : String(e);
       setErrorMessage(message);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const stopScreenShare = useCallback(() => {
@@ -566,6 +592,11 @@ export function useMediasoupViewModel(
     setScreenStream(null);
     setIsSharingScreen(false);
   }, [socket, code]);
+
+  // 최신 stopScreenShare 를 ref 에 반영해 'ended' 리스너가 그것을 호출하게 한다.
+  useEffect(() => {
+    stopScreenShareRef.current = stopScreenShare;
+  }, [stopScreenShare]);
 
   const isRemoteSharingScreen = remoteMedia.some((m) => m.source === 'screen');
 

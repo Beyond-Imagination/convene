@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { API_BASE_URL } from './config';
-import { getReport, listReports, ReportsApiError } from './reports.api';
+import { getReport, listReports } from './reports.api';
 
 const okResponse = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), {

@@ -15,10 +15,18 @@ import { MediaType, TransportDirection } from '@migration/shared-interfaces';
 export interface ProducerInfo {
   readonly kind: 'audio' | 'video';
   readonly source: MediaType;
+  /**
+   * produce 시점의 mute 상태. 기본 OFF(audio/video)로 입장하는 참가자는 true 로
+   * 추가돼, 늦게 입장한 다른 참가자의 LIST_PRODUCERS/NEW_PRODUCER 에 정확한 paused
+   * 가 실린다(검은 화면·켜진 채 표시 방지). 생략하면 false.
+   */
+  readonly paused?: boolean;
 }
 
 export interface ProducerEntry extends ProducerInfo {
   readonly id: string;
+  /** 현재 일시정지(mute) 상태. produce 시 false 로 시작하고 toggle 로 갱신된다. */
+  readonly paused: boolean;
 }
 
 export interface ConsumerInfo {
@@ -93,7 +101,12 @@ export class ParticipantMedia {
     pm._sendTransportId = snapshot.sendTransportId;
     pm._recvTransportId = snapshot.recvTransportId;
     for (const p of snapshot.producers) {
-      pm._producers.set(p.id, { id: p.id, kind: p.kind, source: p.source });
+      pm._producers.set(p.id, {
+        id: p.id,
+        kind: p.kind,
+        source: p.source,
+        paused: p.paused ?? false,
+      });
     }
     for (const c of snapshot.consumers) {
       pm._consumers.set(c.id, {
@@ -157,7 +170,25 @@ export class ParticipantMedia {
         `ParticipantMedia(${this.participantId}) already has producer ${id}`,
       );
     }
-    this._producers.set(id, { id, kind: info.kind, source: info.source });
+    this._producers.set(id, {
+      id,
+      kind: info.kind,
+      source: info.source,
+      paused: info.paused ?? false,
+    });
+  }
+
+  /**
+   * producer 의 mute(paused) 상태를 갱신한다. 소유자가 자기 producer 를 toggle 할 때
+   * application 서비스가 호출한다. 없는 producer 면 throw.
+   */
+  setProducerPaused(id: string, paused: boolean): void {
+    this.assertNotClosed();
+    const existing = this._producers.get(id);
+    if (!existing) {
+      throw new Error(`ParticipantMedia(${this.participantId}) has no producer ${id}`);
+    }
+    this._producers.set(id, { ...existing, paused });
   }
 
   removeProducer(id: string): void {

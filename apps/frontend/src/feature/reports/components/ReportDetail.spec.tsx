@@ -1,6 +1,5 @@
-import { render, screen, within } from '@testing-library/react';
-
 import type { ReportDetailResponse } from '@migration/shared-interfaces';
+import { render, screen, within } from '@testing-library/react';
 
 import type { UseReportDetailViewModel } from '@/feature/reports/hooks/useReportDetailViewModel';
 

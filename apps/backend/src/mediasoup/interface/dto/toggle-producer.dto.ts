@@ -1,6 +1,5 @@
-import { IsBoolean, IsString, Length, MaxLength } from 'class-validator';
-
 import type { ToggleProducerRequest } from '@migration/shared-interfaces';
+import { IsBoolean, IsString, Length, MaxLength } from 'class-validator';
 
 import { MeetingCode } from '@/meeting/domain/value-objects';
 

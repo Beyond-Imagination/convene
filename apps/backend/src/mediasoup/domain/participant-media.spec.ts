@@ -65,7 +65,9 @@ describe('ParticipantMedia aggregate', () => {
       const pm = baseSpawn();
       pm.attachTransport('send', 't1');
       pm.addProducer('p1', { kind: 'audio', source: 'audio' });
-      expect(pm.producers).toEqual([{ id: 'p1', kind: 'audio', source: 'audio' }]);
+      expect(pm.producers).toEqual([
+        { id: 'p1', kind: 'audio', source: 'audio', paused: false },
+      ]);
     });
 
     it('같은 producerId 중복은 거부한다', () => {
@@ -73,6 +75,38 @@ describe('ParticipantMedia aggregate', () => {
       pm.attachTransport('send', 't1');
       pm.addProducer('p1', { kind: 'audio', source: 'audio' });
       expect(() => pm.addProducer('p1', { kind: 'video', source: 'video' })).toThrow();
+    });
+
+    it('paused 초깃값을 주면 그대로 반영한다(기본 mute 로 입장하는 경우)', () => {
+      const pm = baseSpawn();
+      pm.attachTransport('send', 't1');
+      pm.addProducer('p1', { kind: 'audio', source: 'audio', paused: true });
+      expect(pm.producers[0].paused).toBe(true);
+    });
+
+    it('paused 를 생략하면 false 로 시작한다', () => {
+      const pm = baseSpawn();
+      pm.attachTransport('send', 't1');
+      pm.addProducer('p1', { kind: 'video', source: 'video' });
+      expect(pm.producers[0].paused).toBe(false);
+    });
+  });
+
+  describe('setProducerPaused', () => {
+    it('producer 의 paused 상태를 갱신한다', () => {
+      const pm = baseSpawn();
+      pm.attachTransport('send', 't1');
+      pm.addProducer('p1', { kind: 'video', source: 'video' });
+      pm.setProducerPaused('p1', true);
+      expect(pm.producers[0].paused).toBe(true);
+      pm.setProducerPaused('p1', false);
+      expect(pm.producers[0].paused).toBe(false);
+    });
+
+    it('없는 producer 면 throw 한다', () => {
+      const pm = baseSpawn();
+      pm.attachTransport('send', 't1');
+      expect(() => pm.setProducerPaused('nope', true)).toThrow();
     });
   });
 
@@ -166,7 +200,7 @@ describe('ParticipantMedia aggregate', () => {
         routerIndex: 0,
         sendTransportId: 't1',
         recvTransportId: null,
-        producers: [{ id: 'p1', kind: 'audio', source: 'audio' }],
+        producers: [{ id: 'p1', kind: 'audio', source: 'audio', paused: false }],
         consumers: [],
         closed: false,
       });
@@ -201,7 +235,9 @@ describe('ParticipantMedia aggregate', () => {
 
       restored.attachTransport('recv', 't-recv');
       restored.addProducer('p1', { kind: 'audio', source: 'audio' });
-      expect(restored.producers).toEqual([{ id: 'p1', kind: 'audio', source: 'audio' }]);
+      expect(restored.producers).toEqual([
+        { id: 'p1', kind: 'audio', source: 'audio', paused: false },
+      ]);
     });
   });
 });

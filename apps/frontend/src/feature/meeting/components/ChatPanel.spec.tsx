@@ -27,8 +27,27 @@ describe('ChatPanel View', () => {
     );
     const items = screen.getAllByTestId('chat-message');
     expect(items).toHaveLength(2);
-    expect(items[0]).toHaveTextContent('준: 안녕');
-    expect(items[1]).toHaveTextContent('아: 하이');
+    expect(items[0]).toHaveTextContent('준');
+    expect(items[0]).toHaveTextContent('안녕');
+    expect(items[1]).toHaveTextContent('아');
+    expect(items[1]).toHaveTextContent('하이');
+  });
+
+  it('myNickname 과 같은 보낸이는 내 메시지(data-mine=true), 다르면 false 로 구분한다', () => {
+    render(
+      <ChatPanel
+        {...baseVm({
+          messages: [
+            { nickname: '준', text: '내거', sentAt: '2026-01-01T00:01:00.000Z' },
+            { nickname: '아', text: '남거', sentAt: '2026-01-01T00:01:05.000Z' },
+          ],
+        })}
+        myNickname="준"
+      />,
+    );
+    const items = screen.getAllByTestId('chat-message');
+    expect(items[0]).toHaveAttribute('data-mine', 'true');
+    expect(items[1]).toHaveAttribute('data-mine', 'false');
   });
 
   it('canSend=false 면 input 과 버튼이 모두 비활성화된다', () => {

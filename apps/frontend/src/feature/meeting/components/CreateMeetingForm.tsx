@@ -23,28 +23,36 @@ export function CreateMeetingForm({
   const submitting = status === 'submitting';
   return (
     <form aria-label="create-form" onSubmit={handleSubmit}>
-      <h2>회의 만들기</h2>
-      <p>
-        <label>
-          닉네임
-          <input
-            type="text"
-            autoComplete="off"
-            aria-invalid={errors.nickname !== undefined}
-            {...register('nickname')}
-          />
-        </label>
+      <h2 className="text-lg font-bold text-text">회의 만들기</h2>
+      <p className="mt-1 text-sm text-muted">
+        닉네임만 입력하면 새 회의를 만들고 바로 입장합니다.
       </p>
-      {errors.nickname !== undefined && (
-        <p role="alert" data-field="nickname">
-          {errors.nickname.message}
-        </p>
-      )}
-      <button type="submit" disabled={submitting}>
+      <div className="mt-4">
+        <label htmlFor="create-nickname" className="field-label">
+          닉네임
+        </label>
+        <input
+          id="create-nickname"
+          type="text"
+          autoComplete="off"
+          placeholder="예: 홍길동"
+          className="field-input"
+          aria-invalid={errors.nickname !== undefined}
+          {...register('nickname')}
+        />
+        {errors.nickname !== undefined && (
+          <p role="alert" data-field="nickname" className="field-error">
+            {errors.nickname.message}
+          </p>
+        )}
+      </div>
+      <button type="submit" disabled={submitting} className="btn-primary mt-4 w-full">
         {submitting ? '생성 중…' : '회의 만들기'}
       </button>
       {errorMessage !== null && status === 'error' && (
-        <p role="alert">{errorMessage}</p>
+        <p role="alert" className="field-error">
+          {errorMessage}
+        </p>
       )}
     </form>
   );

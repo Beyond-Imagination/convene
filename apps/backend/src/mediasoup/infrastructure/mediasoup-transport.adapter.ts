@@ -1,3 +1,4 @@
+import { ConsumeResponse, CreateTransportResponse } from '@migration/shared-interfaces';
 import { Logger } from '@nestjs/common';
 import {
   Consumer,
@@ -14,7 +15,6 @@ import {
   MediaTransportPort,
   ProduceInput,
 } from '@/mediasoup/domain/ports';
-import { ConsumeResponse, CreateTransportResponse } from '@migration/shared-interfaces';
 
 import { MediasoupRouterAdapter } from './mediasoup-router.adapter';
 
@@ -79,6 +79,9 @@ export class MediasoupTransportAdapter implements MediaTransportPort {
     const producer = await transport.produce({
       kind: input.kind,
       rtpParameters: input.rtpParameters as RtpParameters,
+      // 기본 OFF 로 입장하는 audio/video 는 paused 로 생성해, NEW_PRODUCER 가 처음부터
+      // 정확한 mute 상태로 나가게 한다(produce 후 별도 pause 전파 race 제거).
+      paused: input.paused ?? false,
       appData: { ownerId: input.participantId, source: input.source },
     });
     this.producers.set(producer.id, producer);

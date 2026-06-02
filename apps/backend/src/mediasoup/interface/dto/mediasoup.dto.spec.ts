@@ -1,12 +1,12 @@
 import { ValidationPipe } from '@nestjs/common';
 
+import { CloseProducerDto } from './close-producer.dto';
 import { ConnectTransportDto } from './connect-transport.dto';
 import { ConsumeDto } from './consume.dto';
 import { CreateTransportDto } from './create-transport.dto';
 import { GetRtpCapabilitiesDto } from './get-rtp-capabilities.dto';
 import { ProduceDto } from './produce.dto';
 import { ResumeConsumerDto } from './resume-consumer.dto';
-import { CloseProducerDto } from './close-producer.dto';
 import { ToggleProducerDto } from './toggle-producer.dto';
 
 const makePipe = () =>
@@ -17,7 +17,7 @@ const makePipe = () =>
     exceptionFactory: (errors) => new Error(JSON.stringify(errors)),
   });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const run = <T>(metatype: any, body: unknown): Promise<T> =>
   makePipe().transform(body, { type: 'body', metatype }) as Promise<T>;
 
