@@ -3,10 +3,9 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { MeetingNotFoundError, NotHostError } from '@/meeting/application/meeting.errors';
 import { Meeting } from '@/meeting/domain/meeting';
 import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';
-import { externalReference } from '@/shared-kernel/domain/value-objects';
-
 import { CreateMeetingDto } from '@/meeting/interface/dto/create-meeting.dto';
 import { ExternalReferenceDto } from '@/meeting/interface/dto/external-reference.dto';
+import { externalReference } from '@/shared-kernel/domain/value-objects';
 
 import { MeetingController } from './meeting.controller';
 
@@ -36,7 +35,7 @@ const makeController = () => {
       return fakeMeeting();
     }),
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const controller = new MeetingController(service as any);
   return { controller, service, calls };
 };
@@ -106,7 +105,7 @@ describe('MeetingController.closeMeeting', () => {
         },
       ),
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const controller = new MeetingController(service as any);
     return { controller, service, calls };
   };
@@ -140,7 +139,7 @@ describe('MeetingController.closeMeeting', () => {
         throw new NotHostError('abc12xyz');
       }),
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const controller = new MeetingController(service as any);
     await expect(controller.closeMeeting('abc12xyz', 'wrong')).rejects.toBeInstanceOf(
       ForbiddenException,
@@ -159,7 +158,7 @@ describe('MeetingController.closeMeeting', () => {
         throw new MeetingNotFoundError('abc12xyz');
       }),
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const controller = new MeetingController(service as any);
     await expect(controller.closeMeeting('abc12xyz')).rejects.toBeInstanceOf(NotFoundException);
   });
@@ -170,7 +169,7 @@ describe('MeetingController.closeMeeting', () => {
         throw new Error('Meeting is already closed');
       }),
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const controller = new MeetingController(service as any);
     await expect(controller.closeMeeting('abc12xyz')).rejects.toThrow(/already closed/);
   });

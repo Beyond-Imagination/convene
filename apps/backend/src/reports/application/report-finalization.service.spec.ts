@@ -9,8 +9,8 @@ import {
 } from '@/shared-kernel/domain/value-objects';
 
 import { MeetingReport } from '../domain/meeting-report';
-import { ReportFinalizationService } from './report-finalization.service';
 import { ReportNotFoundError } from './report.errors';
+import { ReportFinalizationService } from './report-finalization.service';
 
 interface CapturedEvent {
   name: string;

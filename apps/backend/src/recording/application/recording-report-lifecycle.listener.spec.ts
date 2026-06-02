@@ -1,7 +1,7 @@
 import { ReportTranscriptionRequestedPayload } from '@/shared-kernel/domain/events';
 
-import { RecordingReportLifecycleListener } from './recording-report-lifecycle.listener';
 import { RecordingService, RequestTranscriptionCommand } from './recording.service';
+import { RecordingReportLifecycleListener } from './recording-report-lifecycle.listener';
 
 const makeListener = () => {
   const calls: RequestTranscriptionCommand[] = [];

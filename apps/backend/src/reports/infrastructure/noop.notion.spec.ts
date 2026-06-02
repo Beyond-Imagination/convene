@@ -1,7 +1,7 @@
-import { participantEntry } from '../domain/entries';
-import { MeetingReport } from '../domain/meeting-report';
 import { NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects';
 
+import { participantEntry } from '../domain/entries';
+import { MeetingReport } from '../domain/meeting-report';
 import { NoopNotion } from './noop.notion';
 
 describe('NoopNotion', () => {

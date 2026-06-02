@@ -1,7 +1,6 @@
+import type { DomainEventName } from '@migration/shared-interfaces';
 import { Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-
-import type { DomainEventName } from '@migration/shared-interfaces';
 
 import type { DomainEventPublisher } from '@/shared-kernel/domain/ports';
 

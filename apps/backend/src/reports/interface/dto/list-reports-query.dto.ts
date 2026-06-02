@@ -1,7 +1,6 @@
+import { MAX_REPORT_LIST_LIMIT } from '@migration/shared-interfaces';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
-
-import { MAX_REPORT_LIST_LIMIT } from '@migration/shared-interfaces';
 
 /**
  * GET /reports 쿼리스트링 DTO.

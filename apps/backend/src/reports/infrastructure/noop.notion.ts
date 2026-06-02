@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
-import { NotionPort } from '@/reports/domain/ports';
 import { MeetingReportSnapshot } from '@/reports/domain/meeting-report';
+import { NotionPort } from '@/reports/domain/ports';
 
 /**
  * NotionPort 의 v1 placeholder 구현체.

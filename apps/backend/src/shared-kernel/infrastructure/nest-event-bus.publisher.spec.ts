@@ -1,6 +1,5 @@
-import { EventEmitter2 } from '@nestjs/event-emitter';
-
 import { MEETING_EVENTS, REPORT_EVENTS } from '@migration/shared-interfaces';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { NestEventBusDomainEventPublisher } from './nest-event-bus.publisher';
 

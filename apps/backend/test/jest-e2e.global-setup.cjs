@@ -8,6 +8,8 @@
  * 서버 인스턴스는 globalTeardown 이 stop 할 수 있도록 globalThis 에 보관한다.
  */
 module.exports = async () => {
+  // .cjs CommonJS 파일이라 require 가 정당하다(no-require-imports 는 TS/ESM 대상 규칙).
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { MongoMemoryServer } = require('mongodb-memory-server');
   const mongod = await MongoMemoryServer.create();
   process.env.MONGO_URI = mongod.getUri();

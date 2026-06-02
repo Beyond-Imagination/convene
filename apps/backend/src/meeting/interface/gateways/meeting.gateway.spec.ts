@@ -1,17 +1,15 @@
-import type { Socket } from 'socket.io';
-
 import { MEETING_WS_EVENTS } from '@migration/shared-interfaces';
+import type { Socket } from 'socket.io';
 
 import { Meeting } from '@/meeting/domain/meeting';
 import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';
+import { ChatDto } from '@/meeting/interface/dto/chat.dto';
+import { JoinMeetingDto } from '@/meeting/interface/dto/join-meeting.dto';
+import { LeaveMeetingDto } from '@/meeting/interface/dto/leave-meeting.dto';
 import {
   chatEntry,
   externalReference,
 } from '@/shared-kernel/domain/value-objects';
-
-import { ChatDto } from '@/meeting/interface/dto/chat.dto';
-import { JoinMeetingDto } from '@/meeting/interface/dto/join-meeting.dto';
-import { LeaveMeetingDto } from '@/meeting/interface/dto/leave-meeting.dto';
 
 import { MeetingGateway } from './meeting.gateway';
 
@@ -112,7 +110,7 @@ describe('MeetingGateway.handleJoin', () => {
         return { meeting, participant };
       }),
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const gateway = new MeetingGateway(service as any);
     return { gateway, service, calls };
   };
@@ -170,7 +168,7 @@ describe('MeetingGateway.handleLeave', () => {
         return { meeting, participant };
       }),
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const gateway = new MeetingGateway(service as any);
     return { gateway, service, calls };
   };
@@ -212,7 +210,7 @@ describe('MeetingGateway.handleLeave', () => {
         throw new Error('Cannot removeParticipant: meeting is already closed');
       }),
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const gateway = new MeetingGateway(service as any);
     const { socket, broadcasts, joined } = makeSocket('s1');
     joined.add('meeting:abc12xyz');
@@ -227,10 +225,10 @@ describe('MeetingGateway.onMeetingEnded', () => {
   const tEnded = new Date('2026-01-01T00:30:00Z');
 
   const makeGateway = () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const gateway = new MeetingGateway({} as any);
     const { server, broadcasts: serverBroadcasts } = makeServer();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     gateway.server = server as any;
     return { gateway, serverBroadcasts };
   };
@@ -273,10 +271,10 @@ describe('MeetingGateway.handleChat', () => {
         return entry;
       }),
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const gateway = new MeetingGateway(service as any);
     const { server, broadcasts: serverBroadcasts } = makeServer();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     gateway.server = server as any;
     return { gateway, service, calls, entry, serverBroadcasts };
   };
@@ -309,7 +307,7 @@ describe('MeetingGateway.handleChat', () => {
 
   it('service.postChat이 throw하면 broadcast하지 않는다', async () => {
     const { gateway, serverBroadcasts } = makeGateway();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     (gateway as any).service.postChat = jest.fn(async () => {
       throw new Error('Meeting "abc12xyz" not found');
     });
@@ -338,7 +336,7 @@ describe('MeetingGateway.handleDisconnect', () => {
     const service = {
       leaveMeeting: overrides?.leave ?? defaultLeave,
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const gateway = new MeetingGateway(service as any);
     return { gateway, service, calls };
   };

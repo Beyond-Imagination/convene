@@ -1,7 +1,6 @@
+import { REPORT_EVENTS } from '@migration/shared-interfaces';
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-
-import { REPORT_EVENTS } from '@migration/shared-interfaces';
 
 import { transcriptSegment } from '@/reports/domain/entries';
 import {

@@ -1,3 +1,12 @@
+import {
+  type ChatPostedBroadcast,
+  MEETING_EVENTS,
+  MEETING_WS_EVENTS,
+  type MeetingEndedBroadcast,
+  type MeetingParticipantsBroadcast,
+  type ParticipantJoinedBroadcast,
+  type ParticipantLeftBroadcast,
+} from '@migration/shared-interfaces';
 import { Logger, UsePipes, ValidationPipe } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
@@ -10,16 +19,6 @@ import {
   WsException,
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
-
-import {
-  MEETING_EVENTS,
-  MEETING_WS_EVENTS,
-  type ChatPostedBroadcast,
-  type MeetingEndedBroadcast,
-  type MeetingParticipantsBroadcast,
-  type ParticipantJoinedBroadcast,
-  type ParticipantLeftBroadcast,
-} from '@migration/shared-interfaces';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
 import { ChatDto } from '@/meeting/interface/dto/chat.dto';

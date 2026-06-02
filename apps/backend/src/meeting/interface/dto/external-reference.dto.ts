@@ -1,6 +1,5 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
-
 import type { ExternalReferencePayload } from '@migration/shared-interfaces';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 /**
  * shared-interfaces.ExternalReferencePayload의 backend DTO 구현체.

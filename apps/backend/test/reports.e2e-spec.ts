@@ -1,17 +1,16 @@
 import type { AddressInfo } from 'node:net';
 
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { IoAdapter } from '@nestjs/platform-socket.io';
-import { Test, TestingModule } from '@nestjs/testing';
-import request from 'supertest';
-import { type Socket, io } from 'socket.io-client';
-
 import {
   type CreateMeetingResponse,
   MEETING_WS_EVENTS,
   type ReportDetailResponse,
   type ReportListResponse,
 } from '@migration/shared-interfaces';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { IoAdapter } from '@nestjs/platform-socket.io';
+import { Test, TestingModule } from '@nestjs/testing';
+import { io,type Socket } from 'socket.io-client';
+import request from 'supertest';
 
 import { AppModule } from '@/app.module';
 import { FfmpegAudioCaptureAdapter } from '@/mediasoup/infrastructure/ffmpeg-audio-capture.adapter';

@@ -7,7 +7,6 @@ import {
   WAV_HEADER_BYTES,
   wrapPcmAsWav,
 } from '../infrastructure/audio-chunker';
-
 import { RecordingService } from './recording.service';
 
 interface CapturedEvent {

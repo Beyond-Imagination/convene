@@ -1,7 +1,6 @@
+import { MEETING_EVENTS } from '@migration/shared-interfaces';
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-
-import { MEETING_EVENTS } from '@migration/shared-interfaces';
 
 import { MeetingEndedPayload } from '@/shared-kernel/domain/events';
 

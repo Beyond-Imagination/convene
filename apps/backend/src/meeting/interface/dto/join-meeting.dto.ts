@@ -1,6 +1,5 @@
-import { IsString, Length } from 'class-validator';
-
 import type { JoinMeetingMessage } from '@migration/shared-interfaces';
+import { IsString, Length } from 'class-validator';
 
 import { MeetingCode } from '@/meeting/domain/value-objects';
 

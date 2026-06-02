@@ -7,7 +7,6 @@ import {
 import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events';
 
 import { WAV_HEADER_BYTES } from '../infrastructure/audio-chunker';
-
 import {
   KEEP_LAST_BYTES,
   PartialTranscriptionScheduler,

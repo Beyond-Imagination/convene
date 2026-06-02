@@ -1,3 +1,4 @@
+import type { CloseMeetingResponse, CreateMeetingResponse } from '@migration/shared-interfaces';
 import {
   BadRequestException,
   Body,
@@ -12,12 +13,10 @@ import {
   Post,
 } from '@nestjs/common';
 
-import type { CloseMeetingResponse, CreateMeetingResponse } from '@migration/shared-interfaces';
-
 import { MeetingNotFoundError, NotHostError } from '@/meeting/application/meeting.errors';
 import { MeetingService } from '@/meeting/application/meeting.service';
-import { CreateMeetingDto } from '@/meeting/interface/dto/create-meeting.dto';
 import { MeetingCode } from '@/meeting/domain/value-objects';
+import { CreateMeetingDto } from '@/meeting/interface/dto/create-meeting.dto';
 import { externalReference } from '@/shared-kernel/domain/value-objects';
 
 /**

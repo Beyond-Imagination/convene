@@ -1,7 +1,6 @@
+import { type CreateMeetingRequest, type Source,SOURCES } from '@migration/shared-interfaces';
 import { Type } from 'class-transformer';
 import { IsIn, IsOptional, ValidateNested } from 'class-validator';
-
-import { SOURCES, type CreateMeetingRequest, type Source } from '@migration/shared-interfaces';
 
 import { ExternalReferenceDto } from './external-reference.dto';
 

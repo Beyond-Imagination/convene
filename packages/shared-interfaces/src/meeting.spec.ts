@@ -8,8 +8,8 @@ import {
   MEETING_WS_EVENTS,
   type MeetingEndedBroadcast,
   type MeetingWsEventName,
-  SOURCES,
   type Source,
+  SOURCES,
 } from './meeting.js';
 
 describe('meeting wire format', () => {

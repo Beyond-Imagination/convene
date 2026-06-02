@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   type DomainEventName,
   MEDIASOUP_EVENTS,
-  MEETING_EVENTS,
   type MediasoupEventName,
+  MEETING_EVENTS,
   type MeetingEventName,
   REPORT_EVENTS,
   type ReportEventName,

@@ -7,7 +7,6 @@ import { RedisChatRepository } from '@/meeting/infrastructure/redis-chat.reposit
 import { RedisMeetingRepository } from '@/meeting/infrastructure/redis-meeting.repository';
 import { MeetingController } from '@/meeting/interface/controllers/meeting.controller';
 import { MeetingGateway } from '@/meeting/interface/gateways/meeting.gateway';
-
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 
