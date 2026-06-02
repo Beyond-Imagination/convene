@@ -271,21 +271,21 @@ describe('useMediasoupViewModel.mount', () => {
     expect(recv.close).toHaveBeenCalled();
   });
 
-  it('ready 진입 후 getUserMedia 가 호출되고 audio/video track 으로 sendTransport.produce 가 두 번 호출된다', async () => {
+  it('ready 진입 후에도 getUserMedia/produce 를 호출하지 않는다 (미디어 lazy — 사용자가 켤 때 취득)', async () => {
     const socket = new FakeSocket();
     setupSocketAcks(socket);
     const { result } = renderHook(() =>
       useMediasoupViewModel(socket as unknown as never, code),
     );
     await waitFor(() => expect(result.current.status).toBe('ready'));
-    await waitFor(() => expect(getUserMediaMock).toHaveBeenCalledTimes(1));
-    expect(getUserMediaMock).toHaveBeenCalledWith({ audio: true, video: true });
 
     const send = fakeDevice.createSendTransport.mock.results[0].value as FakeTransport;
-    await waitFor(() => expect(send.produce).toHaveBeenCalledTimes(2));
-    const producedKinds = send.produce.mock.calls.map((c) => c[0].track.kind).sort();
-    expect(producedKinds).toEqual(['audio', 'video']);
-    expect(result.current.localStream).not.toBeNull();
+    // 입장 시점엔 카메라/마이크를 잡지 않는다(LED 깜박임 방지).
+    expect(getUserMediaMock).not.toHaveBeenCalled();
+    expect(send.produce).not.toHaveBeenCalled();
+    expect(result.current.localStream).toBeNull();
+    expect(result.current.isAudioMuted).toBe(true);
+    expect(result.current.isVideoMuted).toBe(true);
   });
 
   it('sendTransport "produce" 이벤트는 PRODUCE RPC 로 위임되고 callback 에 producerId 를 넘긴다', async () => {
@@ -324,13 +324,17 @@ describe('useMediasoupViewModel.mount', () => {
     );
   });
 
-  it('unmount 시 local stream tracks 가 stop 된다', async () => {
+  it('toggle 로 켜 둔 미디어는 unmount 시 track 이 stop 된다', async () => {
     const socket = new FakeSocket();
     setupSocketAcks(socket);
     const { result, unmount } = renderHook(() =>
       useMediasoupViewModel(socket as unknown as never, code),
     );
     await waitFor(() => expect(result.current.status).toBe('ready'));
+    // 사용자가 카메라를 켜야 비로소 getUserMedia 로 디바이스를 잡는다.
+    await act(async () => {
+      await result.current.toggleVideo();
+    });
     await waitFor(() => expect(getUserMediaMock).toHaveBeenCalled());
     const stream = await getUserMediaMock.mock.results[0].value;
     unmount();
@@ -938,82 +942,77 @@ describe('useMediasoupViewModel.muteToggle', () => {
     );
     await waitFor(() => expect(hook.result.current.status).toBe('ready'));
     const send = fakeDevice.createSendTransport.mock.results[0].value as FakeTransport;
-    // local audio/video producer 가 모두 생성될 때까지 대기.
-    await waitFor(() => expect(send.produce).toHaveBeenCalledTimes(2));
-    const audioProducer = (await send.produce.mock.results[0].value) as FakeProducer;
-    const videoProducer = (await send.produce.mock.results[1].value) as FakeProducer;
-    return { socket, send, audioProducer, videoProducer, ...hook };
+    // 입장 시엔 미디어를 잡지 않는다(lazy) — produce 대기 없이 ready 도달만 기다린다.
+    return { socket, send, ...hook };
   };
 
-  it('입장 직후 isAudioMuted / isVideoMuted 가 모두 true 다 (마이크·카메라 기본 OFF)', async () => {
-    const { result } = await setupReady();
-    await waitFor(() => expect(result.current.isAudioMuted).toBe(true));
-    await waitFor(() => expect(result.current.isVideoMuted).toBe(true));
-  });
-
-  it('입장 시 produce 자체에 paused:true 가 실리고(기본 OFF) producer 는 로컬에서 pause 된다 — 별도 TOGGLE_PRODUCER race 없음', async () => {
-    const { socket, send, audioProducer, videoProducer, result } = await setupReady();
-    await waitFor(() => expect(result.current.isVideoMuted).toBe(true));
-    // 로컬 RTP 송출 정지.
-    expect(audioProducer.pause).toHaveBeenCalledTimes(1);
-    expect(videoProducer.pause).toHaveBeenCalledTimes(1);
-    // produce 시점에 paused:true 를 실어 NEW_PRODUCER 가 처음부터 mute 로 나가게 한다.
-    const audioCall = send.produce.mock.calls.find(
-      (c) => c[0].appData?.source === 'audio',
-    );
-    const videoCall = send.produce.mock.calls.find(
-      (c) => c[0].appData?.source === 'video',
-    );
-    expect(audioCall?.[0].appData).toMatchObject({ paused: true });
-    expect(videoCall?.[0].appData).toMatchObject({ paused: true });
-    // 기본 OFF 를 produce 직후 TOGGLE_PRODUCER 로 전파하지 않는다(race 제거).
-    expect(socket.emit).not.toHaveBeenCalledWith(
-      MEDIASOUP_WS_EVENTS.TOGGLE_PRODUCER,
-      expect.anything(),
-    );
-  });
-
-  it('toggleAudio 는 기본 OFF 상태에서 audio producer.resume + isAudioMuted=false + emit(paused:false)', async () => {
-    const { socket, audioProducer, result } = await setupReady();
-    await waitFor(() => expect(result.current.isAudioMuted).toBe(true));
-    socket.emit.mockClear();
-    act(() => result.current.toggleAudio());
-    expect(audioProducer.resume).toHaveBeenCalledTimes(1);
-    expect(result.current.isAudioMuted).toBe(false);
-    expect(socket.emit).toHaveBeenCalledWith(MEDIASOUP_WS_EVENTS.TOGGLE_PRODUCER, {
-      code,
-      producerId: 'producer-audio',
-      paused: false,
-    });
-  });
-
-  it('toggleAudio 를 두 번 호출하면 다시 pause + isAudioMuted=true + emit(paused:true)', async () => {
-    const { socket, audioProducer, result } = await setupReady();
-    await waitFor(() => expect(result.current.isAudioMuted).toBe(true));
-    act(() => result.current.toggleAudio()); // 켜기(resume)
-    audioProducer.pause.mockClear(); // 입장 시 1회 호출분 제거
-    socket.emit.mockClear();
-    act(() => result.current.toggleAudio()); // 다시 끄기(pause)
-    expect(audioProducer.pause).toHaveBeenCalledTimes(1);
+  it('입장 직후 isAudioMuted/isVideoMuted 가 true 이고 getUserMedia/produce 를 호출하지 않는다 (기본 OFF, lazy)', async () => {
+    const { result, send } = await setupReady();
     expect(result.current.isAudioMuted).toBe(true);
-    expect(socket.emit).toHaveBeenCalledWith(MEDIASOUP_WS_EVENTS.TOGGLE_PRODUCER, {
+    expect(result.current.isVideoMuted).toBe(true);
+    expect(getUserMediaMock).not.toHaveBeenCalled();
+    expect(send.produce).not.toHaveBeenCalled();
+    expect(result.current.localStream).toBeNull();
+  });
+
+  it('toggleAudio 최초 호출 시 getUserMedia({audio:true}) 로 취득해 produce(source=audio) 하고 isAudioMuted=false', async () => {
+    const { result, send } = await setupReady();
+    await act(async () => {
+      await result.current.toggleAudio();
+    });
+    expect(getUserMediaMock).toHaveBeenCalledWith({ audio: true });
+    expect(send.produce).toHaveBeenCalledTimes(1);
+    expect(send.produce.mock.calls[0][0].appData).toMatchObject({ source: 'audio' });
+    expect(result.current.isAudioMuted).toBe(false);
+  });
+
+  it('켜진 뒤 toggleAudio 를 다시 호출하면 producer.close + track.stop + CLOSE_PRODUCER emit + isAudioMuted=true', async () => {
+    const { result, send, socket } = await setupReady();
+    await act(async () => {
+      await result.current.toggleAudio();
+    });
+    const producer = (await send.produce.mock.results[0].value) as FakeProducer;
+    const stream = (await getUserMediaMock.mock.results[0].value) as FakeMediaStream;
+    socket.emit.mockClear();
+    await act(async () => {
+      await result.current.toggleAudio();
+    });
+    expect(producer.close).toHaveBeenCalledTimes(1);
+    for (const t of stream.getAudioTracks()) expect(t.stop).toHaveBeenCalled();
+    expect(result.current.isAudioMuted).toBe(true);
+    expect(socket.emit).toHaveBeenCalledWith(MEDIASOUP_WS_EVENTS.CLOSE_PRODUCER, {
       code,
       producerId: 'producer-audio',
-      paused: true,
     });
   });
 
-  it('toggleVideo 는 기본 OFF 상태에서 video producer.resume + isVideoMuted=false + emit(paused:false)', async () => {
-    const { socket, videoProducer, result } = await setupReady();
-    await waitFor(() => expect(result.current.isVideoMuted).toBe(true));
-    socket.emit.mockClear();
-    act(() => result.current.toggleVideo());
-    expect(videoProducer.resume).toHaveBeenCalledTimes(1);
+  it('toggleVideo 최초 호출 시 getUserMedia({video:true}) 로 취득해 produce(source=video) + localStream 설정 + isVideoMuted=false', async () => {
+    const { result, send } = await setupReady();
+    await act(async () => {
+      await result.current.toggleVideo();
+    });
+    expect(getUserMediaMock).toHaveBeenCalledWith({ video: true });
+    expect(send.produce.mock.calls[0][0].appData).toMatchObject({ source: 'video' });
     expect(result.current.isVideoMuted).toBe(false);
-    expect(socket.emit).toHaveBeenCalledWith(MEDIASOUP_WS_EVENTS.TOGGLE_PRODUCER, {
+    expect(result.current.localStream).not.toBeNull();
+  });
+
+  it('켜진 뒤 toggleVideo 를 다시 호출하면 producer.close + CLOSE_PRODUCER emit + localStream=null + isVideoMuted=true', async () => {
+    const { result, send, socket } = await setupReady();
+    await act(async () => {
+      await result.current.toggleVideo();
+    });
+    const producer = (await send.produce.mock.results[0].value) as FakeProducer;
+    socket.emit.mockClear();
+    await act(async () => {
+      await result.current.toggleVideo();
+    });
+    expect(producer.close).toHaveBeenCalledTimes(1);
+    expect(result.current.localStream).toBeNull();
+    expect(result.current.isVideoMuted).toBe(true);
+    expect(socket.emit).toHaveBeenCalledWith(MEDIASOUP_WS_EVENTS.CLOSE_PRODUCER, {
       code,
       producerId: 'producer-video',
-      paused: false,
     });
   });
 

@@ -19,7 +19,6 @@ import {
   type ProduceResponse,
   type ProducerToggledBroadcast,
   type ResumeConsumerRequest,
-  type ToggleProducerRequest,
 } from '@migration/shared-interfaces';
 import type { Device, Producer, Transport } from 'mediasoup-client/types';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -106,9 +105,12 @@ export interface UseMediasoupViewModel {
   readonly isAudioMuted: boolean;
   /** 내 카메라가 mute(paused) 상태인지. */
   readonly isVideoMuted: boolean;
-  /** 내 audio producer 를 mute/unmute 토글. local pause/resume + TOGGLE_PRODUCER RPC. */
+  /**
+   * 마이크 켜기/끄기. 꺼져 있으면 getUserMedia 로 디바이스를 취득해 produce 하고,
+   * 켜져 있으면 producer.close + track.stop 으로 해제한다(lazy acquisition).
+   */
   readonly toggleAudio: () => void;
-  /** 내 video producer 를 mute/unmute 토글. */
+  /** 카메라 켜기/끄기. toggleAudio 와 동일하게 lazy 하게 취득/해제한다. */
   readonly toggleVideo: () => void;
   /**
    * 사용자의 화면을 mediasoup 으로 produce 한다. getDisplayMedia 권한 거부나
@@ -130,12 +132,17 @@ export function useMediasoupViewModel(
   const [reconnectGen, setReconnectGen] = useState(0);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [isSharingScreen, setIsSharingScreen] = useState(false);
-  const [isAudioMuted, setIsAudioMuted] = useState(false);
-  const [isVideoMuted, setIsVideoMuted] = useState(false);
+  // 미디어 기본 OFF — 입장 시엔 카메라/마이크를 잡지 않고(lazy), 사용자가 토글로
+  // 켤 때 비로소 getUserMedia 로 취득한다. 따라서 초깃값은 muted=true.
+  const [isAudioMuted, setIsAudioMuted] = useState(true);
+  const [isVideoMuted, setIsVideoMuted] = useState(true);
   const deviceRef = useRef<Device | null>(null);
   const sendTransportRef = useRef<Transport | null>(null);
   const recvTransportRef = useRef<Transport | null>(null);
+  // video preview(self tile)용 stream. audio 는 별도 audioStreamRef 로 들고
+  // 끄기 시 각각 track.stop() 으로 디바이스를 해제한다.
   const localStreamRef = useRef<MediaStream | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
   const audioProducerRef = useRef<Producer | null>(null);
   const videoProducerRef = useRef<Producer | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
@@ -286,85 +293,27 @@ export function useMediasoupViewModel(
   }, [socket, code, reconnectGen]);
 
   /**
-   * status='ready' 도달 후 별도 effect 에서 local 미디어를 produce 한다.
-   * 1) navigator.mediaDevices.getUserMedia({audio, video})
-   * 2) audio/video track 각각 sendTransport.produce → 'produce' 이벤트가
-   *    PRODUCE RPC 로 위임됨(상단 effect 에서 핸들러 등록).
-   * cleanup 에서 local track 들을 stop 해 카메라/마이크를 해제한다.
+   * 미디어 lazy acquisition — 입장 시점엔 카메라/마이크를 잡지 않는다.
+   * (예전엔 ready 도달 직후 getUserMedia({audio,video}) + produce 후 pause 했는데,
+   * 카메라 LED 가 잠깐 켜졌다 꺼지는 깜박임이 있었다.) 사용자가 toggleAudio/
+   * toggleVideo 로 켤 때 비로소 getUserMedia 로 취득해 produce 하고, 끄면
+   * producer.close + track.stop 으로 디바이스를 해제한다.
+   *
+   * 본 effect 는 재연결/unmount 시 toggle 로 켜 둔 미디어를 정리만 한다.
    */
   useEffect(() => {
     if (status !== 'ready') return undefined;
-    const sendTransport = sendTransportRef.current;
-    if (sendTransport === null) return undefined;
-    let cancelled = false;
-
-    void (async () => {
-      try {
-        console.debug('[mediasoup] getUserMedia 시작');
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: true,
-        });
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        console.debug('[mediasoup] getUserMedia 성공', {
-          audioTracks: stream.getAudioTracks().length,
-          videoTracks: stream.getVideoTracks().length,
-        });
-        localStreamRef.current = stream;
-        setLocalStream(stream);
-        for (const track of stream.getAudioTracks()) {
-          console.debug('[mediasoup] audio produce 시작', { trackId: track.id });
-          // 마이크 기본 OFF: produce 전에 track 을 비활성화해 무음 프레임도 안 나가게 하고,
-          // appData.paused 로 서버가 paused producer 를 생성하게 한다(NEW_PRODUCER 가
-          // 처음부터 mute 로 나가 race 없음). 사용자가 "마이크 켜기" 시 toggleAudio 가 resume.
-          track.enabled = false;
-          const producer = await sendTransport.produce({
-            track: track as never,
-            appData: { source: 'audio' as MediaType, paused: true },
-          });
-          console.debug('[mediasoup] audio produce 성공', { producerId: producer.id });
-          audioProducerRef.current = producer;
-          if (cancelled) return;
-          // 로컬 producer 도 pause 해 RTP 송출을 멈춘다(서버는 이미 paused 로 생성됨).
-          producer.pause();
-          setIsAudioMuted(true);
-        }
-        for (const track of stream.getVideoTracks()) {
-          console.debug('[mediasoup] video produce 시작', { trackId: track.id });
-          // 비디오 기본 OFF: produce 전에 track 을 비활성화해 검은 프레임도 안 나가게 하고,
-          // appData.paused 로 서버가 paused producer 를 생성하게 한다.
-          track.enabled = false;
-          const producer = await sendTransport.produce({
-            track: track as never,
-            appData: { source: 'video' as MediaType, paused: true },
-          });
-          console.debug('[mediasoup] video produce 성공', { producerId: producer.id });
-          videoProducerRef.current = producer;
-          if (cancelled) return;
-          producer.pause();
-          setIsVideoMuted(true);
-        }
-      } catch (e) {
-        if (cancelled) return;
-        const message = e instanceof Error ? e.message : String(e);
-        console.error('[mediasoup] local produce 실패', message);
-        setErrorMessage(message);
-        setStatus('error');
-      }
-    })();
-
     return () => {
-      cancelled = true;
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
+      audioStreamRef.current?.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
-      // 재연결/unmount 시 producer ref + mute 상태를 초기화한다(새 producer 로 교체됨).
+      audioStreamRef.current = null;
       audioProducerRef.current = null;
       videoProducerRef.current = null;
-      setIsAudioMuted(false);
-      setIsVideoMuted(false);
+      setLocalStream(null);
+      // 재연결/unmount 후엔 다시 기본 OFF 로 시작한다(사용자가 재요청해야 켜짐).
+      setIsAudioMuted(true);
+      setIsVideoMuted(true);
     };
   }, [status]);
 
@@ -503,40 +452,75 @@ export function useMediasoupViewModel(
   }, [status, socket, code]);
 
   /**
-   * 로컬 producer 를 mute/unmute 토글한다. mediasoup-client producer.pause()/resume()
-   * 로 RTP 송출을 멈추고, 같은 의도를 backend 에 TOGGLE_PRODUCER RPC 로 알려
-   * server-side producer 도 pause + 다른 참가자에게 broadcast 하게 한다.
-   * ack 는 대기하지 않는다(local 은 이미 반영됨 — fire & forget).
+   * 마이크/카메라를 lazy 하게 켜고 끈다.
+   *  - 꺼진 상태(producer 없음)에서 켜기: 이제서야 getUserMedia 로 디바이스를 잡고
+   *    produce 한다. 그래서 입장 시점엔 카메라 LED 가 켜지지 않는다.
+   *  - 켜진 상태에서 끄기: producer.close + track.stop 으로 디바이스를 완전히 해제하고
+   *    CLOSE_PRODUCER 로 서버·다른 참가자에게 알린다(원격은 PRODUCER_CLOSED 로 정리).
+   * getUserMedia 권한 거부 등은 noop(상태 그대로).
    */
-  const toggleProducer = useCallback(
-    (producerRef: typeof audioProducerRef, setMuted: (v: boolean) => void) => {
-      const producer = producerRef.current;
-      if (producer === null || socket === null) return;
-      const nextPaused = !producer.paused;
-      if (nextPaused) producer.pause();
-      else producer.resume();
-      // RTP pause/resume 과 함께 로컬 track 의 활성 상태도 맞춘다(카메라 LED·
-      // self tile 미리보기까지 일관되게 on/off).
-      const t = (producer as { track?: { enabled: boolean } | null }).track;
-      if (t) t.enabled = !nextPaused;
-      const request: ToggleProducerRequest = {
-        code,
-        producerId: producer.id,
-        paused: nextPaused,
-      };
-      socket.emit(MEDIASOUP_WS_EVENTS.TOGGLE_PRODUCER, request);
-      setMuted(nextPaused);
+  const toggleMedia = useCallback(
+    async (
+      kind: 'audio' | 'video',
+      producerRef: typeof audioProducerRef,
+      streamRef: typeof audioStreamRef,
+      setMuted: (v: boolean) => void,
+    ): Promise<void> => {
+      const existing = producerRef.current;
+      if (existing !== null) {
+        // 끄기 — 디바이스 해제 + 서버 통지.
+        try {
+          existing.close();
+        } catch {
+          // already closed
+        }
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+        if (socket !== null) {
+          const request: CloseProducerRequest = { code, producerId: existing.id };
+          socket.emit(MEDIASOUP_WS_EVENTS.CLOSE_PRODUCER, request);
+        }
+        producerRef.current = null;
+        streamRef.current = null;
+        if (kind === 'video') setLocalStream(null);
+        setMuted(true);
+        return;
+      }
+
+      // 켜기 — 이제서야 디바이스를 잡고 produce.
+      const sendTransport = sendTransportRef.current;
+      if (sendTransport === null) return;
+      try {
+        const constraints = kind === 'audio' ? { audio: true } : { video: true };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const track =
+          kind === 'audio' ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0];
+        if (track === undefined) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        const producer = await sendTransport.produce({
+          track: track as never,
+          appData: { source: kind as MediaType },
+        });
+        producerRef.current = producer;
+        streamRef.current = stream;
+        if (kind === 'video') setLocalStream(stream);
+        setMuted(false);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        setErrorMessage(message);
+      }
     },
     [socket, code],
   );
 
   const toggleAudio = useCallback(() => {
-    toggleProducer(audioProducerRef, setIsAudioMuted);
-  }, [toggleProducer]);
+    void toggleMedia('audio', audioProducerRef, audioStreamRef, setIsAudioMuted);
+  }, [toggleMedia]);
 
   const toggleVideo = useCallback(() => {
-    toggleProducer(videoProducerRef, setIsVideoMuted);
-  }, [toggleProducer]);
+    void toggleMedia('video', videoProducerRef, localStreamRef, setIsVideoMuted);
+  }, [toggleMedia]);
 
   const startScreenShare = useCallback(async () => {
     if (screenProducerRef.current !== null) return;

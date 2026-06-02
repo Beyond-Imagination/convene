@@ -77,9 +77,13 @@ test.describe('두 참가자 - 시그널링 통합', () => {
 
   test('A 회의 만들기 → B 입장 → 양쪽 자기 비디오 + 상대방 참가자 노출', async () => {
     const code = await createMeeting(pageA, 'alice');
+    // 입장 직후엔 카메라가 꺼져 있다(lazy acquisition) — '카메라 켜기' 를 눌러야
+    // getUserMedia 로 디바이스를 잡고 LocalVideoTile 에 video.srcObject 가 부착된다.
+    await pageA.getByRole('button', { name: '카메라 켜기' }).click();
     await expectVideoAttached(pageA, 'local-video-tile');
 
     await joinMeeting(pageB, code, 'bob');
+    await pageB.getByRole('button', { name: '카메라 켜기' }).click();
     await expectVideoAttached(pageB, 'local-video-tile');
 
     // B 에서 A 가 보임 (서버의 PARTICIPANTS broadcast)
