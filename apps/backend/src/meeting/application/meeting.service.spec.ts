@@ -39,6 +39,7 @@ const makeMeeting = (startedAt: Date) =>
     idleTimeout: IdleTimeout.default(),
     startedAt,
     hostToken: 'host-token-1',
+    title: null,
   });
 
 const noopChatRepository = () => ({
@@ -410,6 +411,7 @@ describe('MeetingService.closeMeeting', () => {
           reason: 'manual',
           participants: [{ id: 's1', nickname: 'alice', joinedAt: t1, leftAt: tClose }],
           chat: [],
+          title: null,
         },
       },
     ]);
@@ -552,6 +554,7 @@ describe('MeetingService.detectIdleAndClose', () => {
           reason: 'idle',
           participants: [{ id: 's1', nickname: 'alice', joinedAt: tJoin, leftAt: tLeave }],
           chat: [],
+          title: null,
         },
       },
     ]);

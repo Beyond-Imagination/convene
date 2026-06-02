@@ -35,6 +35,7 @@ export class MeetingController {
     const meeting = await this.service.createMeeting({
       source: dto.source,
       externalReference: ref,
+      title: dto.title ?? null,
     });
     return {
       code: meeting.code.value,

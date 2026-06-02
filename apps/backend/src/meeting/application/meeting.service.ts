@@ -30,6 +30,8 @@ import {
 export interface CreateMeetingCommand {
   source: Source;
   externalReference: ExternalReference;
+  /** 회의 제목(선택). 생략하면 null. */
+  title?: string | null;
 }
 
 export interface JoinMeetingCommand {
@@ -94,6 +96,7 @@ export class MeetingService {
       idleTimeout: IdleTimeout.default(),
       startedAt,
       hostToken: this.deps.hostTokenGenerator.next(),
+      title: command.title ?? null,
     });
     await this.deps.repository.save(meeting);
     await this.deps.eventPublisher.publish(MEETING_EVENTS.CREATED, {
@@ -205,6 +208,7 @@ export class MeetingService {
       reason,
       participants: snapshot.participants,
       chat,
+      title: snapshot.title,
     };
   }
 

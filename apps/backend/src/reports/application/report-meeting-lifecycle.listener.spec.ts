@@ -17,6 +17,7 @@ const payload: MeetingEndedPayload = {
   reason: 'manual',
   participants: [{ id: 's1', nickname: 'alice', joinedAt: tJoin, leftAt: endedAt }],
   chat: [{ nickname: 'alice', text: '안녕', sentAt: tJoin }],
+  title: null,
 };
 
 const makeListener = () => {

@@ -14,6 +14,7 @@ const makeMeeting = (codeStr: string) =>
     idleTimeout: IdleTimeout.default(),
     startedAt: t0,
     hostToken: 'host-token-1',
+    title: null,
   });
 
 describe('InMemoryMeetingRepository', () => {

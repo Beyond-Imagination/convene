@@ -21,6 +21,7 @@ export const meetingReportSchema = new Schema(
     meetingId: { type: String, required: true, unique: true, index: true },
     code: { type: String, required: true, index: true },
     source: { type: String, required: true },
+    title: { type: String, default: null },
     externalReference: { type: Schema.Types.Mixed, default: {} },
     startedAt: { type: Date, required: true },
     endedAt: { type: Date, required: true, index: -1 },

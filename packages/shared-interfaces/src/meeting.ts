@@ -21,6 +21,11 @@ export interface ExternalReferencePayload {
 export interface CreateMeetingRequest {
   source: Source;
   externalReference?: ExternalReferencePayload;
+  /**
+   * 회의 제목(선택). 정하면 회의록 제목으로 쓰이고, 비우면 LLM 요약이 만든 제목
+   * (없으면 "(제목 없음)")이 쓰인다.
+   */
+  title?: string;
 }
 
 export interface CreateMeetingResponse {

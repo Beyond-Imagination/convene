@@ -25,7 +25,8 @@ export function toReportListItem(report: MeetingReport): ReportListItem {
       sttStatus: snapshot.pipeline.sttStatus,
       summaryStatus: snapshot.pipeline.summaryStatus,
     },
-    title: snapshot.summary?.title ?? null,
+    // 사용자가 지정한 회의 제목 우선, 없으면 LLM 요약 제목.
+    title: snapshot.title ?? snapshot.summary?.title ?? null,
   };
 }
 
@@ -36,6 +37,7 @@ export function toReportDetailResponse(report: MeetingReport): ReportDetailRespo
     meetingId: snapshot.meetingId,
     code: snapshot.code,
     source: snapshot.source,
+    title: snapshot.title ?? snapshot.summary?.title ?? null,
     externalReference:
       snapshot.externalReference.issueId === undefined
         ? {}

@@ -105,6 +105,8 @@ export interface ReportDetailResponse {
   meetingId: string;
   code: string;
   source: Source;
+  /** 회의록 제목: 회의 생성 시 지정한 제목 ?? 요약 제목 ?? null. */
+  title: string | null;
   externalReference: { issueId?: string };
   startedAt: string;
   endedAt: string;

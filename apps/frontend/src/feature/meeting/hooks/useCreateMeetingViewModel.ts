@@ -32,6 +32,8 @@ export type CreateMeetingStatus = 'idle' | 'submitting' | 'error';
 
 export interface CreateMeetingFormValues {
   nickname: string;
+  /** 회의 제목(선택). 비우면 회의록 제목은 LLM 요약 제목/("제목 없음")이 쓰인다. */
+  title: string;
 }
 
 export interface UseCreateMeetingViewModel {
@@ -57,7 +59,7 @@ export function useCreateMeetingViewModel(): UseCreateMeetingViewModel {
     handleSubmit: rhfHandleSubmit,
     formState: { errors },
   } = useForm<CreateMeetingFormValues>({
-    defaultValues: { nickname: '' },
+    defaultValues: { nickname: '', title: '' },
     mode: 'onSubmit',
   });
 
@@ -65,8 +67,13 @@ export function useCreateMeetingViewModel(): UseCreateMeetingViewModel {
     setStatus('submitting');
     setErrorMessage(null);
     const trimmed = values.nickname.trim();
+    const trimmedTitle = values.title.trim();
     try {
-      const res = await createMeeting({ source: 'web' });
+      const res = await createMeeting({
+        source: 'web',
+        // 비어 있으면 제목을 보내지 않는다(서버는 미지정으로 처리).
+        title: trimmedTitle === '' ? undefined : trimmedTitle,
+      });
       // 생성자는 host. 회의 종료 권한 식별용 토큰을 회의 code 로 보관한다.
       saveHostToken(res.code, res.hostToken);
       setNickname(trimmed);

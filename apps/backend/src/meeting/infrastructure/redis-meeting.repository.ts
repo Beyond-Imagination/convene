@@ -32,6 +32,8 @@ interface MeetingWire {
   readonly participants: ReadonlyArray<ParticipantWire>;
   // 과거 도큐먼트(hostToken 도입 전)는 이 필드가 없을 수 있어 optional 로 읽는다.
   readonly hostToken?: string;
+  // 과거 도큐먼트(title 도입 전)는 이 필드가 없을 수 있어 optional 로 읽는다.
+  readonly title?: string | null;
 }
 
 /**
@@ -81,6 +83,7 @@ export class RedisMeetingRepository implements MeetingRepository {
         }),
       ),
       hostToken: snapshot.hostToken,
+      title: snapshot.title,
     };
   }
 
@@ -104,6 +107,8 @@ export class RedisMeetingRepository implements MeetingRepository {
       // 레거시 도큐먼트(hostToken 없음)는 빈 문자열로 복원 — isHost 가 빈 토큰을
       // 항상 거부하므로 누구도 종료 권한을 갖지 못하고 idle 로만 종료된다.
       hostToken: wire.hostToken ?? '',
+      // 레거시 도큐먼트(title 없음)는 null 로 복원.
+      title: wire.title ?? null,
     };
   }
 }

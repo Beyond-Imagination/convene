@@ -29,6 +29,8 @@ export interface MeetingSnapshot {
   readonly participants: ReadonlyArray<ParticipantSnapshot>;
   /** 회의 종료 권한자(host) 식별용 비밀 토큰. 생성자만 보관한다. */
   readonly hostToken: string;
+  /** 회의 생성 시 지정한 제목. 없으면 null. 종료 시 회의록 제목 후보로 전달된다. */
+  readonly title: string | null;
 }
 
 export interface CreateMeetingInput {
@@ -43,6 +45,8 @@ export interface CreateMeetingInput {
    * socket id 와 달리 새로고침/재접속해도 유지된다.
    */
   hostToken: string;
+  /** 회의 제목(선택). 없으면 null. */
+  title: string | null;
 }
 
 export class Meeting {
@@ -57,6 +61,7 @@ export class Meeting {
     public readonly idleTimeout: IdleTimeout,
     public readonly startedAt: Date,
     public readonly hostToken: string,
+    public readonly title: string | null,
   ) {
     this._lastActiveAt = startedAt;
   }
@@ -69,6 +74,7 @@ export class Meeting {
       input.idleTimeout,
       input.startedAt,
       input.hostToken,
+      input.title,
     );
   }
 
@@ -88,6 +94,7 @@ export class Meeting {
       IdleTimeout.of(snapshot.idleTimeoutMs),
       snapshot.startedAt,
       snapshot.hostToken,
+      snapshot.title,
     );
     meeting._lastActiveAt = snapshot.lastActiveAt;
     meeting._endedAt = snapshot.endedAt;
@@ -201,6 +208,7 @@ export class Meeting {
       lastActiveAt: this._lastActiveAt,
       participants: Array.from(this.participants.values()).map((p) => p.snapshot()),
       hostToken: this.hostToken,
+      title: this.title,
     };
   }
 

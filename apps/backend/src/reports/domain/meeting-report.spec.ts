@@ -21,6 +21,7 @@ describe('MeetingReport (Aggregate Root)', () => {
       participantEntry({ id: 's1', nickname: 'alice', joinedAt: startedAt, leftAt: endedAt }),
     ],
     chat: [chatEntry({ nickname: 'alice', text: 'hi', sentAt: startedAt })],
+    title: null as string | null,
   });
 
   const validSummary = () =>
@@ -50,6 +51,13 @@ describe('MeetingReport (Aggregate Root)', () => {
       ['code', { code: '' }],
     ])('%s가 trim 후 비어 있으면 거부한다', (_field, overrides) => {
       expect(() => MeetingReport.fromEndedMeeting({ ...baseInput(), ...overrides })).toThrow();
+    });
+
+    it('회의 제목(title)을 보유한다 — 없으면 null', () => {
+      expect(MeetingReport.fromEndedMeeting(baseInput()).title).toBeNull();
+      expect(
+        MeetingReport.fromEndedMeeting({ ...baseInput(), title: '주간 회의' }).title,
+      ).toBe('주간 회의');
     });
 
     it('endedAt이 startedAt보다 이르면 거부한다', () => {

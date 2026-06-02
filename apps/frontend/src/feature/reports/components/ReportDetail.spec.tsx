@@ -12,6 +12,7 @@ const baseDetail = (
   meetingId: 'm1',
   code: 'abc12xyz',
   source: 'web',
+  title: null,
   externalReference: {},
   startedAt: '2026-01-01T00:00:00.000Z',
   endedAt: '2026-01-01T01:00:00.000Z',
@@ -51,6 +52,15 @@ describe('ReportDetail View', () => {
       />,
     );
     expect(screen.getByRole('alert')).toHaveTextContent('mongo down');
+  });
+
+  it('회의 제목(title)이 있으면 헤더에 노출하고, 없으면 "회의록 {code}" 를 쓴다', () => {
+    const { rerender } = render(<ReportDetail {...baseVm()} />);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('회의록 abc12xyz');
+    rerender(
+      <ReportDetail {...baseVm({ report: baseDetail({ title: '주간 스프린트' }) })} />,
+    );
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('주간 스프린트');
   });
 
   it('summary 가 null 이면 "요약 진행 중" 안내를 노출한다', () => {

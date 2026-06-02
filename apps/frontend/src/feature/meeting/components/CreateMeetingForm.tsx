@@ -25,9 +25,22 @@ export function CreateMeetingForm({
     <form aria-label="create-form" onSubmit={handleSubmit}>
       <h2 className="text-lg font-bold text-text">회의 만들기</h2>
       <p className="mt-1 text-sm text-muted">
-        닉네임만 입력하면 새 회의를 만들고 바로 입장합니다.
+        닉네임을 입력하면 새 회의를 만들고 바로 입장합니다. 제목은 선택입니다.
       </p>
       <div className="mt-4">
+        <label htmlFor="create-title" className="field-label">
+          회의 제목 (선택)
+        </label>
+        <input
+          id="create-title"
+          type="text"
+          autoComplete="off"
+          placeholder="예: 주간 스프린트 회의"
+          className="field-input"
+          {...register('title')}
+        />
+      </div>
+      <div className="mt-3">
         <label htmlFor="create-nickname" className="field-label">
           닉네임
         </label>

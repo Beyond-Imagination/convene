@@ -25,6 +25,7 @@ const makeMeeting = () =>
     idleTimeout: IdleTimeout.default(),
     startedAt: t0,
     hostToken: 'host-token-1',
+    title: null,
   });
 
 interface Broadcast {
@@ -244,6 +245,7 @@ describe('MeetingGateway.onMeetingEnded', () => {
     participants: [],
     chat: [],
     reason: 'manual' as const,
+    title: null,
   };
 
   it('meeting.ended 페이로드를 받아 같은 room 에 meeting:ended 를 broadcast 한다', () => {

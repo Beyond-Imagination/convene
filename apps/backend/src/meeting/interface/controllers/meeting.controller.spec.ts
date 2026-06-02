@@ -20,6 +20,7 @@ const fakeMeeting = () =>
     idleTimeout: IdleTimeout.default(),
     startedAt: fakeStartedAt,
     hostToken: 'host-token-1',
+    title: null,
   });
 
 interface ServiceCall {
@@ -90,6 +91,7 @@ describe('MeetingController.closeMeeting', () => {
       idleTimeout: IdleTimeout.default(),
       startedAt: fakeStartedAt,
       hostToken: 'host-token-1',
+      title: null,
     });
     m.close(endedAt);
     return m;

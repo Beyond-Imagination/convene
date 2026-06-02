@@ -37,6 +37,8 @@ export interface CreateMeetingReportInput {
   endedAt: Date;
   participants: ReadonlyArray<ParticipantEntry>;
   chat: ReadonlyArray<ChatEntry>;
+  /** 회의 생성 시 지정한 제목. 생략하면 null. */
+  title?: string | null;
 }
 
 export interface MeetingReportSnapshot {
@@ -47,6 +49,7 @@ export interface MeetingReportSnapshot {
   readonly externalReference: ExternalReference;
   readonly startedAt: Date;
   readonly endedAt: Date;
+  readonly title: string | null;
   readonly participants: ReadonlyArray<ParticipantEntry>;
   readonly chat: ReadonlyArray<ChatEntry>;
   readonly transcript: ReadonlyArray<TranscriptSegment>;
@@ -69,6 +72,7 @@ export class MeetingReport {
     public readonly externalReference: ExternalReference,
     public readonly startedAt: Date,
     public readonly endedAt: Date,
+    public readonly title: string | null,
     public readonly participants: ReadonlyArray<ParticipantEntry>,
     public readonly chat: ReadonlyArray<ChatEntry>,
   ) {
@@ -94,6 +98,7 @@ export class MeetingReport {
       snapshot.externalReference,
       snapshot.startedAt,
       snapshot.endedAt,
+      snapshot.title,
       [...snapshot.participants],
       [...snapshot.chat],
     );
@@ -126,6 +131,7 @@ export class MeetingReport {
       input.externalReference,
       input.startedAt,
       input.endedAt,
+      input.title ?? null,
       [...input.participants],
       [...input.chat],
     );
@@ -196,6 +202,7 @@ export class MeetingReport {
       externalReference: this.externalReference,
       startedAt: this.startedAt,
       endedAt: this.endedAt,
+      title: this.title,
       participants: this.participants,
       chat: this.chat,
       transcript: this._transcript,

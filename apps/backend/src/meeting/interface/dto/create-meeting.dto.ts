@@ -1,8 +1,11 @@
 import { type CreateMeetingRequest, type Source,SOURCES } from '@migration/shared-interfaces';
 import { Type } from 'class-transformer';
-import { IsIn, IsOptional, ValidateNested } from 'class-validator';
+import { IsIn, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
 
 import { ExternalReferenceDto } from './external-reference.dto';
+
+/** 회의 제목 최대 길이. */
+const TITLE_MAX = 100;
 
 /**
  * POST /meetings 요청 본문 DTO. shared-interfaces.CreateMeetingRequest를
@@ -16,4 +19,9 @@ export class CreateMeetingDto implements CreateMeetingRequest {
   @ValidateNested()
   @Type(() => ExternalReferenceDto)
   externalReference?: ExternalReferenceDto;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(TITLE_MAX)
+  title?: string;
 }

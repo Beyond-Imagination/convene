@@ -28,4 +28,6 @@ export interface MeetingEndedPayload {
   readonly reason: MeetingEndedReason;
   readonly participants: ReadonlyArray<MeetingEndedParticipant>;
   readonly chat: ReadonlyArray<ChatEntry>;
+  /** 회의 생성 시 지정한 제목. 없으면 null. Reports BC 가 회의록 제목 후보로 쓴다. */
+  readonly title: string | null;
 }

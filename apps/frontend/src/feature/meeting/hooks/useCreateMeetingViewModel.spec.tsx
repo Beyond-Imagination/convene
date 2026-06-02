@@ -39,6 +39,7 @@ function makeForm(vm: ReturnType<typeof useCreateMeetingViewModel>) {
   return render(
     <form onSubmit={vm.handleSubmit} aria-label="create-form">
       <input data-testid="nickname-input" {...vm.register('nickname')} />
+      <input data-testid="title-input" {...vm.register('title')} />
       <button type="submit">submit</button>
     </form>,
   );
@@ -81,7 +82,25 @@ describe('useCreateMeetingViewModel', () => {
       fireEvent.click(getByRole('button', { name: 'submit' }));
     });
     await waitFor(() => expect(createMeetingMock).toHaveBeenCalled());
-    expect(createMeetingMock).toHaveBeenCalledWith({ source: 'web' });
+    expect(createMeetingMock).toHaveBeenCalledWith({ source: 'web', title: undefined });
+  });
+
+  it('제목을 입력하면 createMeeting 에 title 로 전달된다(앞뒤 공백 trim)', async () => {
+    createMeetingMock.mockResolvedValueOnce({
+      code: 'abc12xyz',
+      source: 'web',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      hostToken: 'tok',
+    });
+    const { result } = renderHook(() => useCreateMeetingViewModel());
+    const { getByTestId, getByRole } = makeForm(result.current);
+    fireEvent.input(getByTestId('nickname-input'), { target: { value: '준' } });
+    fireEvent.input(getByTestId('title-input'), { target: { value: '  주간 회의  ' } });
+    await act(async () => {
+      fireEvent.click(getByRole('button', { name: 'submit' }));
+    });
+    await waitFor(() => expect(createMeetingMock).toHaveBeenCalled());
+    expect(createMeetingMock).toHaveBeenCalledWith({ source: 'web', title: '주간 회의' });
   });
 
   it('성공 시 닉네임이 session store 에 set 되고 router.push(`/meetings/{code}`) 로 이동한다', async () => {

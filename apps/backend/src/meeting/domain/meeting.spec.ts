@@ -10,7 +10,7 @@ describe('Meeting (Aggregate Root)', () => {
   const T_10m_after_T_1m = new Date('2026-01-01T00:11:00Z');
   const T_1m_minus = new Date('2026-01-01T00:00:59Z');
 
-  const newMeeting = () =>
+  const newMeeting = (title: string | null = null) =>
     Meeting.create({
       code: MeetingCode.from('abc12xyz'),
       source: 'web',
@@ -18,6 +18,7 @@ describe('Meeting (Aggregate Root)', () => {
       idleTimeout: IdleTimeout.default(),
       startedAt: T_0,
       hostToken: 'host-token-1',
+      title,
     });
 
   describe('create', () => {
@@ -32,6 +33,11 @@ describe('Meeting (Aggregate Root)', () => {
     it('생성 시 받은 hostToken 을 보유한다 (회의 종료 권한 식별용)', () => {
       const m = newMeeting();
       expect(m.hostToken).toBe('host-token-1');
+    });
+
+    it('생성 시 받은 title 을 보유한다(없으면 null)', () => {
+      expect(newMeeting().title).toBeNull();
+      expect(newMeeting('주간 회의').title).toBe('주간 회의');
     });
 
     it('hostToken 이 주어진 토큰과 일치하는지 isHost 로 검증한다', () => {

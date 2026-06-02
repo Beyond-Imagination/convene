@@ -89,7 +89,7 @@ function Body({ report }: { readonly report: ReportDetailResponse }) {
     <article className="flex flex-col gap-5">
       <header>
         <h1 className="text-2xl font-bold tracking-tight text-text">
-          회의록 {report.code}
+          {report.title ?? `회의록 ${report.code}`}
         </h1>
         <p className="mt-1 text-sm text-muted">
           {formatDate(report.startedAt)} ~ {formatDate(report.endedAt)}

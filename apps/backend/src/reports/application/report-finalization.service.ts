@@ -30,6 +30,8 @@ export interface CreateDraftCommand {
   endedAt: Date;
   participants: ReadonlyArray<ParticipantEntry>;
   chat: ReadonlyArray<ChatEntry>;
+  /** 회의 생성 시 지정한 제목. 생략하면 null. */
+  title?: string | null;
 }
 
 export interface CompleteTranscriptionCommand {
@@ -65,6 +67,7 @@ export class ReportFinalizationService {
       endedAt: command.endedAt,
       participants: command.participants,
       chat: command.chat,
+      title: command.title ?? null,
     });
     await this.deps.repository.save(report);
     // STT 가 speaker 를 nickname 으로 채울 수 있도록 participantId→nickname 매핑을

@@ -35,6 +35,7 @@ export class ReportMeetingLifecycleListener {
         leftAt: p.leftAt,
       })),
       chat: payload.chat,
+      title: payload.title,
     });
   }
 }
