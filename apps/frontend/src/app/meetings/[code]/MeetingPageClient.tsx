@@ -29,6 +29,12 @@ export function MeetingPageClient() {
   // self 타일(항상 1) + 원격 참가자 수 = 전체 비디오 타일 수.
   const totalTiles = 1 + meetingVm.remoteParticipants.length;
   const layout = useMeetingLayoutViewModel(totalTiles);
+
+  // 닉네임이 없으면(직접 URL 접근 또는 회의 종료 후 clearNickname) 회의 화면을
+  // 그리지 않는다. ViewModel 이 홈/회의록으로 이동시키는 동안 "(미인증)" 화면이
+  // 깜박이는 것을 막는다.
+  if (meetingVm.nickname === null) return null;
+
   return (
     <div className="theme-dark flex h-screen overflow-hidden bg-bg text-text">
       <MeetingScreen

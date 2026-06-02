@@ -90,10 +90,18 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
    * 에서 보내지 않는 게 더 깔끔).
    */
   const skipLeaveOnCleanupRef = useRef(false);
+  /**
+   * leave/endMeeting/meeting:ended 로 회의를 떠나는 중인지. clearNickname() 으로
+   * nickname 이 null 이 되면 본 effect 가 재실행되는데, 이때 "직접 URL 접근(미인증)"
+   * 과 "정상 퇴장" 을 구분해야 한다. 퇴장 중이면 이미 목적지로 push/redirect 했으므로
+   * 홈으로의 replace('/') 를 막는다(/reports 로의 이동과 경쟁 방지).
+   */
+  const isNavigatingAwayRef = useRef(false);
 
   useEffect(() => {
     if (nickname === null) {
-      router.replace('/');
+      // 퇴장 중(이미 목적지로 이동 시작)이면 추가 redirect 하지 않는다.
+      if (!isNavigatingAwayRef.current) router.replace('/');
       return;
     }
 
@@ -144,14 +152,15 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
       // 떠나 회의록 페이지로 이동한다. 회의가 이미 backend 에서 닫혔으므로
       // closeMeeting API 는 호출하지 않고, cleanup 의 leave emit 도 skip.
       skipLeaveOnCleanupRef.current = true;
+      isNavigatingAwayRef.current = true;
       const current = socketRef.current;
       if (current !== null) {
         current.disconnect();
         socketRef.current = null;
         setSocket(null);
       }
-      clearNickname();
       router.push('/reports');
+      clearNickname();
     };
 
     socket.on('connect', onConnect);
@@ -183,6 +192,7 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
   }, [code, nickname, router, clearNickname]);
 
   const leave = useCallback(() => {
+    isNavigatingAwayRef.current = true;
     const current = socketRef.current;
     if (current !== null) {
       current.emit(MEETING_WS_EVENTS.LEAVE, { code });
@@ -190,8 +200,8 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
       socketRef.current = null;
       setSocket(null);
     }
-    clearNickname();
     router.push('/');
+    clearNickname();
   }, [code, clearNickname, router]);
 
   const endMeeting = useCallback(async (): Promise<void> => {
@@ -207,14 +217,15 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
     // 다시 emit 해 race 를 만들지 않도록 차단(backend handleLeave 도 swallow 하지만
     // 노이즈를 줄이는 게 깔끔).
     skipLeaveOnCleanupRef.current = true;
+    isNavigatingAwayRef.current = true;
     const current = socketRef.current;
     if (current !== null) {
       current.disconnect();
       socketRef.current = null;
       setSocket(null);
     }
-    clearNickname();
     router.push('/reports');
+    clearNickname();
   }, [code, clearNickname, router]);
 
   return {

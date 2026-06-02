@@ -221,6 +221,8 @@ describe('useMeetingViewModel', () => {
       expect(closeMeetingMock).toHaveBeenCalledWith(code, undefined);
       expect(useSessionStore.getState().nickname).toBeNull();
       expect(pushMock).toHaveBeenCalledWith('/reports');
+      // 닉네임이 비워져도 미인증 홈 redirect 와 경쟁하지 않는다("(미인증)" 깜박임 방지).
+      expect(replaceMock).not.toHaveBeenCalledWith('/');
     });
 
     it('저장된 hostToken 을 closeMeeting 에 함께 전달한다', async () => {
@@ -292,6 +294,8 @@ describe('useMeetingViewModel', () => {
       expect(useSessionStore.getState().nickname).toBeNull();
       expect(fakeSocket.disconnect).toHaveBeenCalled();
       expect(pushMock).toHaveBeenCalledWith('/reports');
+      // 닉네임이 비워져도 미인증 홈 redirect 와 경쟁하지 않는다("(미인증)" 깜박임 방지).
+      expect(replaceMock).not.toHaveBeenCalledWith('/');
     });
 
     it('수신 후 cleanup 에서 meeting:leave 를 emit 하지 않는다(이미 종료됨)', () => {
