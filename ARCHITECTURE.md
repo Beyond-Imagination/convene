@@ -181,7 +181,7 @@ stateDiagram-v2
   Live --> Idle: 활성 참가자 0명
   Idle --> Live: 재입장(idle timeout 이내)
   Idle --> Ending: idle timeout 경과 → idle.detected
-  Live --> Ending: host 수동 종료(DELETE /meetings/:code)
+  Live --> Ending: host 수동 종료(DELETE meetings)
   Ending --> ReportPending: meeting.ended → MeetingReport draft
 
   state ReportPending {
