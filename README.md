@@ -47,13 +47,16 @@ pnpm install
 ```
 
 ### 환경 변수
-`apps/backend/.env`:
+각 앱의 `.env.template` 을 복사해 채운다.
+```bash
+cp apps/backend/.env.template apps/backend/.env
+cp apps/frontend/.env.template apps/frontend/.env.local
+cp apps/ai-worker/.env.template apps/ai-worker/.env   # 선택 — 모두 기본값으로 동작
 ```
-GEMINI_API_KEY=...          # LLM 요약(Gemini)
-MONGO_URI=...               # MongoDB Atlas 또는 로컬
-MONGO_DB_NAME=migration-dev
-```
-프론트엔드는 `NEXT_PUBLIC_API_URL`(기본 `http://localhost:5000`)로 백엔드를 가리킨다.
+- **backend** 핵심: `GEMINI_API_KEY`(LLM 요약), `MONGO_URI`·`MONGO_DB_NAME`(회의록 저장).
+  나머지(Redis·Mediasoup·CORS·포트 등)는 `.env.template` 주석 참조.
+- **frontend**: `NEXT_PUBLIC_API_URL`(기본 `http://localhost:5000`)로 백엔드를 가리킨다.
+  정적 export 라 빌드 타임에 인라인되므로 배포 빌드 시 운영 백엔드 URL 을 넣어야 한다.
 
 ### 개발 실행
 ```bash
@@ -111,4 +114,3 @@ pnpm build:shared  # shared-interfaces 만 빌드 — 타입 변경 후 backend/
 - **View 규칙**: View 컴포넌트에서 `fetch`/`useEffect`/`useState`/socket/zustand setter 를 직접
   호출하지 않는다 — 전부 ViewModel hook 으로 옮긴다.
 - AI 협업(예: Claude Code) 컨텍스트와 하드 룰은 [`CLAUDE.md`](./CLAUDE.md) 에 정리되어 있다.
-```
