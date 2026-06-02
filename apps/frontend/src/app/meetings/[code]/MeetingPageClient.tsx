@@ -4,10 +4,12 @@ import { useParams } from 'next/navigation';
 
 import { ChatPanel } from '@/feature/meeting/components/ChatPanel';
 import { MeetingScreen } from '@/feature/meeting/components/MeetingScreen';
+import { NicknameGate } from '@/feature/meeting/components/NicknameGate';
 import { useChatViewModel } from '@/feature/meeting/hooks/useChatViewModel';
 import { useMediasoupViewModel } from '@/feature/meeting/hooks/useMediasoupViewModel';
 import { useMeetingLayoutViewModel } from '@/feature/meeting/hooks/useMeetingLayoutViewModel';
 import { useMeetingViewModel } from '@/feature/meeting/hooks/useMeetingViewModel';
+import { useNicknameGateViewModel } from '@/feature/meeting/hooks/useNicknameGateViewModel';
 
 /**
  * `/meetings/[code]` 의 client wrapper.
@@ -29,11 +31,15 @@ export function MeetingPageClient() {
   // self 타일(항상 1) + 원격 참가자 수 = 전체 비디오 타일 수.
   const totalTiles = 1 + meetingVm.remoteParticipants.length;
   const layout = useMeetingLayoutViewModel(totalTiles);
+  const gateVm = useNicknameGateViewModel();
 
-  // 닉네임이 없으면(직접 URL 접근 또는 회의 종료 후 clearNickname) 회의 화면을
-  // 그리지 않는다. ViewModel 이 홈/회의록으로 이동시키는 동안 "(미인증)" 화면이
-  // 깜박이는 것을 막는다.
-  if (meetingVm.nickname === null) return null;
+  // 닉네임이 없는 두 경우를 구분한다:
+  //  - 회의 종료 후 이동 중(isNavigatingAway): 화면을 그리지 않아 "(미인증)" 깜박임 방지.
+  //  - 링크로 직접 접속(미인증): 닉네임 입력 모달을 띄워 그 자리에서 입장하게 한다.
+  if (meetingVm.nickname === null) {
+    if (meetingVm.isNavigatingAway) return null;
+    return <NicknameGate code={code} {...gateVm} />;
+  }
 
   return (
     <div className="theme-dark flex h-screen overflow-hidden bg-bg text-text">

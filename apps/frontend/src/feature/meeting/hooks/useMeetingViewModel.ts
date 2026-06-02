@@ -59,6 +59,12 @@ export interface UseMeetingViewModel {
    * 보유하므로 true. View 는 이 값으로 "회의 종료" 버튼 노출을 결정한다.
    */
   readonly isHost: boolean;
+  /**
+   * 회의를 떠나 다른 페이지로 이동하는 중인지(leave/endMeeting/meeting:ended).
+   * nickname 이 null 이 됐을 때 "직접 접속(미인증, 닉네임 모달 표시)" 과
+   * "퇴장 이동 중(화면 미렌더)" 을 View 가 구분하는 데 쓴다.
+   */
+  readonly isNavigatingAway: boolean;
   readonly leave: () => void;
   /**
    * 명시적 회의 종료 액션. backend `DELETE /meetings/:code` 를 호출해
@@ -100,8 +106,11 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
 
   useEffect(() => {
     if (nickname === null) {
-      // 퇴장 중(이미 목적지로 이동 시작)이면 추가 redirect 하지 않는다.
-      if (!isNavigatingAwayRef.current) router.replace('/');
+      // 닉네임이 없으면 socket 을 만들지 않는다. 두 경우가 있다:
+      //  - 링크로 회의에 직접 접속(미인증): MeetingPageClient 가 닉네임 입력 모달을
+      //    띄우고, 입력되면 nickname 이 생겨 본 effect 가 재실행되며 정상 입장한다.
+      //  - 회의 종료 후 퇴장(clearNickname): 이미 목적지로 이동 중이다.
+      // 어느 경우든 여기서 홈으로 redirect 하지 않는다.
       return;
     }
 
@@ -237,6 +246,7 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
     socket,
     reconnectGen,
     isHost,
+    isNavigatingAway: isNavigatingAwayRef.current,
     leave,
     endMeeting,
   };

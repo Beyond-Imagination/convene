@@ -87,9 +87,11 @@ describe('useMeetingViewModel', () => {
     window.sessionStorage.clear();
   });
 
-  it('닉네임이 store에 없으면 / 로 redirect 한다', () => {
-    setup(null);
-    expect(replaceMock).toHaveBeenCalledWith('/');
+  it('닉네임이 store 에 없으면 홈으로 redirect 하지 않고 socket 도 만들지 않는다 (직접 접속 닉네임 모달용)', () => {
+    const { result } = setup(null);
+    // 링크 직접 접속(미인증)은 홈으로 튕기지 않고 회의 페이지에서 닉네임 입력을 받는다.
+    expect(replaceMock).not.toHaveBeenCalled();
+    expect(result.current.socket).toBeNull();
   });
 
   it('mount + connect 시 meeting:join 을 emit 한다', () => {
