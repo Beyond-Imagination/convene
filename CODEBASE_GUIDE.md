@@ -6,8 +6,8 @@
 ## 0. 어디서부터 읽나
 
 1. [`README.md`](./README.md) — 실행/스크립트
-2. [`ARCHITECTURE.md`](./ARCHITECTURE.md) §2~4 — BC·레이어·MVVM
-3. 이 문서 §2 핵심 흐름 — 실제 코드를 흐름 따라
+2. [`ARCHITECTURE.md`](./ARCHITECTURE.md) 섹션#2~4 — BC·레이어·MVVM
+3. 이 문서 섹션#2 핵심 흐름 — 실제 코드를 흐름 따라
 4. 기여할 BC 의 `domain/` → `application/` → `interface/`/`infrastructure/` 순으로 그 모듈만
 
 읽기 팁: **wire 계약은 항상 `packages/shared-interfaces/src/`** 에 있다(이벤트 이름·HTTP/WS

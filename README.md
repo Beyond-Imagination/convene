@@ -21,7 +21,7 @@ WebRTC 화상회의 + 실시간 채팅 + 구조화된 **회의록**(STT + LLM �
 | [`PLAN.md`](./PLAN.md)                     | v1 범위·기술 결정·회의록 스키마·작업 단계                                    |
 | [`CLAUDE.md`](./CLAUDE.md)                 | AI 협업(Claude Code)용 컨텍스트와 하드 룰                                    |
 
-> 처음이라면 README → ARCHITECTURE(§2~4) → CODEBASE_GUIDE(§2 핵심 흐름) 순서를 권장한다.
+> 처음이라면 README → ARCHITECTURE(섹션#2~4) → CODEBASE_GUIDE(섹션#2 핵심 흐름) 순서를 권장한다.
 
 ## 기술 스택
 
@@ -47,7 +47,7 @@ migration/
 ```
 
 Bounded Context: `meeting`(채팅 포함) · `mediasoup` · `recording` · `reports` + `shared-kernel`.
-자세한 매핑은 [`ARCHITECTURE.md`](./ARCHITECTURE.md) §3, 코드 흐름은 [`CODEBASE_GUIDE.md`](./CODEBASE_GUIDE.md) §2.
+자세한 매핑은 [`ARCHITECTURE.md`](./ARCHITECTURE.md) 섹션#3, 코드 흐름은 [`CODEBASE_GUIDE.md`](./CODEBASE_GUIDE.md) 섹션#2.
 
 ## 빠른 시작
 
@@ -145,7 +145,7 @@ pnpm build:shared  # shared-interfaces 만 빌드 — 타입 변경 후 backend/
 - **DTO 규칙**: class-validator 데코레이터 DTO 는 backend 에만. `shared-interfaces` 는 순수 타입·상수만.
 - **View 규칙**: View 에서 `fetch`/`useEffect`/`useState`/socket/zustand setter 직접 호출 금지 — ViewModel hook 으로.
 
-기여 절차(새 기능·새 BC·테스트 패턴)는 [`CODEBASE_GUIDE.md`](./CODEBASE_GUIDE.md) §3 참조.
+기여 절차(새 기능·새 BC·테스트 패턴)는 [`CODEBASE_GUIDE.md`](./CODEBASE_GUIDE.md) 섹션#3 참조.
 
 ## 트러블슈팅
 
