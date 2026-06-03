@@ -8,6 +8,7 @@ import {
   type UseFormRegisterReturn,
 } from 'react-hook-form';
 
+import { saveNickname } from '@/shared/stores/nickname.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
 /**
@@ -57,6 +58,8 @@ export function useJoinMeetingViewModel(): UseJoinMeetingViewModel {
   const handleSubmit = rhfHandleSubmit((values) => {
     setStatus('submitting');
     const trimmed = values.nickname.trim();
+    // 닉네임을 code 별로 보관(리로드 생존) + reactive store 에도 set.
+    saveNickname(values.code, trimmed);
     setNickname(trimmed);
     router.push(`/meetings/${values.code}`);
   });

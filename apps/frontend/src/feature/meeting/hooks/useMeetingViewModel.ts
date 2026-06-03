@@ -14,6 +14,10 @@ import type { Socket } from 'socket.io-client';
 import { closeMeeting } from '@/shared/api/meeting.api';
 import { connectMeetingSocket } from '@/shared/socket/meeting.socket';
 import { getHostToken } from '@/shared/stores/host-token.storage';
+import {
+  clearStoredNickname,
+  getNickname,
+} from '@/shared/stores/nickname.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
 /**
@@ -76,8 +80,14 @@ export interface UseMeetingViewModel {
 
 export function useMeetingViewModel(code: string): UseMeetingViewModel {
   const router = useRouter();
-  const nickname = useSessionStore((s) => s.nickname);
+  const storeNickname = useSessionStore((s) => s.nickname);
   const clearNickname = useSessionStore((s) => s.clearNickname);
+  // 정적 호스팅에선 create/join → /meetings/{code} 이동이 풀 리로드라 in-memory store
+  // 가 비므로, code 별 보관 닉네임(sessionStorage)에서 복구한다(hostToken 과 동일 전략).
+  const [persistedNickname, setPersistedNickname] = useState<string | null>(() =>
+    getNickname(code),
+  );
+  const nickname = storeNickname ?? persistedNickname;
 
   const [status, setStatus] = useState<MeetingConnectionStatus>('connecting');
   const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
@@ -103,6 +113,14 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
    * 홈으로의 replace('/') 를 막는다(/reports 로의 이동과 경쟁 방지).
    */
   const isNavigatingAwayRef = useRef(false);
+
+  // 회의를 떠날 때 닉네임 식별 정보(reactive store + code별 sessionStorage + 로컬 복구값)를
+  // 모두 정리한다. 안 그러면 보관 닉네임이 남아 종료 후에도 nickname 이 non-null 로 남는다.
+  const clearIdentity = useCallback(() => {
+    clearNickname();
+    setPersistedNickname(null);
+    clearStoredNickname(code);
+  }, [clearNickname, code]);
 
   useEffect(() => {
     if (nickname === null) {
@@ -169,7 +187,7 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
         setSocket(null);
       }
       router.push('/reports');
-      clearNickname();
+      clearIdentity();
     };
 
     socket.on('connect', onConnect);
@@ -198,7 +216,7 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
       socketRef.current = null;
       setSocket(null);
     };
-  }, [code, nickname, router, clearNickname]);
+  }, [code, nickname, router, clearIdentity]);
 
   const leave = useCallback(() => {
     isNavigatingAwayRef.current = true;
@@ -210,8 +228,8 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
       setSocket(null);
     }
     router.push('/');
-    clearNickname();
-  }, [code, clearNickname, router]);
+    clearIdentity();
+  }, [code, clearIdentity, router]);
 
   const endMeeting = useCallback(async (): Promise<void> => {
     try {
@@ -234,8 +252,8 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
       setSocket(null);
     }
     router.push('/reports');
-    clearNickname();
-  }, [code, clearNickname, router]);
+    clearIdentity();
+  }, [code, clearIdentity, router]);
 
   return {
     code,

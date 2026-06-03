@@ -10,6 +10,7 @@ import {
 
 import { createMeeting, MeetingApiError } from '@/shared/api/meeting.api';
 import { saveHostToken } from '@/shared/stores/host-token.storage';
+import { saveNickname } from '@/shared/stores/nickname.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
 /**
@@ -74,8 +75,8 @@ export function useCreateMeetingViewModel(): UseCreateMeetingViewModel {
         // 비어 있으면 제목을 보내지 않는다(서버는 미지정으로 처리).
         title: trimmedTitle === '' ? undefined : trimmedTitle,
       });
-      // 생성자는 host. 회의 종료 권한 식별용 토큰을 회의 code 로 보관한다.
       saveHostToken(res.code, res.hostToken);
+      saveNickname(res.code, trimmed);
       setNickname(trimmed);
       router.push(`/meetings/${res.code}`);
     } catch (e) {
