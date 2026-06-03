@@ -340,7 +340,7 @@ export function useMediasoupViewModel(
             code,
             transportId: recvTransport.id,
             producerId: payload.producerId,
-            rtpCapabilities: device.rtpCapabilities as unknown,
+            rtpCapabilities: device.recvRtpCapabilities as unknown,
           };
           const consumeRes = await rpcWithTimeout<ConsumeResponse>(
             socket,
@@ -490,7 +490,19 @@ export function useMediasoupViewModel(
       const sendTransport = sendTransportRef.current;
       if (sendTransport === null) return;
       try {
-        const constraints = kind === 'audio' ? { audio: true } : { video: true };
+        // 오디오는 노이즈 억제/에코 제거/자동 게인을 명시적으로 요청한다(기본값 의존 X).
+        // voiceIsolation 은 표준 외(Chrome/Edge 110+): 지원 시 ML 음성 격리 강화, 미지원 시 무시.
+        const constraints: MediaStreamConstraints =
+          kind === 'audio'
+            ? {
+                audio: {
+                  echoCancellation: true,
+                  noiseSuppression: true,
+                  autoGainControl: true,
+                  voiceIsolation: true,
+                } as MediaTrackConstraints,
+              }
+            : { video: true };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         const track =
           kind === 'audio' ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0];

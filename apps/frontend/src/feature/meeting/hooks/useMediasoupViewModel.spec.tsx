@@ -955,12 +955,19 @@ describe('useMediasoupViewModel.muteToggle', () => {
     expect(result.current.localStream).toBeNull();
   });
 
-  it('toggleAudio 최초 호출 시 getUserMedia({audio:true}) 로 취득해 produce(source=audio) 하고 isAudioMuted=false', async () => {
+  it('toggleAudio 최초 호출 시 getUserMedia(노이즈 억제 오디오 제약) 로 취득해 produce(source=audio) 하고 isAudioMuted=false', async () => {
     const { result, send } = await setupReady();
     await act(async () => {
       await result.current.toggleAudio();
     });
-    expect(getUserMediaMock).toHaveBeenCalledWith({ audio: true });
+    expect(getUserMediaMock).toHaveBeenCalledWith({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        voiceIsolation: true,
+      },
+    });
     expect(send.produce).toHaveBeenCalledTimes(1);
     expect(send.produce.mock.calls[0][0].appData).toMatchObject({ source: 'audio' });
     expect(result.current.isAudioMuted).toBe(false);
