@@ -500,6 +500,18 @@ export function useMediasoupViewModel(
         }
         const producer = await sendTransport.produce({
           track: track as never,
+          // 음질 개선(음성): Opus FEC(패킷 손실 보정) + DTX(무음 구간 절약) +
+          // 비트레이트 상향(기본보다 높게). 영상에는 적용하지 않는다.
+          ...(kind === 'audio'
+            ? {
+                codecOptions: {
+                  opusFec: true,
+                  opusDtx: true,
+                  opusMaxPlaybackRate: 48000,
+                  opusMaxAverageBitrate: 64000,
+                },
+              }
+            : {}),
           appData: { source: kind as MediaType },
         });
         producerRef.current = producer;
