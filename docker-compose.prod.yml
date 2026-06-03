@@ -1,0 +1,79 @@
+# 운영(단일 EC2) compose. 이미지는 GHCR 에서 pull — EC2 에서 빌드하지 않는다.
+#
+# 외부(보안그룹)에 노출하는 것은 Caddy 80/443 + mediasoup RTC 포트 범위뿐이다.
+# backend(5000)·ai-worker(8000)·redis(6379)는 ports 를 발행하지 않아 docker 내부망에서만
+# 접근된다. Caddy 가 backend:5000 으로 reverse_proxy(HTTP+WS)하며 TLS 를 종단한다.
+#
+# 변수(${...})는 같은 디렉터리의 .env 에서 읽는다(.env.prod.template 참조).
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: convene-caddy
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp' # HTTP/3 (QUIC)
+    environment:
+      - DOMAIN=${DOMAIN}
+      - ACME_EMAIL=${ACME_EMAIL:-}
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data # 발급 인증서 영속화(재기동 시 재발급 방지)
+      - caddy-config:/config
+    depends_on:
+      - backend
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: convene-redis
+    restart: unless-stopped
+    command: >-
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 256mb
+      --maxmemory-policy volatile-lru
+      --notify-keyspace-events Ex
+    volumes:
+      - redis-data:/data
+    # ports 발행 안 함 — 내부망 전용
+
+  ai-worker:
+    image: ghcr.io/beyond-imagination/convene-ai-worker:${IMAGE_TAG:-latest}
+    container_name: convene-ai-worker
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+      - STT_MODEL_SIZE=${STT_MODEL_SIZE:-small}
+    # ports 발행 안 함 — backend 가 http://ai-worker:8000 으로 내부 호출
+
+  backend:
+    image: ghcr.io/beyond-imagination/convene-backend:${IMAGE_TAG:-latest}
+    container_name: convene-backend
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - ai-worker
+    env_file:
+      - ./.env # GEMINI_API_KEY / MONGO_URI / MONGO_DB_NAME 등
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - REDIS_URL=redis://redis:6379
+      - AI_WORKER_BASE_URL=http://ai-worker:8000
+      - CORS_ORIGIN=${CORS_ORIGIN}
+      - ANNOUNCED_IP=${ANNOUNCED_IP}
+      - RTC_MIN_PORT=${RTC_MIN_PORT:-40000}
+      - RTC_MAX_PORT=${RTC_MAX_PORT:-40199}
+      - MEDIASOUP_WORKER_NUM=${MEDIASOUP_WORKER_NUM:-1}
+    # HTTP/WS(5000)는 발행하지 않는다 — Caddy 가 내부망으로 proxy 한다.
+    # mediasoup RTC 포트 범위만 호스트로 발행(미디어는 EC2 public IP 로 직접 들어온다).
+    ports:
+      - '${RTC_MIN_PORT:-40000}-${RTC_MAX_PORT:-40199}:${RTC_MIN_PORT:-40000}-${RTC_MAX_PORT:-40199}/udp'
+      - '${RTC_MIN_PORT:-40000}-${RTC_MAX_PORT:-40199}:${RTC_MIN_PORT:-40000}-${RTC_MAX_PORT:-40199}/tcp'
+
+volumes:
+  caddy-data:
+  caddy-config:
+  redis-data:
