@@ -129,7 +129,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: GHCR_TOKEN,GHCR_USER,DOMAIN,ACME_EMAIL,CORS_ORIGIN,RTC_MIN_PORT,RTC_MAX_PORT,MEDIASOUP_WORKER_NUM,STT_MODEL_SIZE,MONGO_DB_NAME,IMAGE_TAG,GEMINI_API_KEY,MONGO_URI
+          envs: GHCR_TOKEN,GHCR_USER,DOMAIN,ACME_EMAIL,CORS_ORIGIN,RTC_MIN_PORT,RTC_MAX_PORT,MEDIASOUP_WORKER_NUM,STT_MODEL_SIZE,MONGO_DB_NAME,IMAGE_TAG,GEMINI_API_KEY,GEMINI_MODEL,MONGO_URI
           script: |
             set -e
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
@@ -153,6 +153,7 @@ jobs:
               echo "MEDIASOUP_WORKER_NUM=${MEDIASOUP_WORKER_NUM:-1}"
               echo "STT_MODEL_SIZE=${STT_MODEL_SIZE:-small}"
               echo "GEMINI_API_KEY=$GEMINI_API_KEY"
+              echo "GEMINI_MODEL=$GEMINI_MODEL"
               echo "MONGO_URI=$MONGO_URI"
               echo "MONGO_DB_NAME=${MONGO_DB_NAME:-convene-prod}"
             } > .env
@@ -174,6 +175,7 @@ jobs:
           MONGO_DB_NAME: ${{ vars.MONGO_DB_NAME }}
           IMAGE_TAG: ${{ vars.IMAGE_TAG }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           MONGO_URI: ${{ secrets.MONGO_URI }}
 
   # 5) 프론트 배포 (정적 export → S3 → CloudFront). FRONTEND_DEPLOY_ENABLED 게이트.
