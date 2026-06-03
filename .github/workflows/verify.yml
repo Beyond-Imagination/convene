@@ -1,0 +1,37 @@
+# 재사용 가능한 검증 워크플로 — lint/build/test.
+# ci.yml(PR) 과 deploy-backend.yml(배포 전 게이트) 가 `uses:` 로 호출한다(중복 정의 방지).
+name: Verify
+
+on:
+  workflow_call: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      HUSKY: '0'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: pnpm 설치
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Node 20 + pnpm store 캐시
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: 의존성 설치
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build
+
+      - name: Test
+        run: pnpm test

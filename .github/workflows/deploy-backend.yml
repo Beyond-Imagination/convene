@@ -1,7 +1,10 @@
-# 백엔드/ai-worker 배포 — main push 시 이미지를 GHCR 에 빌드·push 하고 EC2 에 배포한다.
+# 백엔드/ai-worker 배포 — main push(관련 경로) 또는 수동 실행 시:
+#   verify(lint/build/test) → build-push(변경된 이미지만) → deploy(EC2 SSH).
 #
-# build-push 는 항상 실행(이미지 보관). deploy 는 repo 변수 DEPLOY_ENABLED=true 이고
-# EC2 시크릿(EC2_HOST/EC2_USER/EC2_SSH_KEY)이 있을 때만 실행 — 인프라 준비 전엔 빌드까지만.
+# - CI(verify)가 성공해야만 build/deploy 가 돈다(needs 로 순서·성공 게이트).
+# - 변경된 이미지만 빌드: backend/ai-worker 중 바뀐 것만(dorny/paths-filter). compose·Caddyfile
+#   만 바뀐 경우엔 둘 다 스킵하고 deploy 만 수행(git pull 로 설정 갱신). 수동 실행은 둘 다 빌드.
+# - 전체는 repo 변수 DEPLOY_ENABLED=true 일 때만(아니면 verify 부터 skipped → 전부 skipped).
 name: Deploy Backend
 
 on:
@@ -14,6 +17,7 @@ on:
       - 'docker-compose.prod.yml'
       - 'infra/Caddyfile'
       - '.github/workflows/deploy-backend.yml'
+      - '.github/workflows/verify.yml'
   workflow_dispatch:
 
 concurrency:
@@ -25,17 +29,25 @@ env:
   AIWORKER_IMAGE: ghcr.io/beyond-imagination/convene-ai-worker
 
 jobs:
-  build-push:
-    runs-on: ubuntu-latest
-    # 인프라 준비 전엔 전체 비활성 — repo 변수 DEPLOY_ENABLED=true 일 때만 이미지 빌드·push.
-    # (게이트 전에는 deploy 잡도 needs 미충족으로 함께 스킵된다.)
+  # 1) CI 게이트 — 통과해야 아래 잡이 돈다. DEPLOY_ENABLED 가 아니면 여기서 skip → 전부 skip.
+  verify:
     if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    uses: ./.github/workflows/verify.yml
+
+  # 2) 변경된 이미지만 빌드해 GHCR push.
+  build-push:
+    needs: verify
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # paths-filter 가 push diff 를 보려면 히스토리 필요
+
       - uses: docker/setup-buildx-action@v3
+
       - name: GHCR 로그인
         uses: docker/login-action@v3
         with:
@@ -43,8 +55,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # context=monorepo root (pnpm workspace + @convene/shared-interfaces 필요).
+      # 어떤 이미지가 바뀌었는지 판별(push 일 때만). 수동 실행은 아래 조건의 || 로 둘 다 빌드.
+      - name: 변경 경로 판별
+        if: ${{ github.event_name == 'push' }}
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'apps/backend/**'
+              - 'packages/shared-interfaces/**'
+            aiworker:
+              - 'apps/ai-worker/**'
+
       - name: backend 이미지 빌드+push
+        if: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.backend == 'true' }}
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -57,6 +82,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: ai-worker 이미지 빌드+push
+        if: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.aiworker == 'true' }}
         uses: docker/build-push-action@v6
         with:
           context: apps/ai-worker
@@ -68,17 +94,15 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # 3) EC2 배포 — GHCR 로그인(GITHUB_TOKEN) → git pull(compose/Caddyfile) → .env 생성 →
+  #    이미지 pull(바뀐 것만 실제 갱신) → 재기동. ANNOUNCED_IP 는 IMDS 자동 조회.
   deploy:
     needs: build-push
     runs-on: ubuntu-latest
-    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
     permissions:
       contents: read
       packages: read
     steps:
-      # EC2 에서: GHCR 로그인(GITHUB_TOKEN — EC2 에 PAT 불필요) → git pull(compose/Caddyfile)
-      # → GitHub Secrets/Variables 로 .env 생성(값 변경 시 SSH 불필요) → 이미지 pull → 재기동.
-      # ANNOUNCED_IP 는 EC2 메타데이터(IMDS)에서 자동 조회 — IP 가 바뀌어도 손 안 댐.
       - name: SSH 배포
         uses: appleboy/ssh-action@v1
         with:
