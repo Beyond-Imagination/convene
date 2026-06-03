@@ -1,0 +1,223 @@
+# 통합 배포 — main push(관련 경로) 또는 수동 시:
+#   verify(전체 lint/build/test, 1회) → changes(변경 타깃 판별)
+#     ├─ build-push : 변경된 backend/ai-worker 이미지만 GHCR push
+#     ├─ deploy-backend : EC2 SSH (compose/Caddyfile 갱신 + 이미지 pull + 재기동)  [DEPLOY_ENABLED]
+#     └─ deploy-frontend : 정적 빌드 → S3 sync → CloudFront 무효화              [FRONTEND_DEPLOY_ENABLED]
+#
+# CI(verify) 통과해야 배포(needs). 모노레포라 verify 는 한 번만 돌고, 바뀐 타깃만 배포된다.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/backend/**'
+      - 'apps/ai-worker/**'
+      - 'apps/frontend/**'
+      - 'packages/shared-interfaces/**'
+      - 'docker-compose.prod.yml'
+      - 'infra/Caddyfile'
+      - '.github/workflows/deploy.yml'
+      - '.github/workflows/verify.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  BACKEND_IMAGE: ghcr.io/beyond-imagination/convene-backend
+  AIWORKER_IMAGE: ghcr.io/beyond-imagination/convene-ai-worker
+
+jobs:
+  # 1) CI 게이트 (전체 1회). backend 또는 frontend 배포가 켜져 있을 때만.
+  verify:
+    if: ${{ vars.DEPLOY_ENABLED == 'true' || vars.FRONTEND_DEPLOY_ENABLED == 'true' }}
+    uses: ./.github/workflows/verify.yml
+
+  # 2) 변경 타깃 판별 (push 일 때 diff; dispatch 는 아래 잡들이 강제 실행).
+  changes:
+    needs: verify
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      aiworker: ${{ steps.filter.outputs.aiworker }}
+      backend_deploy: ${{ steps.filter.outputs.backend_deploy }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: 변경 경로 판별
+        if: ${{ github.event_name == 'push' }}
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'apps/backend/**'
+              - 'packages/shared-interfaces/**'
+            aiworker:
+              - 'apps/ai-worker/**'
+            backend_deploy:
+              - 'apps/backend/**'
+              - 'apps/ai-worker/**'
+              - 'packages/shared-interfaces/**'
+              - 'docker-compose.prod.yml'
+              - 'infra/Caddyfile'
+            frontend:
+              - 'apps/frontend/**'
+              - 'packages/shared-interfaces/**'
+
+  # 3) 변경된 backend/ai-worker 이미지만 빌드해 GHCR push.
+  build-push:
+    needs: changes
+    if: ${{ needs.changes.outputs.backend == 'true' || needs.changes.outputs.aiworker == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: GHCR 로그인
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: backend 이미지 빌드+push
+        if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.backend == 'true' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:latest
+            ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: ai-worker 이미지 빌드+push
+        if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.aiworker == 'true' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/ai-worker
+          file: apps/ai-worker/Dockerfile
+          push: true
+          tags: |
+            ${{ env.AIWORKER_IMAGE }}:latest
+            ${{ env.AIWORKER_IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # 4) EC2 배포. compose/Caddyfile 만 바뀐 경우엔 build-push 가 skip 돼도 배포는 수행한다
+  #    (always() + build-push 가 fail/cancel 아닐 때). DEPLOY_ENABLED 게이트.
+  deploy-backend:
+    needs: [changes, build-push]
+    if: ${{ always() && vars.DEPLOY_ENABLED == 'true' && needs.changes.result == 'success' && needs.build-push.result != 'failure' && needs.build-push.result != 'cancelled' && (needs.changes.outputs.backend_deploy == 'true' || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: SSH 배포
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: GHCR_TOKEN,GHCR_USER,DOMAIN,ACME_EMAIL,CORS_ORIGIN,RTC_MIN_PORT,RTC_MAX_PORT,MEDIASOUP_WORKER_NUM,STT_MODEL_SIZE,MONGO_DB_NAME,IMAGE_TAG,GEMINI_API_KEY,MONGO_URI
+          script: |
+            set -e
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+            # EC2 public IP 자동 조회(IMDSv2)
+            IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 120")
+            PUBIP=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
+
+            cd /opt/convene
+            git pull --ff-only
+
+            # GitHub Secrets/Variables → .env 생성(.gitignore 처리됨, 커밋 안 됨)
+            {
+              echo "IMAGE_TAG=${IMAGE_TAG:-latest}"
+              echo "DOMAIN=$DOMAIN"
+              echo "ACME_EMAIL=$ACME_EMAIL"
+              echo "CORS_ORIGIN=$CORS_ORIGIN"
+              echo "ANNOUNCED_IP=$PUBIP"
+              echo "RTC_MIN_PORT=${RTC_MIN_PORT:-40000}"
+              echo "RTC_MAX_PORT=${RTC_MAX_PORT:-40199}"
+              echo "MEDIASOUP_WORKER_NUM=${MEDIASOUP_WORKER_NUM:-1}"
+              echo "STT_MODEL_SIZE=${STT_MODEL_SIZE:-small}"
+              echo "GEMINI_API_KEY=$GEMINI_API_KEY"
+              echo "MONGO_URI=$MONGO_URI"
+              echo "MONGO_DB_NAME=${MONGO_DB_NAME:-convene-prod}"
+            } > .env
+
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d
+            docker image prune -f
+            docker logout ghcr.io
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          DOMAIN: ${{ vars.DOMAIN }}
+          ACME_EMAIL: ${{ vars.ACME_EMAIL }}
+          CORS_ORIGIN: ${{ vars.CORS_ORIGIN }}
+          RTC_MIN_PORT: ${{ vars.RTC_MIN_PORT }}
+          RTC_MAX_PORT: ${{ vars.RTC_MAX_PORT }}
+          MEDIASOUP_WORKER_NUM: ${{ vars.MEDIASOUP_WORKER_NUM }}
+          STT_MODEL_SIZE: ${{ vars.STT_MODEL_SIZE }}
+          MONGO_DB_NAME: ${{ vars.MONGO_DB_NAME }}
+          IMAGE_TAG: ${{ vars.IMAGE_TAG }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+
+  # 5) 프론트 배포 (정적 export → S3 → CloudFront). FRONTEND_DEPLOY_ENABLED 게이트.
+  deploy-frontend:
+    needs: changes
+    if: ${{ vars.FRONTEND_DEPLOY_ENABLED == 'true' && (needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    env:
+      HUSKY: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: 의존성 설치
+        run: pnpm install --frozen-lockfile
+
+      - name: shared-interfaces 빌드
+        run: pnpm build:shared
+
+      # NODE_ENV=production 이면 next.config 가 output:'export' 로 apps/frontend/out 을 만든다.
+      - name: 프론트 정적 빌드 (API URL 인라인)
+        env:
+          NODE_ENV: production
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+        run: pnpm --filter @convene/frontend build
+
+      - name: AWS 자격증명
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: S3 동기화
+        run: aws s3 sync apps/frontend/out "s3://${{ secrets.S3_BUCKET }}" --delete
+
+      - name: CloudFront 무효화
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths "/*"
