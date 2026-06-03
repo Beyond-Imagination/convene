@@ -1,4 +1,4 @@
-import type { DomainEventName } from '@migration/shared-interfaces';
+import type { DomainEventName } from '@convene/shared-interfaces';
 
 /**
  * 도메인 이벤트 발행 포트. Application Service가 본 인터페이스에만 의존하며,

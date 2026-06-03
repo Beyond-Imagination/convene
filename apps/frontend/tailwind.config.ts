@@ -1,7 +1,7 @@
 import type { Config } from 'tailwindcss';
 
 /**
- * migration v1 디자인 시스템 Tailwind 설정.
+ * Convene v1 디자인 시스템 Tailwind 설정.
  *
  * 의미 기반 컬러 토큰(bg/surface/border/text/muted)은 globals.css 의 CSS 변수를
  * 가리킨다. 기본값은 라이트(메인·입장·reports)이고, 회의 화면 컨테이너에

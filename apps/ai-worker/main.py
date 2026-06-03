@@ -1,4 +1,4 @@
-"""migration v1 ai-worker — STT via faster-whisper.
+"""Convene v1 ai-worker — STT via faster-whisper.
 
 `POST /transcribe` 는 raw audio bytes (application/octet-stream) 를 받아
 faster-whisper 로 한국어 STT 를 수행한 뒤 segment 배열을 돌려준다.
@@ -49,7 +49,7 @@ model = WhisperModel(
     cpu_threads=CPU_THREADS,
 )
 
-app = FastAPI(title="migration-ai-worker", version="1.0.0")
+app = FastAPI(title="convene-ai-worker", version="1.0.0")
 
 
 @app.get("/health")

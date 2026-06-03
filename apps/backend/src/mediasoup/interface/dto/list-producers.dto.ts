@@ -1,4 +1,4 @@
-import type { ListProducersRequest } from '@migration/shared-interfaces';
+import type { ListProducersRequest } from '@convene/shared-interfaces';
 import { IsString, Length } from 'class-validator';
 
 import { MeetingCode } from '@/meeting/domain/value-objects';

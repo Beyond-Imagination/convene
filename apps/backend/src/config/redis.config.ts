@@ -10,7 +10,7 @@
  */
 
 export const DEFAULT_REDIS_URL = 'redis://localhost:6379';
-export const DEFAULT_REDIS_KEY_PREFIX = 'migration:';
+export const DEFAULT_REDIS_KEY_PREFIX = 'convene:';
 
 export function resolveRedisUrl(env: NodeJS.ProcessEnv = process.env): string {
   const raw = env.REDIS_URL;

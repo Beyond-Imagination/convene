@@ -3,7 +3,7 @@ import {
   CreateTransportResponse,
   MediaType,
   TransportDirection,
-} from '@migration/shared-interfaces';
+} from '@convene/shared-interfaces';
 
 /**
  * WebRTC Transport / Producer / Consumer 의 lifecycle 을 추상화한 도메인 포트.

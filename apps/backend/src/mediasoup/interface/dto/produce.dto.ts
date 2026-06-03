@@ -2,7 +2,7 @@ import {
   MEDIA_TYPES,
   type MediaType,
   type ProduceRequest,
-} from '@migration/shared-interfaces';
+} from '@convene/shared-interfaces';
 import {
   IsBoolean,
   IsDefined,

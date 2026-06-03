@@ -28,7 +28,7 @@ interface RouterPipeRegistry {
  * `MediaRouterPort` 의 mediasoup 어댑터.
  *
  * **동적 router pool** — plum 은 회의 생성 시 router 를 사전 N 개 만들지만
- * migration 회의는 인원 가변이라 capacity 기반 lazy add 전략을 쓴다:
+ * Convene 회의는 인원 가변이라 capacity 기반 lazy add 전략을 쓴다:
  *   - createRoom: router 1 개 시작
  *   - assignParticipant: 빈 자리(capacity 미달) 있는 router 에 할당. 모두 가득
  *     차면 새 router 추가 + **모든 기존 producer 를 새 router 로 pipe**.

@@ -1,7 +1,8 @@
-# web12-plum-migration
+# Convene
 
-WebRTC 화상회의 + 실시간 채팅 + 구조화된 **회의록**(STT + LLM 요약)을 제공하는 모노레포 프로젝트.
-`web12-plum` 을 슬림화해 마이그레이션한 **v1.0.0** 이며, AWS 단일 인스턴스 + 정적 호스팅 배포를 목표로 한다.
+링크 하나로 시작하는 화상회의 — WebRTC 화상/음성 + 실시간 채팅 + 회의 종료 후 자동 생성되는
+구조화 **회의록**(STT + LLM 요약)을 제공하는 모노레포 프로젝트. **v1.0.0**, AWS 단일 인스턴스 +
+정적 호스팅 배포를 목표로 한다.
 
 ## 주요 기능
 
@@ -35,7 +36,7 @@ WebRTC 화상회의 + 실시간 채팅 + 구조화된 **회의록**(STT + LLM �
 ## 모노레포 구조
 
 ```
-migration/
+convene/
 ├── apps/
 │   ├── backend/    NestJS — Layered MVC + DDD 4-layer (interface/application/domain/infrastructure)
 │   ├── frontend/   Next.js App Router — MVVM (components=View / hooks=ViewModel / stores·services=Model)

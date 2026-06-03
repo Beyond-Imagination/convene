@@ -1,4 +1,4 @@
-import { MEETING_EVENTS } from '@migration/shared-interfaces';
+import { MEETING_EVENTS } from '@convene/shared-interfaces';
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 

@@ -3,7 +3,7 @@
  *
  * 운영/개발 분리 전략(PLAN.md §3 — MongoDB Atlas 무료 티어 1클러스터):
  *   - 같은 클러스터를 공유하되 `MONGO_DB_NAME` 으로 database 만 분리한다.
- *   - 예) 개발 = `migration-dev`, 운영 = `migration-prod`.
+ *   - 예) 개발 = `convene-dev`, 운영 = `convene-prod`.
  *   - `MONGO_URI` 에는 URI 끝의 dbname 을 박지 않고 cluster connection string 만 둔다.
  *     `mongoose.createConnection(uri, { dbName })` 의 옵션으로 dbname 을 주입한다.
  *
@@ -12,7 +12,7 @@
  */
 
 export const DEFAULT_MONGO_URI = 'mongodb://localhost:27017';
-export const DEFAULT_MONGO_DB_NAME = 'migration-dev';
+export const DEFAULT_MONGO_DB_NAME = 'convene-dev';
 
 export function resolveMongoUri(env: NodeJS.ProcessEnv = process.env): string {
   const raw = env.MONGO_URI;

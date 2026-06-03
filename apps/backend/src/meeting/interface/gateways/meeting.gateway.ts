@@ -6,7 +6,7 @@ import {
   type MeetingParticipantsBroadcast,
   type ParticipantJoinedBroadcast,
   type ParticipantLeftBroadcast,
-} from '@migration/shared-interfaces';
+} from '@convene/shared-interfaces';
 import { Logger, UsePipes, ValidationPipe } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {

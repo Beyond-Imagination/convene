@@ -1,4 +1,4 @@
-import type { LeaveMeetingMessage } from '@migration/shared-interfaces';
+import type { LeaveMeetingMessage } from '@convene/shared-interfaces';
 import { IsString, Length } from 'class-validator';
 
 import { MeetingCode } from '@/meeting/domain/value-objects';

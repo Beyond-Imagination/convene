@@ -1,4 +1,4 @@
-import { MAX_REPORT_LIST_LIMIT } from '@migration/shared-interfaces';
+import { MAX_REPORT_LIST_LIMIT } from '@convene/shared-interfaces';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
 

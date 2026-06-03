@@ -11,7 +11,7 @@ import {
   type ProduceResponse,
   type ProducerToggledBroadcast,
   type ToggleProducerResponse,
-} from '@migration/shared-interfaces';
+} from '@convene/shared-interfaces';
 import { Logger, UsePipes, ValidationPipe } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {

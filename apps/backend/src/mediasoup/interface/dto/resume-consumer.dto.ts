@@ -1,4 +1,4 @@
-import type { ResumeConsumerRequest } from '@migration/shared-interfaces';
+import type { ResumeConsumerRequest } from '@convene/shared-interfaces';
 import { IsString, Length, MaxLength } from 'class-validator';
 
 import { MeetingCode } from '@/meeting/domain/value-objects';

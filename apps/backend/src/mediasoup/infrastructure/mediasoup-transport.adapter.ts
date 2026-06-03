@@ -1,4 +1,4 @@
-import { ConsumeResponse, CreateTransportResponse } from '@migration/shared-interfaces';
+import { ConsumeResponse, CreateTransportResponse } from '@convene/shared-interfaces';
 import { Logger } from '@nestjs/common';
 import {
   Consumer,

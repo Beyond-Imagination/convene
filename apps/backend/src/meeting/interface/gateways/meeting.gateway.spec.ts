@@ -1,4 +1,4 @@
-import { MEETING_WS_EVENTS } from '@migration/shared-interfaces';
+import { MEETING_WS_EVENTS } from '@convene/shared-interfaces';
 import type { Socket } from 'socket.io';
 
 import { Meeting } from '@/meeting/domain/meeting';

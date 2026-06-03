@@ -1,5 +1,5 @@
 {
-  "name": "migration",
+  "name": "convene",
   "version": "1.0.0",
   "private": true,
   "packageManager": "pnpm@9.15.0",
@@ -15,7 +15,7 @@
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "build:shared": "pnpm --filter @migration/shared-interfaces build"
+    "build:shared": "pnpm --filter @convene/shared-interfaces build"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

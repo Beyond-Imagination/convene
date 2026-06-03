@@ -1,4 +1,4 @@
-import { MEDIASOUP_WS_EVENTS, MEETING_WS_EVENTS } from '@migration/shared-interfaces';
+import { MEDIASOUP_WS_EVENTS, MEETING_WS_EVENTS } from '@convene/shared-interfaces';
 import { act, renderHook, waitFor } from '@testing-library/react';
 
 import { useMediasoupViewModel } from './useMediasoupViewModel';

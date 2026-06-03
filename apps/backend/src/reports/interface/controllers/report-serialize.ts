@@ -2,7 +2,7 @@ import {
   ReportDetailResponse,
   ReportListItem,
   ReportPipelineWire,
-} from '@migration/shared-interfaces';
+} from '@convene/shared-interfaces';
 
 import { MeetingReport } from '@/reports/domain/meeting-report';
 

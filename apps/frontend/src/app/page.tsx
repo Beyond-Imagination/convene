@@ -26,7 +26,7 @@ export default function HomePage() {
           <div className="inline-flex items-center gap-2">
             <span className="inline-block h-7 w-7 rounded-full bg-accent" aria-hidden />
             <span className="text-2xl font-extrabold tracking-tight text-text">
-              migration
+              Convene
             </span>
           </div>
           <p className="mt-2 text-sm text-muted">

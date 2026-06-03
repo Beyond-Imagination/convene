@@ -2,7 +2,7 @@ import type {
   ReportDetailResponse,
   ReportListItem,
   ReportListResponse,
-} from '@migration/shared-interfaces';
+} from '@convene/shared-interfaces';
 
 import { API_BASE_URL } from './config';
 

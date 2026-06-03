@@ -1,4 +1,4 @@
-import { type CreateMeetingRequest, type Source,SOURCES } from '@migration/shared-interfaces';
+import { type CreateMeetingRequest, type Source,SOURCES } from '@convene/shared-interfaces';
 import { Type } from 'class-transformer';
 import { IsIn, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
 

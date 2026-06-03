@@ -43,7 +43,7 @@ interface MeetingWire {
  *   - `meeting:{code}` key 에 Aggregate snapshot 의 JSON 직렬화 본을 string 으로 저장.
  *   - Date 는 ISO string, 복원 시 명시적으로 `new Date(iso)`.
  *   - 같은 redis 인스턴스(@Global RedisModule)를 BC 들이 공유하므로 `keyPrefix`
- *     옵션이 추가로 `migration:` 등 환경별 네임스페이스를 덧붙인다.
+ *     옵션이 추가로 `convene:` 등 환경별 네임스페이스를 덧붙인다.
  */
 @Injectable()
 export class RedisMeetingRepository implements MeetingRepository {

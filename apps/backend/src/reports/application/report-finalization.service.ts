@@ -1,4 +1,4 @@
-import { REPORT_EVENTS } from '@migration/shared-interfaces';
+import { REPORT_EVENTS } from '@convene/shared-interfaces';
 
 import { ParticipantEntry, TranscriptSegment } from '@/reports/domain/entries';
 import { MeetingReport } from '@/reports/domain/meeting-report';

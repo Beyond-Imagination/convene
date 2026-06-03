@@ -4,7 +4,7 @@ import {
   MEDIASOUP_EVENTS,
   MediaType,
   TransportDirection,
-} from '@migration/shared-interfaces';
+} from '@convene/shared-interfaces';
 
 import { ParticipantMedia } from '@/mediasoup/domain/participant-media';
 import {

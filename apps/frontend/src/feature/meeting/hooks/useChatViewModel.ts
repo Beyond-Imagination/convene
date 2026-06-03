@@ -3,7 +3,7 @@
 import {
   type ChatPostedBroadcast,
   MEETING_WS_EVENTS,
-} from '@migration/shared-interfaces';
+} from '@convene/shared-interfaces';
 import { useCallback, useEffect, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 

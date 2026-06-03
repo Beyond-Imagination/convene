@@ -1,4 +1,4 @@
-import { MEETING_EVENTS } from '@migration/shared-interfaces';
+import { MEETING_EVENTS } from '@convene/shared-interfaces';
 
 import { Meeting } from '@/meeting/domain/meeting';
 import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';

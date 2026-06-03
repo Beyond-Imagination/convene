@@ -46,11 +46,11 @@ describe('resolveMongoDbName', () => {
   });
 
   it('명시된 db name 을 trim 해서 돌려준다(개발/운영 분리용)', () => {
-    expect(resolveMongoDbName({ MONGO_DB_NAME: '  migration-dev  ' })).toBe(
-      'migration-dev',
+    expect(resolveMongoDbName({ MONGO_DB_NAME: '  convene-dev  ' })).toBe(
+      'convene-dev',
     );
-    expect(resolveMongoDbName({ MONGO_DB_NAME: 'migration-prod' })).toBe(
-      'migration-prod',
+    expect(resolveMongoDbName({ MONGO_DB_NAME: 'convene-prod' })).toBe(
+      'convene-prod',
     );
   });
 });

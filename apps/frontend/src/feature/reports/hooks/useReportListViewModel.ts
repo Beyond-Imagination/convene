@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReportListItem } from '@migration/shared-interfaces';
+import type { ReportListItem } from '@convene/shared-interfaces';
 import { useCallback, useEffect, useState } from 'react';
 
 import { listReports } from '@/shared/api/reports.api';

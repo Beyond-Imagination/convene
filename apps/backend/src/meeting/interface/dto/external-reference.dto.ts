@@ -1,4 +1,4 @@
-import type { ExternalReferencePayload } from '@migration/shared-interfaces';
+import type { ExternalReferencePayload } from '@convene/shared-interfaces';
 import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 /**

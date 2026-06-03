@@ -1,7 +1,7 @@
 # 운영용 backend 이미지.
 #
 # - base 는 Debian-slim. Alpine 은 mediasoup prebuilt binary(glibc) 와 호환되지 않는다.
-# - context 는 monorepo root 로 잡는다(pnpm workspace + @migration/shared-interfaces 가 필요).
+# - context 는 monorepo root 로 잡는다(pnpm workspace + @convene/shared-interfaces 가 필요).
 #   `docker build -f apps/backend/Dockerfile .` 또는 docker-compose 의 `context: .` + `dockerfile: apps/backend/Dockerfile`.
 # - mediasoup native worker 는 builder stage 에서만 빌드된다. runtime stage 에는 ffmpeg 만 필요.
 
@@ -39,8 +39,8 @@ RUN HUSKY=0 pnpm install --frozen-lockfile
 COPY apps/backend ./apps/backend
 COPY packages/shared-interfaces ./packages/shared-interfaces
 
-RUN pnpm --filter @migration/shared-interfaces build \
- && pnpm --filter @migration/backend build
+RUN pnpm --filter @convene/shared-interfaces build \
+ && pnpm --filter @convene/backend build
 
 # 4) dev deps 제거. mediasoup 는 dependencies 라 prune 후에도 worker 바이너리는 살아남는다.
 RUN HUSKY=0 pnpm prune --prod
@@ -49,7 +49,7 @@ RUN HUSKY=0 pnpm prune --prod
 # Stage 2: runtime
 #   - ffmpeg(recording BC 가 PlainTransport RTP → ffmpeg subprocess → Redis LIST).
 #   - builder 에서 prune 된 node_modules + dist 만 복사. pnpm 재설치 없음.
-#   - pnpm workspace 의 symlink(node_modules/@migration/shared-interfaces → packages/...)
+#   - pnpm workspace 의 symlink(node_modules/@convene/shared-interfaces → packages/...)
 #     를 유지하기 위해 monorepo 디렉터리 구조를 그대로 보존한다.
 # ============================================================================
 FROM node:20-bookworm-slim

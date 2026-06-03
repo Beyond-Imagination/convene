@@ -5,7 +5,7 @@ import {
   MEETING_WS_EVENTS,
   type ReportDetailResponse,
   type ReportListResponse,
-} from '@migration/shared-interfaces';
+} from '@convene/shared-interfaces';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { Test, TestingModule } from '@nestjs/testing';

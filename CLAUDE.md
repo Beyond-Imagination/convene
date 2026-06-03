@@ -4,7 +4,7 @@ This file is for Claude Code. Read it before editing anything in this repo.
 
 ## Project
 
-`web12-plum-migration` (v1.0.0) — a slimmed successor of `../web12-plum`. WebRTC meetings + real-time chat + structured **meeting reports** (STT + LLM summary). v2 (a separate effort) adds Notion integration.
+`convene` (v1.0.0) — a standalone product: WebRTC meetings + real-time chat + structured **meeting reports** (STT + LLM summary). v2 (a separate effort) adds Notion integration.
 
 ## Source-of-truth docs
 
@@ -80,7 +80,7 @@ After each step, summarize in Korean to the user and wait for confirmation.
 ## Repository layout (target)
 
 ```
-migration/
+convene/
 ├── PLAN.md, ARCHITECTURE.md, CLAUDE.md
 ├── package.json, pnpm-workspace.yaml, turbo.json, tsconfig.base.json
 ├── eslint.config.mjs, .prettierrc, .editorconfig, .gitignore
@@ -121,4 +121,4 @@ feature/<name>/
 2. Check `git log -10 --oneline` for recent progress.
 3. Locate the current task: failing specs, TODO comments, or ask the user.
 4. **Speak Korean to the user.** Code identifiers (class/function/variable/event names, file paths) stay English. **All code comments, JSDoc bodies, and test (`it`/`describe`) labels are written in Korean** so non-Claude collaborators can read them. PLAN/ARCHITECTURE stay Korean. This file (CLAUDE.md) stays English because it is for future Claude sessions.
-5. Memory in `~/.claude/projects/D--programming-boostcamp-2025-membership-web12-plum/memory/` carries user preferences and project state across sessions; check `MEMORY.md` there.
+5. Memory in `~/.claude/projects/D--programming-boostcamp-2025-membership-migration/memory/` carries user preferences and project state across sessions; check `MEMORY.md` there. (Folder rename to `convene` is pending — flip this to `...-convene` when the rename happens.)

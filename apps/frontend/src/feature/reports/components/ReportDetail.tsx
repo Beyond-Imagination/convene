@@ -3,7 +3,7 @@
 import type {
   ReportDetailResponse,
   ReportSummaryWire,
-} from '@migration/shared-interfaces';
+} from '@convene/shared-interfaces';
 
 import type { UseReportDetailViewModel } from '@/feature/reports/hooks/useReportDetailViewModel';
 

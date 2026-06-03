@@ -2,7 +2,7 @@ import {
   type CreateTransportRequest,
   TRANSPORT_DIRECTIONS,
   type TransportDirection,
-} from '@migration/shared-interfaces';
+} from '@convene/shared-interfaces';
 import { IsIn, IsString, Length } from 'class-validator';
 
 import { MeetingCode } from '@/meeting/domain/value-objects';

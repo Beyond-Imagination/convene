@@ -1,5 +1,5 @@
 {
-  "name": "@migration/shared-interfaces",
+  "name": "@convene/shared-interfaces",
   "version": "1.0.0",
   "private": true,
   "type": "module",

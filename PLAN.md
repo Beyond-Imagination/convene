@@ -1,9 +1,9 @@
-# Migration Plan (v1.0.0)
+# Convene 마이그레이션 계획 (v1.0.0)
 
 ## 1. 목표
 
 - **참조 레포**: `../web12-plum` (수정 금지, 참조만)
-- **새 레포 루트**: `./` (= `D:/programming/boostcamp-2025-membership/migration`)
+- **새 레포 루트**: `./` (= `D:/programming/boostcamp-2025-membership/convene`)
 - **방향**: PLUM에서 강의 부가 기능을 걷어낸 "회의 링크 + 화상회의 + 채팅 + **구조화된 회의록**" 코어. C안(Mediasoup 유지, 기능 축소, AWS 이전) 채택.
 - **v2.0.0(별도 작업)**: 노션 연동 — 이슈 ↔ 회의 링크, iframe 임베딩, 회의록을 노션 페이지에 자동 업로드. v1에서 회의록은 별도 페이지/DB로 완성하고, v2는 그 도큐먼트를 노션으로 푸시하는 어댑터만 얹는다.
 
@@ -85,7 +85,7 @@ interface MeetingReport {
 ## 6. 디렉터리 구조
 
 ```
-migration/
+convene/
 ├── PLAN.md
 ├── ARCHITECTURE.md                  ← 협업용, 다음 단계에서 작성
 ├── apps/

@@ -1,4 +1,4 @@
-import { MEETING_WS_EVENTS } from '@migration/shared-interfaces';
+import { MEETING_WS_EVENTS } from '@convene/shared-interfaces';
 import { act, renderHook, waitFor } from '@testing-library/react';
 
 import { saveHostToken } from '@/shared/stores/host-token.storage';

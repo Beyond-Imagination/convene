@@ -1,4 +1,4 @@
-import type { CloseMeetingResponse, CreateMeetingResponse } from '@migration/shared-interfaces';
+import type { CloseMeetingResponse, CreateMeetingResponse } from '@convene/shared-interfaces';
 import {
   BadRequestException,
   Body,

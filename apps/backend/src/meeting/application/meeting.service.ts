@@ -1,4 +1,4 @@
-import { MEETING_EVENTS } from '@migration/shared-interfaces';
+import { MEETING_EVENTS } from '@convene/shared-interfaces';
 
 import { MeetingNotFoundError, NotHostError } from '@/meeting/application/meeting.errors';
 import { Meeting } from '@/meeting/domain/meeting';

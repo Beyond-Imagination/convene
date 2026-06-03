@@ -1,4 +1,4 @@
-import { MediaType, TransportDirection } from '@migration/shared-interfaces';
+import { MediaType, TransportDirection } from '@convene/shared-interfaces';
 
 /**
  * Mediasoup BC 의 Aggregate Root. 한 회의에 참여한 **한 명의 미디어 상태**를 표현한다.

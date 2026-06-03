@@ -1,4 +1,4 @@
-import { MAX_REPORT_LIST_LIMIT } from '@migration/shared-interfaces';
+import { MAX_REPORT_LIST_LIMIT } from '@convene/shared-interfaces';
 import { ValidationPipe } from '@nestjs/common';
 
 import { ListReportsQueryDto } from './list-reports-query.dto';

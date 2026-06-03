@@ -38,7 +38,7 @@ importers:
 
   apps/backend:
     dependencies:
-      '@migration/shared-interfaces':
+      '@convene/shared-interfaces':
         specifier: workspace:*
         version: link:../../packages/shared-interfaces
       '@nestjs/common':
@@ -141,7 +141,7 @@ importers:
 
   apps/frontend:
     dependencies:
-      '@migration/shared-interfaces':
+      '@convene/shared-interfaces':
         specifier: workspace:*
         version: link:../../packages/shared-interfaces
       mediasoup-client:

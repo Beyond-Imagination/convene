@@ -1,4 +1,4 @@
-import type { ConnectTransportRequest } from '@migration/shared-interfaces';
+import type { ConnectTransportRequest } from '@convene/shared-interfaces';
 import { IsDefined, IsObject, IsString, Length, MaxLength } from 'class-validator';
 
 import { MeetingCode } from '@/meeting/domain/value-objects';

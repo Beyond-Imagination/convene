@@ -6,7 +6,7 @@ import {
   type MeetingParticipantsBroadcast,
   type ParticipantJoinedBroadcast,
   type ParticipantLeftBroadcast,
-} from '@migration/shared-interfaces';
+} from '@convene/shared-interfaces';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';

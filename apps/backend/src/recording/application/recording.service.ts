@@ -1,4 +1,4 @@
-import { REPORT_EVENTS } from '@migration/shared-interfaces';
+import { REPORT_EVENTS } from '@convene/shared-interfaces';
 
 import {
   AbsoluteTranscriptSegment,

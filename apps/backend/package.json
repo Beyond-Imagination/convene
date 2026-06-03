@@ -1,5 +1,5 @@
 {
-  "name": "@migration/backend",
+  "name": "@convene/backend",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -14,7 +14,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.config.cjs"
   },
   "dependencies": {
-    "@migration/shared-interfaces": "workspace:*",
+    "@convene/shared-interfaces": "workspace:*",
     "@nestjs/common": "^11.1.20",
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.1.20",

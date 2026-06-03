@@ -1,4 +1,4 @@
-import type { ReportListItem } from '@migration/shared-interfaces';
+import type { ReportListItem } from '@convene/shared-interfaces';
 import { renderHook, waitFor } from '@testing-library/react';
 
 import { ReportsApiError } from '@/shared/api/reports.api';

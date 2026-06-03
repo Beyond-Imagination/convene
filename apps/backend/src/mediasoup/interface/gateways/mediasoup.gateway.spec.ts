@@ -1,4 +1,4 @@
-import { MEDIASOUP_WS_EVENTS } from '@migration/shared-interfaces';
+import { MEDIASOUP_WS_EVENTS } from '@convene/shared-interfaces';
 import type { Socket } from 'socket.io';
 
 import { MediasoupSignalingService } from '@/mediasoup/application/mediasoup-signaling.service';

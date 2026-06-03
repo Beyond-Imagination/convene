@@ -46,7 +46,7 @@ export function resolveNumWorkers(env: NodeJS.ProcessEnv = process.env): number 
 /**
  * router 1 개의 참가자 capacity. assignParticipant 시 모든 기존 router 가 가득 차
  * 면 새 router 가 lazy 하게 추가된다. plum 은 capacity 무관(workers 수만큼 사전
- * 생성)이지만 migration 회의는 인원 가변이라 capacity 기반 동적 pool 이 자연스럽다.
+ * 생성)이지만 Convene 회의는 인원 가변이라 capacity 기반 동적 pool 이 자연스럽다.
  *
  * env `MEDIASOUP_PARTICIPANTS_PER_ROUTER` (default 5). 너무 크면 한 router CPU 가
  * bottleneck 이 되고, 너무 작으면 pipeProducer 오버헤드 증가 — 5 가 시작점.

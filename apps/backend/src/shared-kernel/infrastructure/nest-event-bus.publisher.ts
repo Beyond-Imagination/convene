@@ -1,4 +1,4 @@
-import type { DomainEventName } from '@migration/shared-interfaces';
+import type { DomainEventName } from '@convene/shared-interfaces';
 import { Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 

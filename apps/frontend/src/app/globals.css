@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /**
- * migration v1 의미 컬러 토큰.
+ * Convene v1 의미 컬러 토큰.
  * :root = 라이트(메인·입장·reports). .theme-dark = 회의 화면 컨테이너.
  * Tailwind 의 bg-surface / text-muted 등이 이 변수를 읽는다.
  */

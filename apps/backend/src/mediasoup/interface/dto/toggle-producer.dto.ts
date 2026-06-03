@@ -1,4 +1,4 @@
-import type { ToggleProducerRequest } from '@migration/shared-interfaces';
+import type { ToggleProducerRequest } from '@convene/shared-interfaces';
 import { IsBoolean, IsString, Length, MaxLength } from 'class-validator';
 
 import { MeetingCode } from '@/meeting/domain/value-objects';

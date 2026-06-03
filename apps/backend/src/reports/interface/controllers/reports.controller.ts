@@ -2,7 +2,7 @@ import {
   DEFAULT_REPORT_LIST_LIMIT,
   type ReportDetailResponse,
   type ReportListResponse,
-} from '@migration/shared-interfaces';
+} from '@convene/shared-interfaces';
 import {
   Controller,
   Get,
