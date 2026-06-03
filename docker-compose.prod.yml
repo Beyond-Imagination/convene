@@ -4,7 +4,7 @@
 # backend(5000)·ai-worker(8000)·redis(6379)는 ports 를 발행하지 않아 docker 내부망에서만
 # 접근된다. Caddy 가 backend:5000 으로 reverse_proxy(HTTP+WS)하며 TLS 를 종단한다.
 #
-# 변수(${...})는 같은 디렉터리의 .env 에서 읽는다(.env.prod.template 참조).
+# 변수(${...})는 같은 디렉터리의 .env 에서 읽는다(deploy 워크플로가 GitHub Secrets/Variables 로 생성).
 services:
   caddy:
     image: caddy:2-alpine

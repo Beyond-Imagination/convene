@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Convene 단일 EC2 부트스트랩 — docker/compose 설치 + repo 클론 + .env 준비.
+# Convene 단일 EC2 부트스트랩 — docker/compose 설치 + repo 클론까지만.
 # Ubuntu 22.04/24.04 기준 (Amazon Linux 2023 은 아래 주석의 dnf 명령으로 대체).
+#
+# .env·이미지 pull·재기동·GHCR 로그인은 모두 GitHub Actions(Deploy)가 SSH 로 수행한다.
+# 특히 .env 는 GitHub Secrets/Variables 로 매 배포 시 생성되므로 EC2 에 수동 .env 가 필요 없다.
 #
 # 사용:
 #   1) EC2 에 SSH 접속.
 #   2) 스크립트 실행:  REPO_URL=https://github.com/Beyond-Imagination/convene.git bash ec2-bootstrap.sh
-#   3) /opt/convene/.env 를 .env.prod.template 기준으로 채운다.
-#   4) 배포는 GitHub Actions(deploy-backend) 가 SSH 로 수행 — GHCR 로그인은 워크플로가
-#      GITHUB_TOKEN 으로 처리하므로 EC2 에 PAT 보관 불필요. (수동 pull 시에만 docker login 필요)
+#   3) GitHub Secrets/Variables 등록 + DEPLOY_ENABLED=true → Deploy 워크플로 실행.
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/Beyond-Imagination/convene.git}"
@@ -35,18 +36,13 @@ else
 	git -C "$APP_DIR" pull --ff-only
 fi
 
-echo "==> .env 준비"
-if [ ! -f "$APP_DIR/.env" ]; then
-	cp "$APP_DIR/.env.prod.template" "$APP_DIR/.env"
-	echo "    => $APP_DIR/.env 를 편집해 값을 채우세요(DOMAIN/ANNOUNCED_IP/CORS_ORIGIN/GEMINI/MONGO)."
-fi
-
 cat <<'NEXT'
 
-==> 부트스트랩 완료. 남은 단계:
-    1) /opt/convene/.env 값 채우기 (DOMAIN/ANNOUNCED_IP/CORS_ORIGIN/GEMINI/MONGO)
-    2) GitHub 에 EC2 시크릿(EC2_HOST/EC2_USER/EC2_SSH_KEY) + 변수 DEPLOY_ENABLED=true 등록
-    3) deploy-backend 워크플로 실행 → 자동 빌드·배포 (GHCR 로그인은 워크플로가 처리)
-    4) 보안그룹: 443/tcp, 40000-40199/udp, 40000-40199/tcp, 22/tcp(admin) 오픈.
+==> 부트스트랩 완료(docker + repo clone). 남은 단계는 모두 GitHub 쪽:
+    1) Secrets:   EC2_HOST / EC2_USER / EC2_SSH_KEY / GEMINI_API_KEY / MONGO_URI
+       Variables: DOMAIN / CORS_ORIGIN / RTC_MIN_PORT / RTC_MAX_PORT / MONGO_DB_NAME
+                  (선택) GEMINI_MODEL / MEDIASOUP_WORKER_NUM / STT_MODEL_SIZE / DEPLOY_ENABLED=true
+    2) Deploy 워크플로 실행 → .env 생성 + 빌드·배포 (GHCR 로그인·ANNOUNCED_IP 자동)
+    3) 보안그룹: 443/tcp, 40000-40199/udp, 40000-40199/tcp, 22/tcp(admin) 오픈.
        5000/8000/6379 는 열지 말 것(내부망 전용).
 NEXT
