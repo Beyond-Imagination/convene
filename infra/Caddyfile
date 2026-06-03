@@ -8,11 +8,9 @@
 # 유휴 타임아웃 제약이 없어 장기 시그널링 소켓에 적합하다.
 #
 # ai-worker(8000)·redis(6379)는 여기로 노출하지 않는다 — backend 만 proxy 한다.
-
-{
-	# Let's Encrypt 알림 이메일(선택). 비어 있어도 발급은 된다.
-	email {$ACME_EMAIL}
-}
+#
+# 만료 알림 메일을 받고 싶으면 전역 블록을 추가한다(값이 있을 때만 — 빈 email 은 파싱 에러):
+#   { email you@example.com }
 
 {$DOMAIN} {
 	encode zstd gzip
