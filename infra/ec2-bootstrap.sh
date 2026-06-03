@@ -5,9 +5,9 @@
 # 사용:
 #   1) EC2 에 SSH 접속.
 #   2) 스크립트 실행:  REPO_URL=https://github.com/Beyond-Imagination/convene.git bash ec2-bootstrap.sh
-#   3) GHCR 로그인(비공개 이미지 pull):  echo <PAT> | docker login ghcr.io -u <github-id> --password-stdin
-#   4) /opt/convene/.env 를 .env.prod.template 기준으로 채운다.
-#   5) cd /opt/convene && docker compose -f docker-compose.prod.yml up -d
+#   3) /opt/convene/.env 를 .env.prod.template 기준으로 채운다.
+#   4) 배포는 GitHub Actions(deploy-backend) 가 SSH 로 수행 — GHCR 로그인은 워크플로가
+#      GITHUB_TOKEN 으로 처리하므로 EC2 에 PAT 보관 불필요. (수동 pull 시에만 docker login 필요)
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/Beyond-Imagination/convene.git}"
@@ -44,9 +44,9 @@ fi
 cat <<'NEXT'
 
 ==> 부트스트랩 완료. 남은 단계:
-    1) GHCR 로그인:  echo <PAT(read:packages)> | docker login ghcr.io -u <github-id> --password-stdin
-    2) /opt/convene/.env 값 채우기
-    3) cd /opt/convene && docker compose -f docker-compose.prod.yml up -d
+    1) /opt/convene/.env 값 채우기 (DOMAIN/ANNOUNCED_IP/CORS_ORIGIN/GEMINI/MONGO)
+    2) GitHub 에 EC2 시크릿(EC2_HOST/EC2_USER/EC2_SSH_KEY) + 변수 DEPLOY_ENABLED=true 등록
+    3) deploy-backend 워크플로 실행 → 자동 빌드·배포 (GHCR 로그인은 워크플로가 처리)
     4) 보안그룹: 443/tcp, 40000-40199/udp, 40000-40199/tcp, 22/tcp(admin) 오픈.
        5000/8000/6379 는 열지 말 것(내부망 전용).
 NEXT
