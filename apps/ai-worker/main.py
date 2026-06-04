@@ -43,7 +43,8 @@ LANGUAGE = os.getenv("STT_LANGUAGE", "ko")
 
 def _env_bool(name: str, default: bool) -> bool:
     raw = os.getenv(name)
-    if raw is None:
+    # 미설정(None)뿐 아니라 빈 문자열·공백("STT_VAD_FILTER=")도 기본값으로 본다.
+    if raw is None or not raw.strip():
         return default
     return raw.strip().lower() in ("1", "true", "yes", "on")
 
