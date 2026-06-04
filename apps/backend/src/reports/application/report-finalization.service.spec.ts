@@ -9,7 +9,7 @@ import {
 } from '@/shared-kernel/domain/value-objects';
 
 import { MeetingReport } from '../domain/meeting-report';
-import { ReportNotFoundError } from './report.errors';
+import { ReportNotFoundError, ReportNotResummarizableError } from './report.errors';
 import { ReportFinalizationService } from './report-finalization.service';
 
 interface CapturedEvent {
@@ -278,6 +278,184 @@ describe('ReportFinalizationService.completeTranscription', () => {
       { stage: 'summary', error: 'LLM 502', at: failedAt },
     ]);
     expect(events.map((e) => e.name)).toEqual([REPORT_EVENTS.FINALIZED]);
+  });
+});
+
+describe('ReportFinalizationService.resummarize', () => {
+  const startedAt = new Date('2026-01-01T00:00:00Z');
+  const endedAt = new Date('2026-01-01T00:30:00Z');
+  const now = new Date('2026-01-01T01:00:00Z');
+  const reportId = 'rep_resum';
+  const chat = [chatEntry({ nickname: '준', text: '회의 시작', sentAt: startedAt })];
+  const transcript = [transcriptSegment({ text: '안녕하세요', startMs: 0, endMs: 1000 })];
+  const firstSummary: ReportSummary = reportSummary({
+    title: '1차 요약',
+    overview: '처음 요약',
+    decisions: [],
+    actionItems: [],
+    keyTopics: [],
+  });
+  const newSummary: ReportSummary = reportSummary({
+    title: '재요약',
+    overview: '새 프롬프트 요약',
+    decisions: ['결정 1'],
+    actionItems: [],
+    keyTopics: [],
+  });
+
+  /** STT done + summary done/failed 상태의 회의록을 만든다. */
+  const makeReport = (summaryState: 'done' | 'failed' | 'pending'): MeetingReport => {
+    const report = MeetingReport.fromEndedMeeting({
+      id: reportId,
+      meetingId: 'mtg_x',
+      code: 'code-x',
+      source: 'web',
+      externalReference: NO_EXTERNAL_REFERENCE,
+      startedAt,
+      endedAt,
+      participants: [],
+      chat,
+    });
+    report.applyTranscript(transcript);
+    if (summaryState === 'done') report.applySummary(firstSummary);
+    else if (summaryState === 'failed') report.markSummaryFailed('llm boom', endedAt);
+    return report;
+  };
+
+  const makeService = (
+    report: MeetingReport | null,
+    opts: { summarizerResult?: ReportSummary; summarizerError?: Error } = {},
+  ) => {
+    const store = new Map<string, MeetingReport>();
+    if (report) store.set(report.id, report);
+    const saves: string[] = [];
+    const { events, publisher } = makeEventPublisher();
+    const summarizer = {
+      summarize: jest.fn(async () => {
+        if (opts.summarizerError) throw opts.summarizerError;
+        return opts.summarizerResult ?? newSummary;
+      }),
+    };
+    const service = new ReportFinalizationService({
+      repository: {
+        save: async (r) => {
+          store.set(r.id, r);
+          saves.push(r.id);
+        },
+        findById: async (id) => store.get(id) ?? null,
+        findByMeetingId: async () => null,
+        listRecent: async () => [],
+      },
+      summarizer,
+      notion: noopNotion(),
+      idGenerator: { next: () => 'unused' },
+      clock: { now: () => now },
+      eventPublisher: publisher,
+    });
+    return { service, store, saves, events, summarizer };
+  };
+
+  it('존재하지 않는 reportId면 ReportNotFoundError를 던진다', async () => {
+    const { service } = makeService(null);
+    await expect(service.resummarize('unknown')).rejects.toThrow(ReportNotFoundError);
+  });
+
+  it('summary 가 pending(파이프라인 진행 중)이면 ReportNotResummarizableError', async () => {
+    const { service, summarizer } = makeService(makeReport('pending'));
+    await expect(service.resummarize(reportId)).rejects.toThrow(ReportNotResummarizableError);
+    expect(summarizer.summarize).not.toHaveBeenCalled();
+  });
+
+  it('STT 가 실패해 transcript 가 없으면 재요약을 거부하고 Summarizer 를 호출하지 않는다', async () => {
+    // STT 실패 → transcript 없음. 빈 입력으로 LLM 을 호출하지 않도록 차단해야 한다.
+    const sttFailed = MeetingReport.fromEndedMeeting({
+      id: reportId,
+      meetingId: 'mtg_x',
+      code: 'code-x',
+      source: 'web',
+      externalReference: NO_EXTERNAL_REFERENCE,
+      startedAt,
+      endedAt,
+      participants: [],
+      chat,
+    });
+    sttFailed.markTranscriptionFailed('ai-worker 5xx', endedAt);
+    sttFailed.markSummaryFailed('cascade', endedAt);
+    const { service, summarizer } = makeService(sttFailed);
+    await expect(service.resummarize(reportId)).rejects.toThrow(ReportNotResummarizableError);
+    expect(summarizer.summarize).not.toHaveBeenCalled();
+  });
+
+  it('저장된 transcript+chat+meta 를 Summarizer 에 그대로 전달한다', async () => {
+    const { service, summarizer } = makeService(makeReport('done'));
+    await service.resummarize(reportId);
+    expect(summarizer.summarize).toHaveBeenCalledWith({
+      transcript,
+      chat,
+      meta: { meetingId: 'mtg_x', code: 'code-x', startedAt, endedAt },
+    });
+  });
+
+  it('성공 시 기존 summary 를 새 결과로 교체하고 summaryStatus=done 유지', async () => {
+    const { service, store } = makeService(makeReport('done'));
+    await service.resummarize(reportId);
+    const after = store.get(reportId)!;
+    expect(after.summary).toEqual(newSummary);
+    expect(after.pipeline.summaryStatus).toBe('done');
+  });
+
+  it('실패했던 회의록을 재요약하면 done 으로 복구된다', async () => {
+    const { service, store } = makeService(makeReport('failed'));
+    await service.resummarize(reportId);
+    const after = store.get(reportId)!;
+    expect(after.summary).toEqual(newSummary);
+    expect(after.pipeline.summaryStatus).toBe('done');
+  });
+
+  it('성공 시 summary.completed → finalized 순으로 발행한다', async () => {
+    const { service, events } = makeService(makeReport('done'));
+    await service.resummarize(reportId);
+    expect(events.map((e) => e.name)).toEqual([
+      REPORT_EVENTS.SUMMARY_COMPLETED,
+      REPORT_EVENTS.FINALIZED,
+    ]);
+    expect(events[0].payload).toEqual({ reportId });
+  });
+
+  it('재요약 Summarizer 가 throw 하면 에러를 그대로 전파한다(동기 HTTP → 5xx)', async () => {
+    const { service } = makeService(makeReport('done'), {
+      summarizerError: new Error('LLM 503'),
+    });
+    await expect(service.resummarize(reportId)).rejects.toThrow('LLM 503');
+  });
+
+  it('done 회의록 재요약 실패 시 done 상태를 보존하고 저장/이벤트를 하지 않는다(격하 방지)', async () => {
+    const { service, store, saves, events } = makeService(makeReport('done'), {
+      summarizerError: new Error('LLM 503'),
+    });
+    await expect(service.resummarize(reportId)).rejects.toThrow();
+    const after = store.get(reportId)!;
+    expect(after.pipeline.summaryStatus).toBe('done');
+    expect(after.summary).toEqual(firstSummary);
+    expect(saves).toEqual([]);
+    expect(events).toEqual([]);
+  });
+
+  it('failed 회의록 재요약 실패 시 기존 failed 상태/failures 를 그대로 둔다', async () => {
+    const { service, store, saves } = makeService(makeReport('failed'), {
+      summarizerError: new Error('LLM 503'),
+    });
+    await expect(service.resummarize(reportId)).rejects.toThrow();
+    const after = store.get(reportId)!;
+    expect(after.pipeline.summaryStatus).toBe('failed');
+    expect(after.pipeline.failures).toEqual([{ stage: 'summary', error: 'llm boom', at: endedAt }]);
+    expect(saves).toEqual([]);
+  });
+
+  it('갱신된 MeetingReport 를 반환한다', async () => {
+    const { service } = makeService(makeReport('done'));
+    const result = await service.resummarize(reportId);
+    expect(result.summary).toEqual(newSummary);
   });
 });
 

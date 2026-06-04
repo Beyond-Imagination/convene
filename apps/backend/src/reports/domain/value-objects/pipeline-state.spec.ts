@@ -77,6 +77,40 @@ describe('PipelineState', () => {
     });
   });
 
+  describe('resummarizeDone (관리자 재요약)', () => {
+    it('failed 였던 summary 를 done 으로 덮어쓰고 기존 failures 는 보존한다', () => {
+      const s = PipelineState.initial()
+        .markTranscriptionDone()
+        .markSummaryFailed('llm boom', at1)
+        .resummarizeDone();
+      expect(s.sttStatus).toBe('done');
+      expect(s.summaryStatus).toBe('done');
+      expect(s.failures).toEqual([{ stage: 'summary', error: 'llm boom', at: at1 }]);
+      expect(s.isDone).toBe(true);
+    });
+
+    it('done 이던 summary 도 다시 done 으로 덮어쓸 수 있다(새 프롬프트 재요약)', () => {
+      const s = PipelineState.initial()
+        .markTranscriptionDone()
+        .markSummaryDone()
+        .resummarizeDone();
+      expect(s.summaryStatus).toBe('done');
+    });
+
+    it('summary 가 아직 pending 이면 재요약 전이를 거부한다', () => {
+      const s = PipelineState.initial().markTranscriptionDone();
+      expect(() => s.resummarizeDone()).toThrow(/pending/);
+    });
+
+    it('새 인스턴스를 반환하고 원본은 유지된다(immutable)', () => {
+      const a = PipelineState.initial().markTranscriptionDone().markSummaryFailed('boom', at1);
+      const b = a.resummarizeDone();
+      expect(a.summaryStatus).toBe('failed');
+      expect(b.summaryStatus).toBe('done');
+      expect(a).not.toBe(b);
+    });
+  });
+
   describe('immutability', () => {
     it('전이 메서드는 새 인스턴스를 반환하고 원본은 유지된다', () => {
       const a = PipelineState.initial();

@@ -131,6 +131,39 @@ describe('MeetingReport (Aggregate Root)', () => {
     });
   });
 
+  describe('replaceSummary / markResummaryFailed (관리자 재요약)', () => {
+    const newSummary = () =>
+      reportSummary({
+        title: '재요약된 주간 회의',
+        overview: '새 프롬프트 요약',
+        decisions: ['결정 A'],
+        actionItems: [],
+        keyTopics: [],
+      });
+
+    it('성공했던 회의록을 새 summary 로 교체하고 summary=done 을 유지한다', () => {
+      const r = MeetingReport.fromEndedMeeting(baseInput());
+      r.applyTranscript([transcriptSegment({ text: '안녕', startMs: 0, endMs: 500 })]);
+      r.applySummary(validSummary());
+      const replacement = newSummary();
+      r.replaceSummary(replacement);
+      expect(r.summary).toBe(replacement);
+      expect(r.pipeline.summaryStatus).toBe('done');
+    });
+
+    it('실패했던 회의록을 재요약으로 done 으로 복구한다', () => {
+      const r = MeetingReport.fromEndedMeeting(baseInput());
+      r.markSummaryFailed('llm boom', failAt);
+      r.replaceSummary(newSummary());
+      expect(r.pipeline.summaryStatus).toBe('done');
+    });
+
+    it('아직 요약 전(pending)이면 재요약을 거부한다', () => {
+      const r = MeetingReport.fromEndedMeeting(baseInput());
+      expect(() => r.replaceSummary(newSummary())).toThrow(/pending/);
+    });
+  });
+
   describe('attachNotionPushResult', () => {
     it('pipeline이 final 상태가 아니면 거부한다', () => {
       const r = MeetingReport.fromEndedMeeting(baseInput());
