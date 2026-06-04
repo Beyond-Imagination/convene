@@ -77,7 +77,7 @@ describe('PipelineState', () => {
     });
   });
 
-  describe('resummarizeDone / resummarizeFailed (관리자 재요약)', () => {
+  describe('resummarizeDone (관리자 재요약)', () => {
     it('failed 였던 summary 를 done 으로 덮어쓰고 기존 failures 는 보존한다', () => {
       const s = PipelineState.initial()
         .markTranscriptionDone()
@@ -97,19 +97,9 @@ describe('PipelineState', () => {
       expect(s.summaryStatus).toBe('done');
     });
 
-    it('재요약 실패 시 failed 로 덮어쓰고 failure 를 누적한다', () => {
-      const s = PipelineState.initial()
-        .markTranscriptionDone()
-        .markSummaryDone()
-        .resummarizeFailed('llm 503', at2);
-      expect(s.summaryStatus).toBe('failed');
-      expect(s.failures).toEqual([{ stage: 'summary', error: 'llm 503', at: at2 }]);
-    });
-
     it('summary 가 아직 pending 이면 재요약 전이를 거부한다', () => {
       const s = PipelineState.initial().markTranscriptionDone();
       expect(() => s.resummarizeDone()).toThrow(/pending/);
-      expect(() => s.resummarizeFailed('x', at1)).toThrow(/pending/);
     });
 
     it('새 인스턴스를 반환하고 원본은 유지된다(immutable)', () => {

@@ -162,14 +162,6 @@ describe('MeetingReport (Aggregate Root)', () => {
       const r = MeetingReport.fromEndedMeeting(baseInput());
       expect(() => r.replaceSummary(newSummary())).toThrow(/pending/);
     });
-
-    it('재요약 실패 시 summary=failed 로 전이하고 failure 를 누적한다', () => {
-      const r = MeetingReport.fromEndedMeeting(baseInput());
-      r.applySummary(validSummary());
-      r.markResummaryFailed('llm 503', failAt);
-      expect(r.pipeline.summaryStatus).toBe('failed');
-      expect(r.pipeline.failures).toEqual([{ stage: 'summary', error: 'llm 503', at: failAt }]);
-    });
   });
 
   describe('attachNotionPushResult', () => {

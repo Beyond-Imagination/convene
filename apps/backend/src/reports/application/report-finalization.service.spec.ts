@@ -402,15 +402,34 @@ describe('ReportFinalizationService.resummarize', () => {
     expect(events[0].payload).toEqual({ reportId });
   });
 
-  it('재요약 Summarizer 가 throw 하면 summaryStatus=failed 로 전이하고 finalized 만 발행한다', async () => {
-    const { service, store, events } = makeService(makeReport('done'), {
+  it('재요약 Summarizer 가 throw 하면 에러를 그대로 전파한다(동기 HTTP → 5xx)', async () => {
+    const { service } = makeService(makeReport('done'), {
       summarizerError: new Error('LLM 503'),
     });
-    await service.resummarize(reportId);
+    await expect(service.resummarize(reportId)).rejects.toThrow('LLM 503');
+  });
+
+  it('done 회의록 재요약 실패 시 done 상태를 보존하고 저장/이벤트를 하지 않는다(격하 방지)', async () => {
+    const { service, store, saves, events } = makeService(makeReport('done'), {
+      summarizerError: new Error('LLM 503'),
+    });
+    await expect(service.resummarize(reportId)).rejects.toThrow();
+    const after = store.get(reportId)!;
+    expect(after.pipeline.summaryStatus).toBe('done');
+    expect(after.summary).toEqual(firstSummary);
+    expect(saves).toEqual([]);
+    expect(events).toEqual([]);
+  });
+
+  it('failed 회의록 재요약 실패 시 기존 failed 상태/failures 를 그대로 둔다', async () => {
+    const { service, store, saves } = makeService(makeReport('failed'), {
+      summarizerError: new Error('LLM 503'),
+    });
+    await expect(service.resummarize(reportId)).rejects.toThrow();
     const after = store.get(reportId)!;
     expect(after.pipeline.summaryStatus).toBe('failed');
-    expect(after.pipeline.failures).toEqual([{ stage: 'summary', error: 'LLM 503', at: now }]);
-    expect(events.map((e) => e.name)).toEqual([REPORT_EVENTS.FINALIZED]);
+    expect(after.pipeline.failures).toEqual([{ stage: 'summary', error: 'llm boom', at: endedAt }]);
+    expect(saves).toEqual([]);
   });
 
   it('갱신된 MeetingReport 를 반환한다', async () => {

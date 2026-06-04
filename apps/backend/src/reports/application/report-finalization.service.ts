@@ -125,8 +125,12 @@ export class ReportFinalizationService {
    * summary 를 교체한다(요약 실패 회의록 재시도 / 새 프롬프트 A/B 비교 용도).
    *
    * 1차 요약이 끝난(done/failed) 회의록만 대상으로 한다. 진행 중(pending)이면
-   * `ReportNotResummarizableError`. 결과는 중간 pending 없이 한 번에 done/failed 로
-   * 교체하므로 재요약 도중 크래시가 나도 영구 pending 으로 갇히지 않는다.
+   * `ReportNotResummarizableError`.
+   *
+   * 동기 HTTP 요청이므로 요약기 실패는 삼키지 않고 그대로 전파한다(상위에서 5xx).
+   * 실패 시 **상태를 바꾸거나 저장하지 않는다** — 이미 done 이던 회의록이 일시적
+   * LLM 장애로 failed 로 격하되어 "요약 실패" 로 보이는 UX 퇴행을 막기 위함이다.
+   * 성공했을 때만 중간 pending 없이 done 으로 교체하므로 영구 pending 으로도 갇히지 않는다.
    */
   async resummarize(reportId: string): Promise<MeetingReport> {
     const report = await this.requireReport(reportId);
@@ -134,35 +138,28 @@ export class ReportFinalizationService {
       throw new ReportNotResummarizableError(reportId, report.pipeline.summaryStatus);
     }
 
-    try {
-      const summary = await this.deps.summarizer.summarize({
-        transcript: report.transcript,
-        chat: report.chat,
-        meta: {
-          meetingId: report.meetingId,
-          code: report.code,
-          startedAt: report.startedAt,
-          endedAt: report.endedAt,
-        },
-      });
-      report.replaceSummary(summary);
-      await this.deps.repository.save(report);
-      await this.deps.eventPublisher.publish(REPORT_EVENTS.SUMMARY_COMPLETED, {
-        reportId: report.id,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      report.markResummaryFailed(message, this.deps.clock.now());
-      await this.deps.repository.save(report);
-    }
-
+    // summarize 실패는 catch 하지 않고 전파한다. 이 시점 이전에는 어떤 상태 변경/저장도
+    // 하지 않았으므로 기존 회의록 상태(done/failed)는 그대로 보존된다.
+    const summary = await this.deps.summarizer.summarize({
+      transcript: report.transcript,
+      chat: report.chat,
+      meta: {
+        meetingId: report.meetingId,
+        code: report.code,
+        startedAt: report.startedAt,
+        endedAt: report.endedAt,
+      },
+    });
+    report.replaceSummary(summary);
+    await this.deps.repository.save(report);
+    await this.deps.eventPublisher.publish(REPORT_EVENTS.SUMMARY_COMPLETED, {
+      reportId: report.id,
+    });
     // 재요약 대상은 이미 STT 가 끝난 회의록이므로 pipeline 은 항상 final 상태다.
-    // 일관성을 위해 1차 파이프라인과 동일하게 finalized 이벤트를 발행한다.
-    if (report.isFinalized) {
-      await this.deps.eventPublisher.publish(REPORT_EVENTS.FINALIZED, {
-        reportId: report.id,
-      });
-    }
+    // 1차 파이프라인과 동일하게 finalized 이벤트를 발행한다.
+    await this.deps.eventPublisher.publish(REPORT_EVENTS.FINALIZED, {
+      reportId: report.id,
+    });
     return report;
   }
 
