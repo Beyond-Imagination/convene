@@ -11,12 +11,69 @@ export interface GeminiSummarizerOptions {
 }
 
 /**
+ * 회의록 요약은 창의적 생성이 아니라 입력 사실의 일관된 정제이므로,
+ * Gemini default(1.0)보다 낮은 temperature 로 출력 변동을 줄인다.
+ */
+const SUMMARY_TEMPERATURE = 0.2;
+
+/**
+ * `generationConfig.responseSchema` (REST v1beta, OpenAPI-subset — type 은
+ * 대문자 enum: OBJECT/STRING/ARRAY).
+ *
+ * 모델단에서 5필드(title/overview/decisions/actionItems/keyTopics) JSON 구조를
+ * 강제해 candidates 텍스트가 항상 계약에 맞는 객체로 오게 한다 → 어댑터의
+ * asString/asStringArray throw 빈도를 낮춘다(요약 실패 감소). `propertyOrdering`
+ * 은 buildPrompt 의 Output format 필드 순서와 동일하게 둬 모델 혼동을 줄인다.
+ * 문자열 본문의 한국어 작성·길이 제약은 프롬프트와 ReportSummary VO 가 계속
+ * 책임진다(스키마는 형/존재만 강제).
+ */
+const SUMMARY_RESPONSE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    title: { type: 'STRING' },
+    overview: { type: 'STRING' },
+    decisions: { type: 'ARRAY', items: { type: 'STRING' } },
+    actionItems: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          owner: { type: 'STRING' },
+          task: { type: 'STRING' },
+          due: { type: 'STRING' },
+        },
+        required: ['task'],
+        propertyOrdering: ['owner', 'task', 'due'],
+      },
+    },
+    keyTopics: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          topic: { type: 'STRING' },
+          points: { type: 'ARRAY', items: { type: 'STRING' } },
+        },
+        required: ['topic', 'points'],
+        propertyOrdering: ['topic', 'points'],
+      },
+    },
+  },
+  required: ['title', 'overview', 'decisions', 'actionItems', 'keyTopics'],
+  propertyOrdering: ['title', 'overview', 'decisions', 'actionItems', 'keyTopics'],
+} as const;
+
+/**
  * Gemini `generateContent` REST API (v1beta) 기반 SummarizerPort 어댑터.
  *
  * POST {baseUrl}/v1beta/models/{model}:generateContent?key={apiKey}
  *   body: {
  *     contents: [{ role: 'user', parts: [{ text: <prompt> }] }],
- *     generationConfig: { responseMimeType: 'application/json' }
+ *     generationConfig: {
+ *       responseMimeType: 'application/json',
+ *       temperature: <낮은 값 — 일관성>,
+ *       responseSchema: <5필드 구조 강제>
+ *     }
  *   }
  *
  * 응답 candidates[0].content.parts[0].text 를 JSON.parse → reportSummary VO
@@ -48,7 +105,11 @@ export class GeminiSummarizer implements SummarizerPort {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: 'application/json' },
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: SUMMARY_TEMPERATURE,
+            responseSchema: SUMMARY_RESPONSE_SCHEMA,
+          },
         }),
         signal: controller.signal,
       });

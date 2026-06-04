@@ -99,6 +99,48 @@ describe('GeminiSummarizer', () => {
     expect(promptText).toContain('Korean');
   });
 
+  it('generationConfig 에 낮은 temperature 와 5필드 responseSchema 가 강제된다', async () => {
+    const fetchMock = jest.fn().mockResolvedValueOnce(okResponse(validSummaryJson));
+    const summarizer = new GeminiSummarizer(options, fetchMock as unknown as typeof fetch);
+
+    await summarizer.summarize({ transcript: [], chat: [], meta });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as {
+      generationConfig: {
+        responseMimeType: string;
+        temperature: number;
+        responseSchema: {
+          type: string;
+          properties: Record<string, { type: string }>;
+          required: string[];
+          propertyOrdering?: string[];
+        };
+      };
+    };
+    // 요약 일관성을 위해 temperature 를 낮춘다(Gemini default 1.0 → 0.2).
+    expect(body.generationConfig.temperature).toBeLessThanOrEqual(0.2);
+    // 모델단에서 5필드 JSON 구조를 강제해 어댑터 파싱부의 throw 빈도를 낮춘다.
+    const schema = body.generationConfig.responseSchema;
+    // REST v1beta Schema 의 type 은 대문자 enum(OBJECT/STRING/ARRAY).
+    expect(schema.type).toBe('OBJECT');
+    expect(Object.keys(schema.properties).sort()).toEqual(
+      ['actionItems', 'decisions', 'keyTopics', 'overview', 'title'],
+    );
+    expect(schema.required).toEqual(
+      expect.arrayContaining([
+        'title',
+        'overview',
+        'decisions',
+        'actionItems',
+        'keyTopics',
+      ]),
+    );
+    // 중첩 배열 구조(actionItems/keyTopics)도 스키마에 명시한다.
+    expect(schema.properties.actionItems.type).toBe('ARRAY');
+    expect(schema.properties.keyTopics.type).toBe('ARRAY');
+  });
+
   it('응답 JSON 을 ReportSummary VO 로 변환해 돌려준다', async () => {
     const fetchMock = jest.fn().mockResolvedValueOnce(okResponse(validSummaryJson));
     const summarizer = new GeminiSummarizer(options, fetchMock as unknown as typeof fetch);
