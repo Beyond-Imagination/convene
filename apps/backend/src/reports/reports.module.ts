@@ -1,5 +1,6 @@
 import { Logger, Module } from '@nestjs/common';
 
+import { resolveAdminConfig } from '@/config/admin.config';
 import { resolveGeminiConfig } from '@/config/gemini.config';
 import { ReportFinalizationService } from '@/reports/application/report-finalization.service';
 import { ReportMeetingLifecycleListener } from '@/reports/application/report-meeting-lifecycle.listener';
@@ -11,6 +12,7 @@ import { NoopNotion } from '@/reports/infrastructure/noop.notion';
 import { NoopSummarizer } from '@/reports/infrastructure/noop.summarizer';
 import { UuidReportIdGenerator } from '@/reports/infrastructure/uuid-report-id.generator';
 import { ReportsController } from '@/reports/interface/controllers/reports.controller';
+import { AdminGuard } from '@/reports/interface/guards/admin.guard';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 
@@ -37,6 +39,12 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
     UuidReportIdGenerator,
     ReportMeetingLifecycleListener,
     ReportPipelineListener,
+    {
+      // 관리자 재요약 엔드포인트 보호. ADMIN_API_TOKEN 미설정 시 token=null →
+      // AdminGuard 가 엔드포인트를 비활성(403)으로 막는다.
+      provide: AdminGuard,
+      useFactory: (): AdminGuard => new AdminGuard(resolveAdminConfig()?.token ?? null),
+    },
     {
       provide: GeminiSummarizer,
       useFactory: (): SummarizerPort => {

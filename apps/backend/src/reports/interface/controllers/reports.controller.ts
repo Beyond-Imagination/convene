@@ -4,18 +4,25 @@ import {
   type ReportListResponse,
 } from '@convene/shared-interfaces';
 import {
+  ConflictException,
   Controller,
   Get,
   HttpCode,
   HttpStatus,
   NotFoundException,
   Param,
+  Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 
-import { ReportNotFoundError } from '@/reports/application/report.errors';
+import {
+  ReportNotFoundError,
+  ReportNotResummarizableError,
+} from '@/reports/application/report.errors';
 import { ReportFinalizationService } from '@/reports/application/report-finalization.service';
 import { ListReportsQueryDto } from '@/reports/interface/dto/list-reports-query.dto';
+import { AdminGuard } from '@/reports/interface/guards/admin.guard';
 
 import {
   toReportDetailResponse,
@@ -49,6 +56,28 @@ export class ReportsController {
     } catch (e) {
       if (e instanceof ReportNotFoundError) {
         throw new NotFoundException(e.message);
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * 관리자 재요약. 저장된 transcript+chat 으로 다시 요약해 기존 summary 를 교체한다.
+   * `AdminGuard` 가 `Authorization: Bearer <ADMIN_API_TOKEN>` 로 호출자를 가른다.
+   */
+  @Post(':id/resummarize')
+  @UseGuards(AdminGuard)
+  @HttpCode(HttpStatus.OK)
+  async resummarize(@Param('id') id: string): Promise<ReportDetailResponse> {
+    try {
+      const report = await this.service.resummarize(id);
+      return toReportDetailResponse(report);
+    } catch (e) {
+      if (e instanceof ReportNotFoundError) {
+        throw new NotFoundException(e.message);
+      }
+      if (e instanceof ReportNotResummarizableError) {
+        throw new ConflictException(e.message);
       }
       throw e;
     }

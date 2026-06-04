@@ -77,6 +77,26 @@ export class PipelineState {
     );
   }
 
+  /**
+   * 이미 끝난(done/failed) summary stage 를 새 요약 성공 결과로 덮어쓴다.
+   *
+   * 관리자 재요약(`POST /reports/:id/resummarize`) 전용 전이. 중간 pending 을
+   * 거치지 않고 한 번에 done 으로 교체하므로, 재요약 도중 크래시가 나도 회의록이
+   * 영구 pending 으로 갇히지 않는다. 아직 1차 요약이 끝나지 않은(pending) stage 는
+   * 재요약 대상이 아니므로 거부한다. 누적 failures 는 보존.
+   */
+  resummarizeDone(): PipelineState {
+    throw new Error('not implemented');
+  }
+
+  /**
+   * 재요약 시도가 실패했을 때 summary stage 를 failed 로 덮어쓰고 failure 를 누적한다.
+   * `resummarizeDone` 과 마찬가지로 pending stage 에는 적용할 수 없다.
+   */
+  resummarizeFailed(error: string, at: Date): PipelineState {
+    throw new Error('not implemented');
+  }
+
   /** 두 stage 모두 pending이 아니면 finalize 가능. */
   get isFinal(): boolean {
     return this.sttStatus !== 'pending' && this.summaryStatus !== 'pending';

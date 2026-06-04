@@ -160,6 +160,24 @@ export class MeetingReport {
     this._pipeline = this._pipeline.markSummaryFailed(error, at);
   }
 
+  /**
+   * 관리자 재요약 성공 결과를 반영한다. 기존 summary 를 새 summary 로 교체하고
+   * summary stage 를 done 으로 전이한다(이미 끝난 stage 대상, ARCHITECTURE.md §5).
+   */
+  replaceSummary(summary: ReportSummary): void {
+    const next = this._pipeline.resummarizeDone();
+    this._summary = summary;
+    this._pipeline = next;
+  }
+
+  /**
+   * 관리자 재요약 시도가 실패했을 때 summary stage 를 failed 로 전이한다.
+   * 기존 summary 본문은 그대로 두어(있다면) 마지막 성공 요약을 보존한다.
+   */
+  markResummaryFailed(error: string, at: Date): void {
+    this._pipeline = this._pipeline.resummarizeFailed(error, at);
+  }
+
   attachNotionPushResult(result: NotionPushResult): void {
     if (!this._pipeline.isFinal) {
       throw new Error('Cannot attach Notion push result before pipeline is final');

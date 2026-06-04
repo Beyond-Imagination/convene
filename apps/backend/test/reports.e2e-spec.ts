@@ -65,12 +65,48 @@ const waitForFinalizedReport = async (
   throw new Error(`Report for code ${code} did not finalize within ${timeoutMs}ms`);
 };
 
+/** 회의 생성→채팅→종료→파이프라인 finalize 까지 진행하고 회의록 목록 항목을 돌려준다. */
+const createFinalizedReport = async (
+  httpServer: ReturnType<INestApplication['getHttpServer']>,
+  baseUrl: string,
+): Promise<ReportListResponse['items'][number]> => {
+  const created = await request(httpServer)
+    .post('/meetings')
+    .send({ source: 'web' })
+    .expect(201);
+  const createdBody = created.body as CreateMeetingResponse;
+  const code = createdBody.code;
+
+  const client = await connectClient(baseUrl);
+  try {
+    client.emit(MEETING_WS_EVENTS.JOIN, { code, nickname: 'alice' });
+    await new Promise((r) => setTimeout(r, 30));
+    client.emit(MEETING_WS_EVENTS.CHAT, { code, text: '회의 시작' });
+    await new Promise((r) => setTimeout(r, 30));
+  } finally {
+    client.disconnect();
+  }
+
+  await request(httpServer)
+    .delete(`/meetings/${code}`)
+    .set('x-host-token', createdBody.hostToken)
+    .expect(200);
+
+  return waitForFinalizedReport(httpServer, code);
+};
+
 describe('Reports e2e', () => {
   let app: INestApplication;
   let baseUrl: string;
   let httpServer: ReturnType<INestApplication['getHttpServer']>;
+  // 재요약 엔드포인트는 ADMIN_API_TOKEN 으로 보호된다. AdminGuard 가 모듈 초기화
+  // 시점에 env 를 읽으므로 테스트 모듈 생성 전에 토큰을 심는다.
+  const ADMIN_TOKEN = 'e2e-admin-token';
+  let prevAdminToken: string | undefined;
 
   beforeAll(async () => {
+    prevAdminToken = process.env.ADMIN_API_TOKEN;
+    process.env.ADMIN_API_TOKEN = ADMIN_TOKEN;
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
@@ -102,6 +138,8 @@ describe('Reports e2e', () => {
 
   afterAll(async () => {
     await app.close();
+    if (prevAdminToken === undefined) delete process.env.ADMIN_API_TOKEN;
+    else process.env.ADMIN_API_TOKEN = prevAdminToken;
   });
 
   it('회의 생성→채팅→종료 후 회의록이 목록/상세에서 노출된다', async () => {
@@ -170,5 +208,40 @@ describe('Reports e2e', () => {
     await request(httpServer).get('/reports?limit=0').expect(400);
     await request(httpServer).get('/reports?limit=999').expect(400);
     await request(httpServer).get('/reports?limit=abc').expect(400);
+  });
+
+  describe('POST /reports/:id/resummarize (관리자 재요약)', () => {
+    it('Authorization 헤더가 없으면 401', async () => {
+      const report = await createFinalizedReport(httpServer, baseUrl);
+      await request(httpServer).post(`/reports/${report.id}/resummarize`).expect(401);
+    });
+
+    it('잘못된 토큰이면 401', async () => {
+      const report = await createFinalizedReport(httpServer, baseUrl);
+      await request(httpServer)
+        .post(`/reports/${report.id}/resummarize`)
+        .set('Authorization', 'Bearer wrong-token')
+        .expect(401);
+    });
+
+    it('올바른 Bearer 토큰이면 200 으로 재요약된 상세를 돌려준다', async () => {
+      const report = await createFinalizedReport(httpServer, baseUrl);
+      const res = await request(httpServer)
+        .post(`/reports/${report.id}/resummarize`)
+        .set('Authorization', `Bearer ${ADMIN_TOKEN}`)
+        .expect(200);
+      const body = res.body as ReportDetailResponse;
+      expect(body.id).toBe(report.id);
+      // NoopSummarizer 가 placeholder 요약을 다시 채워 summary stage 는 done 유지.
+      expect(body.pipeline.summaryStatus).toBe('done');
+      expect(body.summary?.title).toBe('(요약 미적용)');
+    });
+
+    it('존재하지 않는 report id 는 토큰이 맞아도 404', async () => {
+      await request(httpServer)
+        .post('/reports/unknown-id/resummarize')
+        .set('Authorization', `Bearer ${ADMIN_TOKEN}`)
+        .expect(404);
+    });
   });
 });
