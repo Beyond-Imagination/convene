@@ -366,6 +366,26 @@ describe('ReportFinalizationService.resummarize', () => {
     expect(summarizer.summarize).not.toHaveBeenCalled();
   });
 
+  it('STT 가 실패해 transcript 가 없으면 재요약을 거부하고 Summarizer 를 호출하지 않는다', async () => {
+    // STT 실패 → transcript 없음. 빈 입력으로 LLM 을 호출하지 않도록 차단해야 한다.
+    const sttFailed = MeetingReport.fromEndedMeeting({
+      id: reportId,
+      meetingId: 'mtg_x',
+      code: 'code-x',
+      source: 'web',
+      externalReference: NO_EXTERNAL_REFERENCE,
+      startedAt,
+      endedAt,
+      participants: [],
+      chat,
+    });
+    sttFailed.markTranscriptionFailed('ai-worker 5xx', endedAt);
+    sttFailed.markSummaryFailed('cascade', endedAt);
+    const { service, summarizer } = makeService(sttFailed);
+    await expect(service.resummarize(reportId)).rejects.toThrow(ReportNotResummarizableError);
+    expect(summarizer.summarize).not.toHaveBeenCalled();
+  });
+
   it('저장된 transcript+chat+meta 를 Summarizer 에 그대로 전달한다', async () => {
     const { service, summarizer } = makeService(makeReport('done'));
     await service.resummarize(reportId);

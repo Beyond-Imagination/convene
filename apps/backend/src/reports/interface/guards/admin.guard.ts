@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 
 import {
   CanActivate,
@@ -51,10 +51,15 @@ export function extractBearerToken(header: unknown): string | null {
   return match ? match[1].trim() : null;
 }
 
-/** 길이 노출/타이밍 공격을 줄이기 위한 상수 시간 비교. */
+/**
+ * 타이밍 공격을 막기 위한 상수 시간 토큰 비교.
+ *
+ * 두 토큰을 먼저 SHA-256(고정 32바이트)으로 해시한 뒤 비교한다. 길이가 다른
+ * 입력에서도 항상 같은 길이 버퍼를 비교하므로 timingSafeEqual 예외를 피하고,
+ * 길이 차이로 토큰 길이가 노출되는 타이밍 누출도 없앤다.
+ */
 export function safeTokenEqual(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) return false;
-  return timingSafeEqual(bufA, bufB);
+  const hashA = createHash('sha256').update(a).digest();
+  const hashB = createHash('sha256').update(b).digest();
+  return timingSafeEqual(hashA, hashB);
 }

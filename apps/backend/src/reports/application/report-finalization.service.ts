@@ -124,8 +124,10 @@ export class ReportFinalizationService {
    * 관리자 재요약. 저장된 transcript+chat 을 SummarizerPort 로 다시 요약해 기존
    * summary 를 교체한다(요약 실패 회의록 재시도 / 새 프롬프트 A/B 비교 용도).
    *
-   * 1차 요약이 끝난(done/failed) 회의록만 대상으로 한다. 진행 중(pending)이면
-   * `ReportNotResummarizableError`.
+   * 재요약 조건: STT 완료(sttStatus=done)로 transcript 가 있고, 1차 요약이 끝난
+   * (summaryStatus=done/failed) 회의록. STT 가 실패/미완료면 transcript 가 비어 빈
+   * 입력으로 LLM 을 호출하게 되므로 거부하고, 요약이 진행 중(pending)이어도 거부한다
+   * (둘 다 `ReportNotResummarizableError` → 409).
    *
    * 동기 HTTP 요청이므로 요약기 실패는 삼키지 않고 그대로 전파한다(상위에서 5xx).
    * 실패 시 **상태를 바꾸거나 저장하지 않는다** — 이미 done 이던 회의록이 일시적
@@ -134,8 +136,14 @@ export class ReportFinalizationService {
    */
   async resummarize(reportId: string): Promise<MeetingReport> {
     const report = await this.requireReport(reportId);
+    if (report.pipeline.sttStatus !== 'done') {
+      throw new ReportNotResummarizableError(
+        reportId,
+        `STT 가 완료되지 않아(sttStatus=${report.pipeline.sttStatus}) 재요약할 transcript 가 없습니다`,
+      );
+    }
     if (report.pipeline.summaryStatus === 'pending') {
-      throw new ReportNotResummarizableError(reportId, report.pipeline.summaryStatus);
+      throw new ReportNotResummarizableError(reportId, '요약이 진행 중입니다(summaryStatus=pending)');
     }
 
     // summarize 실패는 catch 하지 않고 전파한다. 이 시점 이전에는 어떤 상태 변경/저장도
