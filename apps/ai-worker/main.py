@@ -40,6 +40,29 @@ BEAM_SIZE = int(os.getenv("STT_BEAM_SIZE", "1"))
 MODEL_SIZE = os.getenv("STT_MODEL_SIZE", "small")
 LANGUAGE = os.getenv("STT_LANGUAGE", "ko")
 
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+# faster-whisper small 한국어 STT 의 오인식·환각을 줄이는 디코딩 옵션.
+#
+# - VAD_FILTER: Silero VAD 로 무음 구간을 잘라낸다. 회의 오디오는 긴 정적
+#   구간이 많아 그대로 디코드하면 무음에 환각 자막이 붙는다(특히 30s 청크).
+# - INITIAL_PROMPT: 도메인 어휘를 모델에 미리 알려 영어 기술 용어 오인식
+#   (예: "MySQL" → "마이스쿨")을 줄인다. 빈 문자열이면 비활성(None).
+#   도메인이 다르면 STT_INITIAL_PROMPT 로 교체한다.
+DEFAULT_INITIAL_PROMPT = (
+    "이 녹음은 IT 개발 동아리의 화상 회의입니다. "
+    "API, OAuth, MySQL, Redis, Docker, 백엔드, 프론트엔드, 배포, 리팩터링 같은 "
+    "기술 용어와 영어 약어가 자주 등장합니다."
+)
+VAD_FILTER = _env_bool("STT_VAD_FILTER", True)
+INITIAL_PROMPT = (os.getenv("STT_INITIAL_PROMPT", DEFAULT_INITIAL_PROMPT).strip() or None)
+
 # 모듈 import 시점에 모델을 1회 로드(warm-start). 컨테이너 부팅 시 cold-load 비용
 # 한 번만 지불하고, 이후 매 요청은 transcribe 만 호출한다.
 model = WhisperModel(
@@ -74,6 +97,12 @@ async def transcribe(request: Request) -> dict[str, Any]:
             io.BytesIO(audio),
             beam_size=BEAM_SIZE,
             language=LANGUAGE,
+            vad_filter=VAD_FILTER,
+            initial_prompt=INITIAL_PROMPT,
+            # 청크 전사는 청크마다 독립 호출이라 이전 청크 문맥이 없다. 기본값
+            # (True)은 직전 텍스트에 조건을 걸어 반복·드리프트 환각을 유발하므로
+            # 청크 단위 안정성을 위해 끈다.
+            condition_on_previous_text=False,
         )
 
         segments: list[dict[str, Any]] = []
