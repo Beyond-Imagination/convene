@@ -1,5 +1,5 @@
 /**
- * 도메인 이벤트 이름 상수. ARCHITECTURE.md §2.4 참고.
+ * 도메인 이벤트 이름 상수.
  *
  * Prefix 규칙:
  *   - `meeting.*`   — Meeting bounded context.

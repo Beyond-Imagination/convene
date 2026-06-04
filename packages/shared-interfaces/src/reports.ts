@@ -3,7 +3,7 @@
  *
  * 본 파일은 frontend ↔ backend가 공유하는 **순수 TS 인터페이스 / literal 타입**만
  * 정의한다. class-validator 데코레이터는 backend `dto/` 클래스가 본 인터페이스를
- * implements하면서 추가한다 (CLAUDE.md hard rule 2).
+ * implements하면서 추가한다.
  *
  * 직렬화 규약:
  *   - 모든 `Date` 값은 ISO 8601 문자열로 직렬화한다.

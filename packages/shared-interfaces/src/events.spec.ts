@@ -29,7 +29,7 @@ describe('도메인 이벤트 이름', () => {
     }
   });
 
-  it('meeting 6 + report 5 + mediasoup 3 = 14개, 모두 서로 다르다 (ARCHITECTURE §2.4 + STT fail 분기)', () => {
+  it('meeting 6 + report 5 + mediasoup 3 = 14개, 모두 서로 다르다', () => {
     const meeting = Object.values(MEETING_EVENTS);
     const report = Object.values(REPORT_EVENTS);
     const mediasoup = Object.values(MEDIASOUP_EVENTS);

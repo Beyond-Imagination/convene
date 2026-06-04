@@ -1,25 +1,8 @@
-"""Convene v1 ai-worker — STT via faster-whisper.
+"""faster-whisper 기반 STT worker.
 
-`POST /transcribe` 는 raw audio bytes (application/octet-stream) 를 받아
-faster-whisper 로 한국어 STT 를 수행한 뒤 segment 배열을 돌려준다.
-
-backend 의 `TranscriberPort` (`apps/backend/src/recording/domain/ports/transcriber.port.ts`)
-와 호환되는 wire format:
-
-    Request:
-        Content-Type: application/octet-stream
-        Body: opus/wav/... 오디오 바이트(faster-whisper 가 ffmpeg 로 decode)
-
-    Response 200 OK:
-        {
-            "segments": [
-                { "text": "...", "startMs": 0, "endMs": 1200 },
-                ...
-            ]
-        }
-
-backend ↔ ai-worker 는 HTTP body 로 audio 를 흘려보낸다(공유 volume / 임시 디스크
-경로 미사용). PLAN.md §3 — "STT 후 즉시 폐기, S3 미사용" 원칙.
+`POST /transcribe` 가 raw audio bytes(application/octet-stream)를 받아 한국어 STT 를
+수행하고 `{ "segments": [{ text, startMs, endMs }] }` 를 돌려준다.
+audio 는 디스크에 남기지 않고 STT 후 즉시 폐기한다.
 """
 
 from __future__ import annotations
