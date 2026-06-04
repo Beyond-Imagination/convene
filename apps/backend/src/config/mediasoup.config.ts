@@ -45,8 +45,8 @@ export function resolveNumWorkers(env: NodeJS.ProcessEnv = process.env): number 
 
 /**
  * router 1 개의 참가자 capacity. assignParticipant 시 모든 기존 router 가 가득 차
- * 면 새 router 가 lazy 하게 추가된다. plum 은 capacity 무관(workers 수만큼 사전
- * 생성)이지만 Convene 회의는 인원 가변이라 capacity 기반 동적 pool 이 자연스럽다.
+ * 면 새 router 가 lazy 하게 추가된다. Convene 회의는 인원 가변이라 capacity 기반
+ * 동적 pool 이 자연스럽다.
  *
  * env `MEDIASOUP_PARTICIPANTS_PER_ROUTER` (default 5). 너무 크면 한 router CPU 가
  * bottleneck 이 되고, 너무 작으면 pipeProducer 오버헤드 증가 — 5 가 시작점.
@@ -77,7 +77,7 @@ export function resolveWorkerOptions(env: NodeJS.ProcessEnv = process.env): Work
  *
  * `preferredPayloadType` 은 mediasoup 가 router 생성 시 자동 할당하므로 우리가
  * 지정하지 않는다. `RtpCodecCapability` 타입은 해당 필드를 required 로 보지만
- * mediasoup 런타임은 missing 을 허용 — plum 도 동일하게 `as` cast 로 우회한다.
+ * mediasoup 런타임은 missing 을 허용하므로 `as` cast 로 우회한다.
  */
 export const MEDIA_CODECS = [
   { kind: 'audio', mimeType: 'audio/opus', clockRate: 48000, channels: 2 },

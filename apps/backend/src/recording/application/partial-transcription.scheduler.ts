@@ -14,12 +14,11 @@ import {
 } from '../infrastructure/audio-chunker';
 
 /**
- * Phase 2 — 회의 진행 중 매 N초 마다 누적된 audio chunk 를 잘라 ai-worker 로
+ * 회의 진행 중 매 N초 마다 누적된 audio chunk 를 잘라 ai-worker 로
  * 보내고, 결과 segments 를 회의 단위 partial transcript 에 누적한다.
  *
  * - 매 `INTERVAL_MS` 마다 `audioBufferRepository.listActiveMeetings()` 으로
- *   active 회의 enumerate ([[project-migration-scope]] 의 self-contained 원칙
- *   — meeting BC 와 결합 없음).
+ *   active 회의 enumerate (meeting BC 와 결합 없는 self-contained 방식).
  * - 각 (code, pid) 마다 `drainAvailable(KEEP_LAST_BYTES)` 로 누적 PCM 을 잘라낸다.
  *   끝 `KEEP_LAST_BYTES`(2초) 는 overlap 으로 redis 에 남는다.
  * - drain pcm → wav → `transcriber.transcribe()` → segment 의 startMs/endMs 에

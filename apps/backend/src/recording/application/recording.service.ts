@@ -60,7 +60,7 @@ export class RecordingService {
 
   async requestTranscription(command: RequestTranscriptionCommand): Promise<void> {
     try {
-      // 1) Phase 2 partial scheduler 가 누적해 둔 segments 를 가져온다(절대 epoch ms).
+      // 1) partial scheduler 가 누적해 둔 segments 를 가져온다(절대 epoch ms).
       const partial = await this.deps.partialTranscriptStore.consume(command.meetingCode);
       // 2) 회의 종료 시점의 잔여 audio 를 consume. scheduler 가 사전 drain 한 만큼은
       //    `startMs`(시간축 위치) 로 표현된다.

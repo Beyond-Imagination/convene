@@ -631,6 +631,6 @@ describe('RecordingService.requestTranscription', () => {
 });
 
 // wavBodyText / wrapPcmAsWav 는 import 만 해도 트리쉐이크 방지가 충분하지만 lint
-// 에서 unused 로 잡힐 수 있어 명시적으로 사용한다(추후 chunk 검증 케이스 확장 시 활용).
+// 에서 unused 로 잡힐 수 있어 명시적으로 사용한다.
 void wavBodyText;
 void wrapPcmAsWav;

@@ -1,5 +1,5 @@
 /**
- * Phase 2 partial transcribe 의 누적 결과 저장소.
+ * 실시간 partial 전사의 누적 결과 저장소.
  *
  * `PartialTranscriptionScheduler` 가 회의 진행 중 N초마다 chunk 를 ai-worker 로
  * 보내 받은 segments 를 본 store 에 append 한다. 회의 종료 시 `RecordingService`

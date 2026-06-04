@@ -23,7 +23,7 @@ const CURSOR_KEY_PREFIX = 'audio-buffer:cursor:';
  * binary chunk 는 `rpush(key, buffer)` 로 그대로 누적되고 `lrangeBuffer` 로 다시
  * `Buffer[]` 로 읽힌다(문자열 코덱 변환 없음). `consume` 은 회의 색인 SET 으로
  * 참가자 목록을 얻은 뒤 각 LIST 를 LRANGE + DEL pipeline 으로 묶어 한 번에
- * 비운다 — 반환과 동시에 폐기(PLAN.md §3).
+ * 비운다 — 반환과 동시에 폐기한다.
  *
  * 누적 적이 없는 회의(audio capture 미트리거 또는 모두 leave)는 빈 배열 반환.
  */

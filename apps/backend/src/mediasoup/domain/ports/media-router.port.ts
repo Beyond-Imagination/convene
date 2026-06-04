@@ -31,7 +31,6 @@ export interface MediaRouterPort {
    * 측에 동일 id 의 producer 를 생성해, target router 의 transport 에서도
    * `transport.consume({ producerId })` 가 동작하게 한다.
    *
-   * plum `MultiRouterManagerService.pipeProducerToAllRouters` 와 동등 동작 — v1
    * 회의는 역할 구분이 없어 모든 producer 에 적용한다.
    */
   pipeProducerToAllRouters(

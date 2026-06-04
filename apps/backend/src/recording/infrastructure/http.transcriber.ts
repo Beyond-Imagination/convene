@@ -10,7 +10,7 @@ import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events';
  * `POST {baseUrl}/transcribe` 에 raw body(application/octet-stream)로 보내고,
  * `{ segments: [{ text, startMs, endMs }] }` 를 받아 그대로 돌려준다.
  *
- * 디스크/공유 volume 미사용 — PLAN.md §3 ("STT 후 즉시 폐기, S3 미사용") 원칙.
+ * 디스크/공유 volume 미사용 — audio 는 전송 직후 폐기된다.
  *
  * fetch 는 Node 18+ global API 를 사용하되 constructor 2번째 인자로 주입 가능해
  * spec 에서 jest.fn() 으로 손쉽게 mock 한다.

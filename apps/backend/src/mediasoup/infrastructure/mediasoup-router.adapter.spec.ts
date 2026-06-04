@@ -166,7 +166,7 @@ describe('MediasoupRouterAdapter', () => {
   it('pipeProducerToAllRouters: 다른 router 의 transport 에서도 동일 producerId 로 consume 가능해진다', async () => {
     // 실제 mediasoup native worker 두 개로 router 2 개를 묶고, router#0 에 만든
     // producer 를 router#1 로 pipe → router#1 의 transport.consume 이 같은 id 로
-    // 동작하는지 검증. plum eager pipe 의 핵심 효과.
+    // 동작하는지 검증.
     const { adapter, cleanup } = await setup(2, 1);
     try {
       await adapter.createRoom('CODE1111');

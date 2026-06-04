@@ -18,7 +18,7 @@ import { ReportNotFoundError, ReportNotResummarizableError } from './report.erro
  *
  * `meeting.ended` 이벤트를 받아 회의록 draft를 생성한 뒤 STT/Summary
  * 파이프라인을 따라 Aggregate(`MeetingReport`)를 진행시키고, 그 결과를
- * 도메인 이벤트로 발행한다(ARCHITECTURE.md §2.4 / §5).
+ * 도메인 이벤트로 발행한다.
  */
 
 export interface CreateDraftCommand {
@@ -183,8 +183,7 @@ export class ReportFinalizationService {
     const report = await this.requireReport(command.reportId);
     const at = this.deps.clock.now();
     report.markTranscriptionFailed(command.error, at);
-    // STT가 실패하면 summary 입력이 없으므로 cascade로 종료 처리.
-    // 재시도 정책은 v2 운영 단계에서 다룬다(ARCHITECTURE §5).
+    // STT가 실패하면 summary 입력이 없으므로 cascade로 종료 처리(재시도 없음).
     report.markSummaryFailed(`Skipped due to transcription failure: ${command.error}`, at);
     await this.deps.repository.save(report);
 

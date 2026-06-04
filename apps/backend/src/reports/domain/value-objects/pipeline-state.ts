@@ -6,8 +6,6 @@
  *
  * VO이므로 모든 전이 메서드는 새 인스턴스를 반환한다(immutable).
  * Aggregate(MeetingReport)는 인스턴스를 교체하는 방식으로 상태를 진행시킨다.
- *
- * 상태 전이 다이어그램: ARCHITECTURE.md §5.
  */
 
 export const PIPELINE_STAGE_STATUSES = ['pending', 'done', 'failed'] as const;

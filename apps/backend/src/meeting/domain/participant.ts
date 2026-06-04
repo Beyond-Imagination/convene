@@ -5,7 +5,6 @@
  * `join → (선택적으로) leave` 라이프사이클을 갖는다.
  *
  * 회의록(MeetingReport) 저장 시점에는 `ParticipantEntry` 인터페이스로 변환된다.
- * (PLAN.md §5 / ARCHITECTURE.md §2.3)
  */
 
 export interface ParticipantSnapshot {

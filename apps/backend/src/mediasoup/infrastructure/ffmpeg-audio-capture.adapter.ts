@@ -21,7 +21,7 @@ interface CaptureContext {
 }
 
 const FFMPEG_BIN = process.env.FFMPEG_BIN ?? 'ffmpeg';
-/** plum 동등 — PlainTransport.connect 직후 즉시 consumer.resume 하면 ffmpeg 의
+/** PlainTransport.connect 직후 즉시 consumer.resume 하면 ffmpeg 의
  *  port binding 이 끝나기 전에 RTP 가 떨어져 packet loss. 1초 양보. */
 const RESUME_DELAY_MS = 1000;
 /** ffmpeg 가 stdin 종료 후 자체 정리할 시간을 주고도 살아 있으면 SIGTERM. */
@@ -31,16 +31,16 @@ const SIGTERM_DELAY_MS = 2000;
  * `AudioCapturePort` 의 mediasoup PlainTransport + ffmpeg 어댑터.
  *
  * 한 (meetingCode, participantId) 마다 PlainTransport 1 개 + ffmpeg subprocess 1
- * 개를 띄운다 (plum 패턴). mediasoup 가 PlainTransport 를 통해 audio RTP 를
+ * 개를 띄운다. mediasoup 가 PlainTransport 를 통해 audio RTP 를
  * 127.0.0.1:{freePort} 로 흘려보내고, ffmpeg 가 그 port 에서 SDP 로 RTP 를 받아
- * **stdout 으로 wav stream** 을 출력한다(디스크 미사용, PLAN.md §3 원칙).
+ * **stdout 으로 wav stream** 을 출력한다(디스크 미사용).
  *
  * ffmpeg stdout 의 chunk 는 `AudioBufferRepository.append(meetingCode, pid, chunk)`
  * 로 redis 에 누적되고, 회의 종료 시 RecordingService 가 consume 해 ai-worker 로
  * 한 번에 전송한다.
  *
  * dedup: 같은 (code, pid) 에 대해 start 가 중복 호출되어도 첫 호출만 효과가
- * 있다 — in-flight Set + 완료 Map 양쪽으로 race 차단([[feedback-mediasoup-no-race]]).
+ * 있다 — in-flight Set + 완료 Map 양쪽으로 race 차단.
  * stop 은 idempotent, stopAll 은 회의 전체 정리.
  */
 @Injectable()
@@ -223,7 +223,7 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
       '-i', 'pipe:0',
       '-analyzeduration', '0',
       '-probesize', '32',
-      // 노이즈 게이트 — plum 동일.
+      // 노이즈 게이트.
       '-af', 'agate=threshold=-45dB:range=0.01:release=1000',
       '-map', '0:a',
       '-acodec', 'pcm_s16le',
@@ -233,7 +233,7 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
       '-flush_packets', '1',
       // raw PCM s16le 로 stdout 출력 — RIFF header 없음. Redis 에는 raw PCM 만
       // 누적되고, RecordingService 가 audio-chunker 로 30s+2s overlap chunk 를
-      // 만들 때 각 chunk 에 WAV header 를 prepend 해 ai-worker 로 보낸다(Phase 1).
+      // 만들 때 각 chunk 에 WAV header 를 prepend 해 ai-worker 로 보낸다.
       // wav 컨테이너 출력보다 chunk 단위 자르기가 자유롭다(중간을 잘라도 valid).
       '-f', 's16le',
       'pipe:1',

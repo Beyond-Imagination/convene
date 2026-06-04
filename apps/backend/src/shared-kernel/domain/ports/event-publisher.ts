@@ -5,11 +5,10 @@ import type { DomainEventName } from '@convene/shared-interfaces';
  * 구현체(예: `@nestjs/event-emitter` 기반 어댑터)는 Infrastructure layer에서
  * 주입한다.
  *
- * ARCHITECTURE.md §2.4 / §3 — 도메인 이벤트 발행 책임은 Application layer에 있고,
- * 프레임워크 의존성은 Port로 격리한다.
+ * 도메인 이벤트 발행 책임은 Application layer에 있고, 프레임워크 의존성은 Port로
+ * 격리한다.
  *
- * `payload` 타입은 v1 단계에선 컨텍스트별로 자유롭게 정의되며, shared 페이로드
- * 인터페이스가 굳어지는 시점에 제네릭으로 좁힐 예정이다.
+ * `payload` 타입은 컨텍스트별로 자유롭게 정의되도록 `unknown` 으로 둔다.
  */
 /**
  * publish 는 **async listener 의 완료까지 await** 한다. nest-event-bus 어댑터는
@@ -21,7 +20,7 @@ import type { DomainEventName } from '@convene/shared-interfaces';
  *     return 한 시점에 admit 이 아직 안 끝난 race 가 발생. 곧이은 CREATE_TRANSPORT /
  *     PRODUCE RPC 가 ParticipantMediaNotFoundError 로 fail 한다.
  *   - publish 호출이 끝났을 때 **모든 listener 의 동기/비동기 작업도 완료** 되어야
- *     동등 동작이 보장된다 ([[feedback-mediasoup-no-race]]).
+ *     동등 동작이 보장된다.
  */
 export interface DomainEventPublisher {
   publish(name: DomainEventName, payload: unknown): Promise<void>;

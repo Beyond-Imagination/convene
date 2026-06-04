@@ -2,14 +2,13 @@
  * raw PCM(16kHz mono pcm_s16le) buffer 를 30초(default) chunk 단위로 split 한다.
  *
  * 회의 종료 후 RecordingService 가 누적 audio 를 한 번에 ai-worker 로 보내지 않고,
- * 본 헬퍼로 잘라 N 번 호출한다(Phase 1). chunk 경계의 단어 잘림을 줄이기 위해
+ * 본 헬퍼로 잘라 N 번 호출한다. chunk 경계의 단어 잘림을 줄이기 위해
  * 인접 chunk 사이에 `overlapMs` 만큼 겹친다. 각 chunk 의 `startMs` 는 raw PCM
  * 시간축 기준이고, RecordingService 가 STT 결과 segment.startMs/endMs 에 합산한다.
  *
  * 각 chunk 는 ai-worker 가 그대로 디코드 할 수 있도록 RIFF WAVE header(44 byte)
  * 를 prepend 한 형태로 돌려준다 — ffmpeg 출력 포맷이 `-f s16le` (raw PCM) 인 것을
- * 전제로 한다. ([[reference-plum-mediasoup]] plum 도 동일하게 chunk-level 로 ai
- * worker 호출).
+ * 전제로 한다.
  */
 
 export const PCM_SAMPLE_RATE = 16_000;

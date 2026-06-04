@@ -1,11 +1,8 @@
 /**
  * MongoDB 접속 옵션을 환경변수에서 해석한다.
  *
- * 운영/개발 분리 전략(PLAN.md §3 — MongoDB Atlas 무료 티어 1클러스터):
- *   - 같은 클러스터를 공유하되 `MONGO_DB_NAME` 으로 database 만 분리한다.
- *   - 예) 개발 = `convene-dev`, 운영 = `convene-prod`.
- *   - `MONGO_URI` 에는 URI 끝의 dbname 을 박지 않고 cluster connection string 만 둔다.
- *     `mongoose.createConnection(uri, { dbName })` 의 옵션으로 dbname 을 주입한다.
+ * `MONGO_URI` 에는 cluster connection string 만 두고, database 는 `MONGO_DB_NAME`
+ * 으로 분리해 `createConnection(uri, { dbName })` 옵션으로 주입한다.
  *
  * 본 파일은 `server.config.ts` / `redis.config.ts` 와 동일하게 순수 함수로
  * 부트스트랩 단계의 env 해석만 담당한다.

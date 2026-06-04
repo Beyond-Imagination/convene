@@ -6,7 +6,7 @@ import {
 } from '@/recording/domain/ports';
 
 /**
- * Phase 2 부트스트랩 / 테스트용 in-memory 구현. 회의 1건 규모의 누적 segments
+ * 부트스트랩 / 테스트용 in-memory 구현. 회의 1건 규모의 누적 segments
  * 만 메모리에 유지한다.
  */
 @Injectable()

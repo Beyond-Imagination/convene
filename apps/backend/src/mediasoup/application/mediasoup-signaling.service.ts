@@ -26,7 +26,7 @@ import { ParticipantMediaNotFoundError, ScreenShareConflictError } from './media
  * WebSocket 시그널링 RPC(`mediasoup:*`) 진입점에서 호출되어 transport/producer/
  * consumer lifecycle 을 진행시킨다.
  *
- * 도메인 이벤트는 본 layer 에서 발행한다 (ARCHITECTURE.md §3).
+ * 도메인 이벤트는 본 layer 에서 발행한다.
  */
 
 export interface MediasoupSignalingServiceDeps {
@@ -185,7 +185,7 @@ export class MediasoupSignalingService {
     });
     await this.deps.participantMediaRepository.save(media);
 
-    // plum eager pipe — 다른 모든 router 에 동일 producer 가 보이도록 즉시 pipe.
+    // 다른 모든 router 에 동일 producer 가 보이도록 즉시 pipe.
     // routersPerRoom <= 1 이면 adapter 가 no-op.
     await this.deps.routerPort.pipeProducerToAllRouters(
       command.meetingCode,
@@ -242,7 +242,7 @@ export class MediasoupSignalingService {
   /**
    * 자기 producer 를 mute(paused:true)/unmute(paused:false) 한다.
    * 소유 검증: 호출자의 ParticipantMedia 에 없는 producerId 면 거부해
-   * 남의 producer 를 toggle 하지 못하게 막는다(plum `toggle_media` 와 동등).
+   * 남의 producer 를 toggle 하지 못하게 막는다.
    */
   async toggleProducer(command: ToggleProducerCommand): Promise<void> {
     const media = await this.requireParticipantMedia(command.participantId);

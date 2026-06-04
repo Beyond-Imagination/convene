@@ -2,7 +2,7 @@
  * MeetingReport에 영속되는 참가자 한 명의 데이터.
  *
  * Meeting Aggregate가 보유한 `Participant.snapshot()` 결과와 동형이며,
- * `meeting.ended` 시점에 Report로 이관된다(ARCHITECTURE §2.3).
+ * `meeting.ended` 시점에 Report로 이관된다.
  *
  * Meeting 컨텍스트의 `Participant`는 mutating Entity인 반면, 본 Entry는
  * 회의 종료 후 영속 도큐먼트에 들어가는 readonly 스냅숏이다.

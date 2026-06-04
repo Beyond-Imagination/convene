@@ -16,7 +16,7 @@ import {
  *
  * Meeting이 종료되는 순간 `fromEndedMeeting(...)`으로 draft가 만들어지고,
  * 비동기 파이프라인(STT → LLM 요약)을 거치면서 transcript·summary·pipeline
- * 상태가 채워진다(ARCHITECTURE.md §5 상태도, §6 시퀀스).
+ * 상태가 채워진다.
  *
  * 책임:
  *   - 회의 종료 시점의 영속 가능한 draft 생성 + 입력 검증
@@ -162,7 +162,7 @@ export class MeetingReport {
 
   /**
    * 관리자 재요약 성공 결과를 반영한다. 기존 summary 를 새 summary 로 교체하고
-   * summary stage 를 done 으로 전이한다(이미 끝난 stage 대상, ARCHITECTURE.md §5).
+   * summary stage 를 done 으로 전이한다(이미 끝난 stage 대상).
    *
    * 재요약 실패 시에는 호출하지 않는다 — Application 이 에러를 전파하고 기존 상태를
    * 보존하므로 done 회의록이 failed 로 격하되지 않는다.

@@ -7,7 +7,7 @@
  * 한 명의 발화 시간축이 유지된다.
  *
  * `consume(code)` 는 회의의 모든 참가자 버퍼를 한 번에 돌려주고 **즉시 삭제**한다
- * (PLAN.md §3: "오디오는 STT 후 즉시 폐기, 장기 보존 X, S3 미사용").
+ * (오디오는 STT 후 즉시 폐기, 장기 보존하지 않는다).
  *
  * 누적된 참가자가 한 명도 없으면 빈 배열을 돌려준다.
  */
@@ -60,7 +60,7 @@ export interface AudioBufferRepository {
    *
    * `startedAtMs` 는 `markStarted` 가 호출된 적이 있으면 그 값, 없으면 undefined.
    * `startMs` 는 잔여 audio 의 첫 byte 가 participant audio 시간축에서 갖는
-   * 위치(ms). Phase 2 partial scheduler 가 사전 drain 한 양만큼 0 보다 클 수 있다.
+   * 위치(ms). partial scheduler 가 사전 drain 한 양만큼 0 보다 클 수 있다.
    */
   consume(
     meetingCode: string,

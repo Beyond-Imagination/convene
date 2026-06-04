@@ -11,7 +11,7 @@ import { ReportFinalizationService } from './report-finalization.service';
  * 생성을 트리거하는 application listener.
  *
  * 두 BC는 본 listener 외 직접 의존을 갖지 않으며 `MeetingEndedPayload`
- * 인터페이스 하나로만 결합한다(CLAUDE.md hard rule 7).
+ * 인터페이스 하나로만 결합한다.
  */
 @Injectable()
 export class ReportMeetingLifecycleListener {

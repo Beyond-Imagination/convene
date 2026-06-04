@@ -6,8 +6,8 @@ import { resolveMongoDbName, resolveMongoUri } from '@/config/mongo.config';
 /**
  * 전역 mongoose Connection 인스턴스를 묶어주는 모듈.
  *
- * `mongoose.createConnection(uri, { dbName })` 으로 Atlas 클러스터에 접속하며,
- * 운영/개발은 같은 URI 를 공유하되 `dbName` 만 분리한다(PLAN.md §3).
+ * `mongoose.createConnection(uri, { dbName })` 으로 클러스터에 접속하며,
+ * 같은 URI 를 공유하되 `dbName` 만 분리한다.
  *
  * 본 모듈은 mongoose 의 `Connection` 클래스를 직접 DI 토큰으로 쓴다.
  * `ReportRepository` 등 인프라 어댑터들은 `@Inject(Connection)` 으로 같은

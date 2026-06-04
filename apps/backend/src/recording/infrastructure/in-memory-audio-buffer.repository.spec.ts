@@ -37,7 +37,7 @@ describe('InMemoryAudioBufferRepository', () => {
     expect(byPid.get('s2')).toBe('B');
   });
 
-  it('consume 후 같은 code 로 다시 consume 하면 빈 배열(즉시 폐기, PLAN.md §3)', async () => {
+  it('consume 후 같은 code 로 다시 consume 하면 빈 배열(즉시 폐기)', async () => {
     const repo = new InMemoryAudioBufferRepository();
     await repo.append('abc12xyz', 's1', Buffer.from('x'));
     await repo.consume('abc12xyz');

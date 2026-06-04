@@ -28,10 +28,10 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
  *   / @WebSocketGateway 데코레이터가 있으므로 클래스 토큰만 등록한다. Redis 클라이언트는
  *   RedisModule(@Global) 이 제공하므로 imports 추가 없이 inject 가능.
  * - SharedKernelModule 의 NestEventBusDomainEventPublisher 가 도메인 이벤트 publish
- *   채널 ([[gateway-shared-config]]).
+ *   채널.
  * - `FfmpegAudioCaptureAdapter` 는 audio producer 의 RTP 를 PlainTransport + ffmpeg
  *   pipeline 으로 capture 해 RecordingModule 의 `AudioBufferRepository` 로 흘려보낸다.
- *   cross-BC 결합은 Port 인터페이스 한정(CLAUDE.md hard rule 7).
+ *   cross-BC 결합은 Port 인터페이스 한정.
  */
 @Module({
   imports: [forwardRef(() => RecordingModule)],

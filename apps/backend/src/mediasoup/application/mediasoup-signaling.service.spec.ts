@@ -491,7 +491,7 @@ describe('MediasoupSignalingService.produce', () => {
     expect(audioCapture.calls.filter((c) => c.name === 'start')).toEqual([]);
   });
 
-  it('produce 직후 routerPort.pipeProducerToAllRouters 를 자기 routerIndex 로 호출한다 (plum eager pipe)', async () => {
+  it('produce 직후 routerPort.pipeProducerToAllRouters 를 자기 routerIndex 로 호출한다', async () => {
     const { service, router } = makeService();
     await service.openRoom({ meetingCode });
     await service.admitParticipant({ meetingCode, participantId: 's1' });

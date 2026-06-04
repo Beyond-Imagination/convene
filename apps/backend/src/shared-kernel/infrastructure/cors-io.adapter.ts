@@ -5,7 +5,7 @@ import { IoAdapter } from '@nestjs/platform-socket.io';
  * WS gateway 전역 CORS 설정을 적용하는 IoAdapter.
  *
  * 두 Gateway(Meeting/Mediasoup) 가 동일한 socket.io 서버를 공유하므로 본 adapter
- * 한 곳에서 cors 옵션을 묶는다 ([[gateway-shared-config]]).
+ * 한 곳에서 cors 옵션을 묶는다.
  *
  * `super.createIOServer` 가 반환하는 socket.io Server 인스턴스에 cors 옵션을
  * 머지해 전달한다. 본 adapter 는 IoAdapter 외부 의존(예: ConfigService)을 두지

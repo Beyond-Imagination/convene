@@ -8,8 +8,7 @@ import { ReportSummary } from '../value-objects';
  *
  * Application Service가 transcript + chat을 한 묶음으로 넘기면 구현체는
  * 외부 LLM(API 또는 in-house)을 호출해 구조화된 `ReportSummary`를 돌려준다.
- * 모델 공급자(예: Gemini, OpenAI 등)는 env 스위치로 교체 가능하다
- * (PLAN.md §3 / ARCHITECTURE.md §3.2).
+ * 모델 공급자(예: Gemini, OpenAI 등)는 env 스위치로 교체 가능하다.
  *
  * 구현체는 본 인터페이스 외 부수 효과를 일으키지 않으며, 실패는 throw로
  * 표현한다. Application Service가 throw를 받아 `markSummaryFailed`로 전이한다.

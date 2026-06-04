@@ -11,8 +11,8 @@ const KEY_PREFIX = 'meeting:';
 /**
  * Redis 에 저장하는 직렬화 형태. Date 는 ISO string 으로, 나머지는 snapshot 과 동일.
  *
- * 인터페이스를 분리해 두면 추후 스키마 마이그레이션(필드 추가/이름 변경) 시
- * 직렬화 layer 한 곳에서만 변환을 처리할 수 있다.
+ * 인터페이스를 분리해 두면 스키마가 바뀔 때(필드 추가/이름 변경) 직렬화
+ * layer 한 곳에서만 변환을 처리할 수 있다.
  */
 interface ParticipantWire {
   readonly id: string;

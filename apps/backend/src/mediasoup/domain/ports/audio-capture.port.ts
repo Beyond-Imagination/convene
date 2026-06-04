@@ -8,7 +8,7 @@
  * `closeRoom` 이 stop/stopAll 을 호출한다.
  *
  * 모든 메서드는 idempotent — 같은 (meetingCode, participantId) 에 대한 중복
- * 호출은 dedup 으로 처리한다([[feedback-mediasoup-no-race]] 원칙).
+ * 호출은 dedup 으로 처리한다.
  *
  * start 는 실패해도 throw 하지 않는다(회의 본 흐름을 막지 않기 위함). 실패는
  * 구현체가 logger 에 기록한다.

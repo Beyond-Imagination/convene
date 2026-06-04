@@ -16,7 +16,7 @@ import { ReportFinalizationService } from './report-finalization.service';
  *
  * payload 의 plain transcript 구조를 도메인 `TranscriptSegment` VO 로 변환해
  * Aggregate 의 불변식을 통과시킨 뒤 Application Service 에 위임한다.
- * 두 BC 는 본 listener 외 직접 의존을 갖지 않는다(CLAUDE.md hard rule 7).
+ * 두 BC 는 본 listener 외 직접 의존을 갖지 않는다.
  */
 @Injectable()
 export class ReportPipelineListener {

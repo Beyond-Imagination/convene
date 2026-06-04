@@ -12,8 +12,7 @@ import { IdleTimeout, MeetingCode } from './value-objects';
  *   - 종료(`close`) 시 모든 mutating 메서드를 거부.
  *
  * 도메인 이벤트는 직접 발행하지 않는다. Application Service가 본 Aggregate의
- * 메서드 호출 결과를 보고 `@nestjs/event-emitter`로 발행한다
- * (ARCHITECTURE.md §2.4, §3).
+ * 메서드 호출 결과를 보고 `@nestjs/event-emitter`로 발행한다.
  *
  * `code` 유일성은 Repository 책임이며 본 Aggregate에서는 형식만 신뢰한다.
  */
@@ -189,7 +188,7 @@ export class Meeting {
   /**
    * 활성 참가자가 0이고 마지막 활동으로부터 `idleTimeout` 이상 경과했으면 true.
    * 활성 참가자가 한 명이라도 있으면 항상 false
-   * (ARCHITECTURE.md §2.3 불변식: idle 타이머는 0명이 된 순간부터만 작동).
+   * (idle 타이머는 0명이 된 순간부터만 작동하는 불변식).
    */
   isIdleSince(now: Date): boolean {
     if (this.activeParticipantCount > 0) return false;
