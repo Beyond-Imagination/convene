@@ -17,6 +17,7 @@ on:
       - 'packages/shared-interfaces/**'
       - 'docker-compose.prod.yml'
       - 'infra/Caddyfile'
+      - 'infra/cloudfront-rewrite.js'
       - '.github/workflows/deploy.yml'
       - '.github/workflows/verify.yml'
   workflow_dispatch:
@@ -68,6 +69,7 @@ jobs:
             frontend:
               - 'apps/frontend/**'
               - 'packages/shared-interfaces/**'
+              - 'infra/cloudfront-rewrite.js'
 
   # 3) 변경된 backend/ai-worker 이미지만 빌드해 GHCR push.
   build-push:
@@ -223,3 +225,22 @@ jobs:
           aws cloudfront create-invalidation \
             --distribution-id "${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" \
             --paths "/*"
+
+      # 정적 export 라우팅 함수(viewer-request) 코드 동기화.
+      # describe 로 현재 ETag·config(런타임/주석) 를 가져와 코드만 교체 → publish 로 DEVELOPMENT→LIVE 승격.
+      # behavior 연결(Associate)은 1회성 콘솔 작업이라 자동화 제외.
+      - name: CloudFront Function 동기화
+        run: |
+          set -euo pipefail
+          NAME=convene-rewrite
+          aws cloudfront describe-function --name "$NAME" --stage DEVELOPMENT > /tmp/fn.json
+          ETAG=$(jq -r '.ETag' /tmp/fn.json)
+          # 기존 config(Comment/Runtime/KeyValueStore 연결)를 보존하고 코드만 갱신
+          jq '.FunctionSummary.FunctionConfig' /tmp/fn.json > /tmp/fn-config.json
+          NEW_ETAG=$(aws cloudfront update-function \
+            --name "$NAME" \
+            --if-match "$ETAG" \
+            --function-config "file:///tmp/fn-config.json" \
+            --function-code fileb://infra/cloudfront-rewrite.js \
+            --query 'ETag' --output text)
+          aws cloudfront publish-function --name "$NAME" --if-match "$NEW_ETAG"
