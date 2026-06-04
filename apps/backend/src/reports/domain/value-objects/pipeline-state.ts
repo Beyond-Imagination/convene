@@ -86,7 +86,8 @@ export class PipelineState {
    * 재요약 대상이 아니므로 거부한다. 누적 failures 는 보존.
    */
   resummarizeDone(): PipelineState {
-    throw new Error('not implemented');
+    this.assertNotPending('summary');
+    return new PipelineState(this.sttStatus, 'done', this.failures);
   }
 
   /**
@@ -94,7 +95,12 @@ export class PipelineState {
    * `resummarizeDone` 과 마찬가지로 pending stage 에는 적용할 수 없다.
    */
   resummarizeFailed(error: string, at: Date): PipelineState {
-    throw new Error('not implemented');
+    this.assertNotPending('summary');
+    return new PipelineState(
+      this.sttStatus,
+      'failed',
+      this.appendFailure('summary', error, at),
+    );
   }
 
   /** 두 stage 모두 pending이 아니면 finalize 가능. */
@@ -111,6 +117,13 @@ export class PipelineState {
     const status = stage === 'stt' ? this.sttStatus : this.summaryStatus;
     if (status !== 'pending') {
       throw new Error(`Pipeline stage "${stage}" is already ${status}`);
+    }
+  }
+
+  private assertNotPending(stage: PipelineStage): void {
+    const status = stage === 'stt' ? this.sttStatus : this.summaryStatus;
+    if (status === 'pending') {
+      throw new Error(`Pipeline stage "${stage}" is still pending; cannot resummarize`);
     }
   }
 

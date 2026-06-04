@@ -4,9 +4,16 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+
+/**
+ * AdminGuard 가 주입받는 관리자 토큰 값의 DI 토큰.
+ * ReportsModule 이 `resolveAdminConfig()` 결과(token | null)를 이 토큰으로 제공한다.
+ */
+export const ADMIN_API_TOKEN = Symbol('ADMIN_API_TOKEN');
 
 /**
  * 관리자 전용 엔드포인트(회의록 재요약 등)를 단일 운영자 시크릿으로 보호하는 Guard.
@@ -20,10 +27,20 @@ import {
  */
 @Injectable()
 export class AdminGuard implements CanActivate {
-  constructor(private readonly token: string | null) {}
+  constructor(@Inject(ADMIN_API_TOKEN) private readonly token: string | null) {}
 
   canActivate(context: ExecutionContext): boolean {
-    throw new Error('not implemented');
+    if (this.token === null) {
+      throw new ForbiddenException(
+        '관리자 엔드포인트가 비활성화되어 있습니다(ADMIN_API_TOKEN 미설정).',
+      );
+    }
+    const request = context.switchToHttp().getRequest<{ headers: Record<string, unknown> }>();
+    const provided = extractBearerToken(request.headers.authorization);
+    if (provided === null || !safeTokenEqual(provided, this.token)) {
+      throw new UnauthorizedException('유효한 관리자 토큰이 필요합니다.');
+    }
+    return true;
   }
 }
 

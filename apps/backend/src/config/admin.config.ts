@@ -16,5 +16,7 @@ export interface AdminConfig {
 export function resolveAdminConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): AdminConfig | null {
-  throw new Error('not implemented');
+  const token = env.ADMIN_API_TOKEN?.trim();
+  if (token === undefined || token.length === 0) return null;
+  return { token };
 }
