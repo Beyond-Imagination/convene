@@ -11,8 +11,8 @@ import type { UseReportDetailViewModel } from '@/feature/reports/hooks/useReport
  * 회의록 상세 페이지의 dumb View.
  *
  * ViewModel 의 status 머신을 그대로 분기 렌더하고, summary / participants / chat /
- * transcript 를 각각 섹션으로 보여준다. 미구현 단계(STT/요약 pipeline) 는
- * "진행 중" 안내로 분기.
+ * transcript 를 각각 섹션으로 보여준다. STT/요약 파이프라인이 아직 끝나지 않은
+ * (pending/processing) 상태는 "진행 중" 안내로 분기.
  */
 export type ReportDetailProps = UseReportDetailViewModel;
 

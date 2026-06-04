@@ -5,7 +5,7 @@ import type { UseJoinMeetingViewModel } from '@/feature/meeting/hooks/useJoinMee
 /**
  * 회의 입장 폼 View.
  *
- * ARCHITECTURE §4.2 — View 는 props 만으로 렌더한다. ViewModel hook 의 반환을
+ * View 는 props 만으로 렌더한다. ViewModel hook 의 반환을
  * 그대로 prop 타입으로 받는 패턴을 사용한다(`UseJoinMeetingViewModel`).
  */
 export type JoinMeetingFormProps = UseJoinMeetingViewModel;

@@ -10,7 +10,7 @@ import { listReports } from '@/shared/api/reports.api';
  *
  * 책임: mount 시 GET /reports, 상태 머신(loading/loaded/error), refresh() 노출.
  * 정적 export 빌드에서 server 쪽 fetch 가 없으므로 모든 데이터는 client mount 시
- * 가져온다(ARCHITECTURE §4.3).
+ * 가져온다.
  */
 export type ReportListStatus = 'loading' | 'loaded' | 'error';
 

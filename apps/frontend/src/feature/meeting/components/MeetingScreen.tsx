@@ -28,7 +28,7 @@ import type { UseMeetingViewModel } from '@/feature/meeting/hooks/useMeetingView
 /**
  * 회의 화면의 dumb View.
  *
- * ARCHITECTURE §4.2 — useState/useEffect/fetch/socket 호출 금지. ViewModel hook
+ * useState/useEffect/fetch/socket 호출 금지. ViewModel hook
  * 반환을 그대로 prop 타입으로 받는다.
  *
  * 레이아웃(Zoom/Meet 톤): 상단 헤더 / 중앙 비디오 영역(스크롤 차단) / 하단 컨트롤 바.
@@ -302,7 +302,7 @@ export function MeetingScreen({
         )}
       </div>
 
-      {/* 원격 audio 는 video 와 분리된 별도 `<audio>` 요소로 재생 (plum 패턴) */}
+      {/* 원격 audio 는 video 와 분리된 별도 `<audio>` 요소로 재생 */}
       <RemoteAudioPlayer remoteMedia={mediasoup.remoteMedia} />
 
       {/* 하단 컨트롤 바 */}

@@ -6,7 +6,7 @@ import type { UseNicknameGateViewModel } from '@/feature/meeting/hooks/useNickna
  * 회의 링크로 직접 접속한(닉네임 없는) 사용자에게 보여주는 닉네임 입력 게이트 View.
  *
  * 회의 화면 톤(`.theme-dark`)의 배경 위에 중앙 모달 카드로 닉네임만 입력받는다.
- * 회의 코드는 URL 에서 이미 정해졌으므로 헤더에 안내만 한다. ARCHITECTURE §4.2 —
+ * 회의 코드는 URL 에서 이미 정해졌으므로 헤더에 안내만 한다.
  * View 는 props 만으로 렌더하며, 상태/검증은 `useNicknameGateViewModel` 이 담당한다.
  */
 export interface NicknameGateProps extends UseNicknameGateViewModel {

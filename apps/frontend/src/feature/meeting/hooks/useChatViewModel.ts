@@ -21,7 +21,7 @@ export type ChatMessageView = ChatPostedBroadcast;
 export interface UseChatViewModel {
   readonly messages: ReadonlyArray<ChatMessageView>;
   readonly canSend: boolean;
-  /** 입력 상태도 ViewModel 이 보유 — View 는 dumb 유지(ARCHITECTURE §4.2). */
+  /** 입력 상태도 ViewModel 이 보유 — View 는 dumb 유지. */
   readonly draft: string;
   readonly setDraft: (text: string) => void;
   /** draft 를 trim 해서 emit 하고 입력을 비운다. canSend=false 또는 공백이면 no-op. */

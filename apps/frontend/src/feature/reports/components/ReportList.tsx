@@ -8,8 +8,7 @@ import type { UseReportListViewModel } from '@/feature/reports/hooks/useReportLi
  * 회의록 목록 페이지의 dumb View.
  *
  * ViewModel 의 status 머신을 그대로 분기 렌더한다. 각 카드는 /reports/:id 로
- * 가는 `next/link` — CloudFront SPA fallback(/404 → /index.html) 으로 정적
- * export 환경에서도 client routing 으로 진입한다.
+ * 가는 `next/link` 로, 정적 export 환경에서도 client routing 으로 진입한다.
  */
 export type ReportListProps = UseReportListViewModel;
 

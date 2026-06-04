@@ -3,11 +3,10 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * Playwright e2e 설정.
  *
- * - testDir: `test/` 만 본다(vitest 가 `src/**\/*.spec` 을 가져가는 것과 분리,
- *   [[feedback-test-layout]] 규칙).
+ * - testDir: `test/` 만 본다(vitest 가 `src/**\/*.spec` 을 가져가는 것과 분리).
  * - webServer.frontend: `pnpm dev` (Next.js dev, port 3000). 정적 export 산출물
- *   대신 dev 서버를 쓰는 이유는 첫 단계에서 dev 흐름이 더 빠르고 디버깅이 쉽기
- *   때문이다(추후 `pnpm build && pnpm preview` 로 교체 가능).
+ *   대신 dev 서버를 쓰는 이유는 dev 흐름이 빌드보다 빠르고 디버깅이 쉽기
+ *   때문이다.
  * - webServer.backend: 같은 monorepo 의 backend dev 도 같이 띄운다. backend 가
  *   존재해야 회의 생성/목록 흐름이 의미 있다(InMemory 어댑터라 외부 의존 없음).
  * - reuseExistingServer: 로컬에서 이미 떠 있으면 그대로 사용해 빠르게 반복.

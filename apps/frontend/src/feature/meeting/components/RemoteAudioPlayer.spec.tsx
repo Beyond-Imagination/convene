@@ -5,8 +5,8 @@ import type { RemoteMediaEntry } from '@/feature/meeting/hooks/useMediasoupViewM
 import { RemoteAudioPlayer } from './RemoteAudioPlayer';
 
 /**
- * plum `RemoteAudioPlayer.tsx` 패턴 — 원격 audio 트랙들을 video 와 분리해 별도
- * `<audio>` 요소로 재생. autoplay 정책 회피 + 본인 비디오의 mute 와 독립.
+ * 원격 audio 트랙들을 video 와 분리해 별도 `<audio>` 요소로 재생.
+ * autoplay 정책 회피 + 본인 비디오의 mute 와 독립.
  */
 
 const fakeAudioTrack = (id: string): MediaStreamTrack =>

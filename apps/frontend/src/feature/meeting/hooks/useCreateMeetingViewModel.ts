@@ -23,7 +23,7 @@ import { useSessionStore } from '@/shared/stores/session.store';
  *   3) `/meetings/{code}` 로 router.push — useMeetingViewModel 이 store.nickname
  *      을 보고 정상 진입한다(닉네임 없으면 / 로 redirect 되던 문제 해결).
  *
- * 검증 규칙은 useJoinMeetingViewModel 과 일치 — 추후 zod 도입 시 공통화한다.
+ * 검증 규칙은 useJoinMeetingViewModel 과 일치한다.
  */
 
 export const NICKNAME_MIN = 1;

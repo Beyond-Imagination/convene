@@ -9,7 +9,7 @@ import { useMediaElementBinding } from '@/feature/meeting/hooks/useMediaElementB
 /**
  * 자신의 카메라/마이크 스트림을 보여주는 dumb tile.
  *
- * 함정 해결(plum 패턴 도입, [[reference-plum-mediasoup]] §3):
+ * 함정 해결:
  *  - `<video muted>` 항상 — 본인 오디오 에코 방지 + autoplay 정책 회피
  *  - `useMediaElementBinding` 으로 `loadeddata` 후 명시 `.play()` 호출 + reject swallow
  *  - srcObject idempotent + cleanup 시 pause + 리스너 제거

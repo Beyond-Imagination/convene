@@ -8,7 +8,7 @@ import type { UseChatViewModel } from '@/feature/meeting/hooks/useChatViewModel'
  * 회의 채팅 패널 dumb View.
  *
  * draft input + 메시지 목록만 렌더. 입력 상태/전송/메시지 누적은 모두
- * `useChatViewModel` 이 책임진다(ARCHITECTURE §4.2).
+ * `useChatViewModel` 이 책임진다.
  */
 export type ChatPanelProps = UseChatViewModel & {
   /** 내 닉네임. 일치하는 메시지는 카톡식으로 우측(내 메시지)에 표시한다. */

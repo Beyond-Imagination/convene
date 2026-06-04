@@ -10,9 +10,9 @@ import type { RemoteParticipant } from '@/feature/meeting/hooks/useMeetingViewMo
 /**
  * 다른 참가자의 카메라 스트림을 보여주는 dumb tile.
  *
- * 함정 해결(plum 패턴 도입, [[reference-plum-mediasoup]] §3):
+ * 함정 해결:
  *  - `<video muted>` 항상 — autoplay 정책 회피. 원격 오디오는 별도 RemoteAudioPlayer
- *    가 처리(Cycle 2B). 본 컴포넌트는 video 만 책임.
+ *    가 처리한다. 본 컴포넌트는 video 만 책임.
  *  - `useMediaElementBinding` 으로 `loadeddata` 후 명시 `.play()` 호출
  *  - track 변경 시 새 MediaStream 으로 갱신, idempotent
  */

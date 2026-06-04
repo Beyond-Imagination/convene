@@ -9,7 +9,7 @@ import { API_BASE_URL } from './config';
 /**
  * Meeting bounded context 의 HTTP API client (Model 레이어).
  *
- * View / ViewModel 은 본 모듈 외 fetch 를 직접 호출하지 않는다(ARCHITECTURE §4).
+ * View / ViewModel 은 본 모듈 외 fetch 를 직접 호출하지 않는다.
  * 비-2xx 응답은 `MeetingApiError` 로 일관되게 던져 ViewModel 이 분기 처리한다.
  */
 export class MeetingApiError extends Error {

@@ -33,7 +33,7 @@ export interface UseMeetingLayoutViewModel {
  *  - 채팅 패널 열림/닫힘(기본 열림)
  *  - 비디오 타일 페이지네이션(Zoom 갤러리식) — totalTiles 를 받아 페이지 수를 계산
  *
- * View 는 useState 를 직접 쓸 수 없으므로(CLAUDE.md hard rule 3) 여기로 분리한다.
+ * View 는 useState 를 직접 쓸 수 없으므로 여기로 분리한다.
  */
 export function useMeetingLayoutViewModel(
   totalTiles = 0,

@@ -4,7 +4,7 @@ import { useMeetingLayoutViewModel } from './useMeetingLayoutViewModel';
 
 /**
  * 회의 페이지의 순수 레이아웃 상태(채팅 패널 열림/닫힘)를 담는 ViewModel.
- * View 는 useState 를 직접 쓸 수 없으므로(CLAUDE.md hard rule 3) 토글 상태를
+ * View 는 useState 를 직접 쓸 수 없으므로 토글 상태를
  * 이 hook 으로 분리한다.
  */
 describe('useMeetingLayoutViewModel', () => {

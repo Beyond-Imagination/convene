@@ -5,7 +5,7 @@ import type { UseCreateMeetingViewModel } from '@/feature/meeting/hooks/useCreat
 /**
  * 회의 만들기 폼 View.
  *
- * ARCHITECTURE §4.2 — View 는 useState/useEffect/fetch/socket/zustand 호출 금지.
+ * View 는 useState/useEffect/fetch/socket/zustand 호출 금지.
  * ViewModel hook 의 반환을 그대로 prop 으로 받아 input/submit/error 표시만 한다.
  *
  * 입력은 닉네임 1 개 — 회의 만들고 곧바로 입장하므로 useMeetingViewModel 이

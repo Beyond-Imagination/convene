@@ -8,7 +8,7 @@ import type { RemoteMediaEntry } from '@/feature/meeting/hooks/useMediasoupViewM
 /**
  * 원격 참가자들의 audio 트랙을 별도 `<audio>` 요소로 재생하는 dumb 컴포넌트.
  *
- * plum `RemoteAudioPlayer.tsx` 패턴 차용 ([[reference-plum-mediasoup]] §3-2):
+ * 다음 함정을 해결한다:
  *  - video tile 은 `<video muted>` 강제 → 본 컴포넌트가 audio 만 담당해 충돌 회피
  *  - 각 consumer 마다 독립 `<audio>` 요소 + useMediaElementBinding 으로 명시 play()
  *  - 화면에는 보이지 않게 aria-hidden + 시각적 hidden (sr-only 와 유사)

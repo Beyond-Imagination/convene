@@ -4,7 +4,7 @@ import { useRef } from 'react';
 import { useMediaElementBinding } from './useMediaElementBinding';
 
 /**
- * plum `useVideoElementBinding` 의 동작을 video/audio 공통으로 일반화한 hook.
+ * video/audio 요소 공통의 MediaStream attach hook.
  * View 가 MediaStream 을 받았을 때 srcObject 부착 + `loadeddata` 후 명시 play()
  * 까지 한 hook 에 캡슐화한다. spec 은 video element 로 검증하지만 audio 도 동일.
  */

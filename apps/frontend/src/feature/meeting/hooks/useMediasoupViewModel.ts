@@ -69,8 +69,8 @@ const rpcWithTimeout = async <T>(
  *   3. `mediasoup:createTransport(recv)` → recvTransport
  *
  * 각 transport 의 `connect` 이벤트를 받아 backend `connectTransport` RPC 로
- * 위임한다. produce(local stream) / consume(remote) 흐름은 후속 단계에서
- * 본 hook 의 transport ref 위에 쌓는다.
+ * 위임한다. produce(local stream) / consume(remote) 흐름은 본 hook 의 transport
+ * ref 위에 쌓는다.
  *
  * unmount 시 transport.close() 로 정리.
  */
@@ -377,7 +377,7 @@ export function useMediasoupViewModel(
             paused: payload.paused ?? false,
           };
           // producerId 기준 dedup (LIST_PRODUCERS 응답과 NEW_PRODUCER broadcast 가
-          // 동일 producer 를 두 번 통보할 수 있다 — [[feedback-mediasoup-no-race]] #2)
+          // 동일 producer 를 두 번 통보할 수 있다)
           setRemoteMedia((prev) => {
             if (prev.some((m) => m.producerId === entry.producerId)) return prev;
             return [...prev, entry];

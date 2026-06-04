@@ -16,7 +16,7 @@ import { useSessionStore } from '@/shared/stores/session.store';
  *
  * 폼 입력 2종(code, nickname)을 react-hook-form 으로 검증하고, 통과 시 닉네임을
  * session store 에 저장한 뒤 `/meetings/[code]` 로 이동한다. View 는 본 hook 의
- * 반환만으로 input/submit/error 표시를 수행한다(ARCHITECTURE §4).
+ * 반환만으로 input/submit/error 표시를 수행한다.
  */
 
 export const MEETING_CODE_PATTERN = /^[a-z0-9]{8}$/;

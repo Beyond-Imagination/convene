@@ -29,9 +29,8 @@ import { useSessionStore } from '@/shared/stores/session.store';
  *   - participantJoined / participantLeft 브로드캐스트 수신 → 참가자 목록 갱신
  *   - unmount 시 `meeting:leave` emit + socket 종료
  *
- * v1 단계는 채팅/미디어 통합 없이 참가자 표시까지만 다룬다. 채팅(useChatViewModel)
- * 과 mediasoup 통합은 후속 사이클에서 본 hook 과 socket 인스턴스를 공유하도록
- * 확장한다.
+ * 채팅(useChatViewModel)·mediasoup(useMediasoupViewModel) ViewModel 이 본 hook 의
+ * socket 인스턴스를 공유해 같은 연결 위에서 동작한다.
  */
 
 export type MeetingConnectionStatus = 'connecting' | 'joined' | 'error';
