@@ -1,8 +1,3 @@
-/**
- * Mediasoup 의 application 에러. 던져지면 Interface 가 WsException/HttpException
- * 으로 매핑한다.
- */
-
 export class ParticipantMediaNotFoundError extends Error {
   constructor(public readonly participantId: string) {
     super(`ParticipantMedia for "${participantId}" not found`);

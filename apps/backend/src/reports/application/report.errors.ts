@@ -1,8 +1,3 @@
-/**
- * Reports 의 application/도메인 에러. 던져지면 Interface 가 대응 HttpException
- * (`NotFoundException`, 409 Conflict 등)으로 매핑한다.
- */
-
 export class ReportNotFoundError extends Error {
   constructor(public readonly reportId: string) {
     super(`Report "${reportId}" not found`);

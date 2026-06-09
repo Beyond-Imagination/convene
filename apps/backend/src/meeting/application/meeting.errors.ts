@@ -1,8 +1,3 @@
-/**
- * Meeting 의 application/도메인 에러. 던져지면 Interface 가 대응 HttpException
- * (`NotFoundException` 등)으로 매핑한다.
- */
-
 export class MeetingNotFoundError extends Error {
   constructor(public readonly code: string) {
     super(`Meeting "${code}" not found`);
