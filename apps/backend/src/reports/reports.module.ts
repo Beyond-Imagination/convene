@@ -17,7 +17,7 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
 import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 
 /**
- * Reports bounded context 의 NestJS 모듈.
+ * Reports 기능을 구성하는 NestJS 모듈.
  *
  * - `ReportFinalizationService` 는 비-Nest class 라 `useFactory` 로 묶는다
  *   (Meeting/Mediasoup BC 와 동일 패턴).

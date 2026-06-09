@@ -4,15 +4,14 @@ import { Participant, ParticipantSnapshot } from './participant';
 import { IdleTimeout, MeetingCode } from './value-objects';
 
 /**
- * 회의 한 건. Bounded Context 'Meeting'의 Aggregate Root.
+ * 회의 한 건.
  *
  * 책임:
  *   - 참가자(Participant Entity) 컬렉션 관리(join/leave).
  *   - 활동 시각(`lastActiveAt`) 추적과 idle 만료 판정(`isIdleSince`).
  *   - 종료(`close`) 시 모든 mutating 메서드를 거부.
  *
- * 도메인 이벤트는 직접 발행하지 않는다. Application Service가 본 Aggregate의
- * 메서드 호출 결과를 보고 `@nestjs/event-emitter`로 발행한다.
+ * 도메인 이벤트는 직접 발행하지 않는다(Application Service 가 메서드 결과를 보고 발행).
  *
  * `code` 유일성은 Repository 책임이며 본 Aggregate에서는 형식만 신뢰한다.
  */

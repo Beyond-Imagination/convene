@@ -10,7 +10,7 @@ import { RedisPartialTranscriptStore } from '@/recording/infrastructure/redis-pa
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 
 /**
- * Recording bounded context 의 NestJS 모듈.
+ * Recording 기능을 구성하는 NestJS 모듈.
  *
  * - `RecordingService` 는 비-Nest class 라 `useFactory` 로 묶는다
  *   (Meeting/Mediasoup/Reports BC 와 동일 패턴).

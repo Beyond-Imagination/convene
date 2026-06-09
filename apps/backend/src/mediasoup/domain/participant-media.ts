@@ -1,7 +1,7 @@
 import { MediaType, TransportDirection } from '@convene/shared-interfaces';
 
 /**
- * Mediasoup BC 의 Aggregate Root. 한 회의에 참여한 **한 명의 미디어 상태**를 표현한다.
+ * 한 회의에 참여한 **한 명의 미디어 상태**를 표현한다.
  *
  * - identity 는 `participantId`(Meeting BC 의 `Participant.id` 와 동일한 socket id).
  * - `meetingCode` 는 그룹 키로, Mediasoup BC 의 application 서비스가

@@ -20,7 +20,7 @@ import { RecordingModule } from '@/recording/recording.module';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 
 /**
- * Mediasoup bounded context 의 NestJS 모듈.
+ * Mediasoup 기능을 구성하는 NestJS 모듈.
  *
  * - WorkerPool / RouterAdapter / TransportAdapter / SignalingService 는 비-Nest
  *   클래스라 useFactory 로 묶는다 (Meeting BC 의 MeetingService 와 동일 패턴).

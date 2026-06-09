@@ -20,10 +20,10 @@ import {
 } from '@/shared-kernel/domain/value-objects';
 
 /**
- * Meeting Bounded Context의 Application Service.
+ * 회의 생성·입장·종료 등 use case 를 처리하는 서비스.
  *
- * Use case 단위로 도메인 객체를 조립하고 Repository / Clock / CodeGenerator
- * 같은 Port 의존성을 호출한다. 도메인 이벤트 발행도 본 layer에서 수행한다.
+ * 도메인 객체를 조립하고 Repository / Clock / CodeGenerator Port 를 호출하며,
+ * 결과에 따라 도메인 이벤트를 발행한다.
  */
 
 export interface CreateMeetingCommand {

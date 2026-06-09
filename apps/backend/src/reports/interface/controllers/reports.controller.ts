@@ -30,8 +30,6 @@ import {
 } from './report-serialize';
 
 /**
- * Reports bounded context의 HTTP Interface layer.
- *
  * 책임: query/path 검증, 서비스 호출, wire format 직렬화, 도메인 에러 → HTTP 매핑.
  * 비즈니스 로직은 일체 두지 않는다.
  */

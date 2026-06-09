@@ -47,7 +47,6 @@ interface ProducerCreatedPayload {
 }
 
 /**
- * Mediasoup bounded context 의 WebSocket Interface layer.
  * mediasoup:* RPC 6 개 핸들러 + `mediasoup.producer.created` 도메인 이벤트 구독.
  *
  * Meeting BC 의 `MeetingGateway` 와 동일한 socket.io 네임스페이스(/)를 공유한다.

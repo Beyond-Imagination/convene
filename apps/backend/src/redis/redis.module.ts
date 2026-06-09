@@ -7,8 +7,8 @@ import { resolveRedisKeyPrefix, resolveRedisUrl } from '@/config/redis.config';
  * 전역 Redis 클라이언트(`ioredis`) 인스턴스를 묶어주는 모듈.
  *
  * `ioredis` 의 default export 인 `Redis` 클래스 자체를 DI 토큰으로 사용한다.
- * Bounded Context 별 RedisXRepository 들은 `@Inject(Redis)` 또는 useFactory
- * inject 로 같은 인스턴스를 공유한다.
+ * 각 RedisXRepository 는 `@Inject(Redis)` 또는 useFactory inject 로 같은
+ * 인스턴스를 공유한다.
  *
  * 테스트에서는 `Test.createTestingModule(...).overrideProvider(Redis).useValue(new IORedisMock())`
  * 로 손쉽게 교체할 수 있다. 단위 spec 은 RedisXRepository 를 직접 인스턴스화하는

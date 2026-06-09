@@ -29,7 +29,6 @@ import { MeetingEndedPayload } from '@/shared-kernel/domain/events';
 const roomOf = (code: string): string => `meeting:${code}`;
 
 /**
- * Meeting bounded context의 WebSocket Interface layer.
  * Socket.io 단일 네임스페이스에서 `meeting:join`, `meeting:leave`, `meeting:chat`
  * 요청을 처리하고 같은 room에 `meeting:*Broadcast` 이벤트를 emit한다.
  */

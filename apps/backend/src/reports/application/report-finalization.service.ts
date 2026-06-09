@@ -14,11 +14,11 @@ import { ChatEntry, ExternalReference, Source } from '@/shared-kernel/domain/val
 import { ReportNotFoundError, ReportNotResummarizableError } from './report.errors';
 
 /**
- * Reports Bounded Context의 Application Service.
+ * 회의록 생성·후처리 파이프라인을 처리하는 서비스.
  *
  * `meeting.ended` 이벤트를 받아 회의록 draft를 생성한 뒤 STT/Summary
- * 파이프라인을 따라 Aggregate(`MeetingReport`)를 진행시키고, 그 결과를
- * 도메인 이벤트로 발행한다.
+ * 파이프라인을 따라 `MeetingReport` 를 진행시키고, 그 결과를 도메인 이벤트로
+ * 발행한다.
  */
 
 export interface CreateDraftCommand {

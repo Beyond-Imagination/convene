@@ -1,8 +1,6 @@
 /**
- * Meeting bounded context의 application/도메인 에러.
- *
- * NestJS 의존성은 두지 않는다(framework-free). Interface layer가 본 에러를
- * NestJS HttpException(`NotFoundException` 등)으로 매핑한다.
+ * Meeting 의 application/도메인 에러. 던져지면 Interface 가 대응 HttpException
+ * (`NotFoundException` 등)으로 매핑한다.
  */
 
 export class MeetingNotFoundError extends Error {
@@ -13,7 +11,7 @@ export class MeetingNotFoundError extends Error {
 }
 
 /**
- * 회의 종료를 host 가 아닌 요청자가 시도했을 때. Interface layer 가
+ * 회의 종료를 host 가 아닌 요청자가 시도했을 때. Interface 가
  * `ForbiddenException`(403)으로 매핑한다.
  */
 export class NotHostError extends Error {

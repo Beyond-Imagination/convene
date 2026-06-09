@@ -7,7 +7,7 @@ import {
 import { MeetingReport } from '@/reports/domain/meeting-report';
 
 /**
- * Interface layer 의 도메인 → wire format 직렬화 helper.
+ * 도메인 → wire format 직렬화 helper.
  *
  * 컨트롤러는 비즈니스 로직을 두지 않으며, 본 helper 가 `MeetingReport` Aggregate 의
  * snapshot 을 shared-interfaces wire format 으로 평면화한다.

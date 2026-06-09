@@ -47,7 +47,7 @@ interface MeetingReportDoc {
  *   collection 이 작아 단순 정렬로도 충분하다.
  *
  * Schema 는 도메인 invariant 를 중복 검증하지 않는다. nested 영역은 Mixed 로 두고
- * 검증은 Aggregate · VO 가 담당한다(framework-free 원칙 유지).
+ * 검증은 Aggregate · VO 가 담당한다.
  */
 @Injectable()
 export class MongoReportRepository implements ReportRepository {

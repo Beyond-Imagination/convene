@@ -12,7 +12,7 @@ import {
 } from './value-objects';
 
 /**
- * 회의록. Bounded Context 'Report'의 Aggregate Root.
+ * 회의록.
  *
  * Meeting이 종료되는 순간 `fromEndedMeeting(...)`으로 draft가 만들어지고,
  * 비동기 파이프라인(STT → LLM 요약)을 거치면서 transcript·summary·pipeline
@@ -23,8 +23,7 @@ import {
  *   - 후처리 stage 결과 반영(`applyTranscript`/`applySummary` + `mark*Failed`)
  *   - 노션 push 결과 1회 부착(`attachNotionPushResult`, v2)
  *
- * 도메인 이벤트는 직접 발행하지 않으며, Application Service가 메서드 호출
- * 결과를 보고 `@nestjs/event-emitter`로 발행한다.
+ * 도메인 이벤트는 직접 발행하지 않는다(Application Service 가 메서드 결과를 보고 발행).
  */
 
 export interface CreateMeetingReportInput {

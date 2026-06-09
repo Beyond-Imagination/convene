@@ -19,14 +19,12 @@ import { DomainEventPublisher } from '@/shared-kernel/domain/ports';
 import { ParticipantMediaNotFoundError, ScreenShareConflictError } from './mediasoup.errors';
 
 /**
- * Mediasoup Bounded Context 의 Application Service.
+ * mediasoup 시그널링을 처리하는 서비스.
  *
  * Meeting BC 의 도메인 이벤트(`meeting.created` / `participant.joined` / ...)에
  * 반응해 회의 단위 라우터 풀과 참가자 단위 ParticipantMedia 를 관리하고,
  * WebSocket 시그널링 RPC(`mediasoup:*`) 진입점에서 호출되어 transport/producer/
- * consumer lifecycle 을 진행시킨다.
- *
- * 도메인 이벤트는 본 layer 에서 발행한다.
+ * consumer lifecycle 을 진행시키며 도메인 이벤트를 발행한다.
  */
 
 export interface MediasoupSignalingServiceDeps {

@@ -15,7 +15,7 @@ import {
 } from '../infrastructure/audio-chunker';
 
 /**
- * Recording Bounded Context의 Application Service.
+ * 회의 오디오를 STT 로 전사하는 서비스.
  *
  * Reports BC 가 발행한 `report.transcription.requested` 를 받아 회의의 참가자별
  * 누적 오디오 버퍼를 소비하고, 각 참가자 audio 에 대해 `TranscriberPort` 로 STT 를

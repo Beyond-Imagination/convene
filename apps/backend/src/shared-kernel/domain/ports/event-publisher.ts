@@ -1,12 +1,8 @@
 import type { DomainEventName } from '@convene/shared-interfaces';
 
 /**
- * 도메인 이벤트 발행 포트. Application Service가 본 인터페이스에만 의존하며,
- * 구현체(예: `@nestjs/event-emitter` 기반 어댑터)는 Infrastructure layer에서
- * 주입한다.
- *
- * 도메인 이벤트 발행 책임은 Application layer에 있고, 프레임워크 의존성은 Port로
- * 격리한다.
+ * 도메인 이벤트 발행 포트. 구현체(예: `@nestjs/event-emitter` 기반 어댑터)가
+ * 주입된다.
  *
  * `payload` 타입은 컨텍스트별로 자유롭게 정의되도록 `unknown` 으로 둔다.
  */
