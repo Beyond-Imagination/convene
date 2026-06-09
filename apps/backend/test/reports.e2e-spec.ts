@@ -9,7 +9,7 @@ import {
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { Test, TestingModule } from '@nestjs/testing';
-import { io,type Socket } from 'socket.io-client';
+import { io, type Socket } from 'socket.io-client';
 import request from 'supertest';
 
 import { AppModule } from '@/app.module';
@@ -21,7 +21,7 @@ import { GeminiSummarizer } from '@/reports/infrastructure/gemini.summarizer';
 import { NoopSummarizer } from '@/reports/infrastructure/noop.summarizer';
 
 /**
- * Reports 의 e2e 통합 테스트.
+ * Reports의 e2e 통합 테스트.
  *
  * 흐름:
  *   1) HTTP create → WS join + chat → HTTP close
@@ -47,7 +47,7 @@ const connectClient = (url: string): Promise<Socket> =>
  *               → NoopSummarizer → report.summary.completed → report.finalized
  *
  * 모든 흐름이 비동기 이벤트로 연결돼 있으므로 controller 응답을 기다린 뒤
- * pipeline 이 done/done 으로 finalize 될 때까지 짧게 polling 한다.
+ * pipeline이 done/done으로 finalize 될 때까지 짧게 polling 한다.
  */
 const waitForFinalizedReport = async (
   httpServer: ReturnType<INestApplication['getHttpServer']>,
@@ -65,15 +65,12 @@ const waitForFinalizedReport = async (
   throw new Error(`Report for code ${code} did not finalize within ${timeoutMs}ms`);
 };
 
-/** 회의 생성→채팅→종료→파이프라인 finalize 까지 진행하고 회의록 목록 항목을 돌려준다. */
+/** 회의 생성→채팅→종료→파이프라인 finalize까지 진행하고 회의록 목록 항목을 돌려준다. */
 const createFinalizedReport = async (
   httpServer: ReturnType<INestApplication['getHttpServer']>,
   baseUrl: string,
 ): Promise<ReportListResponse['items'][number]> => {
-  const created = await request(httpServer)
-    .post('/meetings')
-    .send({ source: 'web' })
-    .expect(201);
+  const created = await request(httpServer).post('/meetings').send({ source: 'web' }).expect(201);
   const createdBody = created.body as CreateMeetingResponse;
   const code = createdBody.code;
 
@@ -99,8 +96,8 @@ describe('Reports e2e', () => {
   let app: INestApplication;
   let baseUrl: string;
   let httpServer: ReturnType<INestApplication['getHttpServer']>;
-  // 재요약 엔드포인트는 ADMIN_API_TOKEN 으로 보호된다. AdminGuard 가 모듈 초기화
-  // 시점에 env 를 읽으므로 테스트 모듈 생성 전에 토큰을 심는다.
+  // 재요약 엔드포인트는 ADMIN_API_TOKEN으로 보호된다. AdminGuard가 모듈 초기화
+  // 시점에 env를 읽으므로 테스트 모듈 생성 전에 토큰을 심는다.
   const ADMIN_TOKEN = 'e2e-admin-token';
   let prevAdminToken: string | undefined;
 
@@ -111,8 +108,8 @@ describe('Reports e2e', () => {
       imports: [AppModule],
     })
       // e2e 환경엔 ai-worker / ffmpeg / Gemini API 키가 없으므로 외부 의존 어댑터를
-      // 모두 Noop 으로 갈아끼운다. transcription 흐름은 빈 transcript 로 done 까지
-      // 진행하고, NoopSummarizer 가 placeholder 요약을 채워 finalize 한다.
+      // 모두 Noop으로 갈아끼운다. transcription 흐름은 빈 transcript로 done까지
+      // 진행하고, NoopSummarizer가 placeholder 요약을 채워 finalize 한다.
       .overrideProvider(HttpTranscriber)
       .useValue(new NoopTranscriber())
       .overrideProvider(FfmpegAudioCaptureAdapter)
@@ -144,10 +141,7 @@ describe('Reports e2e', () => {
 
   it('회의 생성→채팅→종료 후 회의록이 목록/상세에서 노출된다', async () => {
     // 1) 회의 생성.
-    const created = await request(httpServer)
-      .post('/meetings')
-      .send({ source: 'web' })
-      .expect(201);
+    const created = await request(httpServer).post('/meetings').send({ source: 'web' }).expect(201);
     const createdBody = created.body as CreateMeetingResponse;
     const code = createdBody.code;
 
@@ -162,19 +156,19 @@ describe('Reports e2e', () => {
       alice.disconnect();
     }
 
-    // 3) 회의 종료(이 시점에 meeting.ended 이벤트가 발행되고 listener 가 createDraft 를 호출).
+    // 3) 회의 종료(이 시점에 meeting.ended 이벤트가 발행되고 listener가 createDraft를 호출).
     await request(httpServer)
       .delete(`/meetings/${code}`)
       .set('x-host-token', createdBody.hostToken)
       .expect(200);
 
-    // 4) Recording → Reports 파이프라인이 done/done 으로 finalize 될 때까지 폴링.
+    // 4) Recording → Reports 파이프라인이 done/done으로 finalize 될 때까지 폴링.
     const listItem = await waitForFinalizedReport(httpServer, code);
     expect(listItem.code).toBe(code);
     expect(listItem.source).toBe('web');
     expect(listItem.participantCount).toBe(1);
     expect(listItem.pipeline).toEqual({ sttStatus: 'done', summaryStatus: 'done' });
-    // NoopSummarizer 가 placeholder 요약(title="(요약 미적용)")을 채워 finalize 한다.
+    // NoopSummarizer가 placeholder 요약(title="(요약 미적용)")을 채워 finalize 한다.
     expect(listItem.title).toBe('(요약 미적용)');
 
     // 5) GET /reports/:id 상세 응답 검증.
@@ -191,8 +185,8 @@ describe('Reports e2e', () => {
       text: '회의 시작',
       sentAt: expect.any(String),
     });
-    // Recording BC + NoopTranscriber: STT 결과는 빈 transcript, 그 위에 NoopSummarizer 가
-    // placeholder summary 를 적용해 두 stage 모두 done 으로 finalize.
+    // Recording BC + NoopTranscriber: STT 결과는 빈 transcript, 그 위에 NoopSummarizer가
+    // placeholder summary를 적용해 두 stage 모두 done으로 finalize.
     expect(body.pipeline.sttStatus).toBe('done');
     expect(body.pipeline.summaryStatus).toBe('done');
     expect(body.pipeline.failures).toEqual([]);
@@ -224,7 +218,7 @@ describe('Reports e2e', () => {
         .expect(401);
     });
 
-    it('올바른 Bearer 토큰이면 200 으로 재요약된 상세를 돌려준다', async () => {
+    it('올바른 Bearer 토큰이면 200으로 재요약된 상세를 돌려준다', async () => {
       const report = await createFinalizedReport(httpServer, baseUrl);
       const res = await request(httpServer)
         .post(`/reports/${report.id}/resummarize`)
@@ -232,12 +226,12 @@ describe('Reports e2e', () => {
         .expect(200);
       const body = res.body as ReportDetailResponse;
       expect(body.id).toBe(report.id);
-      // NoopSummarizer 가 placeholder 요약을 다시 채워 summary stage 는 done 유지.
+      // NoopSummarizer가 placeholder 요약을 다시 채워 summary stage는 done 유지.
       expect(body.pipeline.summaryStatus).toBe('done');
       expect(body.summary?.title).toBe('(요약 미적용)');
     });
 
-    it('존재하지 않는 report id 는 토큰이 맞아도 404', async () => {
+    it('존재하지 않는 report id는 토큰이 맞아도 404', async () => {
       await request(httpServer)
         .post('/reports/unknown-id/resummarize')
         .set('Authorization', `Bearer ${ADMIN_TOKEN}`)

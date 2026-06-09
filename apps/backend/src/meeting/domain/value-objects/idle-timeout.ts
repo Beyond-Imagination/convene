@@ -2,7 +2,6 @@
  * 마지막 참가자가 나간 뒤 회의가 자동 종료될 때까지의 idle 시간.
  *
  * v1.0.0 디폴트는 1분이며 **회의 자체의 hard time limit은 없다**.
- * 회의는 (a) idle 윈도우가 경과하거나 (b) 명시적으로 종료될 때에만 닫힌다.
  */
 export class IdleTimeout {
   static readonly DEFAULT_MS = 1 * 60 * 1000;

@@ -14,7 +14,11 @@ describe('NestEventBusDomainEventPublisher', () => {
     });
 
     const publisher = new NestEventBusDomainEventPublisher(emitter);
-    const payload = { code: 'abc12xyz', endedAt: new Date('2026-01-01T00:00:00Z'), reason: 'manual' };
+    const payload = {
+      code: 'abc12xyz',
+      endedAt: new Date('2026-01-01T00:00:00Z'),
+      reason: 'manual',
+    };
     publisher.publish(MEETING_EVENTS.ENDED, payload);
 
     expect(received).toHaveLength(1);

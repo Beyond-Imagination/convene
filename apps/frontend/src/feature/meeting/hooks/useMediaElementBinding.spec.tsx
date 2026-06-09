@@ -3,12 +3,6 @@ import { useRef } from 'react';
 
 import { useMediaElementBinding } from './useMediaElementBinding';
 
-/**
- * video/audio 요소 공통의 MediaStream attach hook.
- * View 가 MediaStream 을 받았을 때 srcObject 부착 + `loadeddata` 후 명시 play()
- * 까지 한 hook 에 캡슐화한다. spec 은 video element 로 검증하지만 audio 도 동일.
- */
-
 interface ProbeProps {
   stream: MediaStream | null;
   enabled?: boolean;
@@ -37,60 +31,83 @@ const fireLoadedData = (el: HTMLMediaElement) => {
 };
 
 describe('useMediaElementBinding', () => {
-  it('stream 이 주어지면 ref.current.srcObject 에 attach 된다', () => {
+  it('stream이 주어지면 ref.current.srcObject에 attach 된다', () => {
     const stream = new MediaStream();
     let captured: HTMLVideoElement | null = null;
     render(
-      <VideoProbe stream={stream} exposeRef={(el) => (captured = el)} />,
+      <VideoProbe
+        stream={stream}
+        exposeRef={(el) => (captured = el)}
+      />,
     );
     expect(captured).not.toBeNull();
     expect(captured!.srcObject).toBe(stream);
   });
 
-  it('stream 이 null 이면 srcObject 는 null 이고 pause 가 호출된다', () => {
+  it('stream이 null 이면 srcObject는 null이고 pause가 호출된다', () => {
     let captured: HTMLVideoElement | null = null;
     const { rerender } = render(
-      <VideoProbe stream={new MediaStream()} exposeRef={(el) => (captured = el)} />,
+      <VideoProbe
+        stream={new MediaStream()}
+        exposeRef={(el) => (captured = el)}
+      />,
     );
     const pauseSpy = vi.spyOn(captured!, 'pause');
-    rerender(<VideoProbe stream={null} exposeRef={(el) => (captured = el)} />);
+    rerender(
+      <VideoProbe
+        stream={null}
+        exposeRef={(el) => (captured = el)}
+      />,
+    );
     expect(captured!.srcObject).toBeNull();
     expect(pauseSpy).toHaveBeenCalled();
   });
 
-  it('enabled=false 면 srcObject 가 비어 있고 pause 가 호출된다', () => {
+  it('enabled=false 면 srcObject가 비어 있고 pause가 호출된다', () => {
     let captured: HTMLVideoElement | null = null;
     const stream = new MediaStream();
     const { rerender } = render(
-      <VideoProbe stream={stream} enabled exposeRef={(el) => (captured = el)} />,
+      <VideoProbe
+        stream={stream}
+        enabled
+        exposeRef={(el) => (captured = el)}
+      />,
     );
     expect(captured!.srcObject).toBe(stream);
     const pauseSpy = vi.spyOn(captured!, 'pause');
     rerender(
-      <VideoProbe stream={stream} enabled={false} exposeRef={(el) => (captured = el)} />,
+      <VideoProbe
+        stream={stream}
+        enabled={false}
+        exposeRef={(el) => (captured = el)}
+      />,
     );
     expect(captured!.srcObject).toBeNull();
     expect(pauseSpy).toHaveBeenCalled();
   });
 
-  it('attach 후 loadeddata 이벤트 발화 시 play() 가 호출된다', () => {
+  it('attach 후 loadeddata 이벤트 발화 시 play()가 호출된다', () => {
     let captured: HTMLVideoElement | null = null;
     render(
-      <VideoProbe stream={new MediaStream()} exposeRef={(el) => (captured = el)} />,
+      <VideoProbe
+        stream={new MediaStream()}
+        exposeRef={(el) => (captured = el)}
+      />,
     );
-    const playSpy = vi
-      .spyOn(captured!, 'play')
-      .mockResolvedValue(undefined);
+    const playSpy = vi.spyOn(captured!, 'play').mockResolvedValue(undefined);
     act(() => {
       fireLoadedData(captured!);
     });
     expect(playSpy).toHaveBeenCalled();
   });
 
-  it('play() 가 reject 해도 throw 되지 않고 swallow 된다', async () => {
+  it('play()가 reject 해도 throw 되지 않고 swallow 된다', async () => {
     let captured: HTMLVideoElement | null = null;
     render(
-      <VideoProbe stream={new MediaStream()} exposeRef={(el) => (captured = el)} />,
+      <VideoProbe
+        stream={new MediaStream()}
+        exposeRef={(el) => (captured = el)}
+      />,
     );
     const playSpy = vi
       .spyOn(captured!, 'play')
@@ -104,24 +121,35 @@ describe('useMediaElementBinding', () => {
     // 예외가 컴포넌트 밖으로 전파되지 않음(이 라인 도달 자체가 검증)
   });
 
-  it('stream 이 바뀌면 새 stream 으로 srcObject 가 갱신된다', () => {
+  it('stream이 바뀌면 새 stream으로 srcObject가 갱신된다', () => {
     let captured: HTMLVideoElement | null = null;
     const s1 = new MediaStream();
     const s2 = new MediaStream();
     const { rerender } = render(
-      <VideoProbe stream={s1} exposeRef={(el) => (captured = el)} />,
+      <VideoProbe
+        stream={s1}
+        exposeRef={(el) => (captured = el)}
+      />,
     );
     expect(captured!.srcObject).toBe(s1);
-    rerender(<VideoProbe stream={s2} exposeRef={(el) => (captured = el)} />);
+    rerender(
+      <VideoProbe
+        stream={s2}
+        exposeRef={(el) => (captured = el)}
+      />,
+    );
     expect(captured!.srcObject).toBe(s2);
   });
 
   it('unmount 시 loadeddata 리스너가 더 이상 동작하지 않는다', () => {
     let captured: HTMLVideoElement | null = null;
     const { unmount } = render(
-      <VideoProbe stream={new MediaStream()} exposeRef={(el) => (captured = el)} />,
+      <VideoProbe
+        stream={new MediaStream()}
+        exposeRef={(el) => (captured = el)}
+      />,
     );
-    // unmount 시 React 가 ref callback 을 null 로 호출하므로 element 참조를 따로 보존.
+    // unmount 시 React가 ref callback을 null로 호출하므로 element 참조를 따로 보존.
     const el = captured!;
     const playSpy = vi.spyOn(el, 'play').mockResolvedValue(undefined);
     playSpy.mockClear();

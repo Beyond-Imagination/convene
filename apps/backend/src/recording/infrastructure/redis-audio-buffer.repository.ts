@@ -5,8 +5,7 @@ import { AudioBufferRepository } from '@/recording/domain/ports';
 
 import { PCM_BYTES_PER_SECOND } from './audio-chunker';
 
-const bytesToMs = (bytes: number): number =>
-  Math.floor((bytes / PCM_BYTES_PER_SECOND) * 1000);
+const bytesToMs = (bytes: number): number => Math.floor((bytes / PCM_BYTES_PER_SECOND) * 1000);
 
 const PARTICIPANT_KEY_PREFIX = 'audio-buffer:';
 const MEETING_INDEX_KEY_PREFIX = 'audio-buffer:meeting:';
@@ -14,16 +13,12 @@ const STARTED_AT_KEY_PREFIX = 'audio-buffer:startedAt:';
 const CURSOR_KEY_PREFIX = 'audio-buffer:cursor:';
 
 /**
- * AudioBufferRepository 의 redis(ioredis) 구현체.
- *
  * 키 구조:
  *   - `audio-buffer:{meetingCode}:{participantId}` (LIST, binary) — chunk 누적
  *   - `audio-buffer:meeting:{meetingCode}` (SET) — 회의 안 participantId 색인
  *
- * binary chunk 는 `rpush(key, buffer)` 로 그대로 누적되고 `lrangeBuffer` 로 다시
- * `Buffer[]` 로 읽힌다(문자열 코덱 변환 없음). `consume` 은 회의 색인 SET 으로
- * 참가자 목록을 얻은 뒤 각 LIST 를 LRANGE + DEL pipeline 으로 묶어 한 번에
- * 비운다 — 반환과 동시에 폐기한다.
+ * binary chunk는 `rpush(key, buffer)`로 그대로 누적되고 `lrangeBuffer`로 다시 `Buffer[]`로 읽힌다(문자열 코덱 변환 없음).
+ * `consume`은 회의 색인 SET으로 참가자 목록을 얻은 뒤 각 LIST를 LRANGE + DEL pipeline으로 묶어 한 번에 비운다 — 반환과 동시에 폐기한다.
  *
  * 누적 적이 없는 회의(audio capture 미트리거 또는 모두 leave)는 빈 배열 반환.
  */
@@ -67,7 +62,7 @@ export class RedisAudioBufferRepository implements AudioBufferRepository {
     participantId: string,
     startedAtMs: number,
   ): Promise<void> {
-    // SET ... NX 로 첫 호출만 기록한다 — 같은 (code, pid) 두 번째 호출은 무시.
+    // SET ... NX로 첫 호출만 기록한다 — 같은 (code, pid) 두 번째 호출은 무시.
     await this.redis.set(
       this.startedAtKey(meetingCode, participantId),
       startedAtMs.toString(),
@@ -84,7 +79,7 @@ export class RedisAudioBufferRepository implements AudioBufferRepository {
     const cursorKey = this.cursorKey(meetingCode, participantId);
     const startedAtKey = this.startedAtKey(meetingCode, participantId);
 
-    // 누적 chunks + 메타데이터를 atomic 으로 가져오고 LIST 는 비운다.
+    // 누적 chunks + 메타데이터를 atomic으로 가져오고 LIST는 비운다.
     const fetched = await this.redis
       .multi()
       .lrangeBuffer(participantKey, 0, -1)
@@ -103,8 +98,8 @@ export class RedisAudioBufferRepository implements AudioBufferRepository {
     const total = chunks && chunks.length > 0 ? Buffer.concat(chunks) : Buffer.alloc(0);
 
     if (total.length <= keepLastBytes) {
-      // drain 할 게 없으면 들고 있던 데이터를 다시 채워둔다. LPUSH 라 그 사이 들어온
-      // 새 append(RPUSH) 보다 앞에 놓여 시간 순서가 유지된다.
+      // drain 할 게 없으면 들고 있던 데이터를 다시 채워둔다.
+      // LPUSH 라 그 사이 들어온 새 append(RPUSH)보다 앞에 놓여 시간 순서가 유지된다.
       if (total.length > 0) await this.redis.lpush(participantKey, total);
       return { pcm: Buffer.alloc(0), startMs: bytesToMs(cursorBefore), startedAtMs };
     }
@@ -113,9 +108,8 @@ export class RedisAudioBufferRepository implements AudioBufferRepository {
     const drainedPcm = total.subarray(0, drainLen);
     const remaining = total.subarray(drainLen);
 
-    // remaining 을 LPUSH(앞에 push) 로 다시 채우고 cursor 를 갱신한다. LRANGE+DEL
-    // 이후 새 append 가 들어왔다면 LIST 는 [new...] 상태이고, LPUSH remaining 으로
-    // [remaining, new...] 가 된다 — 시간 순서 보존.
+    // remaining을 LPUSH(앞에 push)로 다시 채우고 cursor를 갱신한다.
+    // LRANGE+DEL 이후 새 append가 들어왔다면 LIST는 [new...] 상태이고, LPUSH remaining으로 [remaining, new...]가 된다 — 시간 순서 보존.
     await this.redis
       .multi()
       .lpush(participantKey, Buffer.from(remaining))
@@ -129,9 +123,7 @@ export class RedisAudioBufferRepository implements AudioBufferRepository {
     };
   }
 
-  async consume(
-    meetingCode: string,
-  ): Promise<
+  async consume(meetingCode: string): Promise<
     ReadonlyArray<{
       participantId: string;
       audio: Buffer;
@@ -166,7 +158,7 @@ export class RedisAudioBufferRepository implements AudioBufferRepository {
       startMs?: number;
     }[] = [];
     // pid 당 6명령(lrangeBuffer, del, get(startedAt), del, get(cursor), del).
-    // 마지막 del(indexKey) 은 results 끝.
+    // 마지막 del(indexKey)은 results 끝.
     const COMMANDS_PER_PID = 6;
     for (let i = 0; i < pids.length; i++) {
       const lrangeRes = results[i * COMMANDS_PER_PID];
@@ -176,16 +168,10 @@ export class RedisAudioBufferRepository implements AudioBufferRepository {
       const [err, chunks] = lrangeRes as [Error | null, Buffer[]];
       if (err) throw err;
       if (!chunks || chunks.length === 0) continue;
-      const startedAtRaw = startedAtRes
-        ? (startedAtRes as [Error | null, string | null])[1]
-        : null;
-      const cursorRaw = cursorRes
-        ? (cursorRes as [Error | null, string | null])[1]
-        : null;
+      const startedAtRaw = startedAtRes ? (startedAtRes as [Error | null, string | null])[1] : null;
+      const cursorRaw = cursorRes ? (cursorRes as [Error | null, string | null])[1] : null;
       const startedAtMs =
-        startedAtRaw !== null && startedAtRaw !== undefined
-          ? Number(startedAtRaw)
-          : undefined;
+        startedAtRaw !== null && startedAtRaw !== undefined ? Number(startedAtRaw) : undefined;
       const startMs =
         cursorRaw !== null && cursorRaw !== undefined ? bytesToMs(Number(cursorRaw)) : undefined;
       out.push({

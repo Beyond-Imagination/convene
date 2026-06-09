@@ -2,8 +2,7 @@
  * 회의 결과로 도출된 액션 아이템 한 건. LLM 요약 산출물의 일부.
  *
  * owner·due는 모델이 추출 못 하면 비어 있다.
- * due는 ISO 8601 또는 모델이 그대로 뱉는 자연어("이번 주 금요일" 등)일 수 있으므로
- * 본 VO에서는 길이만 검증하고 포맷은 그대로 보존한다.
+ * due는 ISO 8601 또는 모델이 그대로 뱉는 자연어("이번 주 금요일" 등)일 수 있으므로 본 VO에서는 길이만 검증하고 포맷은 그대로 보존한다.
  */
 export interface ActionItem {
   readonly owner?: string;
@@ -15,11 +14,7 @@ const TASK_MAX = 500;
 const OWNER_MAX = 50;
 const DUE_MAX = 100;
 
-export function actionItem(input: {
-  owner?: string;
-  task: string;
-  due?: string;
-}): ActionItem {
+export function actionItem(input: { owner?: string; task: string; due?: string }): ActionItem {
   const task = input.task.trim();
   if (task.length === 0 || task.length > TASK_MAX) {
     throw new Error(`ActionItem.task must be 1~${TASK_MAX} chars after trim`);

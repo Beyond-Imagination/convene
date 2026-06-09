@@ -62,11 +62,11 @@ describe('meeting wire format', () => {
     expect(new Set(Object.values(MEETING_WS_EVENTS)).size).toBe(8);
   });
 
-  it('MEETING_WS_EVENTS.ENDED 는 회의 종료 broadcast 의 채널 이름이다', () => {
+  it('MEETING_WS_EVENTS.ENDED는 회의 종료 broadcast의 채널 이름이다', () => {
     expect(MEETING_WS_EVENTS.ENDED).toBe('meeting:ended');
   });
 
-  it('MeetingEndedBroadcast 는 code + endedAt(ISO) 필드를 가진다', () => {
+  it('MeetingEndedBroadcast는 code + endedAt(ISO) 필드를 가진다', () => {
     const b: MeetingEndedBroadcast = {
       code: 'abc12xyz',
       endedAt: '2026-01-01T00:30:00.000Z',

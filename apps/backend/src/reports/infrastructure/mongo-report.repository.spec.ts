@@ -4,10 +4,7 @@ import { Connection, createConnection } from 'mongoose';
 import { participantEntry, transcriptSegment } from '@/reports/domain/entries';
 import { MeetingReport } from '@/reports/domain/meeting-report';
 import { notionPushResult, reportSummary } from '@/reports/domain/value-objects';
-import {
-  externalReference,
-  NO_EXTERNAL_REFERENCE,
-} from '@/shared-kernel/domain/value-objects';
+import { externalReference, NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects';
 
 import { MongoReportRepository } from './mongo-report.repository';
 
@@ -58,11 +55,11 @@ describe('MongoReportRepository', () => {
     repo = new MongoReportRepository(connection);
   });
 
-  it('등록되지 않은 id 는 null 을 돌려준다', async () => {
+  it('등록되지 않은 id는 null을 돌려준다', async () => {
     expect(await repo.findById('missing')).toBeNull();
   });
 
-  it('save 후 findById 는 동일한 snapshot 의 MeetingReport 를 돌려준다', async () => {
+  it('save 후 findById는 동일한 snapshot의 MeetingReport를 돌려준다', async () => {
     const r = makeReport('r1', 'mtg-1');
     await repo.save(r);
     const found = await repo.findById('r1');
@@ -70,7 +67,7 @@ describe('MongoReportRepository', () => {
     expect(found!.snapshot()).toEqual(r.snapshot());
   });
 
-  it('findByMeetingId 로 회의 1건당 회의록 1건을 조회한다', async () => {
+  it('findByMeetingId로 회의 1건당 회의록 1건을 조회한다', async () => {
     const a = makeReport('r1', 'mtg-1');
     const b = makeReport('r2', 'mtg-2');
     await repo.save(a);
@@ -80,7 +77,7 @@ describe('MongoReportRepository', () => {
     expect(await repo.findByMeetingId('mtg-unknown')).toBeNull();
   });
 
-  it('같은 id 로 두 번 save 하면 마지막 상태로 덮어쓴다(upsert)', async () => {
+  it('같은 id로 두 번 save 하면 마지막 상태로 덮어쓴다(upsert)', async () => {
     const r = makeReport('r1', 'mtg-1', 10 * 60_000);
     await repo.save(r);
     r.applyTranscript([transcriptSegment({ text: 'hi', startMs: 0, endMs: 100 })]);
@@ -90,7 +87,7 @@ describe('MongoReportRepository', () => {
     expect(found!.pipeline.sttStatus).toBe('done');
   });
 
-  it('listRecent 는 endedAt 내림차순으로 limit 만큼 반환한다', async () => {
+  it('listRecent는 endedAt 내림차순으로 limit 만큼 반환한다', async () => {
     const r1 = makeReport('r1', 'mtg-1', 10 * 60_000);
     const r2 = makeReport('r2', 'mtg-2', 30 * 60_000);
     const r3 = makeReport('r3', 'mtg-3', 20 * 60_000);
@@ -104,11 +101,11 @@ describe('MongoReportRepository', () => {
     expect(await repo.listRecent(0)).toEqual([]);
   });
 
-  it('limit 이 음수면 throw', async () => {
+  it('limit이 음수면 throw', async () => {
     await expect(repo.listRecent(-1)).rejects.toThrow(/non-negative/);
   });
 
-  it('완료 상태(transcript + summary + notion push) 가 round-trip 된다', async () => {
+  it('완료 상태(transcript + summary + notion push)가 round-trip 된다', async () => {
     const r = makeReport('r1', 'mtg-1');
     r.applyTranscript([transcriptSegment({ text: 'hi', startMs: 0, endMs: 100 })]);
     r.applySummary(
@@ -120,7 +117,9 @@ describe('MongoReportRepository', () => {
         keyTopics: [{ topic: '로드맵', points: ['A', 'B'] }],
       }),
     );
-    r.attachNotionPushResult(notionPushResult({ pageId: 'p1', at: new Date('2026-01-01T01:00:00Z') }));
+    r.attachNotionPushResult(
+      notionPushResult({ pageId: 'p1', at: new Date('2026-01-01T01:00:00Z') }),
+    );
     await repo.save(r);
 
     const found = await repo.findById('r1');
@@ -129,7 +128,7 @@ describe('MongoReportRepository', () => {
     expect(found!.pushedToNotion?.pageId).toBe('p1');
   });
 
-  it('externalReference.issueId 도 round-trip 된다(v2 노션 대비)', async () => {
+  it('externalReference.issueId도 round-trip 된다(v2 노션 대비)', async () => {
     const r = MeetingReport.fromEndedMeeting({
       id: 'r1',
       meetingId: 'mtg-1',
@@ -147,7 +146,7 @@ describe('MongoReportRepository', () => {
     expect(found!.externalReference.issueId).toBe('NOTION-42');
   });
 
-  it('실패 누적(pipeline.failures) 도 round-trip 된다', async () => {
+  it('실패 누적(pipeline.failures)도 round-trip 된다', async () => {
     const r = makeReport('r1', 'mtg-1');
     const failAt = new Date('2026-01-01T01:00:00Z');
     r.applyTranscript([]);

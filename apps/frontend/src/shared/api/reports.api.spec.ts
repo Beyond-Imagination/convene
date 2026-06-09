@@ -9,8 +9,7 @@ const okResponse = (body: unknown, status = 200): Response =>
     headers: { 'content-type': 'application/json' },
   });
 
-const errorResponse = (status: number, text = ''): Response =>
-  new Response(text, { status });
+const errorResponse = (status: number, text = ''): Response => new Response(text, { status });
 
 describe('listReports', () => {
   const fetchMock = vi.fn();
@@ -24,7 +23,7 @@ describe('listReports', () => {
     vi.unstubAllGlobals();
   });
 
-  it('limit 인자가 없으면 /reports 로 GET 하고 items 를 반환한다', async () => {
+  it('limit 인자가 없으면 /reports로 GET 하고 items를 반환한다', async () => {
     fetchMock.mockResolvedValueOnce(okResponse({ items: [] }));
     const result = await listReports();
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -41,7 +40,7 @@ describe('listReports', () => {
     expect(url).toBe(`${API_BASE_URL}/reports?limit=10`);
   });
 
-  it('items 배열을 그대로 풀어 ReportListItem[] 으로 반환한다', async () => {
+  it('items 배열을 그대로 풀어 ReportListItem[]으로 반환한다', async () => {
     const item = {
       id: 'r1',
       code: 'abc12xyz',
@@ -57,7 +56,7 @@ describe('listReports', () => {
     expect(result).toEqual([item]);
   });
 
-  it('비-2xx 응답이면 ReportsApiError 를 status 와 함께 던진다', async () => {
+  it('비-2xx 응답이면 ReportsApiError를 status와 함께 던진다', async () => {
     fetchMock.mockResolvedValueOnce(errorResponse(500, 'mongo down'));
     await expect(listReports()).rejects.toMatchObject({
       name: 'ReportsApiError',
@@ -78,7 +77,7 @@ describe('getReport', () => {
     vi.unstubAllGlobals();
   });
 
-  it('id 를 path 에 박아 /reports/:id 로 GET 한다', async () => {
+  it('id를 path에 박아 /reports/:id로 GET 한다', async () => {
     fetchMock.mockResolvedValueOnce(
       okResponse({
         id: 'r1',
@@ -102,7 +101,7 @@ describe('getReport', () => {
     expect(result.id).toBe('r1');
   });
 
-  it('404 면 ReportsApiError(status=404) 를 던진다', async () => {
+  it('404 면 ReportsApiError(status=404)를 던진다', async () => {
     fetchMock.mockResolvedValueOnce(errorResponse(404, 'not found'));
     await expect(getReport('missing')).rejects.toMatchObject({
       name: 'ReportsApiError',

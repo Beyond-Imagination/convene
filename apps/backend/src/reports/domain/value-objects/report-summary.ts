@@ -5,8 +5,6 @@ import { KeyTopic, keyTopic } from './key-topic';
  * 회의 종료 후 LLM이 산출하는 "회사 회의록" 형태의 정제된 요약.
  *
  * Plain transcript/timeline이 아니라 의사결정·액션·핵심 토픽으로 구조화된 결과.
- * 본 VO 자체는 형식 검증만 책임지며, 모델 호출과 실패 처리는 Application
- * Service가 `SummarizerPort`를 통해 수행한다.
  */
 export interface ReportSummary {
   readonly title: string;

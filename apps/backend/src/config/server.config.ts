@@ -1,7 +1,3 @@
-/**
- * 부트스트랩 단계에서 환경변수를 읽어 서버 옵션을 만든다.
- */
-
 export const DEFAULT_PORT = 5000;
 
 /**
@@ -23,7 +19,7 @@ export function resolvePort(env: NodeJS.ProcessEnv = process.env): number {
 
 /**
  * 콤마 구분 origin 문자열을 trim/dedupe 한 배열로 변환한다.
- * 빈 문자열은 무시하며, 결과가 비면 디폴트 origin 으로 fallback 한다.
+ * 빈 문자열은 무시하며, 결과가 비면 디폴트 origin으로 fallback 한다.
  */
 export function resolveCorsOrigins(env: NodeJS.ProcessEnv = process.env): string[] {
   const raw = env.CORS_ORIGIN ?? DEFAULT_CORS_ORIGIN;

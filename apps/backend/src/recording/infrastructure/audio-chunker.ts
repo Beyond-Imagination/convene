@@ -1,22 +1,19 @@
 /**
- * raw PCM(16kHz mono pcm_s16le) buffer 를 30초(default) chunk 단위로 split 한다.
+ * raw PCM(16kHz mono pcm_s16le) buffer를 30초(default) chunk 단위로 split 한다.
  *
- * 회의 종료 후 RecordingService 가 누적 audio 를 한 번에 ai-worker 로 보내지 않고,
- * 본 헬퍼로 잘라 N 번 호출한다. chunk 경계의 단어 잘림을 줄이기 위해
- * 인접 chunk 사이에 `overlapMs` 만큼 겹친다. 각 chunk 의 `startMs` 는 raw PCM
- * 시간축 기준이고, RecordingService 가 STT 결과 segment.startMs/endMs 에 합산한다.
+ * 회의 종료 후 누적 audio를 한 번에 ai-worker로 보내지 않고, 본 헬퍼로 잘라 N 번 호출한다.
+ * chunk 경계의 단어 잘림을 줄이기 위해 인접 chunk 사이에 `overlapMs` 만큼 겹친다.
+ * 각 chunk의 `startMs`는 raw PCM 시간축 기준이고, STT 결과 segment.startMs/endMs에 합산한다.
  *
- * 각 chunk 는 ai-worker 가 그대로 디코드 할 수 있도록 RIFF WAVE header(44 byte)
- * 를 prepend 한 형태로 돌려준다 — ffmpeg 출력 포맷이 `-f s16le` (raw PCM) 인 것을
- * 전제로 한다.
+ * 각 chunk는 ai-worker가 그대로 디코드 할 수 있도록 RIFF WAVE header(44 byte)를 prepend 한 형태로 돌려준다.
+ * ffmpeg 출력 포맷이 `-f s16le` (raw PCM)인 것을 전제로 한다.
  */
 
 export const PCM_SAMPLE_RATE = 16_000;
 export const PCM_CHANNELS = 1;
 export const PCM_BITS_PER_SAMPLE = 16;
 export const PCM_BYTES_PER_SAMPLE = PCM_BITS_PER_SAMPLE / 8;
-export const PCM_BYTES_PER_SECOND =
-  PCM_SAMPLE_RATE * PCM_CHANNELS * PCM_BYTES_PER_SAMPLE;
+export const PCM_BYTES_PER_SECOND = PCM_SAMPLE_RATE * PCM_CHANNELS * PCM_BYTES_PER_SAMPLE;
 
 export const WAV_HEADER_BYTES = 44;
 
@@ -24,9 +21,9 @@ export const DEFAULT_CHUNK_MS = 30_000;
 export const DEFAULT_OVERLAP_MS = 2_000;
 
 export interface PcmChunk {
-  /** RIFF WAVE header + PCM body. ai-worker 가 그대로 디코드 가능. */
+  /** RIFF WAVE header + PCM body. ai-worker가 그대로 디코드 가능. */
   readonly wav: Buffer;
-  /** 본 chunk 첫 sample 의 시간축 위치(ms). raw PCM 첫 sample = 0. */
+  /** 본 chunk 첫 sample의 시간축 위치(ms). raw PCM 첫 sample = 0. */
   readonly startMs: number;
 }
 
@@ -56,17 +53,12 @@ export function wrapPcmAsWav(pcm: Buffer): Buffer {
   return Buffer.concat([header, pcm], WAV_HEADER_BYTES + pcm.length);
 }
 
-export function splitPcmIntoWavChunks(
-  pcm: Buffer,
-  options: ChunkOptions = {},
-): PcmChunk[] {
+export function splitPcmIntoWavChunks(pcm: Buffer, options: ChunkOptions = {}): PcmChunk[] {
   if (pcm.length === 0) return [];
   const chunkMs = options.chunkMs ?? DEFAULT_CHUNK_MS;
   const overlapMs = options.overlapMs ?? DEFAULT_OVERLAP_MS;
   if (overlapMs >= chunkMs) {
-    throw new Error(
-      `overlapMs(${overlapMs}) 는 chunkMs(${chunkMs}) 보다 작아야 합니다.`,
-    );
+    throw new Error(`overlapMs(${overlapMs})는 chunkMs(${chunkMs})보다 작아야 합니다.`);
   }
 
   const chunkBytes = msToBytes(chunkMs);
@@ -100,12 +92,11 @@ interface HasStartMs {
 }
 
 /**
- * chunk 경계 dedup — chunk N+1 의 첫 `overlapMs` 구간 안에 시작하는 segment 들은
- * chunk N 의 마지막에서도 잡혔다고 가정해 skip 한다. 첫 chunk(`isFirstChunk=true`)
- * 는 그 이전 chunk 가 없으므로 그대로 보존한다.
+ * chunk 경계 dedup — chunk N+1의 첫 `overlapMs` 구간 안에 시작하는 segment 들은 chunk N의 마지막에서도 잡혔다고 가정해 skip 한다.
+ * 첫 chunk(`isFirstChunk=true`)는 그 이전 chunk가 없으므로 그대로 보존한다.
  *
- * 입력 segment 의 `startMs` 는 chunk-local 시각(transcribe 직접 반환). 호출자가
- * 이후 chunk offset / participant offset 등을 가산한다.
+ * 입력 segment의 `startMs`는 chunk-local 시각(transcribe 직접 반환).
+ * 호출자가 이후 chunk offset / participant offset 등을 가산한다.
  */
 export function dropOverlapHeadSegments<T extends HasStartMs>(
   segments: ReadonlyArray<T>,

@@ -26,11 +26,10 @@ const makeEventPublisher = () => {
   };
 };
 
-/** transcribe input.audio 가 wav(RIFF) 인지 가정하고, PCM body 의 text 식별값을 돌려준다. */
-const wavBodyText = (audio: Buffer): string =>
-  audio.subarray(WAV_HEADER_BYTES).toString();
+/** transcribe input.audio가 wav(RIFF)인지 가정하고, PCM body의 text 식별값을 돌려준다. */
+const wavBodyText = (audio: Buffer): string => audio.subarray(WAV_HEADER_BYTES).toString();
 
-/** chunker 가 PCM 을 얼마나 잘랐는지 검증할 수 있도록 길이 명시적으로 생성. */
+/** chunker가 PCM을 얼마나 잘랐는지 검증할 수 있도록 길이 명시적으로 생성. */
 const pcmOfSeconds = (seconds: number, fill = 0): Buffer =>
   Buffer.alloc(seconds * PCM_BYTES_PER_SECOND, fill);
 
@@ -73,13 +72,13 @@ describe('RecordingService.requestTranscription', () => {
     return { service, consumeMock, transcribeMock, events };
   };
 
-  it('AudioBuffer.consume 을 meetingCode 로 호출한다', async () => {
+  it('AudioBuffer.consume을 meetingCode로 호출한다', async () => {
     const { service, consumeMock } = makeService();
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
     expect(consumeMock).toHaveBeenCalledWith(meetingCode);
   });
 
-  it('consume 결과가 빈 배열이면 transcribe 호출 없이 빈 transcript 로 completed', async () => {
+  it('consume 결과가 빈 배열이면 transcribe 호출 없이 빈 transcript로 completed', async () => {
     const { service, transcribeMock, events } = makeService({ audios: [] });
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
     expect(transcribeMock).not.toHaveBeenCalled();
@@ -91,7 +90,7 @@ describe('RecordingService.requestTranscription', () => {
     ]);
   });
 
-  it('transcribe 에 전달되는 audio 는 RIFF WAVE header + PCM 으로 wrap 된 wav buffer 다', async () => {
+  it('transcribe에 전달되는 audio는 RIFF WAVE header + PCM으로 wrap 된 wav buffer 다', async () => {
     const { service, transcribeMock } = makeService({
       audios: [{ participantId: 's1', audio: pcmOfSeconds(1, 0xab) }],
     });
@@ -100,11 +99,11 @@ describe('RecordingService.requestTranscription', () => {
     const passed = transcribeMock.mock.calls[0][0].audio as Buffer;
     expect(passed.subarray(0, 4).toString('ascii')).toBe('RIFF');
     expect(passed.subarray(8, 12).toString('ascii')).toBe('WAVE');
-    // RIFF header 뒤의 PCM body 가 원본과 동일
+    // RIFF header 뒤의 PCM body가 원본과 동일
     expect(passed.subarray(WAV_HEADER_BYTES)).toEqual(pcmOfSeconds(1, 0xab));
   });
 
-  it('participant 별 transcribe 결과의 segment 에 speaker=participantId 가 채워진다', async () => {
+  it('participant 별 transcribe 결과의 segment에 speaker=participantId가 채워진다', async () => {
     const { service, events } = makeService({
       audios: [{ participantId: 's1', audio: pcmOfSeconds(1) }],
       transcribeImpl: async () => [
@@ -125,7 +124,7 @@ describe('RecordingService.requestTranscription', () => {
     });
   });
 
-  it('participantNames 가 주어지면 segment 의 speaker 가 participantId 대신 nickname 으로 채워진다', async () => {
+  it('participantNames가 주어지면 segment의 speaker가 participantId 대신 nickname으로 채워진다', async () => {
     const { service, events } = makeService({
       audios: [{ participantId: 's1', audio: pcmOfSeconds(1) }],
       transcribeImpl: async () => [{ text: '안녕하세요', startMs: 0, endMs: 1000 }],
@@ -145,7 +144,7 @@ describe('RecordingService.requestTranscription', () => {
     });
   });
 
-  it('participantNames 에 매칭되는 항목이 없으면 speaker 는 원본 participantId 를 유지한다', async () => {
+  it('participantNames에 매칭되는 항목이 없으면 speaker는 원본 participantId를 유지한다', async () => {
     const { service, events } = makeService({
       audios: [{ participantId: 's1', audio: pcmOfSeconds(1) }],
       transcribeImpl: async () => [{ text: '안녕', startMs: 0, endMs: 1000 }],
@@ -160,7 +159,7 @@ describe('RecordingService.requestTranscription', () => {
     expect(payload.transcript[0].speaker).toBe('s1');
   });
 
-  it('partial store 의 segment speaker 도 participantNames 로 nickname 변환된다', async () => {
+  it('partial store의 segment speaker도 participantNames로 nickname 변환된다', async () => {
     const meetingStartedAtMs = 1_000_000_000_000;
     const { events, publisher } = makeEventPublisher();
     const service = new RecordingService({
@@ -198,8 +197,8 @@ describe('RecordingService.requestTranscription', () => {
     ]);
   });
 
-  it('여러 participant 의 segment 가 startMs 기준 오름차순으로 merge 된다', async () => {
-    // 짧은 PCM(1초) 은 단일 chunk → chunk offset 0. participant 식별을 fill byte 로.
+  it('여러 participant의 segment가 startMs 기준 오름차순으로 merge 된다', async () => {
+    // 짧은 PCM(1초)은 단일 chunk → chunk offset 0. participant 식별을 fill byte로.
     const pcmA = pcmOfSeconds(1, 0xa1);
     const pcmB = pcmOfSeconds(1, 0xb1);
     const transcribeMock = jest.fn(async ({ audio }: { audio: Buffer }) => {
@@ -245,7 +244,7 @@ describe('RecordingService.requestTranscription', () => {
     ]);
   });
 
-  it('participant 의 startedAtMs 가 회의 시작 시각보다 늦으면 segment offset 이 +(startedAtMs - meetingStartedAtMs) 만큼 가산된다', async () => {
+  it('participant의 startedAtMs가 회의 시작 시각보다 늦으면 segment offset이 +(startedAtMs - meetingStartedAtMs) 만큼 가산된다', async () => {
     const meetingStartedAtMs = 1_000_000_000_000;
     const s2StartedAtMs = meetingStartedAtMs + 30_000;
     const pcmA = pcmOfSeconds(1, 0xa1);
@@ -281,9 +280,9 @@ describe('RecordingService.requestTranscription', () => {
     ]);
   });
 
-  it('30s 이상 PCM 은 30s+2s overlap 으로 chunk 가 나뉘어 transcribe 가 N 번 호출되고 segment 에 chunk startMs 가 가산된다', async () => {
+  it('30s 이상 PCM은 30s+2s overlap으로 chunk가 나뉘어 transcribe가 N 번 호출되고 segment에 chunk startMs가 가산된다', async () => {
     // 58s PCM → chunk0=[0..30], chunk1=[28..58]
-    // chunk1 의 segment startMs 는 dedup 임계(2000ms) 보다 커야 keep 된다.
+    // chunk1의 segment startMs는 dedup 임계(2000ms)보다 커야 keep 된다.
     const pcm = pcmOfSeconds(58);
     let call = 0;
     const transcribeMock = jest.fn(async () => {
@@ -315,9 +314,9 @@ describe('RecordingService.requestTranscription', () => {
     ]);
   });
 
-  it('잔여 audio 가 여러 chunk 로 split 될 때 2번째 chunk 부터 첫 2초 안 segments 는 dedup 으로 skip', async () => {
-    // 58s PCM → 2 chunks. chunk0 의 모든 segment 유지, chunk1 의 chunk-local
-    // startMs < 2000ms segment 는 chunk0 의 마지막 overlap 과 중복으로 보고 skip.
+  it('잔여 audio가 여러 chunk로 split 될 때 2번째 chunk부터 첫 2초 안 segments는 dedup으로 skip', async () => {
+    // 58s PCM → 2 chunks. chunk0의 모든 segment 유지, chunk1의 chunk-local
+    // startMs < 2000ms segment는 chunk0의 마지막 overlap과 중복으로 보고 skip.
     const pcm = pcmOfSeconds(58);
     let call = 0;
     const transcribeMock = jest.fn(async () => {
@@ -355,12 +354,12 @@ describe('RecordingService.requestTranscription', () => {
     expect(payload.transcript).toEqual([
       { speaker: 's1', text: 'c0_a', startMs: 1_000, endMs: 1_500 },
       { speaker: 's1', text: 'c0_last', startMs: 27_000, endMs: 29_500 },
-      // c1_dup 은 chunk-local startMs=100 < 2000 → dedup. c1_keep 만 유지(absolute=28000+2500=30500).
+      // c1_dup은 chunk-local startMs=100 < 2000 → dedup. c1_keep만 유지(absolute=28000+2500=30500).
       { speaker: 's1', text: 'c1_keep', startMs: 30_500, endMs: 31_500 },
     ]);
   });
 
-  it('잔여 audio 의 첫 chunk(consume.startMs=0) 는 partial 누적이 없었다고 보고 dedup 없이 모든 segment 유지', async () => {
+  it('잔여 audio의 첫 chunk(consume.startMs=0)는 partial 누적이 없었다고 보고 dedup 없이 모든 segment 유지', async () => {
     const pcm = pcmOfSeconds(1);
     const transcribeMock = jest.fn(async () => [
       { text: 'a', startMs: 100, endMs: 500 },
@@ -388,9 +387,9 @@ describe('RecordingService.requestTranscription', () => {
     ]);
   });
 
-  it('잔여 audio.startMs>0 (partial scheduler 가 사전 drain 함) 이면 첫 chunk 도 overlap dedup 적용', async () => {
-    // partial scheduler 가 이미 처리한 마지막의 끝 2초가 잔여 audio 의 첫 2초.
-    // → 잔여 audio 첫 chunk 의 chunk-local startMs < 2000ms segment 는 skip.
+  it('잔여 audio.startMs>0 (partial scheduler가 사전 drain 함) 이면 첫 chunk도 overlap dedup 적용', async () => {
+    // partial scheduler가 이미 처리한 마지막의 끝 2초가 잔여 audio의 첫 2초.
+    // → 잔여 audio 첫 chunk의 chunk-local startMs < 2000ms segment는 skip.
     const pcm = pcmOfSeconds(1);
     const transcribeMock = jest.fn(async () => [
       { text: 'dup', startMs: 500, endMs: 1_500 },
@@ -405,7 +404,7 @@ describe('RecordingService.requestTranscription', () => {
         listActiveMeetings: async () => [],
         listActiveParticipants: async () => [],
         consume: async () => [
-          { participantId: 's1', audio: pcm, startMs: 28_000 }, // scheduler 가 처리 후 잔여
+          { participantId: 's1', audio: pcm, startMs: 28_000 }, // scheduler가 처리 후 잔여
         ],
       },
       partialTranscriptStore: { append: async () => {}, consume: async () => [] },
@@ -414,21 +413,21 @@ describe('RecordingService.requestTranscription', () => {
     });
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
-    // dup 은 28000+500=28500 위치인데 dedup. keep 은 28000+2500=30500.
+    // dup은 28000+500=28500 위치인데 dedup. keep은 28000+2500=30500.
     expect(payload.transcript).toEqual([
       { speaker: 's1', text: 'keep', startMs: 30_500, endMs: 31_500 },
     ]);
   });
 
-  it('chunk startMs 위에 participant startedAtMs offset 도 누적된다(두 보정 동시 적용)', async () => {
+  it('chunk startMs 위에 participant startedAtMs offset도 누적된다(두 보정 동시 적용)', async () => {
     const meetingStartedAtMs = 1_000_000_000_000;
-    const s1StartedAtMs = meetingStartedAtMs + 10_000; // s1 이 10초 늦게 입장
+    const s1StartedAtMs = meetingStartedAtMs + 10_000; // s1이 10초 늦게 입장
     const pcm = pcmOfSeconds(58); // 2 chunks
     let call = 0;
     const transcribeMock = jest.fn(async () => {
       call += 1;
       if (call === 1) return [{ text: 'c0', startMs: 0, endMs: 100 }];
-      // chunk1 의 startMs 는 dedup 임계(2000ms) 보다 커야 한다.
+      // chunk1의 startMs는 dedup 임계(2000ms)보다 커야 한다.
       if (call === 2) return [{ text: 'c1', startMs: 2500, endMs: 2600 }];
       return [];
     });
@@ -440,9 +439,7 @@ describe('RecordingService.requestTranscription', () => {
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
         listActiveMeetings: async () => [],
         listActiveParticipants: async () => [],
-        consume: async () => [
-          { participantId: 's1', audio: pcm, startedAtMs: s1StartedAtMs },
-        ],
+        consume: async () => [{ participantId: 's1', audio: pcm, startedAtMs: s1StartedAtMs }],
       },
       partialTranscriptStore: { append: async () => {}, consume: async () => [] },
       transcriber: { transcribe: transcribeMock },
@@ -458,7 +455,7 @@ describe('RecordingService.requestTranscription', () => {
     ]);
   });
 
-  it('participant 의 startedAtMs 가 누락되면 보정 없이 0 offset 으로 취급한다(레거시 호환)', async () => {
+  it('participant의 startedAtMs가 누락되면 보정 없이 0 offset으로 취급한다(레거시 호환)', async () => {
     const meetingStartedAtMs = 1_000_000_000_000;
     const { events, publisher } = makeEventPublisher();
     const service = new RecordingService({
@@ -480,12 +477,10 @@ describe('RecordingService.requestTranscription', () => {
     });
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
-    expect(payload.transcript).toEqual([
-      { speaker: 's1', text: 'a0', startMs: 100, endMs: 400 },
-    ]);
+    expect(payload.transcript).toEqual([{ speaker: 's1', text: 'a0', startMs: 100, endMs: 400 }]);
   });
 
-  it('startedAtMs 가 회의 시작보다 이전이면 0 으로 clamp 한다(음수 startMs 방지)', async () => {
+  it('startedAtMs가 회의 시작보다 이전이면 0으로 clamp 한다(음수 startMs 방지)', async () => {
     const meetingStartedAtMs = 1_000_000_000_000;
     const beforeMeetingMs = meetingStartedAtMs - 5_000;
     const { events, publisher } = makeEventPublisher();
@@ -508,12 +503,10 @@ describe('RecordingService.requestTranscription', () => {
     });
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
-    expect(payload.transcript).toEqual([
-      { speaker: 's1', text: 'a0', startMs: 0, endMs: 500 },
-    ]);
+    expect(payload.transcript).toEqual([{ speaker: 's1', text: 'a0', startMs: 0, endMs: 500 }]);
   });
 
-  it('PartialTranscriptStore 의 누적 segments 가 (absolute - meetingStartedAtMs) 로 정규화되어 결과에 포함된다', async () => {
+  it('PartialTranscriptStore의 누적 segments가 (absolute - meetingStartedAtMs)로 정규화되어 결과에 포함된다', async () => {
     const meetingStartedAtMs = 1_000_000_000_000;
     const { events, publisher } = makeEventPublisher();
     const service = new RecordingService({
@@ -553,7 +546,7 @@ describe('RecordingService.requestTranscription', () => {
     ]);
   });
 
-  it('partial store segments 와 잔여 audio segments 가 시간순으로 merge 된다', async () => {
+  it('partial store segments와 잔여 audio segments가 시간순으로 merge 된다', async () => {
     const meetingStartedAtMs = 1_000_000_000_000;
     const participantStartedAtMs = meetingStartedAtMs; // 회의 시작과 동시
     const partialSeg = {
@@ -575,7 +568,7 @@ describe('RecordingService.requestTranscription', () => {
             participantId: 's1',
             audio: pcmOfSeconds(1),
             startedAtMs: participantStartedAtMs,
-            // 잔여 audio 시작 위치 = scheduler 가 사전 drain 한 양 = 25000ms
+            // 잔여 audio 시작 위치 = scheduler가 사전 drain 한 양 = 25000ms
             startMs: 25_000,
           },
         ],
@@ -585,8 +578,8 @@ describe('RecordingService.requestTranscription', () => {
         consume: async () => [partialSeg],
       },
       transcriber: {
-        // 잔여 chunk 의 STT 결과. partial scheduler 가 사전 drain 했으므로 첫 chunk
-        // 라도 chunk-local startMs<2000 segment 는 dedup. tail 은 2000 이상이라 keep.
+        // 잔여 chunk의 STT 결과. partial scheduler가 사전 drain 했으므로 첫 chunk
+        // 라도 chunk-local startMs<2000 segment는 dedup. tail은 2000 이상이라 keep.
         transcribe: async () => [{ text: 'tail', startMs: 2500, endMs: 3000 }],
       },
       eventPublisher: publisher,
@@ -601,7 +594,7 @@ describe('RecordingService.requestTranscription', () => {
     ]);
   });
 
-  it('Transcriber 가 throw 하면 report.transcription.failed 를 error 메시지와 함께 발행한다', async () => {
+  it('Transcriber가 throw 하면 report.transcription.failed를 error 메시지와 함께 발행한다', async () => {
     const { service, events } = makeService({
       audios: [{ participantId: 's1', audio: pcmOfSeconds(1) }],
       transcribeImpl: async () => {
@@ -630,7 +623,7 @@ describe('RecordingService.requestTranscription', () => {
   });
 });
 
-// wavBodyText / wrapPcmAsWav 는 import 만 해도 트리쉐이크 방지가 충분하지만 lint
-// 에서 unused 로 잡힐 수 있어 명시적으로 사용한다.
+// wavBodyText / wrapPcmAsWav는 import만 해도 트리쉐이크 방지가 충분하지만 lint
+// 에서 unused로 잡힐 수 있어 명시적으로 사용한다.
 void wavBodyText;
 void wrapPcmAsWav;

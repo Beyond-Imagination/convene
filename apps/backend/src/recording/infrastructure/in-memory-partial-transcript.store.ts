@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import {
-  AbsoluteTranscriptSegment,
-  PartialTranscriptStore,
-} from '@/recording/domain/ports';
+import { AbsoluteTranscriptSegment, PartialTranscriptStore } from '@/recording/domain/ports';
 
 /**
  * 부트스트랩 / 테스트용 in-memory 구현. 회의 1건 규모의 누적 segments
@@ -23,9 +20,7 @@ export class InMemoryPartialTranscriptStore implements PartialTranscriptStore {
     else this.store.set(meetingCode, [...segments]);
   }
 
-  async consume(
-    meetingCode: string,
-  ): Promise<ReadonlyArray<AbsoluteTranscriptSegment>> {
+  async consume(meetingCode: string): Promise<ReadonlyArray<AbsoluteTranscriptSegment>> {
     const out = this.store.get(meetingCode) ?? [];
     this.store.delete(meetingCode);
     return out;

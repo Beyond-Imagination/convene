@@ -61,8 +61,8 @@ describe('ReportSummary', () => {
   });
 
   it('keyTopic 검증은 keyTopic factory에 위임된다(topic 빈 값 거부)', () => {
-    expect(() =>
-      reportSummary({ ...valid, keyTopics: [{ topic: '', points: ['p'] }] }),
-    ).toThrow(/topic/);
+    expect(() => reportSummary({ ...valid, keyTopics: [{ topic: '', points: ['p'] }] })).toThrow(
+      /topic/,
+    );
   });
 });

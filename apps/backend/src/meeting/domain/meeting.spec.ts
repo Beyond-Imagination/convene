@@ -30,17 +30,17 @@ describe('Meeting (Aggregate Root)', () => {
       expect(m.lastActiveAt).toBe(T_0);
     });
 
-    it('생성 시 받은 hostToken 을 보유한다 (회의 종료 권한 식별용)', () => {
+    it('생성 시 받은 hostToken을 보유한다 (회의 종료 권한 식별용)', () => {
       const m = newMeeting();
       expect(m.hostToken).toBe('host-token-1');
     });
 
-    it('생성 시 받은 title 을 보유한다(없으면 null)', () => {
+    it('생성 시 받은 title을 보유한다(없으면 null)', () => {
       expect(newMeeting().title).toBeNull();
       expect(newMeeting('주간 회의').title).toBe('주간 회의');
     });
 
-    it('hostToken 이 주어진 토큰과 일치하는지 isHost 로 검증한다', () => {
+    it('hostToken이 주어진 토큰과 일치하는지 isHost로 검증한다', () => {
       const m = newMeeting();
       expect(m.isHost('host-token-1')).toBe(true);
       expect(m.isHost('wrong-token')).toBe(false);
@@ -230,7 +230,7 @@ describe('Meeting (Aggregate Root)', () => {
   });
 
   describe('fromSnapshot (복원)', () => {
-    it('open 상태의 snapshot 으로부터 동일한 Meeting 을 복원한다', () => {
+    it('open 상태의 snapshot으로부터 동일한 Meeting을 복원한다', () => {
       const m = newMeeting();
       m.addParticipant('s1', 'alice', T_30s);
       m.addParticipant('s2', 'bob', T_30s);
@@ -241,7 +241,7 @@ describe('Meeting (Aggregate Root)', () => {
       expect(restored.hostToken).toBe('host-token-1');
     });
 
-    it('close 된 snapshot 도 ended 상태 그대로 복원한다(다시 mutate 불가)', () => {
+    it('close 된 snapshot도 ended 상태 그대로 복원한다(다시 mutate 불가)', () => {
       const m = newMeeting();
       m.addParticipant('s1', 'alice', T_30s);
       m.close(T_1m);
@@ -251,7 +251,7 @@ describe('Meeting (Aggregate Root)', () => {
       expect(() => restored.addParticipant('s2', 'bob', T_1m)).toThrow(/already closed/);
     });
 
-    it('leave 한 참가자도 그대로 복원한다(findParticipant 로 조회 가능)', () => {
+    it('leave 한 참가자도 그대로 복원한다(findParticipant로 조회 가능)', () => {
       const m = newMeeting();
       m.addParticipant('s1', 'alice', T_30s);
       m.removeParticipant('s1', T_1m);
@@ -261,7 +261,7 @@ describe('Meeting (Aggregate Root)', () => {
       expect(found?.leftAt?.getTime()).toBe(T_1m.getTime());
     });
 
-    it('복원된 Meeting 에서 동일한 idle 조건이 그대로 평가된다', () => {
+    it('복원된 Meeting에서 동일한 idle 조건이 그대로 평가된다', () => {
       const m = newMeeting();
       m.addParticipant('s1', 'alice', T_30s);
       m.removeParticipant('s1', T_1m);

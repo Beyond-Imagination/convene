@@ -1,25 +1,12 @@
 'use client';
 
 import { type BaseSyntheticEvent, useState } from 'react';
-import {
-  type FieldErrors,
-  useForm,
-  type UseFormRegisterReturn,
-} from 'react-hook-form';
+import { type FieldErrors, useForm, type UseFormRegisterReturn } from 'react-hook-form';
 
 import { useSessionStore } from '@/shared/stores/session.store';
 
-/**
- * 회의 링크로 직접 접속한(닉네임 없는) 사용자가 회의 페이지에서 닉네임을 입력해
- * 입장하도록 하는 닉네임 게이트의 ViewModel.
- *
- * 회의 코드는 URL(`/meetings/[code]`)에서 이미 정해지므로 닉네임만 받는다.
- * submit 성공 시 session store 에 닉네임을 set 하면, `useMeetingViewModel` 이
- * 그 nickname 을 보고 socket 을 만들어 정상 입장한다(라우팅 이동 없음).
- */
-
-export const NICKNAME_MIN = 1;
-export const NICKNAME_MAX = 30;
+const NICKNAME_MIN = 1;
+const NICKNAME_MAX = 30;
 
 export type NicknameGateStatus = 'idle' | 'submitting';
 
@@ -34,6 +21,12 @@ export interface UseNicknameGateViewModel {
   readonly handleSubmit: (e?: BaseSyntheticEvent) => Promise<void>;
 }
 
+/**
+ * 회의 링크로 직접 접속한(닉네임 없는) 사용자가 회의 페이지에서 닉네임을 입력해 입장하도록 하는 닉네임 게이트의 ViewModel.
+ *
+ * 회의 코드는 URL에서 이미 정해지므로 닉네임만 받는다.
+ * submit 성공 시 session store에 닉네임을 set 하면, `useMeetingViewModel`이 그 nickname을 보고 socket을 만들어 정상 입장한다.
+ */
 export function useNicknameGateViewModel(): UseNicknameGateViewModel {
   const setNickname = useSessionStore((s) => s.setNickname);
   const [status, setStatus] = useState<NicknameGateStatus>('idle');

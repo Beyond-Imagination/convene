@@ -15,7 +15,9 @@ describe('ChatEntry', () => {
   });
 
   it('nickname이 30자를 넘으면 거부한다', () => {
-    expect(() => chatEntry({ nickname: 'a'.repeat(31), text: 'hi', sentAt: at })).toThrow(/nickname/);
+    expect(() => chatEntry({ nickname: 'a'.repeat(31), text: 'hi', sentAt: at })).toThrow(
+      /nickname/,
+    );
   });
 
   it.each(['', '   '])('text가 trim 후 비어 있으면 거부한다: "%s"', (t) => {
@@ -23,8 +25,8 @@ describe('ChatEntry', () => {
   });
 
   it('text가 2000자를 넘으면 거부한다', () => {
-    expect(() =>
-      chatEntry({ nickname: 'alice', text: 'a'.repeat(2001), sentAt: at }),
-    ).toThrow(/text/);
+    expect(() => chatEntry({ nickname: 'alice', text: 'a'.repeat(2001), sentAt: at })).toThrow(
+      /text/,
+    );
   });
 });

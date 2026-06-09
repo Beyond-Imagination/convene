@@ -4,10 +4,7 @@ import { AddressInfo, createServer } from 'node:net';
 import { Injectable, Logger } from '@nestjs/common';
 import { Consumer, PlainTransport } from 'mediasoup/node/lib/types';
 
-import {
-  AudioCapturePort,
-  AudioCaptureStartInput,
-} from '@/mediasoup/domain/ports';
+import { AudioCapturePort, AudioCaptureStartInput } from '@/mediasoup/domain/ports';
 import { AudioBufferRepository } from '@/recording/domain/ports';
 
 import { MediasoupRouterAdapter } from './mediasoup-router.adapter';
@@ -21,27 +18,20 @@ interface CaptureContext {
 }
 
 const FFMPEG_BIN = process.env.FFMPEG_BIN ?? 'ffmpeg';
-/** PlainTransport.connect 직후 즉시 consumer.resume 하면 ffmpeg 의
- *  port binding 이 끝나기 전에 RTP 가 떨어져 packet loss. 1초 양보. */
+/** PlainTransport.connect 직후 즉시 consumer.
+ * resume하면 ffmpeg의 port binding이 끝나기 전에 RTP가 떨어져 packet loss. 1초 양보.
+ * */
 const RESUME_DELAY_MS = 1000;
-/** ffmpeg 가 stdin 종료 후 자체 정리할 시간을 주고도 살아 있으면 SIGTERM. */
+/** ffmpeg가 stdin 종료 후 자체 정리할 시간을 주고도 살아 있으면 SIGTERM. */
 const SIGTERM_DELAY_MS = 2000;
 
 /**
- * `AudioCapturePort` 의 mediasoup PlainTransport + ffmpeg 어댑터.
+ * `AudioCapturePort`의 mediasoup PlainTransport + ffmpeg 어댑터
  *
- * 한 (meetingCode, participantId) 마다 PlainTransport 1 개 + ffmpeg subprocess 1
- * 개를 띄운다. mediasoup 가 PlainTransport 를 통해 audio RTP 를
- * 127.0.0.1:{freePort} 로 흘려보내고, ffmpeg 가 그 port 에서 SDP 로 RTP 를 받아
- * **stdout 으로 wav stream** 을 출력한다(디스크 미사용).
- *
- * ffmpeg stdout 의 chunk 는 `AudioBufferRepository.append(meetingCode, pid, chunk)`
- * 로 redis 에 누적되고, 회의 종료 시 RecordingService 가 consume 해 ai-worker 로
- * 한 번에 전송한다.
- *
- * dedup: 같은 (code, pid) 에 대해 start 가 중복 호출되어도 첫 호출만 효과가
- * 있다 — in-flight Set + 완료 Map 양쪽으로 race 차단.
- * stop 은 idempotent, stopAll 은 회의 전체 정리.
+ * 한 (meetingCode, participantId) 마다 PlainTransport 1개 + ffmpeg subprocess 1개를 띄운다.
+ * mediasoup가 PlainTransport를 통해 audio RTP를 127.0.0.1:{freePort}로 흘려보내고, ffmpeg가 그 port에서 SDP로 RTP를 받아 stdout으로 wav stream을 출력한다.
+ * ffmpeg stdout의 chunk는 redis에 누적되고, 회의 종료 시 RecordingService가 consume해 ai-worker로 한 번에 전송한다.
+ * dedup: 같은 (code, pid)에 대해 start가 중복 호출되어도 첫 호출만 효과가 있다 — in-flight Set + 완료 Map 양쪽으로 race 차단.
  */
 @Injectable()
 export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
@@ -64,8 +54,7 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
     this.inflight.add(key);
     try {
       const ctx = await this.createCaptureContext(input);
-      // start 가 in-flight 인 사이 stop 이 호출돼 inflight 에서 제거됐다면,
-      // 막 만든 context 도 즉시 정리하고 등록하지 않는다.
+      // start가 in-flight인 사이 stop이 호출돼 inflight에서 제거됐다면, 막 만든 context도 즉시 정리하고 등록하지 않는다.
       if (!this.inflight.has(key)) {
         await this.terminateContext(ctx);
         return;
@@ -75,9 +64,7 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
         `capture started (code=${input.meetingCode}, pid=${input.participantId}, producerId=${input.producerId})`,
       );
     } catch (err) {
-      this.logger.error(
-        `capture start failed (${key}): ${(err as Error).message}`,
-      );
+      this.logger.error(`capture start failed (${key}): ${(err as Error).message}`);
     } finally {
       this.inflight.delete(key);
     }
@@ -107,13 +94,8 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
     await Promise.all(targets.map((ctx) => this.terminateContext(ctx)));
   }
 
-  private async createCaptureContext(
-    input: AudioCaptureStartInput,
-  ): Promise<CaptureContext> {
-    const router = this.routerAdapter.getParticipantRouter(
-      input.meetingCode,
-      input.participantId,
-    );
+  private async createCaptureContext(input: AudioCaptureStartInput): Promise<CaptureContext> {
+    const router = this.routerAdapter.getParticipantRouter(input.meetingCode, input.participantId);
 
     const transport = await router.createPlainTransport({
       listenIp: { ip: '127.0.0.1' },
@@ -130,12 +112,7 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
     });
 
     const codec = consumer.rtpParameters.codecs[0];
-    const sdp = buildSdp(
-      port,
-      codec.payloadType,
-      codec.clockRate,
-      codec.channels ?? 2,
-    );
+    const sdp = buildSdp(port, codec.payloadType, codec.clockRate, codec.channels ?? 2);
 
     const ffmpeg = this.spawnFfmpeg(input.meetingCode, input.participantId);
     if (!ffmpeg.stdin || !ffmpeg.stdout) {
@@ -164,10 +141,8 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
         );
     }, RESUME_DELAY_MS);
 
-    // 참가자의 capture 시작 시각을 1회만 기록한다. RecordingService 가 회의
-    // 시작 시각을 origin 으로 잡고 본 값과의 차이를 segment.startMs/endMs 에
-    // 가산해 시간축을 회의 기준으로 normalize 한다. SETNX 성격이라 두 번째
-    // capture 가 들어와도 첫 호출 값만 유효.
+    // 참가자의 capture 시작 시각을 1회만 기록한다. RecordingService가 회의 시작 시각을 origin으로 잡고 본 값과의 차이를
+    // segment.startMs/endMs에 가산해 시간축을 회의 기준으로 normalize. SETNX 성격이라 두 번째 capture가 들어와도 첫 호출 값만 유효.
     this.audioBufferRepository
       .markStarted(input.meetingCode, input.participantId, Date.now())
       .catch((err) =>
@@ -216,26 +191,37 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
 
   private spawnFfmpeg(meetingCode: string, participantId: string): ChildProcess {
     const ffmpeg = spawn(FFMPEG_BIN, [
-      '-loglevel', 'warning',
-      '-protocol_whitelist', 'rtp,file,udp,pipe',
-      '-reorder_queue_size', '100',
-      '-f', 'sdp',
-      '-i', 'pipe:0',
-      '-analyzeduration', '0',
-      '-probesize', '32',
+      '-loglevel',
+      'warning',
+      '-protocol_whitelist',
+      'rtp,file,udp,pipe',
+      '-reorder_queue_size',
+      '100',
+      '-f',
+      'sdp',
+      '-i',
+      'pipe:0',
+      '-analyzeduration',
+      '0',
+      '-probesize',
+      '32',
       // 노이즈 게이트.
-      '-af', 'agate=threshold=-45dB:range=0.01:release=1000',
-      '-map', '0:a',
-      '-acodec', 'pcm_s16le',
+      '-af',
+      'agate=threshold=-45dB:range=0.01:release=1000',
+      '-map',
+      '0:a',
+      '-acodec',
+      'pcm_s16le',
       // AI STT 표준: 16kHz mono.
-      '-ac', '1',
-      '-ar', '16000',
-      '-flush_packets', '1',
-      // raw PCM s16le 로 stdout 출력 — RIFF header 없음. Redis 에는 raw PCM 만
-      // 누적되고, RecordingService 가 audio-chunker 로 30s+2s overlap chunk 를
-      // 만들 때 각 chunk 에 WAV header 를 prepend 해 ai-worker 로 보낸다.
-      // wav 컨테이너 출력보다 chunk 단위 자르기가 자유롭다(중간을 잘라도 valid).
-      '-f', 's16le',
+      '-ac',
+      '1',
+      '-ar',
+      '16000',
+      '-flush_packets',
+      '1',
+      // raw PCM 출력 — wav 컨테이너보다 chunk 단위 자르기가 자유롭다(중간을 잘라도 valid).
+      '-f',
+      's16le',
       'pipe:1',
     ]);
     ffmpeg.on('error', (err) => {
@@ -244,15 +230,11 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
       );
     });
     ffmpeg.on('close', (exit) => {
-      this.logger.log(
-        `ffmpeg closed (code=${meetingCode}, pid=${participantId}, exit=${exit})`,
-      );
+      this.logger.log(`ffmpeg closed (code=${meetingCode}, pid=${participantId}, exit=${exit})`);
     });
     if (ffmpeg.stderr) {
       ffmpeg.stderr.on('data', (data: Buffer) => {
-        this.logger.debug(
-          `[ffmpeg ${meetingCode}/${participantId}] ${data.toString().trim()}`,
-        );
+        this.logger.debug(`[ffmpeg ${meetingCode}/${participantId}] ${data.toString().trim()}`);
       });
     }
     return ffmpeg;
@@ -263,12 +245,7 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
   }
 }
 
-function buildSdp(
-  port: number,
-  payloadType: number,
-  clockRate: number,
-  channels: number,
-): string {
+function buildSdp(port: number, payloadType: number, clockRate: number, channels: number): string {
   return (
     `v=0\n` +
     `o=- 0 0 IN IP4 127.0.0.1\n` +

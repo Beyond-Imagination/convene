@@ -13,14 +13,9 @@ export interface MediasoupWorkerPoolOptions {
 }
 
 /**
- * mediasoup `Worker` 풀. NestJS lifecycle hook 에 묶여 onModuleInit 에
- * 워커 N 개를 생성하고 onModuleDestroy 에 정리한다.
- *
- * `getNextWorker()` 는 round-robin 으로 워커를 분배하므로 회의별 라우터를
- * 다른 워커에 분산시킬 수 있다 (MultiRouterManager 가 호출).
- *
- * Worker 가 `died` 이벤트로 죽으면 무결성 보장이 불가하므로 프로세스를 종료한다
- * (운영에서는 PM2/Docker 가 재시작).
+ * mediasoup `Worker` 풀.
+ * NestJS lifecycle hook에 묶여 onModuleInit에 워커 N 개를 생성하고 onModuleDestroy에 정리한다.
+ * Worker가 `died` 이벤트로 죽으면 무결성 보장이 불가하므로 프로세스를 종료한다.
  */
 export class MediasoupWorkerPool implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MediasoupWorkerPool.name);
@@ -68,12 +63,6 @@ export class MediasoupWorkerPool implements OnModuleInit, OnModuleDestroy {
     return worker;
   }
 
-  /**
-   * 특정 인덱스의 worker 반환. 회의별 worker affinity 를 RouterAdapter 가
-   * 직접 관리할 때 사용 — 한 회의의 두 router 가 같은 worker 에 들어가
-   * pipeToRouter 가 producerId 충돌로 깨지는 것을 막기 위해 호출자가
-   * 직접 idx 를 골라야 한다.
-   */
   getWorker(idx: number): Worker {
     if (idx < 0 || idx >= this.workers.length) {
       throw new Error(

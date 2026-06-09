@@ -1,16 +1,14 @@
-/**
- * Reports 의 HTTP wire format.
+import type { Source } from './meeting.js';
+
+/*
+ * Reports의 HTTP wire format.
  *
- * 본 파일은 frontend ↔ backend가 공유하는 **순수 TS 인터페이스 / literal 타입**만
- * 정의한다. class-validator 데코레이터는 backend `dto/` 클래스가 본 인터페이스를
- * implements하면서 추가한다.
+ * 본 파일은 frontend ↔ backend가 공유하는 **순수 TS 인터페이스 / literal 타입**만 정의한다.
  *
  * 직렬화 규약:
  *   - 모든 `Date` 값은 ISO 8601 문자열로 직렬화한다.
- *   - 누락 가능 필드(`null` 허용)는 backend 도메인 모델의 `null` 을 그대로 반영한다.
+ *   - 누락 가능 필드(`null` 허용)는 backend 도메인 모델의 `null`을 그대로 반영한다.
  */
-
-import type { Source } from './meeting.js';
 
 export const REPORT_PIPELINE_STATUSES = ['pending', 'done', 'failed'] as const;
 export type ReportPipelineStatus = (typeof REPORT_PIPELINE_STATUSES)[number];
@@ -77,8 +75,7 @@ export interface ReportNotionPushWire {
 /**
  * GET /reports 목록 응답의 한 항목.
  *
- * 카드/리스트 뷰에서 필요한 핵심 정보만 평면화한다. 상세 본문은 GET /reports/:id 로
- * 가져온다.
+ * 카드/리스트 뷰에서 필요한 핵심 정보만 평면화한다. 상세 본문은 GET /reports/:id로 가져온다.
  */
 export interface ReportListItem {
   id: string;
@@ -98,14 +95,13 @@ export interface ReportListResponse {
 /**
  * GET /reports/:id 상세 응답.
  *
- * 도메인 Aggregate `MeetingReport` 의 wire format 1:1 직렬화.
+ * 도메인 Aggregate `MeetingReport`의 wire format 1:1 직렬화.
  */
 export interface ReportDetailResponse {
   id: string;
   meetingId: string;
   code: string;
   source: Source;
-  /** 회의록 제목: 회의 생성 시 지정한 제목 ?? 요약 제목 ?? null. */
   title: string | null;
   externalReference: { issueId?: string };
   startedAt: string;

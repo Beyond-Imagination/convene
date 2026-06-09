@@ -1,8 +1,4 @@
-import {
-  MEDIA_TYPES,
-  type MediaType,
-  type ProduceRequest,
-} from '@convene/shared-interfaces';
+import { MEDIA_TYPES, type MediaType, type ProduceRequest } from '@convene/shared-interfaces';
 import {
   IsBoolean,
   IsDefined,

@@ -1,17 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import Redis from 'ioredis';
 
-import {
-  AbsoluteTranscriptSegment,
-  PartialTranscriptStore,
-} from '@/recording/domain/ports';
+import { AbsoluteTranscriptSegment, PartialTranscriptStore } from '@/recording/domain/ports';
 
 const PARTIAL_TRANSCRIPT_KEY_PREFIX = 'transcript-partial:';
 
 /**
- * `transcript-partial:{meetingCode}` LIST 에 각 segment 를 JSON 직렬화해 RPUSH.
- * append 가 여러 번 호출돼도 회의 단위로 순서대로 누적된다. consume 은 LRANGE +
- * DEL 로 atomic 하게 모두 가져오고 키를 비운다.
+ * `transcript-partial:{meetingCode}` LIST에 각 segment를 JSON 직렬화해 RPUSH.
+ * append가 여러 번 호출돼도 회의 단위로 순서대로 누적된다.
+ * consume은 LRANGE + DEL로 atomic 하게 모두 가져오고 키를 비운다.
  */
 @Injectable()
 export class RedisPartialTranscriptStore implements PartialTranscriptStore {
@@ -26,9 +23,7 @@ export class RedisPartialTranscriptStore implements PartialTranscriptStore {
     await this.redis.rpush(this.key(meetingCode), ...payload);
   }
 
-  async consume(
-    meetingCode: string,
-  ): Promise<ReadonlyArray<AbsoluteTranscriptSegment>> {
+  async consume(meetingCode: string): Promise<ReadonlyArray<AbsoluteTranscriptSegment>> {
     const key = this.key(meetingCode);
     const result = await this.redis.multi().lrange(key, 0, -1).del(key).exec();
     if (!result) return [];

@@ -76,7 +76,12 @@ describe('toReportDetailResponse', () => {
     expect(detail.startedAt).toBe('2026-01-01T00:00:00.000Z');
     expect(detail.endedAt).toBe('2026-01-01T00:30:00.000Z');
     expect(detail.participants).toEqual([
-      { id: 'p1', nickname: '준', joinedAt: '2026-01-01T00:01:00.000Z', leftAt: '2026-01-01T00:30:00.000Z' },
+      {
+        id: 'p1',
+        nickname: '준',
+        joinedAt: '2026-01-01T00:01:00.000Z',
+        leftAt: '2026-01-01T00:30:00.000Z',
+      },
       { id: 'p2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z', leftAt: null },
     ]);
     expect(detail.chat).toEqual([
@@ -124,9 +129,7 @@ describe('toReportDetailResponse', () => {
       }),
     );
     const detail = toReportDetailResponse(report);
-    expect(detail.transcript).toEqual([
-      { speaker: '준', text: '안녕', startMs: 0, endMs: 1500 },
-    ]);
+    expect(detail.transcript).toEqual([{ speaker: '준', text: '안녕', startMs: 0, endMs: 1500 }]);
     expect(detail.summary).toEqual({
       title: '회의 요약',
       overview: '한 줄',

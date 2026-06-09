@@ -29,7 +29,7 @@ describe('RecordingReportLifecycleListener', () => {
     expect(service.requestTranscription).toHaveBeenCalledTimes(1);
   });
 
-  it('payload.code/meetingStartedAtMs/participantNames 를 RecordingService 입력에 그대로 매핑한다', async () => {
+  it('payload.code/meetingStartedAtMs/participantNames를 RecordingService 입력에 그대로 매핑한다', async () => {
     const { listener, calls } = makeListener();
     await listener.onTranscriptionRequested(payload);
     expect(calls[0]).toEqual({

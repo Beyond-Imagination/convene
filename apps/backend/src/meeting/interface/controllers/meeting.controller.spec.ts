@@ -36,7 +36,7 @@ const makeController = () => {
       return fakeMeeting();
     }),
   };
-   
+
   const controller = new MeetingController(service as any);
   return { controller, service, calls };
 };
@@ -100,14 +100,12 @@ describe('MeetingController.closeMeeting', () => {
   const makeController = () => {
     const calls: Array<{ code: string; reason: string; hostToken: string }> = [];
     const service = {
-      closeMeeting: jest.fn(
-        async (cmd: { code: string; reason: string; hostToken: string }) => {
-          calls.push(cmd);
-          return makeClosed();
-        },
-      ),
+      closeMeeting: jest.fn(async (cmd: { code: string; reason: string; hostToken: string }) => {
+        calls.push(cmd);
+        return makeClosed();
+      }),
     };
-     
+
     const controller = new MeetingController(service as any);
     return { controller, service, calls };
   };
@@ -115,9 +113,7 @@ describe('MeetingController.closeMeeting', () => {
   it('service.closeMeeting을 code + reason="manual" + 전달받은 hostToken으로 호출한다', async () => {
     const { controller, calls } = makeController();
     await controller.closeMeeting('abc12xyz', 'host-token-1');
-    expect(calls).toEqual([
-      { code: 'abc12xyz', reason: 'manual', hostToken: 'host-token-1' },
-    ]);
+    expect(calls).toEqual([{ code: 'abc12xyz', reason: 'manual', hostToken: 'host-token-1' }]);
   });
 
   it('hostToken 헤더가 없으면 빈 문자열로 위임한다(서버가 host 아님으로 거부)', async () => {
@@ -141,7 +137,7 @@ describe('MeetingController.closeMeeting', () => {
         throw new NotHostError('abc12xyz');
       }),
     };
-     
+
     const controller = new MeetingController(service as any);
     await expect(controller.closeMeeting('abc12xyz', 'wrong')).rejects.toBeInstanceOf(
       ForbiddenException,
@@ -160,7 +156,7 @@ describe('MeetingController.closeMeeting', () => {
         throw new MeetingNotFoundError('abc12xyz');
       }),
     };
-     
+
     const controller = new MeetingController(service as any);
     await expect(controller.closeMeeting('abc12xyz')).rejects.toBeInstanceOf(NotFoundException);
   });
@@ -171,7 +167,7 @@ describe('MeetingController.closeMeeting', () => {
         throw new Error('Meeting is already closed');
       }),
     };
-     
+
     const controller = new MeetingController(service as any);
     await expect(controller.closeMeeting('abc12xyz')).rejects.toThrow(/already closed/);
   });

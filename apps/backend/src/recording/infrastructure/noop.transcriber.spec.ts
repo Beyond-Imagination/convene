@@ -12,7 +12,7 @@ describe('NoopTranscriber', () => {
     ).toEqual([]);
   });
 
-  it('throw하지 않는다 (RecordingService 가 failed 분기로 빠지지 않도록)', async () => {
+  it('throw하지 않는다 (RecordingService가 failed 분기로 빠지지 않도록)', async () => {
     const transcriber = new NoopTranscriber();
     await expect(
       transcriber.transcribe({ meetingCode: 'abc12xyz', audio: Buffer.alloc(0) }),

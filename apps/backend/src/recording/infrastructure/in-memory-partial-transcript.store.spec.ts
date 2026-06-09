@@ -14,12 +14,12 @@ const seg = (
 });
 
 describe('InMemoryPartialTranscriptStore', () => {
-  it('append 한 적 없는 회의는 consume 이 빈 배열', async () => {
+  it('append 한 적 없는 회의는 consume이 빈 배열', async () => {
     const store = new InMemoryPartialTranscriptStore();
     expect(await store.consume('abc12xyz')).toEqual([]);
   });
 
-  it('append 한 segments 가 같은 순서로 consume 된다', async () => {
+  it('append 한 segments가 같은 순서로 consume 된다', async () => {
     const store = new InMemoryPartialTranscriptStore();
     await store.append('abc12xyz', [seg('s1', 'a', 100), seg('s2', 'b', 200)]);
     const result = await store.consume('abc12xyz');
@@ -31,21 +31,17 @@ describe('InMemoryPartialTranscriptStore', () => {
     await store.append('abc12xyz', [seg('s1', 'a', 100)]);
     await store.append('abc12xyz', [seg('s2', 'b', 200), seg('s1', 'c', 300)]);
     const result = await store.consume('abc12xyz');
-    expect(result).toEqual([
-      seg('s1', 'a', 100),
-      seg('s2', 'b', 200),
-      seg('s1', 'c', 300),
-    ]);
+    expect(result).toEqual([seg('s1', 'a', 100), seg('s2', 'b', 200), seg('s1', 'c', 300)]);
   });
 
-  it('consume 후 같은 code consume 은 빈 배열(즉시 폐기)', async () => {
+  it('consume 후 같은 code consume은 빈 배열(즉시 폐기)', async () => {
     const store = new InMemoryPartialTranscriptStore();
     await store.append('abc12xyz', [seg('s1', 'a', 100)]);
     await store.consume('abc12xyz');
     expect(await store.consume('abc12xyz')).toEqual([]);
   });
 
-  it('서로 다른 회의의 segments 는 독립적이다', async () => {
+  it('서로 다른 회의의 segments는 독립적이다', async () => {
     const store = new InMemoryPartialTranscriptStore();
     await store.append('aaa11aaa', [seg('s1', 'a', 100)]);
     await store.append('bbb22bbb', [seg('s2', 'b', 200)]);
@@ -55,7 +51,7 @@ describe('InMemoryPartialTranscriptStore', () => {
     expect(b).toEqual([seg('s2', 'b', 200)]);
   });
 
-  it('빈 segments 배열 append 는 no-op', async () => {
+  it('빈 segments 배열 append는 no-op', async () => {
     const store = new InMemoryPartialTranscriptStore();
     await store.append('abc12xyz', []);
     expect(await store.consume('abc12xyz')).toEqual([]);

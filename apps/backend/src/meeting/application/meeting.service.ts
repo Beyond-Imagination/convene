@@ -19,67 +19,58 @@ import {
   Source,
 } from '@/shared-kernel/domain/value-objects';
 
-/**
- * 회의 생성·입장·종료 등 use case 를 처리하는 서비스.
- *
- * 도메인 객체를 조립하고 Repository / Clock / CodeGenerator Port 를 호출하며,
- * 결과에 따라 도메인 이벤트를 발행한다.
- */
-
-export interface CreateMeetingCommand {
-  source: Source;
-  externalReference: ExternalReference;
-  /** 회의 제목(선택). 생략하면 null. */
-  title?: string | null;
-}
-
-export interface JoinMeetingCommand {
-  code: string;
-  participantId: string;
-  nickname: string;
-}
-
-export interface JoinMeetingResult {
-  meeting: Meeting;
-  participant: Participant;
-}
-
-export interface LeaveMeetingCommand {
-  code: string;
-  participantId: string;
-}
-
-export interface LeaveMeetingResult {
-  meeting: Meeting;
-  participant: Participant;
-}
-
-export interface PostChatCommand {
-  code: string;
-  participantId: string;
-  text: string;
-}
-
-export type CloseMeetingReason = 'manual' | 'idle';
-
-export interface CloseMeetingCommand {
-  code: string;
-  reason: CloseMeetingReason;
-  /** 수동 종료 요청자가 제시한 host 토큰. host 가 아니면 NotHostError. */
-  hostToken: string;
-}
-
-export interface DetectIdleAndCloseCommand {
-  code: string;
-}
-
-export interface MeetingServiceDeps {
+interface MeetingServiceDeps {
   repository: MeetingRepository;
   chatRepository: ChatRepository;
   codeGenerator: MeetingCodeGenerator;
   hostTokenGenerator: HostTokenGenerator;
   clock: Clock;
   eventPublisher: DomainEventPublisher;
+}
+
+interface CreateMeetingCommand {
+  source: Source;
+  externalReference: ExternalReference;
+  title?: string | null;
+}
+
+interface JoinMeetingCommand {
+  code: string;
+  participantId: string;
+  nickname: string;
+}
+
+interface JoinMeetingResult {
+  meeting: Meeting;
+  participant: Participant;
+}
+
+interface LeaveMeetingCommand {
+  code: string;
+  participantId: string;
+}
+
+interface LeaveMeetingResult {
+  meeting: Meeting;
+  participant: Participant;
+}
+
+interface PostChatCommand {
+  code: string;
+  participantId: string;
+  text: string;
+}
+
+type CloseMeetingReason = 'manual' | 'idle';
+
+interface CloseMeetingCommand {
+  code: string;
+  reason: CloseMeetingReason;
+  hostToken: string;
+}
+
+interface DetectIdleAndCloseCommand {
+  code: string;
 }
 
 export class MeetingService {
@@ -125,10 +116,7 @@ export class MeetingService {
 
   async leaveMeeting(command: LeaveMeetingCommand): Promise<LeaveMeetingResult> {
     const meeting = await this.requireMeeting(command.code);
-    const participant = meeting.removeParticipant(
-      command.participantId,
-      this.deps.clock.now(),
-    );
+    const participant = meeting.removeParticipant(command.participantId, this.deps.clock.now());
     await this.deps.repository.save(meeting);
     await this.deps.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_LEFT, {
       code: command.code,
@@ -147,7 +135,6 @@ export class MeetingService {
       );
     }
     const now = this.deps.clock.now();
-    // ChatEntry 검증을 markActive보다 먼저 수행 → 검증 실패 시 Meeting 상태 미변경.
     const entry = chatEntry({ nickname: participant.nickname, text: command.text, sentAt: now });
     meeting.markActive(now);
     await this.deps.chatRepository.append(command.code, entry);
@@ -157,8 +144,7 @@ export class MeetingService {
 
   async closeMeeting(command: CloseMeetingCommand): Promise<Meeting> {
     const meeting = await this.requireMeeting(command.code);
-    // 수동 종료는 host 토큰을 제시한 요청자만 가능하다. idle 자동 종료는
-    // detectIdleAndClose 가 별도 경로로 처리하므로 본 검증을 거치지 않는다.
+    // 수동 종료는 host 토큰을 제시한 요청자만 가능하다. idle 자동 종료는 별도 경로로 처리하므로 본 검증을 거치지 않는다.
     if (!meeting.isHost(command.hostToken)) {
       throw new NotHostError(command.code);
     }

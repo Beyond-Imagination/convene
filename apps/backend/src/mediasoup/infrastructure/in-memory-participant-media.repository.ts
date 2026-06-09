@@ -4,9 +4,9 @@ import { ParticipantMedia } from '@/mediasoup/domain/participant-media';
 import { ParticipantMediaRepository } from '@/mediasoup/domain/ports';
 
 /**
- * ParticipantMediaRepository 의 in-memory 구현체. v1 부트스트랩용.
+ * ParticipantMediaRepository의 in-memory 구현체. v1 부트스트랩용.
  *
- * participantId 기반 단순 Map. 같은 회의 그룹 조회는 meetingCode 로 filter.
+ * participantId 기반 단순 Map. 같은 회의 그룹 조회는 meetingCode로 filter.
  */
 @Injectable()
 export class InMemoryParticipantMediaRepository implements ParticipantMediaRepository {

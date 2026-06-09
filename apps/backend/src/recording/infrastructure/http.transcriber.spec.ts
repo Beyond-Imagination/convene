@@ -9,10 +9,8 @@ describe('HttpTranscriber', () => {
       headers: { 'Content-Type': 'application/json' },
     });
 
-  it('audio Buffer 를 POST {baseUrl}/transcribe 에 octet-stream 으로 전송한다', async () => {
-    const fetchMock = jest
-      .fn()
-      .mockResolvedValueOnce(okResponse({ segments: [] }));
+  it('audio Buffer를 POST {baseUrl}/transcribe에 octet-stream으로 전송한다', async () => {
+    const fetchMock = jest.fn().mockResolvedValueOnce(okResponse({ segments: [] }));
     const transcriber = new HttpTranscriber(baseUrl, fetchMock as unknown as typeof fetch);
     const audio = Buffer.from([1, 2, 3, 4, 5]);
 
@@ -28,7 +26,7 @@ describe('HttpTranscriber', () => {
     expect(init.body).toBe(audio);
   });
 
-  it('응답의 segments 를 TranscriptionSegmentPayload[] 로 그대로 돌려준다', async () => {
+  it('응답의 segments를 TranscriptionSegmentPayload[]로 그대로 돌려준다', async () => {
     const fetchMock = jest.fn().mockResolvedValueOnce(
       okResponse({
         segments: [
@@ -49,24 +47,18 @@ describe('HttpTranscriber', () => {
     ]);
   });
 
-  it('응답의 segments 가 비어 있거나 누락이면 빈 배열을 돌려준다', async () => {
+  it('응답의 segments가 비어 있거나 누락이면 빈 배열을 돌려준다', async () => {
     const fetchMock = jest
       .fn()
       .mockResolvedValueOnce(okResponse({ segments: [] }))
       .mockResolvedValueOnce(okResponse({}));
     const transcriber = new HttpTranscriber(baseUrl, fetchMock as unknown as typeof fetch);
-    expect(
-      await transcriber.transcribe({ meetingCode: 'a', audio: Buffer.from('x') }),
-    ).toEqual([]);
-    expect(
-      await transcriber.transcribe({ meetingCode: 'b', audio: Buffer.from('x') }),
-    ).toEqual([]);
+    expect(await transcriber.transcribe({ meetingCode: 'a', audio: Buffer.from('x') })).toEqual([]);
+    expect(await transcriber.transcribe({ meetingCode: 'b', audio: Buffer.from('x') })).toEqual([]);
   });
 
-  it('응답이 non-2xx 면 status 가 포함된 에러를 throw 한다', async () => {
-    const fetchMock = jest.fn().mockResolvedValueOnce(
-      new Response('boom', { status: 500 }),
-    );
+  it('응답이 non-2xx 면 status가 포함된 에러를 throw 한다', async () => {
+    const fetchMock = jest.fn().mockResolvedValueOnce(new Response('boom', { status: 500 }));
     const transcriber = new HttpTranscriber(baseUrl, fetchMock as unknown as typeof fetch);
     await expect(
       transcriber.transcribe({ meetingCode: 'abc12xyz', audio: Buffer.from('x') }),

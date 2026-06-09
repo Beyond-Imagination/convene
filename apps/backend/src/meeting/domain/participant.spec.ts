@@ -83,7 +83,7 @@ describe('Participant', () => {
   });
 
   describe('fromSnapshot', () => {
-    it('active 상태 snapshot 으로부터 동일한 Participant 를 복원한다', () => {
+    it('active 상태 snapshot으로부터 동일한 Participant를 복원한다', () => {
       const restored = Participant.fromSnapshot({
         id: 'socket-1',
         nickname: 'alice',
@@ -97,7 +97,7 @@ describe('Participant', () => {
       expect(restored.leftAt).toBeNull();
     });
 
-    it('leave 한 snapshot 으로부터 inactive 상태를 그대로 복원한다', () => {
+    it('leave 한 snapshot으로부터 inactive 상태를 그대로 복원한다', () => {
       const restored = Participant.fromSnapshot({
         id: 'socket-1',
         nickname: 'alice',
@@ -109,7 +109,7 @@ describe('Participant', () => {
       expect(() => restored.leave(at1)).toThrow(/already left/);
     });
 
-    it('snapshot → fromSnapshot → snapshot 은 round-trip 동등', () => {
+    it('snapshot → fromSnapshot → snapshot은 round-trip 동등', () => {
       const original = Participant.join('socket-1', 'alice', at0);
       original.leave(at1);
       const restored = Participant.fromSnapshot(original.snapshot());

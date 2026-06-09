@@ -49,8 +49,8 @@ interface ProducerCreatedPayload {
 /**
  * mediasoup:* RPC 6 개 핸들러 + `mediasoup.producer.created` 도메인 이벤트 구독.
  *
- * Meeting BC 의 `MeetingGateway` 와 동일한 socket.io 네임스페이스(/)를 공유한다.
- * 회의 room 이름은 `roomOf(code)` 로 양쪽이 일관되게 사용.
+ * Meeting BC의 `MeetingGateway`와 동일한 socket.io 네임스페이스(/)를 공유한다.
+ * 회의 room 이름은 `roomOf(code)`로 양쪽이 일관되게 사용.
  */
 @WebSocketGateway()
 @UsePipes(
@@ -103,8 +103,8 @@ export class MediasoupGateway {
     @MessageBody() dto: ConnectTransportDto,
     @ConnectedSocket() client: Socket,
   ): Promise<{ ok: true }> {
-    // ⚠️ Promise<void> 반환 시 NestJS+socket.io 가 ack callback 을 호출하지 않아
-    // client emitWithAck 가 영원히 대기한다. 명시 응답 객체 반환 필수.
+    // warn: Promise<void> 반환 시 NestJS+socket.io가 ack callback을 호출하지 않아 client emitWithAck가 영원히 대기한다.
+    // 명시 응답 객체 반환 필수.
     try {
       await this.service.connectTransport({
         meetingCode: dto.code,
@@ -112,9 +112,7 @@ export class MediasoupGateway {
         transportId: dto.transportId,
         dtlsParameters: dto.dtlsParameters,
       });
-      this.logger.log(
-        `[connectTransport] ok (sid=${client.id}, transportId=${dto.transportId})`,
-      );
+      this.logger.log(`[connectTransport] ok (sid=${client.id}, transportId=${dto.transportId})`);
       return { ok: true };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -146,9 +144,7 @@ export class MediasoupGateway {
       return res;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.error(
-        `[produce] FAIL (sid=${client.id}, kind=${dto.kind}): ${message}`,
-      );
+      this.logger.error(`[produce] FAIL (sid=${client.id}, kind=${dto.kind}): ${message}`);
       throw err;
     }
   }
@@ -209,7 +205,7 @@ export class MediasoupGateway {
     @MessageBody() dto: ToggleProducerDto,
     @ConnectedSocket() client: Socket,
   ): Promise<ToggleProducerResponse> {
-    // 소유 검증 + pause/resume 위임. 남의 producerId 면 service 가 throw.
+    // 소유 검증 + pause/resume 위임. 남의 producerId 면 service가 throw.
     await this.service.toggleProducer({
       meetingCode: dto.code,
       participantId: client.id,
@@ -255,8 +251,6 @@ export class MediasoupGateway {
       producerId: payload.producerId,
       kind: payload.kind,
       source: payload.source,
-      // produce 시점의 mute 상태를 그대로 전파(기본 OFF 입장이면 true). 이후 mute 변경은
-      // PRODUCER_TOGGLED 로 전파한다.
       paused: payload.paused ?? false,
     };
     this.server

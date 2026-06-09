@@ -122,7 +122,7 @@ describe('MeetingService.createMeeting', () => {
     ]);
   });
 
-  it('HostTokenGenerator 가 발급한 hostToken 을 Meeting 에 부여한다', async () => {
+  it('HostTokenGenerator가 발급한 hostToken을 Meeting에 부여한다', async () => {
     const { service } = makeService();
     const result = await service.createMeeting({
       source: 'web',
@@ -251,9 +251,9 @@ describe('MeetingService.leaveMeeting', () => {
 
   it('Repository에 없는 code면 throw', async () => {
     const { service } = makeService(null);
-    await expect(
-      service.leaveMeeting({ code: 'abc12xyz', participantId: 's1' }),
-    ).rejects.toThrow(/not found/);
+    await expect(service.leaveMeeting({ code: 'abc12xyz', participantId: 's1' })).rejects.toThrow(
+      /not found/,
+    );
   });
 
   it('없는 participantId면 Aggregate 에러가 그대로 전파된다', async () => {
@@ -394,7 +394,11 @@ describe('MeetingService.closeMeeting', () => {
     const meeting = makeMeeting(t0);
     meeting.addParticipant('s1', 'alice', t1);
     const { service, saved, events } = makeService(meeting);
-    const result = await service.closeMeeting({ code: 'abc12xyz', reason: 'manual', hostToken: 'host-token-1' });
+    const result = await service.closeMeeting({
+      code: 'abc12xyz',
+      reason: 'manual',
+      hostToken: 'host-token-1',
+    });
     expect(result).toBe(meeting);
     expect(meeting.isOpen).toBe(false);
     expect(meeting.endedAt).toBe(tClose);
@@ -420,9 +424,7 @@ describe('MeetingService.closeMeeting', () => {
   it('meeting.ended payload의 chat은 ChatRepository.listByCode 결과를 그대로 담는다', async () => {
     const meeting = makeMeeting(t0);
     meeting.addParticipant('s1', 'alice', t1);
-    const accumulated: ChatEntry[] = [
-      chatEntry({ nickname: 'alice', text: '안녕', sentAt: t1 }),
-    ];
+    const accumulated: ChatEntry[] = [chatEntry({ nickname: 'alice', text: '안녕', sentAt: t1 })];
     const saved: Meeting[] = [];
     const { publisher, events } = makeEventPublisher();
     const service = new MeetingService({
@@ -464,7 +466,7 @@ describe('MeetingService.closeMeeting', () => {
     expect(events).toHaveLength(0);
   });
 
-  it('hostToken 이 회의 host 와 일치하지 않으면 NotHostError, close/이벤트 없음', async () => {
+  it('hostToken이 회의 host와 일치하지 않으면 NotHostError, close/이벤트 없음', async () => {
     const meeting = makeMeeting(t0);
     meeting.addParticipant('s1', 'alice', t1);
     const { service, saved, events } = makeService(meeting);

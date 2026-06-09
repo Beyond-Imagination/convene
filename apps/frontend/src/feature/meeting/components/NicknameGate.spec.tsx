@@ -27,7 +27,7 @@ describe('NicknameGate', () => {
     expect(screen.getByRole('button', { name: /입장/ })).toBeInTheDocument();
   });
 
-  it('errors.nickname 이 있으면 에러 메시지를 노출한다', () => {
+  it('errors.nickname이 있으면 에러 메시지를 노출한다', () => {
     render(
       <NicknameGate
         {...baseProps}
@@ -38,7 +38,12 @@ describe('NicknameGate', () => {
   });
 
   it('submitting 상태에서 버튼이 비활성화된다', () => {
-    render(<NicknameGate {...baseProps} status="submitting" />);
+    render(
+      <NicknameGate
+        {...baseProps}
+        status="submitting"
+      />,
+    );
     expect(screen.getByRole('button', { name: /입장/ })).toBeDisabled();
   });
 });

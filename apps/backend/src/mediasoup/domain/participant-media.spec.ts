@@ -65,9 +65,7 @@ describe('ParticipantMedia aggregate', () => {
       const pm = baseSpawn();
       pm.attachTransport('send', 't1');
       pm.addProducer('p1', { kind: 'audio', source: 'audio' });
-      expect(pm.producers).toEqual([
-        { id: 'p1', kind: 'audio', source: 'audio', paused: false },
-      ]);
+      expect(pm.producers).toEqual([{ id: 'p1', kind: 'audio', source: 'audio', paused: false }]);
     });
 
     it('같은 producerId 중복은 거부한다', () => {
@@ -77,14 +75,14 @@ describe('ParticipantMedia aggregate', () => {
       expect(() => pm.addProducer('p1', { kind: 'video', source: 'video' })).toThrow();
     });
 
-    it('paused 초깃값을 주면 그대로 반영한다(기본 mute 로 입장하는 경우)', () => {
+    it('paused 초깃값을 주면 그대로 반영한다(기본 mute로 입장하는 경우)', () => {
       const pm = baseSpawn();
       pm.attachTransport('send', 't1');
       pm.addProducer('p1', { kind: 'audio', source: 'audio', paused: true });
       expect(pm.producers[0].paused).toBe(true);
     });
 
-    it('paused 를 생략하면 false 로 시작한다', () => {
+    it('paused를 생략하면 false로 시작한다', () => {
       const pm = baseSpawn();
       pm.attachTransport('send', 't1');
       pm.addProducer('p1', { kind: 'video', source: 'video' });
@@ -93,7 +91,7 @@ describe('ParticipantMedia aggregate', () => {
   });
 
   describe('setProducerPaused', () => {
-    it('producer 의 paused 상태를 갱신한다', () => {
+    it('producer의 paused 상태를 갱신한다', () => {
       const pm = baseSpawn();
       pm.attachTransport('send', 't1');
       pm.addProducer('p1', { kind: 'video', source: 'video' });
@@ -208,7 +206,7 @@ describe('ParticipantMedia aggregate', () => {
   });
 
   describe('fromSnapshot (복원)', () => {
-    it('snapshot → fromSnapshot → snapshot 은 round-trip 동등', () => {
+    it('snapshot → fromSnapshot → snapshot은 round-trip 동등', () => {
       const original = baseSpawn();
       original.attachTransport('send', 't-send');
       original.attachTransport('recv', 't-recv');
@@ -220,7 +218,7 @@ describe('ParticipantMedia aggregate', () => {
       expect(restored.snapshot()).toEqual(original.snapshot());
     });
 
-    it('closed 상태도 그대로 복원하고 mutation 을 거부한다', () => {
+    it('closed 상태도 그대로 복원하고 mutation을 거부한다', () => {
       const original = baseSpawn();
       original.close();
       const restored = ParticipantMedia.fromSnapshot(original.snapshot());
@@ -228,7 +226,7 @@ describe('ParticipantMedia aggregate', () => {
       expect(() => restored.attachTransport('send', 't1')).toThrow(/closed/);
     });
 
-    it('복원된 ParticipantMedia 는 이어서 mutation 가능하다(transport 부착·producer 추가)', () => {
+    it('복원된 ParticipantMedia는 이어서 mutation 가능하다(transport 부착·producer 추가)', () => {
       const original = baseSpawn();
       original.attachTransport('send', 't-send');
       const restored = ParticipantMedia.fromSnapshot(original.snapshot());

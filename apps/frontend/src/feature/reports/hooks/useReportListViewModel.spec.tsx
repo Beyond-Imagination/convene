@@ -37,7 +37,7 @@ describe('useReportListViewModel', () => {
     expect(result.current.items).toEqual([]);
   });
 
-  it('listReports 가 resolve 되면 status="loaded" + items 가 채워진다', async () => {
+  it('listReports가 resolve 되면 status="loaded" + items가 채워진다', async () => {
     listReportsMock.mockResolvedValueOnce([item({ id: 'r1' }), item({ id: 'r2' })]);
     const { result } = renderHook(() => useReportListViewModel());
     await waitFor(() => expect(result.current.status).toBe('loaded'));
@@ -45,14 +45,14 @@ describe('useReportListViewModel', () => {
     expect(result.current.errorMessage).toBeNull();
   });
 
-  it('listReports 가 reject 되면 status="error" + errorMessage 노출', async () => {
+  it('listReports가 reject 되면 status="error" + errorMessage 노출', async () => {
     listReportsMock.mockRejectedValueOnce(new ReportsApiError(500, 'mongo down'));
     const { result } = renderHook(() => useReportListViewModel());
     await waitFor(() => expect(result.current.status).toBe('error'));
     expect(result.current.errorMessage).toBe('mongo down');
   });
 
-  it('refresh() 호출 시 listReports 가 다시 호출되고 items 가 갱신된다', async () => {
+  it('refresh() 호출 시 listReports가 다시 호출되고 items가 갱신된다', async () => {
     listReportsMock.mockResolvedValueOnce([item({ id: 'r1' })]);
     const { result } = renderHook(() => useReportListViewModel());
     await waitFor(() => expect(result.current.status).toBe('loaded'));

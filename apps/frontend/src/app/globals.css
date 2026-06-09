@@ -37,10 +37,6 @@ body {
     sans-serif;
 }
 
-/**
- * 재사용 UI 프리미티브. 메인·입장·reports·회의 컨트롤 바가 공유한다.
- * 의미 토큰(bg/surface/border/text/muted)을 쓰므로 .theme-dark 안에서도 동작한다.
- */
 @layer components {
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;

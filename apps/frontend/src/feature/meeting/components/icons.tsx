@@ -1,8 +1,8 @@
-/**
- * 회의 컨트롤 바용 인라인 SVG 아이콘 모음 (의존성 없이 currentColor 사용).
- * 모두 24x24 stroke 기반. 버튼의 접근성 이름은 별도 텍스트 라벨이 담당하므로
- * 아이콘 자체는 aria-hidden 으로 둔다.
+/*
+ * 회의 컨트롤 바용 인라인 SVG 아이콘 모음. 모두 24x24 stroke 기반.
+ * 버튼의 접근성 이름은 별도 텍스트 라벨이 담당하므로 아이콘 자체는 aria-hidden으로 둔다.
  */
+
 type IconProps = { readonly className?: string };
 
 const base = (className?: string) => ({
@@ -21,7 +21,13 @@ const base = (className?: string) => ({
 export function MicIcon({ className }: IconProps) {
   return (
     <svg {...base(className)}>
-      <rect x="9" y="2" width="6" height="12" rx="3" />
+      <rect
+        x="9"
+        y="2"
+        width="6"
+        height="12"
+        rx="3"
+      />
       <path d="M5 10a7 7 0 0 0 14 0M12 19v3" />
     </svg>
   );
@@ -39,7 +45,13 @@ export function MicOffIcon({ className }: IconProps) {
 export function VideoIcon({ className }: IconProps) {
   return (
     <svg {...base(className)}>
-      <rect x="2" y="6" width="13" height="12" rx="2" />
+      <rect
+        x="2"
+        y="6"
+        width="13"
+        height="12"
+        rx="2"
+      />
       <path d="M22 8l-7 4 7 4V8z" />
     </svg>
   );
@@ -57,7 +69,13 @@ export function VideoOffIcon({ className }: IconProps) {
 export function ScreenShareIcon({ className }: IconProps) {
   return (
     <svg {...base(className)}>
-      <rect x="2" y="3" width="20" height="14" rx="2" />
+      <rect
+        x="2"
+        y="3"
+        width="20"
+        height="14"
+        rx="2"
+      />
       <path d="M8 21h8M12 17v4M12 7v5M9.5 9.5 12 7l2.5 2.5" />
     </svg>
   );

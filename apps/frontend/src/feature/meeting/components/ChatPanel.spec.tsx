@@ -33,7 +33,7 @@ describe('ChatPanel View', () => {
     expect(items[1]).toHaveTextContent('하이');
   });
 
-  it('myNickname 과 같은 보낸이는 내 메시지(data-mine=true), 다르면 false 로 구분한다', () => {
+  it('myNickname과 같은 보낸이는 내 메시지(data-mine=true), 다르면 false로 구분한다', () => {
     render(
       <ChatPanel
         {...baseVm({
@@ -50,18 +50,18 @@ describe('ChatPanel View', () => {
     expect(items[1]).toHaveAttribute('data-mine', 'false');
   });
 
-  it('canSend=false 면 input 과 버튼이 모두 비활성화된다', () => {
+  it('canSend=false 면 input과 버튼이 모두 비활성화된다', () => {
     render(<ChatPanel {...baseVm({ canSend: false })} />);
     expect(screen.getByLabelText('메시지')).toBeDisabled();
     expect(screen.getByRole('button', { name: '보내기' })).toBeDisabled();
   });
 
-  it('draft 가 빈 문자열이면 버튼은 비활성화된다 (전송 가능 상태와 무관)', () => {
+  it('draft가 빈 문자열이면 버튼은 비활성화된다 (전송 가능 상태와 무관)', () => {
     render(<ChatPanel {...baseVm({ canSend: true, draft: '' })} />);
     expect(screen.getByRole('button', { name: '보내기' })).toBeDisabled();
   });
 
-  it('draft 가 채워지면 버튼이 활성화되고 onChange 가 setDraft 호출', () => {
+  it('draft가 채워지면 버튼이 활성화되고 onChange가 setDraft 호출', () => {
     const setDraft = vi.fn();
     render(<ChatPanel {...baseVm({ draft: '안녕', setDraft })} />);
     expect(screen.getByRole('button', { name: '보내기' })).toBeEnabled();

@@ -1,8 +1,7 @@
 /**
  * Gemini(LLM 요약) 어댑터의 환경변수 해석 모듈.
  *
- * - `GEMINI_API_KEY` 가 비어 있으면 NoopSummarizer fallback 신호로 `null` 반환.
- *   ReportsModule 의 useFactory 가 null 일 때 NoopSummarizer 를 주입한다.
+ * - `GEMINI_API_KEY`가 비어 있으면 NoopSummarizer fallback 신호로 `null` 반환.
  * - 모델/타임아웃은 미설정 시 디폴트 사용.
  */
 
@@ -17,9 +16,7 @@ export interface GeminiConfig {
   readonly baseUrl: string;
 }
 
-export function resolveGeminiConfig(
-  env: NodeJS.ProcessEnv = process.env,
-): GeminiConfig | null {
+export function resolveGeminiConfig(env: NodeJS.ProcessEnv = process.env): GeminiConfig | null {
   const apiKey = env.GEMINI_API_KEY?.trim();
   if (apiKey === undefined || apiKey.length === 0) return null;
 
@@ -31,9 +28,7 @@ export function resolveGeminiConfig(
   if (timeoutRaw !== undefined && timeoutRaw.length > 0) {
     const parsed = Number(timeoutRaw);
     if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0) {
-      throw new Error(
-        `GEMINI_TIMEOUT_MS 는 양의 정수(ms)여야 합니다: "${timeoutRaw}"`,
-      );
+      throw new Error(`GEMINI_TIMEOUT_MS는 양의 정수(ms)여야 합니다: "${timeoutRaw}"`);
     }
     timeoutMs = parsed;
   }
@@ -41,9 +36,7 @@ export function resolveGeminiConfig(
   let baseUrl = DEFAULT_GEMINI_BASE_URL;
   if (baseUrlRaw !== undefined && baseUrlRaw.length > 0) {
     if (!/^https?:\/\//.test(baseUrlRaw)) {
-      throw new Error(
-        `GEMINI_BASE_URL 은 http:// 또는 https:// 스킴이어야 합니다: "${baseUrlRaw}"`,
-      );
+      throw new Error(`GEMINI_BASE_URL은 http:// 또는 https:// 스킴이어야 합니다: "${baseUrlRaw}"`);
     }
     baseUrl = baseUrlRaw.replace(/\/+$/, '');
   }

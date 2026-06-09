@@ -13,7 +13,7 @@ const baseOptions = (numWorkers: number) => ({
 });
 
 describe('MediasoupWorkerPool', () => {
-  it('onModuleInit 후 options.numWorkers 만큼의 살아있는 worker 를 보유한다', async () => {
+  it('onModuleInit 후 options.numWorkers 만큼의 살아있는 worker를 보유한다', async () => {
     const pool = new MediasoupWorkerPool(baseOptions(1));
     try {
       await pool.onModuleInit();
@@ -26,7 +26,7 @@ describe('MediasoupWorkerPool', () => {
     }
   });
 
-  it('getNextWorker 는 round-robin 으로 순환한다', async () => {
+  it('getNextWorker는 round-robin으로 순환한다', async () => {
     const pool = new MediasoupWorkerPool(baseOptions(2));
     try {
       await pool.onModuleInit();
@@ -40,7 +40,7 @@ describe('MediasoupWorkerPool', () => {
     }
   });
 
-  it('onModuleDestroy 후엔 모든 worker 가 closed 상태가 된다', async () => {
+  it('onModuleDestroy 후엔 모든 worker가 closed 상태가 된다', async () => {
     const pool = new MediasoupWorkerPool(baseOptions(1));
     await pool.onModuleInit();
     const worker = pool.getNextWorker();

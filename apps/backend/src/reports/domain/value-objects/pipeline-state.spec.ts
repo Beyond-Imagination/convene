@@ -44,9 +44,9 @@ describe('PipelineState', () => {
     });
 
     it('error가 1000자를 넘으면 거부', () => {
-      expect(() =>
-        PipelineState.initial().markTranscriptionFailed('a'.repeat(1001), at1),
-      ).toThrow(/error/);
+      expect(() => PipelineState.initial().markTranscriptionFailed('a'.repeat(1001), at1)).toThrow(
+        /error/,
+      );
     });
   });
 
@@ -78,7 +78,7 @@ describe('PipelineState', () => {
   });
 
   describe('resummarizeDone (관리자 재요약)', () => {
-    it('failed 였던 summary 를 done 으로 덮어쓰고 기존 failures 는 보존한다', () => {
+    it('failed 였던 summary를 done으로 덮어쓰고 기존 failures는 보존한다', () => {
       const s = PipelineState.initial()
         .markTranscriptionDone()
         .markSummaryFailed('llm boom', at1)
@@ -89,15 +89,12 @@ describe('PipelineState', () => {
       expect(s.isDone).toBe(true);
     });
 
-    it('done 이던 summary 도 다시 done 으로 덮어쓸 수 있다(새 프롬프트 재요약)', () => {
-      const s = PipelineState.initial()
-        .markTranscriptionDone()
-        .markSummaryDone()
-        .resummarizeDone();
+    it('done 이던 summary도 다시 done으로 덮어쓸 수 있다(새 프롬프트 재요약)', () => {
+      const s = PipelineState.initial().markTranscriptionDone().markSummaryDone().resummarizeDone();
       expect(s.summaryStatus).toBe('done');
     });
 
-    it('summary 가 아직 pending 이면 재요약 전이를 거부한다', () => {
+    it('summary가 아직 pending 이면 재요약 전이를 거부한다', () => {
       const s = PipelineState.initial().markTranscriptionDone();
       expect(() => s.resummarizeDone()).toThrow(/pending/);
     });
@@ -128,16 +125,14 @@ describe('PipelineState', () => {
     });
 
     it('한 stage done + 한 stage failed면 finalize 가능, 단 isDone=false', () => {
-      const s = PipelineState.initial()
-        .markTranscriptionDone()
-        .markSummaryFailed('err', at1);
+      const s = PipelineState.initial().markTranscriptionDone().markSummaryFailed('err', at1);
       expect(s.isFinal).toBe(true);
       expect(s.isDone).toBe(false);
     });
   });
 
   describe('fromSnapshot (복원)', () => {
-    it('initial 상태와 동등한 snapshot 으로부터 복원하면 같은 동작', () => {
+    it('initial 상태와 동등한 snapshot으로부터 복원하면 같은 동작', () => {
       const restored = PipelineState.fromSnapshot({
         sttStatus: 'pending',
         summaryStatus: 'pending',
@@ -149,7 +144,7 @@ describe('PipelineState', () => {
       expect(restored.isFinal).toBe(false);
     });
 
-    it('done + failed 가 섞인 상태도 그대로 복원하고 재전이를 거부한다', () => {
+    it('done + failed가 섞인 상태도 그대로 복원하고 재전이를 거부한다', () => {
       const restored = PipelineState.fromSnapshot({
         sttStatus: 'done',
         summaryStatus: 'failed',

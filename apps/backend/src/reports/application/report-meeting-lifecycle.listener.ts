@@ -7,11 +7,7 @@ import { MeetingEndedPayload } from '@/shared-kernel/domain/events';
 import { ReportFinalizationService } from './report-finalization.service';
 
 /**
- * Meeting BC의 `meeting.ended` 이벤트를 구독해 Reports BC의 회의록 draft
- * 생성을 트리거하는 application listener.
- *
- * 두 BC는 본 listener 외 직접 의존을 갖지 않으며 `MeetingEndedPayload`
- * 인터페이스 하나로만 결합한다.
+ * Meeting BC의 `meeting.ended` 이벤트를 구독해 Reports BC의 회의록 draft 생성을 트리거하는 application listener.
  */
 @Injectable()
 export class ReportMeetingLifecycleListener {

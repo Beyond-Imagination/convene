@@ -11,9 +11,7 @@ const noopRegister = (() => ({
   ref: () => {},
 })) as unknown as UseJoinMeetingViewModel['register'];
 
-const baseVm = (
-  overrides: Partial<UseJoinMeetingViewModel> = {},
-): UseJoinMeetingViewModel => ({
+const baseVm = (overrides: Partial<UseJoinMeetingViewModel> = {}): UseJoinMeetingViewModel => ({
   status: 'idle',
   register: noopRegister,
   errors: {},
@@ -34,7 +32,7 @@ describe('JoinMeetingForm View', () => {
     expect(screen.getByRole('button', { name: '입장 중…' })).toBeDisabled();
   });
 
-  it('errors.code 가 있으면 role="alert" 로 메시지를 노출한다', () => {
+  it('errors.code가 있으면 role="alert" 로 메시지를 노출한다', () => {
     render(
       <JoinMeetingForm
         {...baseVm({
@@ -47,7 +45,7 @@ describe('JoinMeetingForm View', () => {
     expect(alert).toHaveAttribute('data-field', 'code');
   });
 
-  it('errors.nickname 이 있으면 alert 로 노출한다', () => {
+  it('errors.nickname이 있으면 alert로 노출한다', () => {
     render(
       <JoinMeetingForm
         {...baseVm({
@@ -58,7 +56,7 @@ describe('JoinMeetingForm View', () => {
     expect(screen.getByText('닉네임 필요')).toHaveAttribute('data-field', 'nickname');
   });
 
-  it('폼 submit 시 vm.handleSubmit 이 호출된다', () => {
+  it('폼 submit 시 vm.handleSubmit이 호출된다', () => {
     const handleSubmit = vi.fn();
     render(<JoinMeetingForm {...baseVm({ handleSubmit })} />);
     fireEvent.submit(screen.getByRole('form', { name: 'join-form' }));

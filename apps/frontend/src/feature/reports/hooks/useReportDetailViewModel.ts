@@ -5,14 +5,7 @@ import { useEffect, useState } from 'react';
 
 import { getReport, ReportsApiError } from '@/shared/api/reports.api';
 
-/**
- * /reports/[id] 회의록 상세 페이지의 ViewModel.
- *
- * `id` 가 빈 문자열이면 idle 유지(정적 export 의 placeholder route 진입 등). id 가
- * 변경되면 새 id 로 다시 fetch. 404 는 별도 status 로 구분해 View 가 "삭제됨/없음"
- * 안내를 쉽게 띄울 수 있게 한다.
- */
-export type ReportDetailStatus = 'idle' | 'loading' | 'loaded' | 'not-found' | 'error';
+type ReportDetailStatus = 'idle' | 'loading' | 'loaded' | 'not-found' | 'error';
 
 export interface UseReportDetailViewModel {
   readonly status: ReportDetailStatus;
@@ -20,10 +13,15 @@ export interface UseReportDetailViewModel {
   readonly errorMessage: string | null;
 }
 
+/**
+ * /reports/[id] 회의록 상세 페이지의 ViewModel.
+ *
+ * `id`가 빈 문자열이면 idle 유지(정적 export의 placeholder route 진입 등).
+ * id가 변경되면 새 id로 다시 fetch.
+ * 404는 별도 status로 구분해 View가 "삭제됨/없음" 안내를 쉽게 띄울 수 있게 한다.
+ */
 export function useReportDetailViewModel(id: string): UseReportDetailViewModel {
-  const [status, setStatus] = useState<ReportDetailStatus>(
-    id === '' ? 'idle' : 'loading',
-  );
+  const [status, setStatus] = useState<ReportDetailStatus>(id === '' ? 'idle' : 'loading');
   const [report, setReport] = useState<ReportDetailResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 

@@ -11,12 +11,7 @@ import {
 import { ReportFinalizationService } from './report-finalization.service';
 
 /**
- * Recording BC 가 발행하는 STT 결과 이벤트를 구독해 회의록 파이프라인을
- * 한 단계 진행시키는 Reports BC application listener.
- *
- * payload 의 plain transcript 구조를 도메인 `TranscriptSegment` VO 로 변환해
- * Aggregate 의 불변식을 통과시킨 뒤 Application Service 에 위임한다.
- * 두 BC 는 본 listener 외 직접 의존을 갖지 않는다.
+ * Recording BC가 발행하는 STT 결과 이벤트를 구독해 회의록 파이프라인을 한 단계 진행시키는 Reports BC application listener.
  */
 @Injectable()
 export class ReportPipelineListener {

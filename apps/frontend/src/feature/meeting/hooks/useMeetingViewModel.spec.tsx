@@ -8,7 +8,7 @@ import { useMeetingViewModel } from './useMeetingViewModel';
 
 /**
  * Socket.IO 클라이언트의 최소 인터페이스만 흉내내는 fake.
- * 테스트가 직접 `trigger(event, payload)` 를 호출해 서버 측 broadcast 를 모사한다.
+ * 테스트가 직접 `trigger(event, payload)`를 호출해 서버 측 broadcast를 모사한다.
  */
 class FakeSocket {
   readonly listeners = new Map<string, Array<(...args: unknown[]) => void>>();
@@ -87,14 +87,14 @@ describe('useMeetingViewModel', () => {
     window.sessionStorage.clear();
   });
 
-  it('닉네임이 store 에 없으면 홈으로 redirect 하지 않고 socket 도 만들지 않는다 (직접 접속 닉네임 모달용)', () => {
+  it('닉네임이 store에 없으면 홈으로 redirect 하지 않고 socket도 만들지 않는다 (직접 접속 닉네임 모달용)', () => {
     const { result } = setup(null);
     // 링크 직접 접속(미인증)은 홈으로 튕기지 않고 회의 페이지에서 닉네임 입력을 받는다.
     expect(replaceMock).not.toHaveBeenCalled();
     expect(result.current.socket).toBeNull();
   });
 
-  it('mount + connect 시 meeting:join 을 emit 한다', () => {
+  it('mount + connect 시 meeting:join을 emit 한다', () => {
     const { result } = setup('준');
     connect();
     expect(fakeSocket.emit).toHaveBeenCalledWith(MEETING_WS_EVENTS.JOIN, {
@@ -136,7 +136,7 @@ describe('useMeetingViewModel', () => {
     expect(result.current.remoteParticipants).toEqual([]);
   });
 
-  it('같은 socketId 가 다시 join 되면 중복되지 않고 갱신된다', () => {
+  it('같은 socketId가 다시 join 되면 중복되지 않고 갱신된다', () => {
     const { result } = setup('준');
     connect();
     act(() => {
@@ -177,7 +177,7 @@ describe('useMeetingViewModel', () => {
     expect(result.current.socket).toBe(fakeSocket);
   });
 
-  it('닉네임 없으면(redirect) socket 은 null 로 유지된다', () => {
+  it('닉네임 없으면(redirect) socket은 null로 유지된다', () => {
     const { result } = setup(null);
     expect(result.current.socket).toBeNull();
   });
@@ -195,20 +195,20 @@ describe('useMeetingViewModel', () => {
   });
 
   describe('isHost', () => {
-    it('회의 code 에 대한 hostToken 이 저장돼 있으면 isHost=true', () => {
+    it('회의 code에 대한 hostToken이 저장돼 있으면 isHost=true', () => {
       saveHostToken(code, 'tok-host');
       const { result } = setup('준');
       expect(result.current.isHost).toBe(true);
     });
 
-    it('hostToken 이 없으면 isHost=false(회의 입장자/비-host)', () => {
+    it('hostToken이 없으면 isHost=false(회의 입장자/비-host)', () => {
       const { result } = setup('준');
       expect(result.current.isHost).toBe(false);
     });
   });
 
   describe('endMeeting()', () => {
-    it('DELETE /meetings/:code 를 호출하고 성공 시 닉네임 clear + /reports 로 push', async () => {
+    it('DELETE /meetings/:code를 호출하고 성공 시 닉네임 clear + /reports로 push', async () => {
       closeMeetingMock.mockResolvedValueOnce({
         code,
         endedAt: '2026-01-01T00:30:00.000Z',
@@ -219,15 +219,15 @@ describe('useMeetingViewModel', () => {
       await act(async () => {
         await result.current.endMeeting();
       });
-      // hostToken 저장이 없으면 undefined 로 호출(backend 가 host 아님으로 거부).
+      // hostToken 저장이 없으면 undefined로 호출(backend가 host 아님으로 거부).
       expect(closeMeetingMock).toHaveBeenCalledWith(code, undefined);
       expect(useSessionStore.getState().nickname).toBeNull();
       expect(pushMock).toHaveBeenCalledWith('/reports');
-      // 닉네임이 비워져도 미인증 홈 redirect 와 경쟁하지 않는다("(미인증)" 깜박임 방지).
+      // 닉네임이 비워져도 미인증 홈 redirect와 경쟁하지 않는다("(미인증)" 깜박임 방지).
       expect(replaceMock).not.toHaveBeenCalledWith('/');
     });
 
-    it('저장된 hostToken 을 closeMeeting 에 함께 전달한다', async () => {
+    it('저장된 hostToken을 closeMeeting에 함께 전달한다', async () => {
       saveHostToken(code, 'tok-host');
       closeMeetingMock.mockResolvedValueOnce({
         code,
@@ -241,7 +241,7 @@ describe('useMeetingViewModel', () => {
       expect(closeMeetingMock).toHaveBeenCalledWith(code, 'tok-host');
     });
 
-    it('성공 시 leave 처럼 socket 도 disconnect 한다(중복 leave 이벤트 차단)', async () => {
+    it('성공 시 leave처럼 socket도 disconnect 한다(중복 leave 이벤트 차단)', async () => {
       closeMeetingMock.mockResolvedValueOnce({
         code,
         endedAt: '2026-01-01T00:30:00.000Z',
@@ -254,7 +254,7 @@ describe('useMeetingViewModel', () => {
       expect(fakeSocket.disconnect).toHaveBeenCalled();
     });
 
-    it('DELETE 가 실패해도 사용자 경험을 깨지 않고 /reports 로 이동한다', async () => {
+    it('DELETE가 실패해도 사용자 경험을 깨지 않고 /reports로 이동한다', async () => {
       closeMeetingMock.mockRejectedValueOnce(new Error('Meeting is already closed'));
       const { result } = setup('준');
       connect();
@@ -265,7 +265,7 @@ describe('useMeetingViewModel', () => {
       expect(useSessionStore.getState().nickname).toBeNull();
     });
 
-    it('성공 후 cleanup 에서 meeting:leave 를 다시 emit 하지 않는다(이미 종료된 회의 race 방지)', async () => {
+    it('성공 후 cleanup에서 meeting:leave를 다시 emit 하지 않는다(이미 종료된 회의 race 방지)', async () => {
       closeMeetingMock.mockResolvedValueOnce({
         code,
         endedAt: '2026-01-01T00:30:00.000Z',
@@ -282,7 +282,7 @@ describe('useMeetingViewModel', () => {
   });
 
   describe('meeting:ended broadcast (자동 종료 브로드캐스트 수신)', () => {
-    it('수신 시 닉네임 clear + socket.disconnect + /reports 로 push', () => {
+    it('수신 시 닉네임 clear + socket.disconnect + /reports로 push', () => {
       const { result } = setup('준');
       connect();
       act(() => {
@@ -291,16 +291,16 @@ describe('useMeetingViewModel', () => {
           endedAt: '2026-01-01T00:30:00.000Z',
         });
       });
-      // result.current 도 함께 갱신됨을 부수적으로 확인
+      // result.current도 함께 갱신됨을 부수적으로 확인
       void result.current;
       expect(useSessionStore.getState().nickname).toBeNull();
       expect(fakeSocket.disconnect).toHaveBeenCalled();
       expect(pushMock).toHaveBeenCalledWith('/reports');
-      // 닉네임이 비워져도 미인증 홈 redirect 와 경쟁하지 않는다("(미인증)" 깜박임 방지).
+      // 닉네임이 비워져도 미인증 홈 redirect와 경쟁하지 않는다("(미인증)" 깜박임 방지).
       expect(replaceMock).not.toHaveBeenCalledWith('/');
     });
 
-    it('수신 후 cleanup 에서 meeting:leave 를 emit 하지 않는다(이미 종료됨)', () => {
+    it('수신 후 cleanup에서 meeting:leave를 emit 하지 않는다(이미 종료됨)', () => {
       const { unmount } = setup('준');
       connect();
       act(() => {
@@ -314,7 +314,7 @@ describe('useMeetingViewModel', () => {
       expect(fakeSocket.emit).not.toHaveBeenCalledWith(MEETING_WS_EVENTS.LEAVE, { code });
     });
 
-    it('수신 시 closeMeeting API 는 호출하지 않는다(backend 가 이미 종료한 회의)', () => {
+    it('수신 시 closeMeeting API는 호출하지 않는다(backend가 이미 종료한 회의)', () => {
       setup('준');
       connect();
       act(() => {
@@ -327,7 +327,7 @@ describe('useMeetingViewModel', () => {
     });
   });
 
-  it('자동 재연결 시(connect 두 번째 발생) JOIN 을 다시 emit 한다', () => {
+  it('자동 재연결 시(connect 두 번째 발생) JOIN을 다시 emit 한다', () => {
     setup('준');
     connect(); // 첫 connect
     fakeSocket.emit.mockClear();
@@ -340,7 +340,7 @@ describe('useMeetingViewModel', () => {
     });
   });
 
-  it('자동 재연결 시 remoteParticipants 가 초기화되어 stale 항목이 제거된다', () => {
+  it('자동 재연결 시 remoteParticipants가 초기화되어 stale 항목이 제거된다', () => {
     const { result } = setup('준');
     connect();
     act(() => {
@@ -357,7 +357,7 @@ describe('useMeetingViewModel', () => {
     expect(result.current.remoteParticipants).toEqual([]);
   });
 
-  it('재연결 후 reconnectGen 이 증가해 외부에 노출된다', () => {
+  it('재연결 후 reconnectGen이 증가해 외부에 노출된다', () => {
     const { result } = setup('준');
     connect();
     expect(result.current.reconnectGen).toBe(0);

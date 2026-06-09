@@ -15,28 +15,13 @@ import {
 import { LocalVideoTile } from '@/feature/meeting/components/LocalVideoTile';
 import { RemoteAudioPlayer } from '@/feature/meeting/components/RemoteAudioPlayer';
 import { RemoteVideoTile } from '@/feature/meeting/components/RemoteVideoTile';
-import {
-  LocalScreenTile,
-  RemoteScreenTile,
-} from '@/feature/meeting/components/ScreenTile';
+import { LocalScreenTile, RemoteScreenTile } from '@/feature/meeting/components/ScreenTile';
 import type {
   RemoteMediaEntry,
   UseMediasoupViewModel,
 } from '@/feature/meeting/hooks/useMediasoupViewModel';
 import type { UseMeetingViewModel } from '@/feature/meeting/hooks/useMeetingViewModel';
 
-/**
- * 회의 화면의 dumb View.
- *
- * useState/useEffect/fetch/socket 호출 금지. ViewModel hook
- * 반환을 그대로 prop 타입으로 받는다.
- *
- * 레이아웃(Zoom/Meet 톤): 상단 헤더 / 중앙 비디오 영역(스크롤 차단) / 하단 컨트롤 바.
- *  - 비디오는 self 가 첫 칸인 균등 그리드. 페이지당 pageSize 개로 페이지네이션.
- *  - 화면 공유 중이면 상단에 큰 화면 stage + 하단에 비디오 가로 strip.
- * 채팅 패널은 상위(MeetingPageClient)가 우측에 배치하고, 그 토글만 컨트롤 바의
- * "채팅" 버튼이 담당한다. 페이지네이션 상태는 useMeetingLayoutViewModel 이 준다.
- */
 export interface MeetingScreenProps extends UseMeetingViewModel {
   readonly mediasoup: UseMediasoupViewModel;
   readonly isChatOpen?: boolean;
@@ -51,7 +36,7 @@ export interface MeetingScreenProps extends UseMeetingViewModel {
   readonly onNextPage?: () => void;
 }
 
-/** 같은 참가자의 카메라(screen 제외) 비디오 entry 를 찾는다. */
+/** 같은 참가자의 카메라(screen 제외) 비디오 entry를 찾는다. */
 const pickVideoEntry = (
   remoteMedia: ReadonlyArray<RemoteMediaEntry>,
   peerSocketId: string,
@@ -64,7 +49,7 @@ const pickVideoEntry = (
   return null;
 };
 
-/** 같은 참가자의 마이크(audio) entry 를 찾는다. */
+/** 같은 참가자의 마이크(audio) entry를 찾는다. */
 const pickAudioEntry = (
   remoteMedia: ReadonlyArray<RemoteMediaEntry>,
   peerSocketId: string,
@@ -106,6 +91,9 @@ const gridDims = (count: number): { cols: number; rows: number } => {
   return { cols: 4, rows: Math.ceil(count / 4) };
 };
 
+/**
+ * 회의 화면의 dumb View.
+ */
 export function MeetingScreen({
   code,
   status,
@@ -127,14 +115,11 @@ export function MeetingScreen({
   onNextPage,
 }: MeetingScreenProps) {
   const participantCount = remoteParticipants.length + (nickname !== null ? 1 : 0);
-  const mediaPreparing =
-    mediasoup.status === 'idle' || mediasoup.status === 'preparing';
+  const mediaPreparing = mediasoup.status === 'idle' || mediasoup.status === 'preparing';
 
   const hasScreen =
     mediasoup.isSharingScreen ||
-    remoteParticipants.some(
-      (p) => pickScreenTrack(mediasoup.remoteMedia, p.socketId) !== null,
-    );
+    remoteParticipants.some((p) => pickScreenTrack(mediasoup.remoteMedia, p.socketId) !== null);
 
   // self(첫 칸) + 원격 카메라 타일을 한 배열로 만든 뒤 페이지 단위로 자른다.
   const tiles: ReactNode[] = [
@@ -167,14 +152,14 @@ export function MeetingScreen({
   return (
     <section className="flex h-full min-w-0 flex-1 flex-col">
       {/* 상단 헤더 */}
-      <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-3">
+      <header className="border-border flex items-center justify-between gap-3 border-b px-5 py-3">
         <div className="min-w-0">
-          <h1 className="truncate text-base font-semibold text-text">회의 {code}</h1>
-          <p className="text-xs text-muted">
+          <h1 className="text-text truncate text-base font-semibold">회의 {code}</h1>
+          <p className="text-muted text-xs">
             내 닉네임: {nickname ?? '(미인증)'} · 참가자 {participantCount}명
           </p>
         </div>
-        <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-muted">
+        <span className="text-muted rounded-full bg-white/10 px-3 py-1 text-xs font-medium">
           {status === 'joined' ? '연결됨' : status}
         </span>
       </header>
@@ -186,12 +171,19 @@ export function MeetingScreen({
         (mediasoup.status === 'error' && mediasoup.errorMessage !== null)) && (
         <div className="flex flex-col gap-1 px-5 py-2">
           {status === 'connecting' && (
-            <p role="status" aria-live="polite" className="text-sm text-muted">
+            <p
+              role="status"
+              aria-live="polite"
+              className="text-muted text-sm"
+            >
               연결 중…
             </p>
           )}
           {status === 'error' && errorMessage !== null && (
-            <p role="alert" className="text-sm text-danger">
+            <p
+              role="alert"
+              className="text-danger text-sm"
+            >
               연결 실패: {errorMessage}
             </p>
           )}
@@ -200,13 +192,16 @@ export function MeetingScreen({
               role="status"
               aria-live="polite"
               data-testid="mediasoup-status"
-              className="text-sm text-muted"
+              className="text-muted text-sm"
             >
               미디어 준비 중…
             </p>
           )}
           {mediasoup.status === 'error' && mediasoup.errorMessage !== null && (
-            <p role="alert" className="text-sm text-danger">
+            <p
+              role="alert"
+              className="text-danger text-sm"
+            >
               미디어 오류: {mediasoup.errorMessage}
             </p>
           )}
@@ -214,14 +209,18 @@ export function MeetingScreen({
       )}
 
       {/* 접근성용 참가자 목록 (시각적으로는 비디오 그리드가 대신함) */}
-      <section aria-labelledby="participants-heading" className="sr-only">
+      <section
+        aria-labelledby="participants-heading"
+        className="sr-only"
+      >
         <h2 id="participants-heading">참가자</h2>
         <ul>
-          {nickname !== null && (
-            <li data-testid="self-participant">{nickname} (나)</li>
-          )}
+          {nickname !== null && <li data-testid="self-participant">{nickname} (나)</li>}
           {remoteParticipants.map((p) => (
-            <li key={p.socketId} data-testid="remote-participant">
+            <li
+              key={p.socketId}
+              data-testid="remote-participant"
+            >
               {p.nickname}
             </li>
           ))}
@@ -252,7 +251,10 @@ export function MeetingScreen({
             {/* 비디오 가로 strip */}
             <div className="mt-3 flex shrink-0 gap-3 overflow-hidden">
               {visibleTiles.map((tile, i) => (
-                <div key={i} className="aspect-video w-44 shrink-0">
+                <div
+                  key={i}
+                  className="aspect-video w-44 shrink-0"
+                >
                   {tile}
                 </div>
               ))}
@@ -282,11 +284,11 @@ export function MeetingScreen({
               onClick={onPrevPage}
               disabled={canPrev === false}
               aria-label="이전 페이지"
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-text transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+              className="border-border text-text flex h-8 w-8 items-center justify-center rounded-full border transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
             >
               ‹
             </button>
-            <span className="text-xs font-medium text-muted">
+            <span className="text-muted text-xs font-medium">
               {(page ?? 0) + 1} / {pageCount}
             </span>
             <button
@@ -294,7 +296,7 @@ export function MeetingScreen({
               onClick={onNextPage}
               disabled={canNext === false}
               aria-label="다음 페이지"
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-text transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+              className="border-border text-text flex h-8 w-8 items-center justify-center rounded-full border transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
             >
               ›
             </button>
@@ -302,11 +304,11 @@ export function MeetingScreen({
         )}
       </div>
 
-      {/* 원격 audio 는 video 와 분리된 별도 `<audio>` 요소로 재생 */}
+      {/* 원격 audio는 video와 분리된 별도 `<audio>` 요소로 재생 */}
       <RemoteAudioPlayer remoteMedia={mediasoup.remoteMedia} />
 
       {/* 하단 컨트롤 바 */}
-      <footer className="flex items-center justify-center gap-2 border-t border-border px-5 py-3">
+      <footer className="border-border flex items-center justify-center gap-2 border-t px-5 py-3">
         <button
           type="button"
           onClick={mediasoup.toggleAudio}
@@ -359,19 +361,23 @@ export function MeetingScreen({
           </button>
         )}
 
-        <div className="mx-1 h-9 w-px bg-border" />
+        <div className="bg-border mx-1 h-9 w-px" />
 
-        <button type="button" onClick={leave} className={`${controlButton} ${controlNeutral}`}>
+        <button
+          type="button"
+          onClick={leave}
+          className={`${controlButton} ${controlNeutral}`}
+        >
           <LeaveIcon />
           나가기
         </button>
 
-        {/* 회의 종료는 host(생성자)만. 비-host 에게는 노출하지 않는다. */}
+        {/* 회의 종료는 host(생성자)만. 비-host에게는 노출하지 않는다. */}
         {isHost && (
           <button
             type="button"
             onClick={() => void endMeeting()}
-            className={`${controlButton} bg-danger text-white hover:bg-danger-hover`}
+            className={`${controlButton} bg-danger hover:bg-danger-hover text-white`}
           >
             <EndCallIcon />
             회의 종료

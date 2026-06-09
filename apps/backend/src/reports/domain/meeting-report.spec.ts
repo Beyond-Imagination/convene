@@ -55,9 +55,9 @@ describe('MeetingReport (Aggregate Root)', () => {
 
     it('회의 제목(title)을 보유한다 — 없으면 null', () => {
       expect(MeetingReport.fromEndedMeeting(baseInput()).title).toBeNull();
-      expect(
-        MeetingReport.fromEndedMeeting({ ...baseInput(), title: '주간 회의' }).title,
-      ).toBe('주간 회의');
+      expect(MeetingReport.fromEndedMeeting({ ...baseInput(), title: '주간 회의' }).title).toBe(
+        '주간 회의',
+      );
     });
 
     it('endedAt이 startedAt보다 이르면 거부한다', () => {
@@ -141,7 +141,7 @@ describe('MeetingReport (Aggregate Root)', () => {
         keyTopics: [],
       });
 
-    it('성공했던 회의록을 새 summary 로 교체하고 summary=done 을 유지한다', () => {
+    it('성공했던 회의록을 새 summary로 교체하고 summary=done을 유지한다', () => {
       const r = MeetingReport.fromEndedMeeting(baseInput());
       r.applyTranscript([transcriptSegment({ text: '안녕', startMs: 0, endMs: 500 })]);
       r.applySummary(validSummary());
@@ -151,7 +151,7 @@ describe('MeetingReport (Aggregate Root)', () => {
       expect(r.pipeline.summaryStatus).toBe('done');
     });
 
-    it('실패했던 회의록을 재요약으로 done 으로 복구한다', () => {
+    it('실패했던 회의록을 재요약으로 done으로 복구한다', () => {
       const r = MeetingReport.fromEndedMeeting(baseInput());
       r.markSummaryFailed('llm boom', failAt);
       r.replaceSummary(newSummary());
@@ -167,9 +167,9 @@ describe('MeetingReport (Aggregate Root)', () => {
   describe('attachNotionPushResult', () => {
     it('pipeline이 final 상태가 아니면 거부한다', () => {
       const r = MeetingReport.fromEndedMeeting(baseInput());
-      expect(() => r.attachNotionPushResult(notionPushResult({ pageId: 'p1', at: failAt }))).toThrow(
-        /pipeline is final/,
-      );
+      expect(() =>
+        r.attachNotionPushResult(notionPushResult({ pageId: 'p1', at: failAt })),
+      ).toThrow(/pipeline is final/);
     });
 
     it('두 stage 모두 done이면 영수증 부착 가능', () => {
@@ -224,7 +224,7 @@ describe('MeetingReport (Aggregate Root)', () => {
   });
 
   describe('fromSnapshot (복원)', () => {
-    it('draft 상태의 snapshot 으로부터 round-trip 동등', () => {
+    it('draft 상태의 snapshot으로부터 round-trip 동등', () => {
       const original = MeetingReport.fromEndedMeeting(baseInput());
       const restored = MeetingReport.fromSnapshot(original.snapshot());
       expect(restored.snapshot()).toEqual(original.snapshot());
@@ -247,7 +247,7 @@ describe('MeetingReport (Aggregate Root)', () => {
       const original = MeetingReport.fromEndedMeeting(baseInput());
       original.applyTranscript([]);
       original.markSummaryFailed('llm boom', failAt);
-      // pipeline.isFinal — failed 도 final 로 간주됨.
+      // pipeline.isFinal — failed도 final로 간주됨.
       original.attachNotionPushResult(notionPushResult({ pageId: 'p1', at: failAt }));
 
       const restored = MeetingReport.fromSnapshot(original.snapshot());
@@ -256,11 +256,11 @@ describe('MeetingReport (Aggregate Root)', () => {
       expect(restored.pipeline.failures).toHaveLength(1);
     });
 
-    it('복원된 MeetingReport 에서 동일한 pipeline 전이 거부 규칙이 그대로 평가된다', () => {
+    it('복원된 MeetingReport에서 동일한 pipeline 전이 거부 규칙이 그대로 평가된다', () => {
       const original = MeetingReport.fromEndedMeeting(baseInput());
       original.applyTranscript([]);
       const restored = MeetingReport.fromSnapshot(original.snapshot());
-      // stt 는 이미 done. 다시 transcript 적용 시도하면 PipelineState 가 throw.
+      // stt는 이미 done. 다시 transcript 적용 시도하면 PipelineState가 throw.
       expect(() => restored.applyTranscript([])).toThrow(/already/);
     });
   });
