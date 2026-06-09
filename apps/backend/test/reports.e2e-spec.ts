@@ -21,7 +21,7 @@ import { GeminiSummarizer } from '@/reports/infrastructure/gemini.summarizer';
 import { NoopSummarizer } from '@/reports/infrastructure/noop.summarizer';
 
 /**
- * Reports bounded context의 e2e 통합 테스트.
+ * Reports 의 e2e 통합 테스트.
  *
  * 흐름:
  *   1) HTTP create → WS join + chat → HTTP close
