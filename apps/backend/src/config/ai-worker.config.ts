@@ -1,8 +1,5 @@
 /**
  * ai-worker(FastAPI + faster-whisper) HTTP base URL 을 환경변수에서 해석한다.
- *
- * `server.config.ts` / `redis.config.ts` / `mongo.config.ts` 와 동일하게
- * 부트스트랩 단계의 env 해석만 담당하는 순수 함수.
  */
 
 export const DEFAULT_AI_WORKER_BASE_URL = 'http://localhost:8000';

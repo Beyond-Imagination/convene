@@ -3,9 +3,6 @@
  *
  * `MONGO_URI` 에는 cluster connection string 만 두고, database 는 `MONGO_DB_NAME`
  * 으로 분리해 `createConnection(uri, { dbName })` 옵션으로 주입한다.
- *
- * 본 파일은 `server.config.ts` / `redis.config.ts` 와 동일하게 순수 함수로
- * 부트스트랩 단계의 env 해석만 담당한다.
  */
 
 export const DEFAULT_MONGO_URI = 'mongodb://localhost:27017';

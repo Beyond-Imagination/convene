@@ -12,8 +12,7 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
 /**
  * Recording 기능을 구성하는 NestJS 모듈.
  *
- * - `RecordingService` 는 비-Nest class 라 `useFactory` 로 묶는다
- *   (Meeting/Mediasoup/Reports BC 와 동일 패턴).
+ * - `RecordingService` 는 비-Nest class 라 `useFactory` 로 묶는다.
  * - `RecordingReportLifecycleListener` 는 Reports BC 가 발행한
  *   `report.transcription.requested` 를 구독해 STT 호출을 트리거한다.
  * - 오디오 버퍼는 redis(ioredis) LIST 로 누적하고 consume 시점에 즉시 폐기한다.

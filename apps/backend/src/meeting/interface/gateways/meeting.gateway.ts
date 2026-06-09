@@ -121,7 +121,6 @@ export class MeetingGateway implements OnGatewayDisconnect {
       // race: '회의 종료' 직후 다른 탭의 useEffect cleanup 이 leave 를 한 번 더
       // emit 할 수 있다(또는 idle 자동 종료와 leave 충돌). 이미 종료된 회의나
       // 이미 leave 한 참가자에 대한 leave 는 best-effort 로 swallow.
-      // handleDisconnect 와 동일 패턴.
       this.logger.debug(
         `handleLeave swallow for code=${dto.code} sid=${client.id}: ${(error as Error).message}`,
       );

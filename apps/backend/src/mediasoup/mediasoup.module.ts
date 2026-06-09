@@ -23,7 +23,7 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
  * Mediasoup 기능을 구성하는 NestJS 모듈.
  *
  * - WorkerPool / RouterAdapter / TransportAdapter / SignalingService 는 비-Nest
- *   클래스라 useFactory 로 묶는다 (Meeting BC 의 MeetingService 와 동일 패턴).
+ *   클래스라 useFactory 로 묶는다.
  * - Gateway / LifecycleListener / RedisParticipantMediaRepository 는 @Injectable
  *   / @WebSocketGateway 데코레이터가 있으므로 클래스 토큰만 등록한다. Redis 클라이언트는
  *   RedisModule(@Global) 이 제공하므로 imports 추가 없이 inject 가능.

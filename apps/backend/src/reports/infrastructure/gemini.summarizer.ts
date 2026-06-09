@@ -83,7 +83,7 @@ const SUMMARY_RESPONSE_SCHEMA = {
  * 타임아웃은 AbortController 로 구현해 fetch 자체에 시간 한계를 둔다.
  *
  * fetch 는 Node 18+ global 을 사용하되 constructor 2번째 인자로 주입 가능해
- * spec 에서 jest.fn() 으로 손쉽게 mock 한다(HttpTranscriber 와 동일 패턴).
+ * spec 에서 jest.fn() 으로 손쉽게 mock 한다.
  */
 @Injectable()
 export class GeminiSummarizer implements SummarizerPort {

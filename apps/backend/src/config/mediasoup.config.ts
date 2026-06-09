@@ -2,10 +2,7 @@ import { RtpCodecCapability, WorkerLogLevel, WorkerLogTag } from 'mediasoup/node
 import * as os from 'os';
 
 /**
- * Mediasoup infrastructure 설정. server.config.ts 와 동일하게 **함수형 lazy
- * evaluation** 패턴 — module evaluation 시점이 아니라 `resolve*` 호출 시점에
- * `process.env` 를 읽는다. 따라서 `@nestjs/config.forRoot()` 가 `.env` 를 로드한
- * 후(=NestFactory.create) useFactory 가 호출되는 시점에 정확한 값을 본다.
+ * Mediasoup infrastructure 설정.
  *
  * - `MEDIASOUP_WORKER_NUM`: 정수 (worker 수). `auto` 면 `os.cpus().length`.
  * - `MEDIASOUP_ROUTERS_PER_ROOM`: 한 회의에 묶을 router 수 (default = workers 수).

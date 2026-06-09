@@ -1,9 +1,6 @@
 /**
  * Gemini(LLM 요약) 어댑터의 환경변수 해석 모듈.
  *
- * `server.config.ts` / `redis.config.ts` / `ai-worker.config.ts` 와 동일하게
- * 부트스트랩 단계의 env 해석만 담당하는 순수 함수.
- *
  * - `GEMINI_API_KEY` 가 비어 있으면 NoopSummarizer fallback 신호로 `null` 반환.
  *   ReportsModule 의 useFactory 가 null 일 때 NoopSummarizer 를 주입한다.
  * - 모델/타임아웃은 미설정 시 디폴트 사용.

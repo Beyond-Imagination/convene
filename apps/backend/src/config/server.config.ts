@@ -1,9 +1,5 @@
 /**
  * 부트스트랩 단계에서 환경변수를 읽어 서버 옵션을 만든다.
- *
- * `@nestjs/config` 의 ConfigService 는 모듈 인스턴스 이후에만 사용 가능하므로,
- * main.ts 의 `NestFactory.create` 이전/직후 단계에서는 본 파일의 순수 함수로
- * 환경변수를 해석한다.
  */
 
 export const DEFAULT_PORT = 5000;

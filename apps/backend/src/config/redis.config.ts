@@ -1,10 +1,6 @@
 /**
  * Redis 접속 옵션을 환경변수에서 해석한다.
  *
- * `@nestjs/config` ConfigService 는 모듈 인스턴스 이후에만 사용 가능하므로
- * `RedisModule` 의 useFactory 에서는 본 파일의 순수 함수로 환경변수를 읽는다
- * (`server.config.ts` 와 동일 패턴).
- *
  * 키 분리는 `keyPrefix` 옵션으로 처리한다.
  */
 

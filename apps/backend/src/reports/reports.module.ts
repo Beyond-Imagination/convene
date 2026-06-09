@@ -19,8 +19,7 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 /**
  * Reports 기능을 구성하는 NestJS 모듈.
  *
- * - `ReportFinalizationService` 는 비-Nest class 라 `useFactory` 로 묶는다
- *   (Meeting/Mediasoup BC 와 동일 패턴).
+ * - `ReportFinalizationService` 는 비-Nest class 라 `useFactory` 로 묶는다.
  * - `ReportMeetingLifecycleListener` 는 `@OnEvent(meeting.ended)` 데코레이터로
  *   Meeting BC 의 도메인 이벤트를 구독한다.
  * - 회의록 영속화는 mongoose 기반 `MongoReportRepository` 가 책임진다. mongoose
