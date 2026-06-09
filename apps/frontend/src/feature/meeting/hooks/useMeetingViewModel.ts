@@ -82,7 +82,7 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
   const storeNickname = useSessionStore((s) => s.nickname);
   const clearNickname = useSessionStore((s) => s.clearNickname);
   // 정적 호스팅에선 create/join → /meetings/{code} 이동이 풀 리로드라 in-memory store
-  // 가 비므로, code 별 보관 닉네임(sessionStorage)에서 복구한다(hostToken 과 동일 전략).
+  // 가 비므로, code 별 보관 닉네임(sessionStorage)에서 복구한다.
   const [persistedNickname, setPersistedNickname] = useState<string | null>(() =>
     getNickname(code),
   );
