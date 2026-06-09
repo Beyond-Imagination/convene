@@ -1,20 +1,14 @@
 /**
  * MeetingReport의 후처리 파이프라인 상태.
  *
- * 두 stage(STT, Summary)가 독립적으로 `pending → done | failed` 한 방향 전이를
- * 한 번씩만 수행한다. done/failed에 도달하면 다시 pending으로 돌아갈 수 없다.
- *
- * VO이므로 모든 전이 메서드는 새 인스턴스를 반환한다(immutable).
- * Aggregate(MeetingReport)는 인스턴스를 교체하는 방식으로 상태를 진행시킨다.
- *
- * 상태 전이 다이어그램: ARCHITECTURE.md §5.
+ * 두 stage(STT, Summary)가 독립적으로 `pending → done | failed` 한 방향 전이를 한 번씩만 수행한다.
+ * done/failed에 도달하면 다시 pending으로 돌아갈 수 없다.
  */
-
 export const PIPELINE_STAGE_STATUSES = ['pending', 'done', 'failed'] as const;
-export type PipelineStageStatus = (typeof PIPELINE_STAGE_STATUSES)[number];
+type PipelineStageStatus = (typeof PIPELINE_STAGE_STATUSES)[number];
 
 export const PIPELINE_STAGES = ['stt', 'summary'] as const;
-export type PipelineStage = (typeof PIPELINE_STAGES)[number];
+type PipelineStage = (typeof PIPELINE_STAGES)[number];
 
 export interface PipelineFailure {
   readonly stage: PipelineStage;
@@ -36,10 +30,8 @@ export class PipelineState {
   }
 
   /**
-   * 영속 저장소(Mongo 등) 의 wire object 로부터 PipelineState 를 복원한다.
-   *
-   * 입력은 신뢰 가능한 snapshot 이라는 trust 하에 형식 검증은 생략한다
-   * (검증 책임은 snapshot 생성 시점에 있다).
+   * 영속 저장소의 wire object로부터 PipelineState를 복원한다.
+   * 입력은 신뢰 가능한 snapshot이라는 trust 하에 형식 검증은 생략한다(검증 책임은 snapshot 생성 시점에 있다).
    */
   static fromSnapshot(input: {
     sttStatus: PipelineStageStatus;
@@ -56,11 +48,7 @@ export class PipelineState {
 
   markTranscriptionFailed(error: string, at: Date): PipelineState {
     this.assertPending('stt');
-    return new PipelineState(
-      'failed',
-      this.summaryStatus,
-      this.appendFailure('stt', error, at),
-    );
+    return new PipelineState('failed', this.summaryStatus, this.appendFailure('stt', error, at));
   }
 
   markSummaryDone(): PipelineState {
@@ -70,24 +58,9 @@ export class PipelineState {
 
   markSummaryFailed(error: string, at: Date): PipelineState {
     this.assertPending('summary');
-    return new PipelineState(
-      this.sttStatus,
-      'failed',
-      this.appendFailure('summary', error, at),
-    );
+    return new PipelineState(this.sttStatus, 'failed', this.appendFailure('summary', error, at));
   }
 
-  /**
-   * 이미 끝난(done/failed) summary stage 를 새 요약 성공 결과로 덮어쓴다.
-   *
-   * 관리자 재요약(`POST /reports/:id/resummarize`) 전용 전이. 중간 pending 을
-   * 거치지 않고 한 번에 done 으로 교체하므로, 재요약 도중 크래시가 나도 회의록이
-   * 영구 pending 으로 갇히지 않는다. 아직 1차 요약이 끝나지 않은(pending) stage 는
-   * 재요약 대상이 아니므로 거부한다. 누적 failures 는 보존.
-   *
-   * 재요약 실패 시에는 이 전이를 호출하지 않는다 — 기존 상태(done/failed)를 그대로
-   * 두고 에러만 전파해 done 회의록이 failed 로 격하되는 것을 막는다(Application 참고).
-   */
   resummarizeDone(): PipelineState {
     this.assertNotPending('summary');
     return new PipelineState(this.sttStatus, 'done', this.failures);

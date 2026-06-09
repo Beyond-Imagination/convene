@@ -7,11 +7,7 @@ import { ReportTranscriptionRequestedPayload } from '@/shared-kernel/domain/even
 import { RecordingService } from './recording.service';
 
 /**
- * Reports BC 의 `report.transcription.requested` 이벤트를 구독해 Recording BC 의
- * STT 호출을 트리거하는 application listener.
- *
- * 두 BC 는 본 listener 외 직접 의존을 갖지 않으며 payload 인터페이스로만 결합한다
- * (CLAUDE.md hard rule 7).
+ * Reports BC의 이벤트를 구독해 Recording BC의 STT 호출을 트리거하는 application listener.
  */
 @Injectable()
 export class RecordingReportLifecycleListener {

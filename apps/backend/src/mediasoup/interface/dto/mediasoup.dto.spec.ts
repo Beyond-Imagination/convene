@@ -17,7 +17,6 @@ const makePipe = () =>
     exceptionFactory: (errors) => new Error(JSON.stringify(errors)),
   });
 
- 
 const run = <T>(metatype: any, body: unknown): Promise<T> =>
   makePipe().transform(body, { type: 'body', metatype }) as Promise<T>;
 
@@ -43,7 +42,7 @@ describe('CreateTransportDto', () => {
     expect(recv.direction).toBe('recv');
   });
 
-  it('direction 이 send/recv 외이면 거부', async () => {
+  it('direction이 send/recv 외이면 거부', async () => {
     await expect(run(CreateTransportDto, { code, direction: 'bogus' })).rejects.toThrow(
       /direction/i,
     );
@@ -61,12 +60,12 @@ describe('ConnectTransportDto', () => {
   });
 
   it('dtlsParameters 누락 거부', async () => {
-    await expect(
-      run(ConnectTransportDto, { code, transportId: 't-1' }),
-    ).rejects.toThrow(/dtlsParameters/i);
+    await expect(run(ConnectTransportDto, { code, transportId: 't-1' })).rejects.toThrow(
+      /dtlsParameters/i,
+    );
   });
 
-  it('dtlsParameters 가 객체가 아니면 거부', async () => {
+  it('dtlsParameters가 객체가 아니면 거부', async () => {
     await expect(
       run(ConnectTransportDto, { code, transportId: 't-1', dtlsParameters: 'string' }),
     ).rejects.toThrow(/dtlsParameters/i);
@@ -87,7 +86,7 @@ describe('ProduceDto', () => {
     }
   });
 
-  it('kind 가 audio/video 외이면 거부', async () => {
+  it('kind가 audio/video 외이면 거부', async () => {
     await expect(
       run(ProduceDto, {
         code,
@@ -99,7 +98,7 @@ describe('ProduceDto', () => {
     ).rejects.toThrow(/kind/i);
   });
 
-  it('source 가 audio/video/screen 외이면 거부', async () => {
+  it('source가 audio/video/screen 외이면 거부', async () => {
     await expect(
       run(ProduceDto, {
         code,
@@ -124,9 +123,9 @@ describe('ConsumeDto', () => {
   });
 
   it('rtpCapabilities 누락 거부', async () => {
-    await expect(
-      run(ConsumeDto, { code, transportId: 't-1', producerId: 'p-1' }),
-    ).rejects.toThrow(/rtpCapabilities/i);
+    await expect(run(ConsumeDto, { code, transportId: 't-1', producerId: 'p-1' })).rejects.toThrow(
+      /rtpCapabilities/i,
+    );
   });
 });
 
@@ -136,10 +135,10 @@ describe('ResumeConsumerDto', () => {
     expect(dto.consumerId).toBe('c-1');
   });
 
-  it('consumerId 가 너무 길면 거부', async () => {
-    await expect(
-      run(ResumeConsumerDto, { code, consumerId: 'x'.repeat(65) }),
-    ).rejects.toThrow(/consumerId/i);
+  it('consumerId가 너무 길면 거부', async () => {
+    await expect(run(ResumeConsumerDto, { code, consumerId: 'x'.repeat(65) })).rejects.toThrow(
+      /consumerId/i,
+    );
   });
 });
 
@@ -160,13 +159,13 @@ describe('ToggleProducerDto', () => {
     expect(off.paused).toBe(false);
   });
 
-  it('paused 가 boolean 이 아니면 거부', async () => {
+  it('paused가 boolean이 아니면 거부', async () => {
     await expect(
       run(ToggleProducerDto, { code, producerId: 'p-1', paused: 'yes' }),
     ).rejects.toThrow(/paused/i);
   });
 
-  it('producerId 가 너무 길면 거부', async () => {
+  it('producerId가 너무 길면 거부', async () => {
     await expect(
       run(ToggleProducerDto, { code, producerId: 'x'.repeat(65), paused: true }),
     ).rejects.toThrow(/producerId/i);
@@ -179,10 +178,10 @@ describe('CloseProducerDto', () => {
     expect(dto.producerId).toBe('p-1');
   });
 
-  it('producerId 가 너무 길면 거부', async () => {
-    await expect(
-      run(CloseProducerDto, { code, producerId: 'x'.repeat(65) }),
-    ).rejects.toThrow(/producerId/i);
+  it('producerId가 너무 길면 거부', async () => {
+    await expect(run(CloseProducerDto, { code, producerId: 'x'.repeat(65) })).rejects.toThrow(
+      /producerId/i,
+    );
   });
 });
 

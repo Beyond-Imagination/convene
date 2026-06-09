@@ -7,10 +7,8 @@ import {
 import { MeetingReport } from '@/reports/domain/meeting-report';
 
 /**
- * Interface layer 의 도메인 → wire format 직렬화 helper.
- *
- * 컨트롤러는 비즈니스 로직을 두지 않으며, 본 helper 가 `MeetingReport` Aggregate 의
- * snapshot 을 shared-interfaces wire format 으로 평면화한다(ARCHITECTURE.md §3).
+ * 도메인 → wire format 직렬화 helper.
+ * 본 helper가 `MeetingReport` Aggregate의 snapshot을 shared-interfaces wire format으로 평면화한다.
  */
 export function toReportListItem(report: MeetingReport): ReportListItem {
   const snapshot = report.snapshot();
@@ -68,9 +66,7 @@ export function toReportDetailResponse(report: MeetingReport): ReportDetailRespo
             overview: snapshot.summary.overview,
             decisions: [...snapshot.summary.decisions],
             actionItems: snapshot.summary.actionItems.map((a) =>
-              a.owner === undefined && a.due === undefined
-                ? { task: a.task }
-                : { ...a },
+              a.owner === undefined && a.due === undefined ? { task: a.task } : { ...a },
             ),
             keyTopics: snapshot.summary.keyTopics.map((k) => ({
               topic: k.topic,

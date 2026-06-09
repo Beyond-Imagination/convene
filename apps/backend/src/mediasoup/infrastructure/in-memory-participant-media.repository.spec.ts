@@ -28,7 +28,7 @@ describe('InMemoryParticipantMediaRepository', () => {
     expect(await repo.findByParticipantId('s1')).toBe(b);
   });
 
-  it('findByMeetingCode 는 같은 meetingCode 의 ParticipantMedia 만 그룹으로 돌려준다', async () => {
+  it('findByMeetingCode는 같은 meetingCode의 ParticipantMedia만 그룹으로 돌려준다', async () => {
     const repo = new InMemoryParticipantMediaRepository();
     const a = spawn('s1', 'CODE1111');
     const b = spawn('s2', 'CODE1111');
@@ -41,14 +41,14 @@ describe('InMemoryParticipantMediaRepository', () => {
     expect(new Set(found)).toEqual(new Set([a, b]));
   });
 
-  it('removeByParticipantId 후엔 null 을 돌려준다', async () => {
+  it('removeByParticipantId 후엔 null을 돌려준다', async () => {
     const repo = new InMemoryParticipantMediaRepository();
     await repo.save(spawn('s1', 'ABCDEFGH'));
     await repo.removeByParticipantId('s1');
     expect(await repo.findByParticipantId('s1')).toBeNull();
   });
 
-  it('removeAllByMeetingCode 는 해당 회의의 ParticipantMedia 만 모두 제거한다', async () => {
+  it('removeAllByMeetingCode는 해당 회의의 ParticipantMedia만 모두 제거한다', async () => {
     const repo = new InMemoryParticipantMediaRepository();
     await repo.save(spawn('s1', 'CODE1111'));
     await repo.save(spawn('s2', 'CODE1111'));

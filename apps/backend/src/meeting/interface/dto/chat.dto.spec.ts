@@ -10,8 +10,7 @@ const makePipe = () =>
     exceptionFactory: (errors) => new Error(JSON.stringify(errors)),
   });
 
-const run = (body: unknown) =>
-  makePipe().transform(body, { type: 'body', metatype: ChatDto });
+const run = (body: unknown) => makePipe().transform(body, { type: 'body', metatype: ChatDto });
 
 describe('ChatDto + ValidationPipe', () => {
   it('정상 payload는 ChatDto 인스턴스로 변환된다', async () => {
@@ -34,14 +33,10 @@ describe('ChatDto + ValidationPipe', () => {
   });
 
   it('text 최대 길이(1000) 초과 거부', async () => {
-    await expect(
-      run({ code: 'abc12xyz', text: 'a'.repeat(1001) }),
-    ).rejects.toThrow(/text/i);
+    await expect(run({ code: 'abc12xyz', text: 'a'.repeat(1001) })).rejects.toThrow(/text/i);
   });
 
   it('whitelist 위반(허용되지 않은 키)은 거부', async () => {
-    await expect(
-      run({ code: 'abc12xyz', text: 'hi', evil: 1 }),
-    ).rejects.toThrow(/evil/);
+    await expect(run({ code: 'abc12xyz', text: 'hi', evil: 1 })).rejects.toThrow(/evil/);
   });
 });

@@ -3,15 +3,8 @@ import { MeetingPageClient } from './MeetingPageClient';
 /**
  * `/meetings/[code]` 동적 라우트.
  *
- * `output: 'export'` 정적 빌드는 dynamic route 마다 `generateStaticParams` 가
- * 필수이며 **최소 1개의 entry** 가 필요하다(빈 배열은 build 에러). 실제 회의
- * 코드는 사전에 알 수 없으므로 placeholder 1개만 빌드해서 dist 에 chunk 와
- * 라우팅 메타데이터를 만들고, 실 사용 시에는 CloudFront `/404 → /index.html`
- * SPA fallback 으로 client side 라우팅이 본 페이지를 렌더한다
- * (ARCHITECTURE §4.3).
- *
- * 본 파일은 server component, 실제 hook 사용은 `MeetingPageClient` ('use client')
- * 에서 한다. server component 만 `generateStaticParams` 를 export 할 수 있다.
+ * `output: 'export'`는 dynamic route마다 `generateStaticParams`의 entry가 최소 1개 필요하므로 placeholder 1개만 빌드하고,
+ * 실제 코드 경로는 SPA fallback으로 client side 라우팅이 렌더한다.
  */
 export async function generateStaticParams(): Promise<Array<{ code: string }>> {
   return [{ code: 'placeholder' }];

@@ -4,15 +4,14 @@ import { AudioBufferRepository } from '@/recording/domain/ports';
 
 import { PCM_BYTES_PER_SECOND } from './audio-chunker';
 
-const bytesToMs = (bytes: number): number =>
-  Math.floor((bytes / PCM_BYTES_PER_SECOND) * 1000);
+const bytesToMs = (bytes: number): number => Math.floor((bytes / PCM_BYTES_PER_SECOND) * 1000);
 
 /**
- * AudioBufferRepository 의 in-memory 구현체.
+ * AudioBufferRepository의 in-memory 구현체.
  *
  * v1 부트스트랩 / 테스트용. 회의 1건 규모의 작은 버퍼만 다룬다는 가정으로
- * 모든 chunk 를 메모리에 누적하고, `consume` 시점에 한 번에 `Buffer.concat` 으로
- * 합쳐 돌려준 뒤 즉시 삭제한다(PLAN.md §3 — STT 후 즉시 폐기).
+ * 모든 chunk를 메모리에 누적하고, `consume` 시점에 한 번에 `Buffer.concat`으로
+ * 합쳐 돌려준 뒤 즉시 삭제한다(STT 후 즉시 폐기).
  */
 @Injectable()
 export class InMemoryAudioBufferRepository implements AudioBufferRepository {
@@ -20,7 +19,7 @@ export class InMemoryAudioBufferRepository implements AudioBufferRepository {
   private readonly store = new Map<string, Map<string, Buffer[]>>();
   // meetingCode → (participantId → 첫 markStarted 시 epoch ms)
   private readonly startedAts = new Map<string, Map<string, number>>();
-  // meetingCode → (participantId → drainAvailable 으로 빠져나간 누적 byte)
+  // meetingCode → (participantId → drainAvailable으로 빠져나간 누적 byte)
   private readonly cursors = new Map<string, Map<string, number>>();
 
   async append(meetingCode: string, participantId: string, chunk: Buffer): Promise<void> {
@@ -55,7 +54,7 @@ export class InMemoryAudioBufferRepository implements AudioBufferRepository {
       perMeeting = new Map();
       this.startedAts.set(meetingCode, perMeeting);
     }
-    // SETNX 의미 — 첫 호출만 기록한다. 동일 (code, pid) 의 두 번째 호출은 무시.
+    // SETNX 의미 — 첫 호출만 기록한다. 동일 (code, pid)의 두 번째 호출은 무시.
     if (!perMeeting.has(participantId)) {
       perMeeting.set(participantId, startedAtMs);
     }
@@ -80,7 +79,7 @@ export class InMemoryAudioBufferRepository implements AudioBufferRepository {
     const drainedPcm = total.subarray(0, drainLen);
     const remaining = total.subarray(drainLen);
 
-    // store 의 chunk list 를 remaining 단일 chunk 로 교체
+    // store의 chunk list를 remaining 단일 chunk로 교체
     if (perMeeting) perMeeting.set(participantId, [Buffer.from(remaining)]);
     // cursor 갱신
     let cm = this.cursors.get(meetingCode);
@@ -97,9 +96,7 @@ export class InMemoryAudioBufferRepository implements AudioBufferRepository {
     };
   }
 
-  async consume(
-    meetingCode: string,
-  ): Promise<
+  async consume(meetingCode: string): Promise<
     ReadonlyArray<{
       participantId: string;
       audio: Buffer;

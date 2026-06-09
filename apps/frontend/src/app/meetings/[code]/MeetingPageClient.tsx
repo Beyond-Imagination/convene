@@ -11,15 +11,12 @@ import { useNicknameGateViewModel } from '@/feature/meeting/hooks/useNicknameGat
 import { useRouteSegment } from '@/shared/hooks/useRouteSegment';
 
 /**
- * `/meetings/[code]` 의 client wrapper.
+ * `/meetings/[code]`의 client wrapper.
  *
- * URL 에서 회의 코드를 읽고(`useRouteSegment` — 정적 export placeholder 대응) 세 ViewModel hook 을 합성한다:
- *   - `useMeetingViewModel` 이 socket 을 만들고 join/참가자 목록 담당
- *   - `useMediasoupViewModel` 이 그 socket 위에서 RTP capabilities/Transport 준비
- *   - `useChatViewModel` 이 그 socket 을 받아 채팅 emit/수신 담당
- *
- * server page(`page.tsx`)와 분리한 이유는 정적 export 의 `generateStaticParams`
- * 와 client hook 사용이 동일 파일에서 공존할 수 없기 때문이다.
+ * URL에서 회의 코드를 읽고 세 ViewModel hook을 합성한다:
+ *   - `useMeetingViewModel`
+ *   - `useMediasoupViewModel`
+ *   - `useChatViewModel`
  */
 export function MeetingPageClient() {
   const code = useRouteSegment('meetings', 'code');
@@ -36,11 +33,16 @@ export function MeetingPageClient() {
   //  - 링크로 직접 접속(미인증): 닉네임 입력 모달을 띄워 그 자리에서 입장하게 한다.
   if (meetingVm.nickname === null) {
     if (meetingVm.isNavigatingAway) return null;
-    return <NicknameGate code={code} {...gateVm} />;
+    return (
+      <NicknameGate
+        code={code}
+        {...gateVm}
+      />
+    );
   }
 
   return (
-    <div className="theme-dark flex h-screen overflow-hidden bg-bg text-text">
+    <div className="theme-dark bg-bg text-text flex h-screen overflow-hidden">
       <MeetingScreen
         {...meetingVm}
         mediasoup={mediasoupVm}
@@ -55,8 +57,11 @@ export function MeetingPageClient() {
         onNextPage={layout.nextPage}
       />
       {layout.isChatOpen && (
-        <aside className="flex w-80 shrink-0 flex-col border-l border-border bg-surface">
-          <ChatPanel {...chatVm} myNickname={meetingVm.nickname} />
+        <aside className="border-border bg-surface flex w-80 shrink-0 flex-col border-l">
+          <ChatPanel
+            {...chatVm}
+            myNickname={meetingVm.nickname}
+          />
         </aside>
       )}
     </div>

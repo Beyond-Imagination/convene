@@ -24,17 +24,14 @@ describe('TranscriptSegment', () => {
   });
 
   it('text가 5000자를 넘으면 거부한다', () => {
-    expect(() =>
-      transcriptSegment({ text: 'a'.repeat(5001), startMs: 0, endMs: 100 }),
-    ).toThrow(/text/);
+    expect(() => transcriptSegment({ text: 'a'.repeat(5001), startMs: 0, endMs: 100 })).toThrow(
+      /text/,
+    );
   });
 
-  it.each([-1, 1.5, NaN, Infinity])(
-    'startMs가 음수·정수 아니면 거부한다: %s',
-    (startMs) => {
-      expect(() => transcriptSegment({ text: 'hi', startMs, endMs: 100 })).toThrow(/startMs/);
-    },
-  );
+  it.each([-1, 1.5, NaN, Infinity])('startMs가 음수·정수 아니면 거부한다: %s', (startMs) => {
+    expect(() => transcriptSegment({ text: 'hi', startMs, endMs: 100 })).toThrow(/startMs/);
+  });
 
   it('endMs가 startMs보다 작으면 거부한다', () => {
     expect(() => transcriptSegment({ text: 'hi', startMs: 100, endMs: 50 })).toThrow(/endMs/);
@@ -46,8 +43,8 @@ describe('TranscriptSegment', () => {
   });
 
   it('speaker가 trim 후 빈 문자열이면 거부한다', () => {
-    expect(() =>
-      transcriptSegment({ speaker: '   ', text: 'hi', startMs: 0, endMs: 100 }),
-    ).toThrow(/speaker/);
+    expect(() => transcriptSegment({ speaker: '   ', text: 'hi', startMs: 0, endMs: 100 })).toThrow(
+      /speaker/,
+    );
   });
 });

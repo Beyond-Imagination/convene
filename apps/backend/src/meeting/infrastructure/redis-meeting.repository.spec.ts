@@ -27,8 +27,8 @@ describe('RedisMeetingRepository', () => {
   let repo: RedisMeetingRepository;
 
   beforeEach(() => {
-    // ioredis-mock 는 ioredis API 호환의 in-memory 에뮬레이터.
-    // unit spec 에서는 실 redis 없이 동작 검증에만 사용한다.
+    // ioredis-mock는 ioredis API 호환의 in-memory 에뮬레이터.
+    // unit spec에서는 실 redis 없이 동작 검증에만 사용한다.
     redis = new RedisMock() as unknown as Redis;
     repo = new RedisMeetingRepository(redis);
   });
@@ -38,11 +38,11 @@ describe('RedisMeetingRepository', () => {
     await redis.quit();
   });
 
-  it('등록되지 않은 code 는 null 을 돌려준다', async () => {
+  it('등록되지 않은 code는 null을 돌려준다', async () => {
     expect(await repo.findByCode('unknown0')).toBeNull();
   });
 
-  it('save 후 findByCode 는 동일한 snapshot 의 Meeting 을 돌려준다', async () => {
+  it('save 후 findByCode는 동일한 snapshot의 Meeting을 돌려준다', async () => {
     const meeting = makeMeeting('abc12xyz');
     meeting.addParticipant('s1', 'alice', t30s);
     await repo.save(meeting);
@@ -52,7 +52,7 @@ describe('RedisMeetingRepository', () => {
     expect(found!.snapshot()).toEqual(meeting.snapshot());
   });
 
-  it('round-trip 후에도 close 상태와 endedAt 이 보존된다', async () => {
+  it('round-trip 후에도 close 상태와 endedAt이 보존된다', async () => {
     const meeting = makeMeeting('abc12xyz');
     meeting.addParticipant('s1', 'alice', t30s);
     meeting.close(t1m);
@@ -65,7 +65,7 @@ describe('RedisMeetingRepository', () => {
     expect(found!.snapshot()).toEqual(meeting.snapshot());
   });
 
-  it('leave 한 Participant 의 leftAt 도 그대로 round-trip 된다', async () => {
+  it('leave 한 Participant의 leftAt도 그대로 round-trip 된다', async () => {
     const meeting = makeMeeting('abc12xyz');
     meeting.addParticipant('s1', 'alice', t30s);
     meeting.removeParticipant('s1', t1m);
@@ -77,7 +77,7 @@ describe('RedisMeetingRepository', () => {
     expect(p?.isActive).toBe(false);
   });
 
-  it('같은 code 로 두 번 save 하면 마지막 상태로 덮어쓴다', async () => {
+  it('같은 code로 두 번 save 하면 마지막 상태로 덮어쓴다', async () => {
     const m1 = makeMeeting('abc12xyz');
     await repo.save(m1);
     const m2 = makeMeeting('abc12xyz');
@@ -89,7 +89,7 @@ describe('RedisMeetingRepository', () => {
     expect(found!.findParticipant('s2')?.nickname).toBe('bob');
   });
 
-  it('서로 다른 code 의 Meeting 은 독립적으로 보관된다', async () => {
+  it('서로 다른 code의 Meeting은 독립적으로 보관된다', async () => {
     const a = makeMeeting('abc12xyz');
     const b = makeMeeting('xyz99aaa');
     await repo.save(a);
@@ -99,7 +99,7 @@ describe('RedisMeetingRepository', () => {
     expect((await repo.findByCode('xyz99aaa'))!.code.value).toBe('xyz99aaa');
   });
 
-  it('externalReference 의 issueId 도 round-trip 된다(v2 노션 대비)', async () => {
+  it('externalReference의 issueId도 round-trip 된다(v2 노션 대비)', async () => {
     const m = Meeting.create({
       code: MeetingCode.from('abc12xyz'),
       source: 'notion-issue',

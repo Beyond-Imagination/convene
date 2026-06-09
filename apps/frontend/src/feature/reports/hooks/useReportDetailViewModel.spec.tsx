@@ -13,9 +13,7 @@ vi.mock('@/shared/api/reports.api', async () => {
   return { ...actual, getReport: getReportMock };
 });
 
-const baseDetail = (
-  overrides: Partial<ReportDetailResponse> = {},
-): ReportDetailResponse => ({
+const baseDetail = (overrides: Partial<ReportDetailResponse> = {}): ReportDetailResponse => ({
   id: 'r1',
   meetingId: 'm1',
   code: 'abc12xyz',
@@ -37,19 +35,19 @@ describe('useReportDetailViewModel', () => {
     getReportMock.mockReset();
   });
 
-  it('id 가 빈 문자열이면 status="idle" 로 유지하고 getReport 를 호출하지 않는다', () => {
+  it('id가 빈 문자열이면 status="idle" 로 유지하고 getReport를 호출하지 않는다', () => {
     const { result } = renderHook(() => useReportDetailViewModel(''));
     expect(result.current.status).toBe('idle');
     expect(getReportMock).not.toHaveBeenCalled();
   });
 
-  it('id 가 있으면 mount 직후 status="loading" 으로 시작한다', () => {
+  it('id가 있으면 mount 직후 status="loading" 으로 시작한다', () => {
     getReportMock.mockReturnValueOnce(new Promise(() => {}));
     const { result } = renderHook(() => useReportDetailViewModel('r1'));
     expect(result.current.status).toBe('loading');
   });
 
-  it('getReport 가 resolve 되면 status="loaded" + report 가 채워진다', async () => {
+  it('getReport가 resolve 되면 status="loaded" + report가 채워진다', async () => {
     getReportMock.mockResolvedValueOnce(baseDetail({ id: 'r1' }));
     const { result } = renderHook(() => useReportDetailViewModel('r1'));
     await waitFor(() => expect(result.current.status).toBe('loaded'));
@@ -69,7 +67,7 @@ describe('useReportDetailViewModel', () => {
     expect(result.current.errorMessage).toBe('mongo down');
   });
 
-  it('id 가 바뀌면 새 id 로 getReport 가 다시 호출된다', async () => {
+  it('id가 바뀌면 새 id로 getReport가 다시 호출된다', async () => {
     getReportMock.mockResolvedValueOnce(baseDetail({ id: 'r1' }));
     const { result, rerender } = renderHook(({ id }) => useReportDetailViewModel(id), {
       initialProps: { id: 'r1' },

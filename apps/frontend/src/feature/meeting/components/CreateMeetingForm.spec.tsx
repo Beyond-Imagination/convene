@@ -1,8 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import type {
-  FieldErrors,
-  UseFormRegisterReturn,
-} from 'react-hook-form';
+import type { FieldErrors, UseFormRegisterReturn } from 'react-hook-form';
 
 import type {
   CreateMeetingFormValues,
@@ -12,22 +9,17 @@ import type {
 import { CreateMeetingForm } from './CreateMeetingForm';
 
 /**
- * spec 전용 register: react-hook-form 의 실제 register 를 흉내내서 input 에 묶을
- * 수 있는 최소 형태만 돌려준다. View 가 register 의 반환을 `...spread` 하는 동작만
- * 검증 가능하면 충분하다.
+ * spec 전용 register: react-hook-form의 실제 register를 흉내내서 input에 묶을 수 있는 최소 형태만 돌려준다.
+ * View가 register의 반환을 `...spread` 하는 동작만 검증 가능하면 충분하다.
  */
-const fakeRegister = (
-  name: keyof CreateMeetingFormValues,
-): UseFormRegisterReturn => ({
+const fakeRegister = (name: keyof CreateMeetingFormValues): UseFormRegisterReturn => ({
   name,
   onChange: async () => true,
   onBlur: async () => true,
   ref: () => {},
 });
 
-const baseVm = (
-  overrides: Partial<UseCreateMeetingViewModel> = {},
-): UseCreateMeetingViewModel => ({
+const baseVm = (overrides: Partial<UseCreateMeetingViewModel> = {}): UseCreateMeetingViewModel => ({
   status: 'idle',
   errorMessage: null,
   register: fakeRegister,
@@ -47,12 +39,12 @@ describe('CreateMeetingForm View', () => {
     expect(screen.getByRole('button', { name: '생성 중…' })).toBeDisabled();
   });
 
-  it('닉네임 input 이 노출된다', () => {
+  it('닉네임 input이 노출된다', () => {
     render(<CreateMeetingForm {...baseVm()} />);
     expect(screen.getByLabelText('닉네임')).toBeInTheDocument();
   });
 
-  it('errors.nickname 이 있으면 해당 필드 alert 가 노출된다', () => {
+  it('errors.nickname이 있으면 해당 필드 alert가 노출된다', () => {
     render(
       <CreateMeetingForm
         {...baseVm({
@@ -65,12 +57,8 @@ describe('CreateMeetingForm View', () => {
     expect(screen.getByText('닉네임을 입력하세요.')).toBeInTheDocument();
   });
 
-  it('status="error" + errorMessage 가 있으면 role="alert" 로 노출된다', () => {
-    render(
-      <CreateMeetingForm
-        {...baseVm({ status: 'error', errorMessage: '잘못된 요청' })}
-      />,
-    );
+  it('status="error" + errorMessage가 있으면 role="alert" 로 노출된다', () => {
+    render(<CreateMeetingForm {...baseVm({ status: 'error', errorMessage: '잘못된 요청' })} />);
     expect(screen.getByText('잘못된 요청')).toBeInTheDocument();
   });
 

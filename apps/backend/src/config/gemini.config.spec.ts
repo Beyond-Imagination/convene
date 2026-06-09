@@ -6,13 +6,13 @@ import {
 } from './gemini.config';
 
 describe('resolveGeminiConfig', () => {
-  it('GEMINI_API_KEY 가 없으면 null 을 돌려준다(Noop fallback 신호)', () => {
+  it('GEMINI_API_KEY가 없으면 null을 돌려준다(Noop fallback 신호)', () => {
     expect(resolveGeminiConfig({})).toBeNull();
     expect(resolveGeminiConfig({ GEMINI_API_KEY: '' })).toBeNull();
     expect(resolveGeminiConfig({ GEMINI_API_KEY: '   ' })).toBeNull();
   });
 
-  it('GEMINI_API_KEY 만 있으면 model/timeout/baseUrl 은 디폴트로 채운다', () => {
+  it('GEMINI_API_KEY만 있으면 model/timeout/baseUrl은 디폴트로 채운다', () => {
     expect(resolveGeminiConfig({ GEMINI_API_KEY: 'k' })).toEqual({
       apiKey: 'k',
       model: DEFAULT_GEMINI_MODEL,
@@ -21,7 +21,7 @@ describe('resolveGeminiConfig', () => {
     });
   });
 
-  it('GEMINI_MODEL / GEMINI_TIMEOUT_MS / GEMINI_BASE_URL 을 적용한다', () => {
+  it('GEMINI_MODEL / GEMINI_TIMEOUT_MS / GEMINI_BASE_URL을 적용한다', () => {
     expect(
       resolveGeminiConfig({
         GEMINI_API_KEY: 'k',
@@ -37,22 +37,22 @@ describe('resolveGeminiConfig', () => {
     });
   });
 
-  it('GEMINI_TIMEOUT_MS 가 양의 정수가 아니면 throw', () => {
-    expect(() =>
-      resolveGeminiConfig({ GEMINI_API_KEY: 'k', GEMINI_TIMEOUT_MS: '0' }),
-    ).toThrow(/GEMINI_TIMEOUT_MS/);
-    expect(() =>
-      resolveGeminiConfig({ GEMINI_API_KEY: 'k', GEMINI_TIMEOUT_MS: '-5' }),
-    ).toThrow(/GEMINI_TIMEOUT_MS/);
-    expect(() =>
-      resolveGeminiConfig({ GEMINI_API_KEY: 'k', GEMINI_TIMEOUT_MS: 'abc' }),
-    ).toThrow(/GEMINI_TIMEOUT_MS/);
-    expect(() =>
-      resolveGeminiConfig({ GEMINI_API_KEY: 'k', GEMINI_TIMEOUT_MS: '1.5' }),
-    ).toThrow(/GEMINI_TIMEOUT_MS/);
+  it('GEMINI_TIMEOUT_MS가 양의 정수가 아니면 throw', () => {
+    expect(() => resolveGeminiConfig({ GEMINI_API_KEY: 'k', GEMINI_TIMEOUT_MS: '0' })).toThrow(
+      /GEMINI_TIMEOUT_MS/,
+    );
+    expect(() => resolveGeminiConfig({ GEMINI_API_KEY: 'k', GEMINI_TIMEOUT_MS: '-5' })).toThrow(
+      /GEMINI_TIMEOUT_MS/,
+    );
+    expect(() => resolveGeminiConfig({ GEMINI_API_KEY: 'k', GEMINI_TIMEOUT_MS: 'abc' })).toThrow(
+      /GEMINI_TIMEOUT_MS/,
+    );
+    expect(() => resolveGeminiConfig({ GEMINI_API_KEY: 'k', GEMINI_TIMEOUT_MS: '1.5' })).toThrow(
+      /GEMINI_TIMEOUT_MS/,
+    );
   });
 
-  it('GEMINI_BASE_URL 이 http(s) 스킴이 아니면 throw', () => {
+  it('GEMINI_BASE_URL이 http(s) 스킴이 아니면 throw', () => {
     expect(() =>
       resolveGeminiConfig({
         GEMINI_API_KEY: 'k',

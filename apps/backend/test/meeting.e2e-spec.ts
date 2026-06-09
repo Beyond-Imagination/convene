@@ -14,7 +14,7 @@ import {
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { Test, TestingModule } from '@nestjs/testing';
-import { io,type Socket } from 'socket.io-client';
+import { io, type Socket } from 'socket.io-client';
 import request from 'supertest';
 
 import { AppModule } from '@/app.module';
@@ -26,7 +26,7 @@ import { GeminiSummarizer } from '@/reports/infrastructure/gemini.summarizer';
 import { NoopSummarizer } from '@/reports/infrastructure/noop.summarizer';
 
 /**
- * Meeting bounded context의 e2e 통합 테스트.
+ * Meeting의 e2e 통합 테스트.
  *
  * 흐름: HTTP create → 두 client WS join → 한쪽 chat broadcast 확인 →
  *      leave broadcast 확인 → HTTP close.
@@ -53,8 +53,8 @@ describe('Meeting e2e', () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
-      // e2e 환경엔 ai-worker 컨테이너 / ffmpeg 바이너리 / Gemini API 키가 없으므로
-      // 외부 의존 어댑터를 모두 Noop 으로 갈아끼운다.
+      // e2e 환경엔 ai-worker 컨테이너/ffmpeg 바이너리/Gemini API 키가 없으므로
+      // 외부 의존 어댑터를 모두 Noop으로 갈아끼운다.
       .overrideProvider(HttpTranscriber)
       .useValue(new NoopTranscriber())
       .overrideProvider(FfmpegAudioCaptureAdapter)
@@ -84,10 +84,7 @@ describe('Meeting e2e', () => {
 
   it('HTTP create → WS join/chat/leave → HTTP close 전 흐름', async () => {
     // 1) 회의 생성.
-    const created = await request(httpServer)
-      .post('/meetings')
-      .send({ source: 'web' })
-      .expect(201);
+    const created = await request(httpServer).post('/meetings').send({ source: 'web' }).expect(201);
     const createBody = created.body as CreateMeetingResponse;
     expect(createBody.code).toHaveLength(8);
     expect(createBody.source).toBe('web');
@@ -114,14 +111,8 @@ describe('Meeting e2e', () => {
       expect(joinPayload.socketId).toBe(bob.id);
 
       // 5) alice가 chat 발화 → bob도 alice도 chatPosted 수신.
-      const aliceGotChat = waitFor<ChatPostedBroadcast>(
-        alice,
-        MEETING_WS_EVENTS.CHAT_POSTED,
-      );
-      const bobGotChat = waitFor<ChatPostedBroadcast>(
-        bob,
-        MEETING_WS_EVENTS.CHAT_POSTED,
-      );
+      const aliceGotChat = waitFor<ChatPostedBroadcast>(alice, MEETING_WS_EVENTS.CHAT_POSTED);
+      const bobGotChat = waitFor<ChatPostedBroadcast>(bob, MEETING_WS_EVENTS.CHAT_POSTED);
       alice.emit(MEETING_WS_EVENTS.CHAT, { code, text: 'hello bob' });
       const [aliceChat, bobChat] = await Promise.all([aliceGotChat, bobGotChat]);
       expect(aliceChat).toEqual({
@@ -162,18 +153,15 @@ describe('Meeting e2e', () => {
     await request(httpServer).delete('/meetings/00000000').expect(404);
   });
 
-  it('HTTP create → WS join → mediasoup:getRtpCapabilities + createTransport 까지 시그널링 동작', async () => {
-    const created = await request(httpServer)
-      .post('/meetings')
-      .send({ source: 'web' })
-      .expect(201);
+  it('HTTP create → WS join → mediasoup:getRtpCapabilities + createTransport까지 시그널링 동작', async () => {
+    const created = await request(httpServer).post('/meetings').send({ source: 'web' }).expect(201);
     const createdBody = created.body as CreateMeetingResponse;
     const code = createdBody.code;
 
     const alice = await connectClient(baseUrl);
     try {
       alice.emit(MEETING_WS_EVENTS.JOIN, { code, nickname: 'alice' });
-      // Meeting BC join 처리 후 mediasoup admitParticipant lifecycle 이 완료될 시간 양보.
+      // Meeting BC join 처리 후 mediasoup admitParticipant lifecycle이 완료될 시간 양보.
       await new Promise((r) => setTimeout(r, 80));
 
       const caps = (await alice.emitWithAck(MEDIASOUP_WS_EVENTS.GET_RTP_CAPABILITIES, {

@@ -1,29 +1,22 @@
 import { Inject, Injectable } from '@nestjs/common';
 import Redis from 'ioredis';
 
-import {
-  ParticipantMedia,
-  ParticipantMediaSnapshot,
-} from '@/mediasoup/domain/participant-media';
+import { ParticipantMedia, ParticipantMediaSnapshot } from '@/mediasoup/domain/participant-media';
 import { ParticipantMediaRepository } from '@/mediasoup/domain/ports';
 
 const PARTICIPANT_KEY_PREFIX = 'participant-media:';
 const MEETING_INDEX_KEY_PREFIX = 'participant-media:meeting:';
 
 /**
- * ParticipantMediaRepository 의 redis(ioredis) 구현체.
+ * ParticipantMediaRepository의 redis(ioredis) 구현체.
  *
  * 키 구조:
  *   - `participant-media:{participantId}` (STRING) — Aggregate snapshot JSON.
  *   - `participant-media:meeting:{meetingCode}` (SET) — 같은 회의의 participantId 색인.
  *
- * 그룹 조회(`findByMeetingCode`) 는 SET 의 SMEMBERS 로 pid 목록을 얻고 MGET 으로
- * 일괄 조회한다. 모든 save/remove 는 단건 키와 회의 색인 SET 을 동시에 갱신해야
- * 일관성이 유지되므로 pipeline 으로 묶는다.
- *
- * 도메인 객체의 `meetingCode` 는 immutable 이라는 가정 하에 동일 participantId
- * 가 회의를 옮겨다니지 않는다(socket 생애주기 = 회의 참여 1회). 그렇기에 회의
- * 색인 갱신은 단순한 SADD/SREM 로 충분하다.
+ * 그룹 조회(`findByMeetingCode`)는 SET의 SMEMBERS로 pid 목록을 얻고 MGET으로 일괄 조회한다.
+ * 도메인 객체의 `meetingCode`는 immutable이라는 가정 하에 동일 participantId가 회의를 옮겨다니지 않는다.
+ * 그렇기에 회의 색인 갱신은 단순한 SADD/SREM로 충분하다.
  */
 @Injectable()
 export class RedisParticipantMediaRepository implements ParticipantMediaRepository {
@@ -69,7 +62,7 @@ export class RedisParticipantMediaRepository implements ParticipantMediaReposito
   async removeAllByMeetingCode(meetingCode: string): Promise<void> {
     const pids = await this.redis.smembers(this.meetingIndexKey(meetingCode));
     if (pids.length === 0) {
-      // 색인 SET 만 있고 비어 있을 가능성은 없지만 안전하게 DEL 호출.
+      // 색인 SET만 있고 비어 있을 가능성은 없지만 안전하게 DEL 호출.
       await this.redis.del(this.meetingIndexKey(meetingCode));
       return;
     }

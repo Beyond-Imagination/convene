@@ -13,12 +13,11 @@ interface ChatEntryWire {
 }
 
 /**
- * ChatRepository 의 redis(ioredis) 구현체.
+ * ChatRepository의 redis(ioredis) 구현체.
  *
- * - 회의별로 redis LIST 한 개(`chat:{code}`) 를 쓴다. RPUSH 로 끝에 append,
- *   LRANGE 0 -1 로 시간순 전체 조회. 회의 종료 시 한 번에 읽어 Report 로 이관.
- * - 각 entry 는 JSON string. Date(sentAt) 는 ISO 로 직렬화하고 복원 시
- *   `new Date(iso)` 로 객체화한다.
+ * - 회의별로 redis LIST 한 개(`chat:{code}`)를 쓴다. RPUSH로 끝에 append, LRANGE 0 -1로 시간순 전체 조회.
+ * - 회의 종료 시 한 번에 읽어 Report로 이관.
+ * - 각 entry는 JSON string. Date(sentAt)는 ISO로 직렬화하고 복원 시 `new Date(iso)`로 객체화한다.
  */
 @Injectable()
 export class RedisChatRepository implements ChatRepository {

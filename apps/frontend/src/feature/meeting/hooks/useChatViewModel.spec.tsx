@@ -33,25 +33,21 @@ class FakeSocket {
 const code = 'abc12xyz';
 
 describe('useChatViewModel', () => {
-  it('초기 messages 는 빈 배열, socket 없으면 canSend=false', () => {
+  it('초기 messages는 빈 배열, socket 없으면 canSend=false', () => {
     const { result } = renderHook(() => useChatViewModel(null, code));
     expect(result.current.messages).toEqual([]);
     expect(result.current.canSend).toBe(false);
   });
 
-  it('socket 이 있으면 canSend=true', () => {
+  it('socket이 있으면 canSend=true', () => {
     const socket = new FakeSocket();
-    const { result } = renderHook(() =>
-      useChatViewModel(socket as unknown as never, code),
-    );
+    const { result } = renderHook(() => useChatViewModel(socket as unknown as never, code));
     expect(result.current.canSend).toBe(true);
   });
 
-  it('chatPosted broadcast 를 수신해 messages 에 누적한다', () => {
+  it('chatPosted broadcast를 수신해 messages에 누적한다', () => {
     const socket = new FakeSocket();
-    const { result } = renderHook(() =>
-      useChatViewModel(socket as unknown as never, code),
-    );
+    const { result } = renderHook(() => useChatViewModel(socket as unknown as never, code));
     act(() => {
       socket.trigger(MEETING_WS_EVENTS.CHAT_POSTED, {
         nickname: '준',
@@ -70,11 +66,9 @@ describe('useChatViewModel', () => {
     ]);
   });
 
-  it('초기 draft 는 빈 문자열, setDraft 로 갱신된다', () => {
+  it('초기 draft는 빈 문자열, setDraft로 갱신된다', () => {
     const socket = new FakeSocket();
-    const { result } = renderHook(() =>
-      useChatViewModel(socket as unknown as never, code),
-    );
+    const { result } = renderHook(() => useChatViewModel(socket as unknown as never, code));
     expect(result.current.draft).toBe('');
     act(() => {
       result.current.setDraft('안녕');
@@ -82,11 +76,9 @@ describe('useChatViewModel', () => {
     expect(result.current.draft).toBe('안녕');
   });
 
-  it('submit() 은 draft 를 trim 해서 meeting:chat 으로 emit 하고 입력을 비운다', () => {
+  it('submit()은 draft를 trim 해서 meeting:chat으로 emit 하고 입력을 비운다', () => {
     const socket = new FakeSocket();
-    const { result } = renderHook(() =>
-      useChatViewModel(socket as unknown as never, code),
-    );
+    const { result } = renderHook(() => useChatViewModel(socket as unknown as never, code));
     act(() => {
       result.current.setDraft('  안녕하세요  ');
     });
@@ -100,11 +92,9 @@ describe('useChatViewModel', () => {
     expect(result.current.draft).toBe('');
   });
 
-  it('draft 가 빈 문자열/공백만이면 submit 은 no-op', () => {
+  it('draft가 빈 문자열/공백만이면 submit은 no-op', () => {
     const socket = new FakeSocket();
-    const { result } = renderHook(() =>
-      useChatViewModel(socket as unknown as never, code),
-    );
+    const { result } = renderHook(() => useChatViewModel(socket as unknown as never, code));
     act(() => {
       result.current.submit();
     });
@@ -117,7 +107,7 @@ describe('useChatViewModel', () => {
     expect(socket.emit).not.toHaveBeenCalled();
   });
 
-  it('socket 이 null 이면 submit 도 emit 하지 않는다', () => {
+  it('socket이 null 이면 submit도 emit 하지 않는다', () => {
     const socket = new FakeSocket();
     const { result } = renderHook(() => useChatViewModel(null, code));
     act(() => {
@@ -127,15 +117,13 @@ describe('useChatViewModel', () => {
       result.current.submit();
     });
     expect(socket.emit).not.toHaveBeenCalled();
-    // draft 는 보존됨(전송 실패 → 사용자가 다시 시도 가능).
+    // draft는 보존됨(전송 실패 → 사용자가 다시 시도 가능).
     expect(result.current.draft).toBe('test');
   });
 
   it('unmount 시 chatPosted 리스너를 해제한다', () => {
     const socket = new FakeSocket();
-    const { unmount } = renderHook(() =>
-      useChatViewModel(socket as unknown as never, code),
-    );
+    const { unmount } = renderHook(() => useChatViewModel(socket as unknown as never, code));
     unmount();
     // listener 해제 후 trigger 해도 throw 안 함 + 이전 setMessages 호출 안 됨
     expect(socket.listeners.get(MEETING_WS_EVENTS.CHAT_POSTED) ?? []).toHaveLength(0);

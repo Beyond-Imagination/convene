@@ -7,12 +7,12 @@ describe('host-token storage', () => {
     window.sessionStorage.clear();
   });
 
-  it('회의 code 로 저장한 hostToken 을 그대로 조회한다', () => {
+  it('회의 code로 저장한 hostToken을 그대로 조회한다', () => {
     saveHostToken('abc12xyz', 'tok-1');
     expect(getHostToken('abc12xyz')).toBe('tok-1');
   });
 
-  it('저장하지 않은 code 는 null 을 돌려준다', () => {
+  it('저장하지 않은 code는 null을 돌려준다', () => {
     expect(getHostToken('zzz99zzz')).toBeNull();
   });
 

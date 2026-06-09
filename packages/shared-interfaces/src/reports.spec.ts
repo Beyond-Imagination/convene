@@ -68,9 +68,7 @@ describe('Reports wire format type-compile checks', () => {
           leftAt: '2026-01-01T00:30:00.000Z',
         },
       ],
-      chat: [
-        { nickname: '준', text: '안녕', sentAt: '2026-01-01T00:01:00.000Z' },
-      ],
+      chat: [{ nickname: '준', text: '안녕', sentAt: '2026-01-01T00:01:00.000Z' }],
       transcript: [{ text: '안녕하세요', startMs: 0, endMs: 1000 }],
       summary: {
         title: '회의 요약',

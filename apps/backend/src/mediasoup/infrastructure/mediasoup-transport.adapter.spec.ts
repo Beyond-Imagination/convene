@@ -45,7 +45,7 @@ const setup = async () => {
 };
 
 describe('MediasoupTransportAdapter', () => {
-  it('createWebRtcTransport 는 회의의 router 위에서 transport 를 만들고 wire format 응답을 반환한다', async () => {
+  it('createWebRtcTransport는 회의의 router 위에서 transport를 만들고 wire format 응답을 반환한다', async () => {
     const { transportAdapter, cleanup } = await setup();
     try {
       const res = await transportAdapter.createWebRtcTransport({
@@ -72,7 +72,7 @@ describe('MediasoupTransportAdapter', () => {
     }
   });
 
-  it('assign 안 된 참가자의 createWebRtcTransport 는 throw 한다', async () => {
+  it('assign 안 된 참가자의 createWebRtcTransport는 throw 한다', async () => {
     const { transportAdapter, cleanup } = await setup();
     try {
       await expect(
@@ -87,7 +87,7 @@ describe('MediasoupTransportAdapter', () => {
     }
   });
 
-  it('createWebRtcTransport 호출 후 closeTransport 로 닫으면 transport 가 더이상 동작하지 않는다', async () => {
+  it('createWebRtcTransport 호출 후 closeTransport로 닫으면 transport가 더이상 동작하지 않는다', async () => {
     const { transportAdapter, cleanup } = await setup();
     try {
       const res = await transportAdapter.createWebRtcTransport({
@@ -96,7 +96,7 @@ describe('MediasoupTransportAdapter', () => {
         direction: 'send',
       });
       await transportAdapter.closeTransport(res.id);
-      // 같은 transportId 로 connect 시도 시 throw (없거나 닫힘)
+      // 같은 transportId로 connect 시도 시 throw (없거나 닫힘)
       await expect(
         transportAdapter.connectTransport(res.id, { fingerprints: [] }),
       ).rejects.toThrow();
@@ -105,7 +105,7 @@ describe('MediasoupTransportAdapter', () => {
     }
   });
 
-  it('알 수 없는 transportId 로 connectTransport 를 호출하면 throw 한다', async () => {
+  it('알 수 없는 transportId로 connectTransport를 호출하면 throw 한다', async () => {
     const { transportAdapter, cleanup } = await setup();
     try {
       await expect(
@@ -116,7 +116,7 @@ describe('MediasoupTransportAdapter', () => {
     }
   });
 
-  it('알 수 없는 transportId 로 produce 를 호출하면 throw 한다', async () => {
+  it('알 수 없는 transportId로 produce를 호출하면 throw 한다', async () => {
     const { transportAdapter, cleanup } = await setup();
     try {
       await expect(
@@ -134,7 +134,7 @@ describe('MediasoupTransportAdapter', () => {
     }
   });
 
-  it('알 수 없는 consumerId 로 resumeConsumer 를 호출하면 throw 한다', async () => {
+  it('알 수 없는 consumerId로 resumeConsumer를 호출하면 throw 한다', async () => {
     const { transportAdapter, cleanup } = await setup();
     try {
       await expect(transportAdapter.resumeConsumer('c-unknown')).rejects.toThrow();
@@ -143,7 +143,7 @@ describe('MediasoupTransportAdapter', () => {
     }
   });
 
-  it('알 수 없는 producerId 로 pauseProducer 를 호출하면 throw 한다', async () => {
+  it('알 수 없는 producerId로 pauseProducer를 호출하면 throw 한다', async () => {
     const { transportAdapter, cleanup } = await setup();
     try {
       await expect(transportAdapter.pauseProducer('p-unknown')).rejects.toThrow();
@@ -152,7 +152,7 @@ describe('MediasoupTransportAdapter', () => {
     }
   });
 
-  it('알 수 없는 producerId 로 resumeProducer 를 호출하면 throw 한다', async () => {
+  it('알 수 없는 producerId로 resumeProducer를 호출하면 throw 한다', async () => {
     const { transportAdapter, cleanup } = await setup();
     try {
       await expect(transportAdapter.resumeProducer('p-unknown')).rejects.toThrow();

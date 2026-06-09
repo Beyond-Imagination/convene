@@ -11,9 +11,7 @@ import type {
 
 import { MeetingScreen } from './MeetingScreen';
 
-const baseMediasoup = (
-  overrides: Partial<UseMediasoupViewModel> = {},
-): UseMediasoupViewModel => ({
+const baseMediasoup = (overrides: Partial<UseMediasoupViewModel> = {}): UseMediasoupViewModel => ({
   status: 'ready',
   errorMessage: null,
   localStream: null,
@@ -31,7 +29,7 @@ const baseMediasoup = (
 });
 
 const fakeTrack = (kind: 'audio' | 'video'): MediaStreamTrack =>
-  ({ kind } as unknown as MediaStreamTrack);
+  ({ kind }) as unknown as MediaStreamTrack;
 
 const fakeStream = (): MediaStream => ({}) as unknown as MediaStream;
 
@@ -64,7 +62,10 @@ const renderScreen = (
   mediasoupOverrides: Partial<UseMediasoupViewModel> = {},
 ) =>
   render(
-    <MeetingScreen {...baseVm(vmOverrides)} mediasoup={baseMediasoup(mediasoupOverrides)} />,
+    <MeetingScreen
+      {...baseVm(vmOverrides)}
+      mediasoup={baseMediasoup(mediasoupOverrides)}
+    />,
   );
 
 describe('MeetingScreen View', () => {
@@ -96,26 +97,26 @@ describe('MeetingScreen View', () => {
     expect(screen.getByRole('status')).toHaveTextContent('연결 중');
   });
 
-  it('status="error" + errorMessage 가 있으면 alert 로 노출', () => {
+  it('status="error" + errorMessage가 있으면 alert로 노출', () => {
     renderScreen({ status: 'error', errorMessage: 'handshake 실패' });
     expect(screen.getByRole('alert')).toHaveTextContent('handshake 실패');
   });
 
-  it('나가기 버튼 클릭 시 vm.leave 가 호출된다', () => {
+  it('나가기 버튼 클릭 시 vm.leave가 호출된다', () => {
     const leave = vi.fn();
     renderScreen({ leave });
     fireEvent.click(screen.getByRole('button', { name: '나가기' }));
     expect(leave).toHaveBeenCalledTimes(1);
   });
 
-  it('host 면 회의 종료 버튼 클릭 시 vm.endMeeting 이 호출된다', () => {
+  it('host 면 회의 종료 버튼 클릭 시 vm.endMeeting이 호출된다', () => {
     const endMeeting = vi.fn(async () => {});
     renderScreen({ endMeeting, isHost: true });
     fireEvent.click(screen.getByRole('button', { name: '회의 종료' }));
     expect(endMeeting).toHaveBeenCalledTimes(1);
   });
 
-  it('host 가 아니면 회의 종료 버튼이 노출되지 않는다', () => {
+  it('host가 아니면 회의 종료 버튼이 노출되지 않는다', () => {
     renderScreen({ isHost: false });
     expect(screen.queryByRole('button', { name: '회의 종료' })).toBeNull();
   });
@@ -130,14 +131,14 @@ describe('MeetingScreen View', () => {
     expect(screen.queryByTestId('mediasoup-status')).toBeNull();
   });
 
-  it('mediasoup.status="error" + errorMessage 가 있으면 미디어 오류가 alert 로 노출된다', () => {
+  it('mediasoup.status="error" + errorMessage가 있으면 미디어 오류가 alert로 노출된다', () => {
     renderScreen({}, { status: 'error', errorMessage: 'no ice' });
     const alerts = screen.getAllByRole('alert');
     expect(alerts.some((el) => el.textContent?.includes('미디어 오류'))).toBe(true);
     expect(alerts.some((el) => el.textContent?.includes('no ice'))).toBe(true);
   });
 
-  it('localStream + 내 닉네임이 있으면 self video tile 이 닉네임과 함께 렌더된다', () => {
+  it('localStream + 내 닉네임이 있으면 self video tile이 닉네임과 함께 렌더된다', () => {
     const stream = fakeStream();
     renderScreen({ nickname: '준' }, { localStream: stream });
     const tile = screen.getByTestId('local-video-tile');
@@ -149,14 +150,14 @@ describe('MeetingScreen View', () => {
     expect(video.muted).toBe(true);
   });
 
-  it('localStream 이 null 이면 self video tile 의 video 는 srcObject 가 비어 있다', () => {
+  it('localStream이 null 이면 self video tile의 video는 srcObject가 비어 있다', () => {
     renderScreen({ nickname: '준' }, { localStream: null });
     const tile = screen.getByTestId('local-video-tile');
     const video = tile.querySelector('video') as HTMLVideoElement;
     expect(video.srcObject).toBeNull();
   });
 
-  it('각 remoteParticipant 에 대해 remote video tile 이 닉네임과 함께 렌더된다', () => {
+  it('각 remoteParticipant에 대해 remote video tile이 닉네임과 함께 렌더된다', () => {
     const remoteParticipants: RemoteParticipant[] = [
       { socketId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z' },
       { socketId: 's3', nickname: '벤', joinedAt: '2026-01-01T00:02:00.000Z' },
@@ -171,7 +172,7 @@ describe('MeetingScreen View', () => {
     expect(tiles[1]).toHaveTextContent('벤');
   });
 
-  it('peerSocketId 와 매칭되는 video track 의 srcObject 가 video 요소에 attach 된다', () => {
+  it('peerSocketId와 매칭되는 video track의 srcObject가 video 요소에 attach 된다', () => {
     const track = fakeTrack('video');
     const remoteParticipants: RemoteParticipant[] = [
       { socketId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z' },
@@ -179,9 +180,7 @@ describe('MeetingScreen View', () => {
     renderScreen(
       { remoteParticipants },
       {
-        remoteMedia: [
-          { ...remoteEntry({ peerSocketId: 's2', kind: 'video' }), track },
-        ],
+        remoteMedia: [{ ...remoteEntry({ peerSocketId: 's2', kind: 'video' }), track }],
       },
     );
     const tile = screen.getByTestId('remote-video-tile');
@@ -193,7 +192,7 @@ describe('MeetingScreen View', () => {
 
   // NOTE: 원격 audio 출력은 RemoteAudioPlayer 별도 컴포넌트에서 검증
   // (RemoteAudioPlayer.spec.tsx). 여기서는 통합만 확인.
-  it('remoteMedia 에 audio 가 있으면 RemoteAudioPlayer 가 audio 요소를 렌더한다', () => {
+  it('remoteMedia에 audio가 있으면 RemoteAudioPlayer가 audio 요소를 렌더한다', () => {
     const audioTrack = fakeTrack('audio');
     const remoteParticipants: RemoteParticipant[] = [
       { socketId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z' },
@@ -201,9 +200,7 @@ describe('MeetingScreen View', () => {
     renderScreen(
       { remoteParticipants },
       {
-        remoteMedia: [
-          { ...remoteEntry({ peerSocketId: 's2', kind: 'audio' }), track: audioTrack },
-        ],
+        remoteMedia: [{ ...remoteEntry({ peerSocketId: 's2', kind: 'audio' }), track: audioTrack }],
       },
     );
     const audioPlayer = screen.getByTestId('remote-audio-player');
@@ -267,7 +264,7 @@ describe('MeetingScreen View', () => {
     expect(video.srcObject).toBe(stream);
   });
 
-  it('원격 참가자의 source=screen 트랙이 있으면 별도 remote-screen-tile 이 노출된다', () => {
+  it('원격 참가자의 source=screen 트랙이 있으면 별도 remote-screen-tile이 노출된다', () => {
     const screenTrack = fakeTrack('video');
     const remoteParticipants: RemoteParticipant[] = [
       { socketId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z' },

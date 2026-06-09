@@ -20,11 +20,7 @@ interface MeetingEndedPayload {
 }
 
 /**
- * Meeting BC 의 도메인 이벤트를 구독해 Mediasoup BC 의 lifecycle 을
- * 트리거하는 application listener.
- *
- * 이로써 Meeting BC 와 Mediasoup BC 는 코드 의존 없이 이벤트로만 결합한다
- * (CLAUDE.md hard rule 7 — cross-context coupling only via Domain Events).
+ * Meeting BC의 도메인 이벤트를 구독해 Mediasoup BC의 lifecycle을 트리거하는 application listener.
  */
 @Injectable()
 export class MediasoupMeetingLifecycleListener {

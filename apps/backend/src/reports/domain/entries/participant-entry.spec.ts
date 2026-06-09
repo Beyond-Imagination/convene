@@ -15,15 +15,15 @@ describe('ParticipantEntry', () => {
   });
 
   it.each(['', '   '])('id가 trim 후 비어 있으면 거부한다: "%s"', (id) => {
-    expect(() =>
-      participantEntry({ id, nickname: 'alice', joinedAt: t0, leftAt: null }),
-    ).toThrow(/id/);
+    expect(() => participantEntry({ id, nickname: 'alice', joinedAt: t0, leftAt: null })).toThrow(
+      /id/,
+    );
   });
 
   it.each(['', '   '])('nickname이 trim 후 비어 있으면 거부한다: "%s"', (n) => {
-    expect(() =>
-      participantEntry({ id: 's1', nickname: n, joinedAt: t0, leftAt: null }),
-    ).toThrow(/nickname/);
+    expect(() => participantEntry({ id: 's1', nickname: n, joinedAt: t0, leftAt: null })).toThrow(
+      /nickname/,
+    );
   });
 
   it('nickname이 30자를 넘으면 거부한다', () => {

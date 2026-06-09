@@ -1,18 +1,9 @@
-/**
- * 부트스트랩 단계에서 환경변수를 읽어 서버 옵션을 만든다.
- *
- * `@nestjs/config` 의 ConfigService 는 모듈 인스턴스 이후에만 사용 가능하므로,
- * main.ts 의 `NestFactory.create` 이전/직후 단계에서는 본 파일의 순수 함수로
- * 환경변수를 해석한다. 추후 더 많은 부트스트랩 옵션(예: 로그 레벨, mediasoup
- * 워커 수)을 여기에 모은다.
- */
-
 export const DEFAULT_PORT = 5000;
 
 /**
  * HTTP/WS 허용 origin 기본값.
  *
- * Next.js dev 서버. 운영에서는 CloudFront 도메인을 `CORS_ORIGIN` 환경변수에 둔다.
+ * 기본값은 로컬 Next.js dev 서버이며, `CORS_ORIGIN` 환경변수로 재정의한다.
  */
 export const DEFAULT_CORS_ORIGIN = 'http://localhost:3000';
 
@@ -28,7 +19,7 @@ export function resolvePort(env: NodeJS.ProcessEnv = process.env): number {
 
 /**
  * 콤마 구분 origin 문자열을 trim/dedupe 한 배열로 변환한다.
- * 빈 문자열은 무시하며, 결과가 비면 디폴트 origin 으로 fallback 한다.
+ * 빈 문자열은 무시하며, 결과가 비면 디폴트 origin으로 fallback 한다.
  */
 export function resolveCorsOrigins(env: NodeJS.ProcessEnv = process.env): string[] {
   const raw = env.CORS_ORIGIN ?? DEFAULT_CORS_ORIGIN;

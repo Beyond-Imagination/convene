@@ -7,11 +7,15 @@ import { useNicknameGateViewModel } from './useNicknameGateViewModel';
 function Harness() {
   const vm = useNicknameGateViewModel();
   return (
-    <form aria-label="gate-form" onSubmit={vm.handleSubmit}>
-      <input data-testid="nickname" {...vm.register('nickname')} />
-      {vm.errors.nickname && (
-        <span data-testid="nickname-error">{vm.errors.nickname.message}</span>
-      )}
+    <form
+      aria-label="gate-form"
+      onSubmit={vm.handleSubmit}
+    >
+      <input
+        data-testid="nickname"
+        {...vm.register('nickname')}
+      />
+      {vm.errors.nickname && <span data-testid="nickname-error">{vm.errors.nickname.message}</span>}
       <button type="submit">입장하기</button>
     </form>
   );
@@ -29,7 +33,7 @@ describe('useNicknameGateViewModel', () => {
     useSessionStore.setState({ nickname: null });
   });
 
-  it('유효한 닉네임 submit 시 trim 해서 session store 에 저장한다', async () => {
+  it('유효한 닉네임 submit 시 trim 해서 session store에 저장한다', async () => {
     render(<Harness />);
     setInput('  준  ');
     submit();
@@ -39,9 +43,7 @@ describe('useNicknameGateViewModel', () => {
   it('닉네임이 비어 있으면 저장하지 않고 에러를 노출한다', async () => {
     render(<Harness />);
     submit();
-    await waitFor(() =>
-      expect(screen.getByTestId('nickname-error')).toHaveTextContent(/닉네임/),
-    );
+    await waitFor(() => expect(screen.getByTestId('nickname-error')).toHaveTextContent(/닉네임/));
     expect(useSessionStore.getState().nickname).toBeNull();
   });
 
@@ -49,9 +51,7 @@ describe('useNicknameGateViewModel', () => {
     render(<Harness />);
     setInput('   ');
     submit();
-    await waitFor(() =>
-      expect(screen.getByTestId('nickname-error')).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId('nickname-error')).toBeInTheDocument());
     expect(useSessionStore.getState().nickname).toBeNull();
   });
 
@@ -59,9 +59,7 @@ describe('useNicknameGateViewModel', () => {
     render(<Harness />);
     setInput('a'.repeat(31));
     submit();
-    await waitFor(() =>
-      expect(screen.getByTestId('nickname-error')).toHaveTextContent(/30자/),
-    );
+    await waitFor(() => expect(screen.getByTestId('nickname-error')).toHaveTextContent(/30자/));
     expect(useSessionStore.getState().nickname).toBeNull();
   });
 });

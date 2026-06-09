@@ -18,7 +18,7 @@ import {
 
 import { MediasoupRouterAdapter } from './mediasoup-router.adapter';
 
-export interface MediasoupTransportAdapterOptions {
+interface MediasoupTransportAdapterOptions {
   listenIps: Array<{ ip: string; announcedIp?: string }>;
   enableUdp: boolean;
   enableTcp: boolean;
@@ -27,14 +27,10 @@ export interface MediasoupTransportAdapterOptions {
 }
 
 /**
- * `MediaTransportPort` 의 mediasoup 어댑터.
+ * `MediaTransportPort`의 mediasoup 어댑터.
  *
- * `MediasoupRouterAdapter.getParticipantRouter(code, participantId)` 로
- * 회의·참가자에 매핑된 router 를 찾아 그 위에서 `WebRtcTransport`/`Producer`/
- * `Consumer` 를 생성한다.
- *
- * mediasoup 객체는 본 어댑터 내부 Map 에만 보관되고, application/domain 으로는
- * 식별자(string) 와 wire format 응답만 노출한다.
+ * 회의·참가자에 매핑된 router를 찾아 그 위에서 `WebRtcTransport`/`Producer`/`Consumer`를 생성한다.
+ * mediasoup 객체는 본 어댑터 내부 Map에만 보관되고, application/domain으로는 식별자(string)와 wire format 응답만 노출한다.
  */
 export class MediasoupTransportAdapter implements MediaTransportPort {
   private readonly logger = new Logger(MediasoupTransportAdapter.name);
@@ -79,8 +75,6 @@ export class MediasoupTransportAdapter implements MediaTransportPort {
     const producer = await transport.produce({
       kind: input.kind,
       rtpParameters: input.rtpParameters as RtpParameters,
-      // 기본 OFF 로 입장하는 audio/video 는 paused 로 생성해, NEW_PRODUCER 가 처음부터
-      // 정확한 mute 상태로 나가게 한다(produce 후 별도 pause 전파 race 제거).
       paused: input.paused ?? false,
       appData: { ownerId: input.participantId, source: input.source },
     });

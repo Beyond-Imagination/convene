@@ -4,7 +4,7 @@ import { chatEntry } from '@/shared-kernel/domain/value-objects';
 import { GeminiSummarizer, GeminiSummarizerOptions } from './gemini.summarizer';
 
 /**
- * Gemini `generateContent` REST API (v1beta) 를 호출하는 SummarizerPort 어댑터 spec.
+ * Gemini `generateContent` REST API를 호출하는 SummarizerPort 어댑터 spec.
  *
  * 요청 형식:
  *   POST {baseUrl}/v1beta/models/{model}:generateContent?key={apiKey}
@@ -13,9 +13,6 @@ import { GeminiSummarizer, GeminiSummarizerOptions } from './gemini.summarizer';
  *
  * 응답 형식:
  *   { candidates: [{ content: { parts: [{ text: '<json string>' }] } }] }
- *
- * 본 어댑터는 응답 text 를 JSON.parse 한 뒤 `reportSummary(...)` VO factory 로
- * 정규화한다(검증 실패는 그대로 throw 되어 Application Service 가 catch).
  */
 describe('GeminiSummarizer', () => {
   const options: GeminiSummarizerOptions = {
@@ -63,13 +60,18 @@ describe('GeminiSummarizer', () => {
     expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
   });
 
-  it('body 에 transcript/chat 텍스트가 포함되고 responseMimeType=application/json 가 강제된다', async () => {
+  it('body에 transcript/chat 텍스트가 포함되고 responseMimeType=application/json가 강제된다', async () => {
     const fetchMock = jest.fn().mockResolvedValueOnce(okResponse(validSummaryJson));
     const summarizer = new GeminiSummarizer(options, fetchMock as unknown as typeof fetch);
 
     await summarizer.summarize({
       transcript: [
-        transcriptSegment({ speaker: 'alice', text: 'OAuth 다음 분기 확정', startMs: 0, endMs: 2000 }),
+        transcriptSegment({
+          speaker: 'alice',
+          text: 'OAuth 다음 분기 확정',
+          startMs: 0,
+          endMs: 2000,
+        }),
         transcriptSegment({ speaker: 'bob', text: '동의합니다', startMs: 2000, endMs: 3000 }),
       ],
       chat: [chatEntry({ nickname: 'carol', text: '회의록 작성 부탁', sentAt: meta.startedAt })],
@@ -99,7 +101,7 @@ describe('GeminiSummarizer', () => {
     expect(promptText).toContain('Korean');
   });
 
-  it('generationConfig 에 낮은 temperature 와 5필드 responseSchema 가 강제된다', async () => {
+  it('generationConfig에 낮은 temperature와 5필드 responseSchema가 강제된다', async () => {
     const fetchMock = jest.fn().mockResolvedValueOnce(okResponse(validSummaryJson));
     const summarizer = new GeminiSummarizer(options, fetchMock as unknown as typeof fetch);
 
@@ -118,30 +120,28 @@ describe('GeminiSummarizer', () => {
         };
       };
     };
-    // 요약 일관성을 위해 temperature 를 낮춘다(Gemini default 1.0 → 0.2).
+    // 요약 일관성을 위해 temperature를 낮춘다(Gemini default 1.0 → 0.2).
     expect(body.generationConfig.temperature).toBeLessThanOrEqual(0.2);
     // 모델단에서 5필드 JSON 구조를 강제해 어댑터 파싱부의 throw 빈도를 낮춘다.
     const schema = body.generationConfig.responseSchema;
-    // REST v1beta Schema 의 type 은 대문자 enum(OBJECT/STRING/ARRAY).
+    // REST v1beta Schema의 type은 대문자 enum(OBJECT/STRING/ARRAY).
     expect(schema.type).toBe('OBJECT');
-    expect(Object.keys(schema.properties).sort()).toEqual(
-      ['actionItems', 'decisions', 'keyTopics', 'overview', 'title'],
-    );
+    expect(Object.keys(schema.properties).sort()).toEqual([
+      'actionItems',
+      'decisions',
+      'keyTopics',
+      'overview',
+      'title',
+    ]);
     expect(schema.required).toEqual(
-      expect.arrayContaining([
-        'title',
-        'overview',
-        'decisions',
-        'actionItems',
-        'keyTopics',
-      ]),
+      expect.arrayContaining(['title', 'overview', 'decisions', 'actionItems', 'keyTopics']),
     );
     // 중첩 배열 구조(actionItems/keyTopics)도 스키마에 명시한다.
     expect(schema.properties.actionItems.type).toBe('ARRAY');
     expect(schema.properties.keyTopics.type).toBe('ARRAY');
   });
 
-  it('응답 JSON 을 ReportSummary VO 로 변환해 돌려준다', async () => {
+  it('응답 JSON을 ReportSummary VO로 변환해 돌려준다', async () => {
     const fetchMock = jest.fn().mockResolvedValueOnce(okResponse(validSummaryJson));
     const summarizer = new GeminiSummarizer(options, fetchMock as unknown as typeof fetch);
 
@@ -152,12 +152,10 @@ describe('GeminiSummarizer', () => {
     expect(summary.actionItems).toEqual([
       { owner: 'alice', task: '마이그레이션 PoC 작성', due: '이번 주 금요일' },
     ]);
-    expect(summary.keyTopics).toEqual([
-      { topic: '인증', points: ['JWT 정책', '세션 만료'] },
-    ]);
+    expect(summary.keyTopics).toEqual([{ topic: '인증', points: ['JWT 정책', '세션 만료'] }]);
   });
 
-  it('빈 transcript + 빈 chat 도 정상 호출하고 응답을 매핑한다', async () => {
+  it('빈 transcript + 빈 chat도 정상 호출하고 응답을 매핑한다', async () => {
     const fetchMock = jest.fn().mockResolvedValueOnce(okResponse(validSummaryJson));
     const summarizer = new GeminiSummarizer(options, fetchMock as unknown as typeof fetch);
 
@@ -166,15 +164,13 @@ describe('GeminiSummarizer', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('non-2xx 응답이면 status 가 포함된 에러를 throw 한다', async () => {
+  it('non-2xx 응답이면 status가 포함된 에러를 throw 한다', async () => {
     const fetchMock = jest
       .fn()
       .mockResolvedValueOnce(new Response('quota exceeded', { status: 429 }));
     const summarizer = new GeminiSummarizer(options, fetchMock as unknown as typeof fetch);
 
-    await expect(summarizer.summarize({ transcript: [], chat: [], meta })).rejects.toThrow(
-      /429/,
-    );
+    await expect(summarizer.summarize({ transcript: [], chat: [], meta })).rejects.toThrow(/429/);
   });
 
   it('fetch 자체가 reject 하면(예: 네트워크 실패) 그 에러를 그대로 전파한다', async () => {
@@ -186,7 +182,7 @@ describe('GeminiSummarizer', () => {
     );
   });
 
-  it('candidates 가 비어 있으면 에러를 throw 한다', async () => {
+  it('candidates가 비어 있으면 에러를 throw 한다', async () => {
     const fetchMock = jest.fn().mockResolvedValueOnce(
       new Response(JSON.stringify({ candidates: [] }), {
         status: 200,
@@ -200,14 +196,14 @@ describe('GeminiSummarizer', () => {
     );
   });
 
-  it('응답 text 가 JSON 이 아니면 에러를 throw 한다', async () => {
+  it('응답 text가 JSON이 아니면 에러를 throw 한다', async () => {
     const fetchMock = jest.fn().mockResolvedValueOnce(okResponse('not a json'));
     const summarizer = new GeminiSummarizer(options, fetchMock as unknown as typeof fetch);
 
     await expect(summarizer.summarize({ transcript: [], chat: [], meta })).rejects.toThrow();
   });
 
-  it('JSON 은 valid 지만 ReportSummary VO 검증 실패면 에러를 그대로 전파한다(title 비어있음)', async () => {
+  it('JSON은 valid 지만 ReportSummary VO 검증 실패면 에러를 그대로 전파한다(title 비어있음)', async () => {
     const invalid = JSON.stringify({
       title: '',
       overview: 'x',
@@ -218,8 +214,6 @@ describe('GeminiSummarizer', () => {
     const fetchMock = jest.fn().mockResolvedValueOnce(okResponse(invalid));
     const summarizer = new GeminiSummarizer(options, fetchMock as unknown as typeof fetch);
 
-    await expect(summarizer.summarize({ transcript: [], chat: [], meta })).rejects.toThrow(
-      /title/,
-    );
+    await expect(summarizer.summarize({ transcript: [], chat: [], meta })).rejects.toThrow(/title/);
   });
 });

@@ -1,31 +1,7 @@
-import {
-  ChatEntry,
-  ExternalReference,
-  Source,
-} from '@/shared-kernel/domain/value-objects';
+import { ChatEntry, ExternalReference, Source } from '@/shared-kernel/domain/value-objects';
 
 import { ParticipantEntry, TranscriptSegment } from './entries';
-import {
-  NotionPushResult,
-  PipelineState,
-  ReportSummary,
-} from './value-objects';
-
-/**
- * 회의록. Bounded Context 'Report'의 Aggregate Root.
- *
- * Meeting이 종료되는 순간 `fromEndedMeeting(...)`으로 draft가 만들어지고,
- * 비동기 파이프라인(STT → LLM 요약)을 거치면서 transcript·summary·pipeline
- * 상태가 채워진다(ARCHITECTURE.md §5 상태도, §6 시퀀스).
- *
- * 책임:
- *   - 회의 종료 시점의 영속 가능한 draft 생성 + 입력 검증
- *   - 후처리 stage 결과 반영(`applyTranscript`/`applySummary` + `mark*Failed`)
- *   - 노션 push 결과 1회 부착(`attachNotionPushResult`, v2)
- *
- * 도메인 이벤트는 직접 발행하지 않으며, Application Service가 메서드 호출
- * 결과를 보고 `@nestjs/event-emitter`로 발행한다.
- */
+import { NotionPushResult, PipelineState, ReportSummary } from './value-objects';
 
 export interface CreateMeetingReportInput {
   id: string;
@@ -37,10 +13,21 @@ export interface CreateMeetingReportInput {
   endedAt: Date;
   participants: ReadonlyArray<ParticipantEntry>;
   chat: ReadonlyArray<ChatEntry>;
-  /** 회의 생성 시 지정한 제목. 생략하면 null. */
   title?: string | null;
 }
 
+/**
+ * 회의록.
+ *
+ * Meeting이 종료되는 순간 draft가 만들어지고, 비동기 파이프라인(STT → LLM 요약)을 거치면서 transcript·summary·pipeline 상태가 채워진다.
+ *
+ * 책임:
+ *   - 회의 종료 시점의 영속 가능한 draft 생성 + 입력 검증
+ *   - 후처리 stage 결과 반영(`applyTranscript`/`applySummary` + `mark*Failed`)
+ *   - 노션 push 결과 1회 부착(`attachNotionPushResult`, v2)
+ *
+ * 도메인 이벤트는 직접 발행하지 않는다(Application Service가 메서드 결과를 보고 발행).
+ */
 export interface MeetingReportSnapshot {
   readonly id: string;
   readonly meetingId: string;
@@ -83,11 +70,10 @@ export class MeetingReport {
   }
 
   /**
-   * snapshot 으로부터 MeetingReport Aggregate 를 복원한다.
+   * snapshot으로부터 MeetingReport Aggregate를 복원한다.
    *
-   * Repository(Mongo 등) 가 영속 저장소에서 읽어들인 raw 도큐먼트를 domain
-   * 객체로 되살린다. 입력 데이터는 신뢰 가능한 snapshot 이라는 trust 하에
-   * 형식 검증은 `fromEndedMeeting` 처럼 하지 않는다(검증은 snapshot 생성 시점).
+   * Repository가 영속 저장소에서 읽어들인 raw 도큐먼트를 domain 객체로 되살린다.
+   * 입력 데이터는 신뢰 가능한 snapshot이라는 trust 하에 형식 검증은 하지 않는다(검증은 snapshot 생성 시점).
    */
   static fromSnapshot(snapshot: MeetingReportSnapshot): MeetingReport {
     const report = new MeetingReport(
@@ -111,7 +97,6 @@ export class MeetingReport {
 
   /**
    * Meeting이 종료된 직후 draft 도큐먼트를 만든다.
-   * transcript·summary는 빈 상태이며 pipeline은 두 stage 모두 pending.
    */
   static fromEndedMeeting(input: CreateMeetingReportInput): MeetingReport {
     const id = input.id.trim();
@@ -161,11 +146,9 @@ export class MeetingReport {
   }
 
   /**
-   * 관리자 재요약 성공 결과를 반영한다. 기존 summary 를 새 summary 로 교체하고
-   * summary stage 를 done 으로 전이한다(이미 끝난 stage 대상, ARCHITECTURE.md §5).
-   *
-   * 재요약 실패 시에는 호출하지 않는다 — Application 이 에러를 전파하고 기존 상태를
-   * 보존하므로 done 회의록이 failed 로 격하되지 않는다.
+   * 관리자 재요약 성공 결과를 반영한다.
+   * 기존 summary를 새 summary로 교체하고 summary stage를 done으로 전이한다.
+   * 재요약 실패 시에는 호출하지 않는다.
    */
   replaceSummary(summary: ReportSummary): void {
     const next = this._pipeline.resummarizeDone();

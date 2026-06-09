@@ -1,16 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { SummarizerInput, SummarizerPort } from '@/reports/domain/ports';
-import { ReportSummary,reportSummary } from '@/reports/domain/value-objects';
+import { ReportSummary, reportSummary } from '@/reports/domain/value-objects';
 
 /**
- * SummarizerPort 의 부트스트랩 fallback 구현체.
+ * SummarizerPort의 부트스트랩 fallback 구현체.
  *
- * v1 초기엔 Gemini 같은 실제 LLM 어댑터가 환경마다 준비돼 있지 않을 수 있어,
- * 어댑터 미설정 상태에서도 회의록 파이프라인이 finalize 까지 진행되도록
- * placeholder `ReportSummary` 를 돌려준다.
- *
- * 운영 환경에서는 본 어댑터를 Gemini 등 실제 구현으로 교체한다(PLAN.md §3 / §10).
+ * Gemini 같은 실제 LLM 어댑터가 환경마다 준비돼 있지 않을 수 있어, 어댑터 미설정 상태에서도 회의록 파이프라인이
+ * finalize까지 진행되도록 placeholder `ReportSummary`를 돌려준다.
  */
 @Injectable()
 export class NoopSummarizer implements SummarizerPort {
@@ -18,7 +15,7 @@ export class NoopSummarizer implements SummarizerPort {
 
   async summarize(_input: SummarizerInput): Promise<ReportSummary> {
     this.logger.warn(
-      'NoopSummarizer 가 호출되었습니다. 실제 LLM 어댑터(SummarizerPort)로 교체하세요.',
+      'NoopSummarizer가 호출되었습니다. 실제 LLM 어댑터(SummarizerPort)로 교체하세요.',
     );
     return reportSummary({
       title: '(요약 미적용)',

@@ -6,14 +6,8 @@ import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events';
 /**
  * ai-worker(FastAPI + faster-whisper) HTTP 어댑터.
  *
- * `TranscriberPort` 의 구현체. backend 가 redis 에서 consume 한 audio Buffer 를
- * `POST {baseUrl}/transcribe` 에 raw body(application/octet-stream)로 보내고,
- * `{ segments: [{ text, startMs, endMs }] }` 를 받아 그대로 돌려준다.
- *
- * 디스크/공유 volume 미사용 — PLAN.md §3 ("STT 후 즉시 폐기, S3 미사용") 원칙.
- *
- * fetch 는 Node 18+ global API 를 사용하되 constructor 2번째 인자로 주입 가능해
- * spec 에서 jest.fn() 으로 손쉽게 mock 한다.
+ * redis에서 consume 한 audio Buffer를 `POST {baseUrl}/transcribe`에 raw body(application/octet-stream)로 보내고,
+ * `{ segments: [{ text, startMs, endMs }] }`를 받아 그대로 돌려준다.
  */
 @Injectable()
 export class HttpTranscriber implements TranscriberPort {
@@ -22,9 +16,7 @@ export class HttpTranscriber implements TranscriberPort {
     private readonly fetchFn: typeof fetch = globalThis.fetch,
   ) {}
 
-  async transcribe(
-    input: TranscriberInput,
-  ): Promise<ReadonlyArray<TranscriptionSegmentPayload>> {
+  async transcribe(input: TranscriberInput): Promise<ReadonlyArray<TranscriptionSegmentPayload>> {
     const response = await this.fetchFn(`${this.baseUrl}/transcribe`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/octet-stream' },
@@ -32,8 +24,7 @@ export class HttpTranscriber implements TranscriberPort {
     });
 
     if (!response.ok) {
-      // non-2xx 응답은 RecordingService 가 catch 해 report.transcription.failed 로
-      // 발행한다(application/recording.service.ts 의 try/catch).
+      // non-2xx 응답은 RecordingService가 catch 해 report.transcription.failed로 발행한다.
       throw new Error(
         `ai-worker /transcribe 응답이 실패했습니다: ${response.status} ${response.statusText}`,
       );

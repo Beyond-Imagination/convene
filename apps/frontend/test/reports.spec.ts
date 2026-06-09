@@ -3,13 +3,11 @@ import { expect, test } from '@playwright/test';
 /**
  * `/reports` 페이지 smoke.
  *
- * webServer.url 이 GET /reports 200 응답으로 readiness 를 확인하므로 backend 는
- * 살아 있고, InMemory ReportRepository 라 항목은 비어 있다. 따라서 빈 상태 메시지
- * `report-list-empty` 가 등장해야 한다.
+ * webServer.url이 GET /reports 200 응답으로 readiness를 확인하므로 backend는 살아 있고,
+ * InMemory ReportRepository 라 항목은 비어 있다. 따라서 빈 상태 메시지 `report-list-empty`가 등장해야 한다.
  *
- * NOTE: Next.js 는 페이지 전환 시 `<div role="alert" id="__next-route-announcer__">`
- * 를 항상 본문에 둔다. `getByRole('alert')` 가 이를 함께 잡아 strict mode 위반이
- * 나므로, ReportList 의 alert 만 찾으려면 testid 또는 본문 텍스트로 한정한다.
+ * NOTE: Next.js는 페이지 전환 시 `<div role="alert" id="__next-route-announcer__">`를 항상 본문에 둔다.
+ * `getByRole('alert')`가 이를 함께 잡아 strict mode 위반이 나므로, ReportList의 alert만 찾으려면 testid 또는 본문 텍스트로 한정한다.
  */
 test.describe('/reports', () => {
   test('빈 상태 메시지가 노출된다', async ({ page }) => {

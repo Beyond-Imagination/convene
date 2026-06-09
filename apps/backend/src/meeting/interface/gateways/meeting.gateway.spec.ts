@@ -6,10 +6,7 @@ import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';
 import { ChatDto } from '@/meeting/interface/dto/chat.dto';
 import { JoinMeetingDto } from '@/meeting/interface/dto/join-meeting.dto';
 import { LeaveMeetingDto } from '@/meeting/interface/dto/leave-meeting.dto';
-import {
-  chatEntry,
-  externalReference,
-} from '@/shared-kernel/domain/value-objects';
+import { chatEntry, externalReference } from '@/shared-kernel/domain/value-objects';
 
 import { MeetingGateway } from './meeting.gateway';
 
@@ -106,12 +103,14 @@ describe('MeetingGateway.handleJoin', () => {
     const participant = meeting.addParticipant('s1', 'alice', t1);
     const calls: Array<{ code: string; participantId: string; nickname: string }> = [];
     const service = {
-      joinMeeting: jest.fn(async (cmd: { code: string; participantId: string; nickname: string }) => {
-        calls.push(cmd);
-        return { meeting, participant };
-      }),
+      joinMeeting: jest.fn(
+        async (cmd: { code: string; participantId: string; nickname: string }) => {
+          calls.push(cmd);
+          return { meeting, participant };
+        },
+      ),
     };
-     
+
     const gateway = new MeetingGateway(service as any);
     return { gateway, service, calls };
   };
@@ -169,7 +168,7 @@ describe('MeetingGateway.handleLeave', () => {
         return { meeting, participant };
       }),
     };
-     
+
     const gateway = new MeetingGateway(service as any);
     return { gateway, service, calls };
   };
@@ -205,13 +204,13 @@ describe('MeetingGateway.handleLeave', () => {
     ]);
   });
 
-  it('service.leaveMeeting 이 throw 해도(이미 종료된 회의 등) swallow + socket.leave 진행 + ok 반환', async () => {
+  it('service.leaveMeeting이 throw 해도(이미 종료된 회의 등) swallow + socket.leave 진행 + ok 반환', async () => {
     const service = {
       leaveMeeting: jest.fn(async () => {
         throw new Error('Cannot removeParticipant: meeting is already closed');
       }),
     };
-     
+
     const gateway = new MeetingGateway(service as any);
     const { socket, broadcasts, joined } = makeSocket('s1');
     joined.add('meeting:abc12xyz');
@@ -226,16 +225,15 @@ describe('MeetingGateway.onMeetingEnded', () => {
   const tEnded = new Date('2026-01-01T00:30:00Z');
 
   const makeGateway = () => {
-     
     const gateway = new MeetingGateway({} as any);
     const { server, broadcasts: serverBroadcasts } = makeServer();
-     
+
     gateway.server = server as any;
     return { gateway, serverBroadcasts };
   };
 
-  // 본 핸들러 검증에는 payload 의 code/endedAt 만 사용된다. 나머지 도메인 필드는
-  // ReportMeetingLifecycleListener 등 다른 구독자가 처리하며 본 spec 의 관심사가 아니다.
+  // 본 핸들러 검증에는 payload의 code/endedAt만 사용된다. 나머지 도메인 필드는
+  // ReportMeetingLifecycleListener 등 다른 구독자가 처리하며 본 spec의 관심사가 아니다.
   const payload = {
     code: 'abc12xyz',
     source: 'web' as const,
@@ -248,7 +246,7 @@ describe('MeetingGateway.onMeetingEnded', () => {
     title: null,
   };
 
-  it('meeting.ended 페이로드를 받아 같은 room 에 meeting:ended 를 broadcast 한다', () => {
+  it('meeting.ended 페이로드를 받아 같은 room에 meeting:ended를 broadcast 한다', () => {
     const { gateway, serverBroadcasts } = makeGateway();
     gateway.onMeetingEnded(payload);
     expect(serverBroadcasts).toEqual([
@@ -273,10 +271,10 @@ describe('MeetingGateway.handleChat', () => {
         return entry;
       }),
     };
-     
+
     const gateway = new MeetingGateway(service as any);
     const { server, broadcasts: serverBroadcasts } = makeServer();
-     
+
     gateway.server = server as any;
     return { gateway, service, calls, entry, serverBroadcasts };
   };
@@ -309,14 +307,14 @@ describe('MeetingGateway.handleChat', () => {
 
   it('service.postChat이 throw하면 broadcast하지 않는다', async () => {
     const { gateway, serverBroadcasts } = makeGateway();
-     
+
     (gateway as any).service.postChat = jest.fn(async () => {
       throw new Error('Meeting "abc12xyz" not found');
     });
     const { socket } = makeSocket('s1');
-    await expect(
-      gateway.handleChat(chatDtoOf(), socket as unknown as Socket),
-    ).rejects.toThrow(/not found/);
+    await expect(gateway.handleChat(chatDtoOf(), socket as unknown as Socket)).rejects.toThrow(
+      /not found/,
+    );
     expect(serverBroadcasts).toEqual([]);
   });
 });
@@ -324,9 +322,7 @@ describe('MeetingGateway.handleChat', () => {
 describe('MeetingGateway.handleDisconnect', () => {
   const tLeave = new Date('2026-01-01T00:05:00Z');
 
-  const makeGateway = (overrides?: {
-    leave?: jest.Mock;
-  }) => {
+  const makeGateway = (overrides?: { leave?: jest.Mock }) => {
     const meeting = makeMeeting();
     const participant = meeting.addParticipant('s1', 'alice', t1);
     participant.leave(tLeave);
@@ -338,7 +334,7 @@ describe('MeetingGateway.handleDisconnect', () => {
     const service = {
       leaveMeeting: overrides?.leave ?? defaultLeave,
     };
-     
+
     const gateway = new MeetingGateway(service as any);
     return { gateway, service, calls };
   };
@@ -383,10 +379,7 @@ describe('MeetingGateway.handleDisconnect', () => {
     const { gateway } = makeGateway({ leave });
     const { socket, data, broadcasts } = makeSocket('s1');
     data.code = 'abc12xyz';
-    await expect(
-      gateway.handleDisconnect(socket as unknown as Socket),
-    ).resolves.toBeUndefined();
+    await expect(gateway.handleDisconnect(socket as unknown as Socket)).resolves.toBeUndefined();
     expect(broadcasts).toEqual([]);
   });
 });
-

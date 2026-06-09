@@ -12,21 +12,26 @@ vi.mock('next/navigation', () => ({
 function Harness() {
   const vm = useJoinMeetingViewModel();
   return (
-    <form aria-label="join-form" onSubmit={vm.handleSubmit}>
+    <form
+      aria-label="join-form"
+      onSubmit={vm.handleSubmit}
+    >
       <label>
         코드
-        <input data-testid="code" {...vm.register('code')} />
+        <input
+          data-testid="code"
+          {...vm.register('code')}
+        />
       </label>
       <label>
         닉네임
-        <input data-testid="nickname" {...vm.register('nickname')} />
+        <input
+          data-testid="nickname"
+          {...vm.register('nickname')}
+        />
       </label>
-      {vm.errors.code && (
-        <span data-testid="code-error">{vm.errors.code.message}</span>
-      )}
-      {vm.errors.nickname && (
-        <span data-testid="nickname-error">{vm.errors.nickname.message}</span>
-      )}
+      {vm.errors.code && <span data-testid="code-error">{vm.errors.code.message}</span>}
+      {vm.errors.nickname && <span data-testid="nickname-error">{vm.errors.nickname.message}</span>}
       <button type="submit">입장</button>
     </form>
   );
@@ -64,7 +69,7 @@ describe('useJoinMeetingViewModel', () => {
     expect(useSessionStore.getState().nickname).toBe('준');
   });
 
-  it('코드가 비어 있으면 router.push 가 호출되지 않고 에러 메시지 노출', async () => {
+  it('코드가 비어 있으면 router.push가 호출되지 않고 에러 메시지 노출', async () => {
     render(<Harness />);
     setInput('nickname', '준');
     submit();
@@ -85,9 +90,7 @@ describe('useJoinMeetingViewModel', () => {
     render(<Harness />);
     setInput('code', 'abc12xyz');
     submit();
-    await waitFor(() =>
-      expect(screen.getByTestId('nickname-error')).toHaveTextContent(/닉네임/),
-    );
+    await waitFor(() => expect(screen.getByTestId('nickname-error')).toHaveTextContent(/닉네임/));
     expect(pushMock).not.toHaveBeenCalled();
   });
 
@@ -96,9 +99,7 @@ describe('useJoinMeetingViewModel', () => {
     setInput('code', 'abc12xyz');
     setInput('nickname', '   ');
     submit();
-    await waitFor(() =>
-      expect(screen.getByTestId('nickname-error')).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId('nickname-error')).toBeInTheDocument());
     expect(pushMock).not.toHaveBeenCalled();
   });
 
@@ -107,9 +108,7 @@ describe('useJoinMeetingViewModel', () => {
     setInput('code', 'abc12xyz');
     setInput('nickname', 'a'.repeat(31));
     submit();
-    await waitFor(() =>
-      expect(screen.getByTestId('nickname-error')).toHaveTextContent(/30자/),
-    );
+    await waitFor(() => expect(screen.getByTestId('nickname-error')).toHaveTextContent(/30자/));
     expect(pushMock).not.toHaveBeenCalled();
   });
 });

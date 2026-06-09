@@ -1,10 +1,8 @@
 import { MeetingReport } from '../meeting-report';
 
 /**
- * MeetingReport Aggregate 의 영속/조회 경계.
- *
- * 구현체는 infrastructure 의 스토리지(v1: MongoDB Atlas, 테스트: in-memory)를
- * 제공한다. 도메인 객체를 그대로 주고받으며, 직렬화/역직렬화는 구현체 책임이다.
+ * MeetingReport Aggregate의 영속/조회 경계.
+ * 도메인 객체를 그대로 주고받으며, 직렬화/역직렬화는 구현체 책임이다.
  *
  * 조회 키:
  *   - `id`           회의록 도큐먼트 id (Application이 생성, MongoDB ObjectId 문자열 호환).

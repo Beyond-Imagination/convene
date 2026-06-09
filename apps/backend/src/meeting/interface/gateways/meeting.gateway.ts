@@ -29,9 +29,8 @@ import { MeetingEndedPayload } from '@/shared-kernel/domain/events';
 const roomOf = (code: string): string => `meeting:${code}`;
 
 /**
- * Meeting bounded context의 WebSocket Interface layer.
- * Socket.io 단일 네임스페이스에서 `meeting:join`, `meeting:leave`, `meeting:chat`
- * 요청을 처리하고 같은 room에 `meeting:*Broadcast` 이벤트를 emit한다.
+ * Socket.io 단일 네임스페이스에서 `meeting:join`, `meeting:leave`, `meeting:chat` 요청을 처리하고
+ * 같은 room에 `meeting:*Broadcast` 이벤트를 emit한다.
  */
 @WebSocketGateway()
 @UsePipes(
@@ -39,8 +38,7 @@ const roomOf = (code: string): string => `meeting:${code}`;
     whitelist: true,
     forbidNonWhitelisted: true,
     transform: true,
-    // HTTP BadRequestException은 Nest 기본 WsExceptionFilter에 의해
-    // 'Internal server error'로 가려져 client에 검증 정보가 전달되지 않는다.
+    // HTTP BadRequestException은 Nest 기본 WsExceptionFilter에 의해 'Internal server error'로 가려져 client에 검증 정보가 전달되지 않는다.
     // WsException으로 명시 변환해 어떤 필드가 잘못됐는지 노출한다.
     // 페이로드의 status: 'error'는 NestJS 기본 fallback 포맷과 동일한 컨벤션.
     exceptionFactory: (errors) =>
@@ -67,7 +65,7 @@ export class MeetingGateway implements OnGatewayDisconnect {
     @MessageBody() dto: JoinMeetingDto,
     @ConnectedSocket() client: Socket,
   ): Promise<{ ok: true }> {
-    // Promise<void> 는 NestJS socket.io 가 ack 미호출 → emitWithAck 영원 대기.
+    // Promise<void> 는 NestJS socket.io가 ack 미호출 → emitWithAck 영원 대기.
     const { meeting, participant } = await this.service.joinMeeting({
       code: dto.code,
       participantId: client.id,
@@ -119,10 +117,9 @@ export class MeetingGateway implements OnGatewayDisconnect {
       };
       client.to(room).emit(MEETING_WS_EVENTS.PARTICIPANT_LEFT, broadcast);
     } catch (error) {
-      // race: '회의 종료' 직후 다른 탭의 useEffect cleanup 이 leave 를 한 번 더
+      // race: '회의 종료' 직후 다른 탭의 useEffect cleanup이 leave를 한 번 더
       // emit 할 수 있다(또는 idle 자동 종료와 leave 충돌). 이미 종료된 회의나
-      // 이미 leave 한 참가자에 대한 leave 는 best-effort 로 swallow.
-      // handleDisconnect 와 동일 패턴.
+      // 이미 leave 한 참가자에 대한 leave는 best-effort로 swallow.
       this.logger.debug(
         `handleLeave swallow for code=${dto.code} sid=${client.id}: ${(error as Error).message}`,
       );
@@ -155,8 +152,8 @@ export class MeetingGateway implements OnGatewayDisconnect {
   }
 
   /**
-   * Meeting BC 의 `meeting.ended` 도메인 이벤트(수동 종료/idle 자동 종료 공통)를
-   * 구독해 같은 room 의 모든 참가자에게 WS `meeting:ended` 를 broadcast 한다.
+   * Meeting BC의 `meeting.ended` 도메인 이벤트(수동 종료/idle 자동 종료 공통)를
+   * 구독해 같은 room의 모든 참가자에게 WS `meeting:ended`를 broadcast 한다.
    *
    * 종료를 직접 트리거한 본인은 이미 socket.disconnect 한 뒤이므로 본 이벤트를
    * 받지 않고, 나머지 참가자만 받아 자동으로 회의 화면을 떠난다(frontend

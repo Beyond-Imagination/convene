@@ -4,12 +4,12 @@ import { MeetingReport } from '@/reports/domain/meeting-report';
 import { ReportRepository } from '@/reports/domain/ports';
 
 /**
- * ReportRepository 의 in-memory 구현체.
+ * ReportRepository의 in-memory 구현체.
  *
  * v1 부트스트랩 / e2e 테스트용. MongoDB 어댑터로 교체되기 전까지의 default
- * provider 이며, 동시성/영속성 보장은 없다.
+ * provider이며, 동시성/영속성 보장은 없다.
  *
- * `listRecent` 는 `endedAt` 내림차순으로 정렬해 회의록 목록 페이지에서 최신순
+ * `listRecent`는 `endedAt` 내림차순으로 정렬해 회의록 목록 페이지에서 최신순
  * 노출을 단순히 모사한다.
  */
 @Injectable()

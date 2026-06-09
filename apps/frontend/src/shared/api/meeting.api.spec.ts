@@ -9,8 +9,7 @@ const okResponse = (body: unknown, init: ResponseInit = { status: 201 }): Respon
     headers: { 'content-type': 'application/json' },
   });
 
-const errorResponse = (status: number, text: string): Response =>
-  new Response(text, { status });
+const errorResponse = (status: number, text: string): Response => new Response(text, { status });
 
 describe('createMeeting', () => {
   const fetchMock = vi.fn();
@@ -24,7 +23,7 @@ describe('createMeeting', () => {
     vi.unstubAllGlobals();
   });
 
-  it('source 만 보내는 정상 요청은 wire format 그대로 JSON body 로 POST 한다', async () => {
+  it('source만 보내는 정상 요청은 wire format 그대로 JSON body로 POST 한다', async () => {
     fetchMock.mockResolvedValueOnce(
       okResponse({
         code: 'abc12xyz',
@@ -48,7 +47,7 @@ describe('createMeeting', () => {
     });
   });
 
-  it('externalReference 가 있으면 body 에 그대로 포함시킨다', async () => {
+  it('externalReference가 있으면 body에 그대로 포함시킨다', async () => {
     fetchMock.mockResolvedValueOnce(
       okResponse({
         code: 'xyz99aaa',
@@ -67,7 +66,7 @@ describe('createMeeting', () => {
     });
   });
 
-  it('비-2xx 응답이면 MeetingApiError 를 status 와 함께 던진다', async () => {
+  it('비-2xx 응답이면 MeetingApiError를 status와 함께 던진다', async () => {
     fetchMock.mockResolvedValueOnce(errorResponse(400, 'invalid source'));
     await expect(createMeeting({ source: 'web' })).rejects.toMatchObject({
       name: 'MeetingApiError',
@@ -75,7 +74,7 @@ describe('createMeeting', () => {
     });
   });
 
-  it('응답 body 가 비어 있어도 MeetingApiError 메시지를 만들어 던진다', async () => {
+  it('응답 body가 비어 있어도 MeetingApiError 메시지를 만들어 던진다', async () => {
     fetchMock.mockResolvedValueOnce(errorResponse(500, ''));
     await expect(createMeeting({ source: 'web' })).rejects.toThrow(MeetingApiError);
   });
@@ -93,30 +92,24 @@ describe('closeMeeting', () => {
     vi.unstubAllGlobals();
   });
 
-  it('DELETE {API_BASE_URL}/meetings/:code 로 호출하고 hostToken 없으면 헤더도 없다', async () => {
+  it('DELETE {API_BASE_URL}/meetings/:code로 호출하고 hostToken 없으면 헤더도 없다', async () => {
     fetchMock.mockResolvedValueOnce(
-      okResponse(
-        { code: 'abc12xyz', endedAt: '2026-01-01T00:30:00.000Z' },
-        { status: 200 },
-      ),
+      okResponse({ code: 'abc12xyz', endedAt: '2026-01-01T00:30:00.000Z' }, { status: 200 }),
     );
 
     await closeMeeting('abc12xyz');
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
-    // 토큰은 URL 이 아니라 헤더로 전달한다(query 는 로그/히스토리에 노출되므로 금지).
+    // 토큰은 URL이 아니라 헤더로 전달한다(query는 로그/히스토리에 노출되므로 금지).
     expect(url).toBe(`${API_BASE_URL}/meetings/abc12xyz`);
     expect(init).toMatchObject({ method: 'DELETE' });
     expect((init.headers ?? {})['x-host-token']).toBeUndefined();
   });
 
-  it('hostToken 을 주면 x-host-token 헤더로 전달한다(URL 에는 노출하지 않는다)', async () => {
+  it('hostToken을 주면 x-host-token 헤더로 전달한다(URL에는 노출하지 않는다)', async () => {
     fetchMock.mockResolvedValueOnce(
-      okResponse(
-        { code: 'abc12xyz', endedAt: '2026-01-01T00:30:00.000Z' },
-        { status: 200 },
-      ),
+      okResponse({ code: 'abc12xyz', endedAt: '2026-01-01T00:30:00.000Z' }, { status: 200 }),
     );
     await closeMeeting('abc12xyz', 'tok-1');
     const [url, init] = fetchMock.mock.calls[0];
@@ -126,10 +119,7 @@ describe('closeMeeting', () => {
 
   it('응답을 CloseMeetingResponse 그대로 돌려준다', async () => {
     fetchMock.mockResolvedValueOnce(
-      okResponse(
-        { code: 'abc12xyz', endedAt: '2026-01-01T00:30:00.000Z' },
-        { status: 200 },
-      ),
+      okResponse({ code: 'abc12xyz', endedAt: '2026-01-01T00:30:00.000Z' }, { status: 200 }),
     );
 
     const result = await closeMeeting('abc12xyz');
@@ -139,7 +129,7 @@ describe('closeMeeting', () => {
     });
   });
 
-  it('비-2xx 응답이면 MeetingApiError 를 status 와 함께 던진다', async () => {
+  it('비-2xx 응답이면 MeetingApiError를 status와 함께 던진다', async () => {
     fetchMock.mockResolvedValueOnce(errorResponse(404, 'meeting not found'));
     await expect(closeMeeting('zzz99zzz')).rejects.toMatchObject({
       name: 'MeetingApiError',
@@ -147,7 +137,7 @@ describe('closeMeeting', () => {
     });
   });
 
-  it('이미 종료된 회의(500 already closed)도 MeetingApiError 로 매핑한다', async () => {
+  it('이미 종료된 회의(500 already closed)도 MeetingApiError로 매핑한다', async () => {
     fetchMock.mockResolvedValueOnce(errorResponse(500, 'Meeting is already closed'));
     await expect(closeMeeting('abc12xyz')).rejects.toMatchObject({
       name: 'MeetingApiError',

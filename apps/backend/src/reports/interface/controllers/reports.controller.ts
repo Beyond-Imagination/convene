@@ -24,16 +24,10 @@ import { ReportFinalizationService } from '@/reports/application/report-finaliza
 import { ListReportsQueryDto } from '@/reports/interface/dto/list-reports-query.dto';
 import { AdminGuard } from '@/reports/interface/guards/admin.guard';
 
-import {
-  toReportDetailResponse,
-  toReportListItem,
-} from './report-serialize';
+import { toReportDetailResponse, toReportListItem } from './report-serialize';
 
 /**
- * Reports bounded context의 HTTP Interface layer.
- *
  * 책임: query/path 검증, 서비스 호출, wire format 직렬화, 도메인 에러 → HTTP 매핑.
- * 비즈니스 로직은 일체 두지 않는다(ARCHITECTURE.md §3).
  */
 @Controller('reports')
 export class ReportsController {
@@ -62,8 +56,8 @@ export class ReportsController {
   }
 
   /**
-   * 관리자 재요약. 저장된 transcript+chat 으로 다시 요약해 기존 summary 를 교체한다.
-   * `AdminGuard` 가 `Authorization: Bearer <ADMIN_API_TOKEN>` 로 호출자를 가른다.
+   * 관리자 재요약. 저장된 transcript+chat으로 다시 요약해 기존 summary를 교체한다.
+   * `AdminGuard`가 `Authorization: Bearer <ADMIN_API_TOKEN>`로 호출자를 가른다.
    */
   @Post(':id/resummarize')
   @UseGuards(AdminGuard)

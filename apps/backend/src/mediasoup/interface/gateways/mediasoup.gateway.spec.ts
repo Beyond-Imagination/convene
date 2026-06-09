@@ -89,19 +89,17 @@ const setup = () => {
 const codeStr = 'abc12xyz';
 
 describe('MediasoupGateway.handleGetRtpCapabilities', () => {
-  it('service 호출 후 { rtpCapabilities } wire format 으로 반환한다', async () => {
+  it('service 호출 후 { rtpCapabilities } wire format으로 반환한다', async () => {
     const { gateway, calls } = setup();
     const dto = Object.assign(new GetRtpCapabilitiesDto(), { code: codeStr });
     const res = await gateway.handleGetRtpCapabilities(dto, makeClient('s1'));
-    expect(calls).toEqual([
-      { name: 'getRtpCapabilities', args: [{ meetingCode: codeStr }] },
-    ]);
+    expect(calls).toEqual([{ name: 'getRtpCapabilities', args: [{ meetingCode: codeStr }] }]);
     expect(res).toEqual({ rtpCapabilities: { fakeRtp: true } });
   });
 });
 
 describe('MediasoupGateway.handleCreateTransport', () => {
-  it('dto + client.id 를 service.createTransport 에 위임하고 응답을 반환한다', async () => {
+  it('dto + client.id를 service.createTransport에 위임하고 응답을 반환한다', async () => {
     const { gateway, calls } = setup();
     const dto = Object.assign(new CreateTransportDto(), { code: codeStr, direction: 'send' });
     const res = await gateway.handleCreateTransport(dto, makeClient('s1'));
@@ -114,7 +112,7 @@ describe('MediasoupGateway.handleCreateTransport', () => {
 });
 
 describe('MediasoupGateway.handleConnectTransport', () => {
-  it('dto + client.id 를 service.connectTransport 에 위임한다', async () => {
+  it('dto + client.id를 service.connectTransport에 위임한다', async () => {
     const { gateway, calls } = setup();
     const dto = Object.assign(new ConnectTransportDto(), {
       code: codeStr,
@@ -137,7 +135,7 @@ describe('MediasoupGateway.handleConnectTransport', () => {
 });
 
 describe('MediasoupGateway.handleProduce', () => {
-  it('dto + client.id 를 service.produce 에 위임하고 producerId 응답', async () => {
+  it('dto + client.id를 service.produce에 위임하고 producerId 응답', async () => {
     const { gateway, calls } = setup();
     const dto = Object.assign(new ProduceDto(), {
       code: codeStr,
@@ -163,7 +161,7 @@ describe('MediasoupGateway.handleProduce', () => {
     expect(res).toEqual({ producerId: 'p-1' });
   });
 
-  it('dto.paused 를 service.produce 에 전달한다(기본 OFF 로 입장하는 경우)', async () => {
+  it('dto.paused를 service.produce에 전달한다(기본 OFF로 입장하는 경우)', async () => {
     const { gateway, calls } = setup();
     const dto = Object.assign(new ProduceDto(), {
       code: codeStr,
@@ -179,7 +177,7 @@ describe('MediasoupGateway.handleProduce', () => {
 });
 
 describe('MediasoupGateway.handleConsume', () => {
-  it('dto + client.id 를 service.consume 에 위임한다', async () => {
+  it('dto + client.id를 service.consume에 위임한다', async () => {
     const { gateway, calls } = setup();
     const dto = Object.assign(new ConsumeDto(), {
       code: codeStr,
@@ -205,7 +203,7 @@ describe('MediasoupGateway.handleConsume', () => {
 });
 
 describe('MediasoupGateway.handleResumeConsumer', () => {
-  it('dto + client.id 를 service.resumeConsumer 에 위임한다', async () => {
+  it('dto + client.id를 service.resumeConsumer에 위임한다', async () => {
     const { gateway, calls } = setup();
     const dto = Object.assign(new ResumeConsumerDto(), { code: codeStr, consumerId: 'c-1' });
     await gateway.handleResumeConsumer(dto, makeClient('s1'));
@@ -217,7 +215,7 @@ describe('MediasoupGateway.handleResumeConsumer', () => {
 });
 
 describe('MediasoupGateway.handleToggleProducer', () => {
-  it('dto + client.id 를 service.toggleProducer 에 위임하고 PRODUCER_TOGGLED 를 본인 제외 broadcast 한다', async () => {
+  it('dto + client.id를 service.toggleProducer에 위임하고 PRODUCER_TOGGLED를 본인 제외 broadcast 한다', async () => {
     const { gateway, calls, emits } = setup();
     const dto = Object.assign(new ToggleProducerDto(), {
       code: codeStr,
@@ -242,7 +240,7 @@ describe('MediasoupGateway.handleToggleProducer', () => {
 });
 
 describe('MediasoupGateway.handleCloseProducer', () => {
-  it('dto + client.id 를 service.closeProducer 에 위임하고 PRODUCER_CLOSED 를 본인 제외 broadcast 한다', async () => {
+  it('dto + client.id를 service.closeProducer에 위임하고 PRODUCER_CLOSED를 본인 제외 broadcast 한다', async () => {
     const { gateway, calls, emits } = setup();
     const dto = Object.assign(new CloseProducerDto(), {
       code: codeStr,
@@ -266,7 +264,7 @@ describe('MediasoupGateway.handleCloseProducer', () => {
 });
 
 describe('MediasoupGateway.onProducerCreated', () => {
-  it('같은 회의 room 에 newProducer 브로드캐스트를 보내되 producer 본인은 제외한다', () => {
+  it('같은 회의 room에 newProducer 브로드캐스트를 보내되 producer 본인은 제외한다', () => {
     const { gateway, emits } = setup();
     gateway.onProducerCreated({
       meetingCode: codeStr,
@@ -291,7 +289,7 @@ describe('MediasoupGateway.onProducerCreated', () => {
     ]);
   });
 
-  it('payload.paused=true 면 newProducer 브로드캐스트에도 paused:true 가 실린다', () => {
+  it('payload.paused=true 면 newProducer 브로드캐스트에도 paused:true가 실린다', () => {
     const { gateway, emits } = setup();
     gateway.onProducerCreated({
       meetingCode: codeStr,

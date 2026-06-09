@@ -2,18 +2,11 @@
 
 import { VideoOffIcon } from '@/feature/meeting/components/icons';
 
-/**
- * 비디오가 꺼진(또는 아직 없는) 타일을 덮는 오버레이.
- * 검은 화면 대신 닉네임 이니셜 아바타 + 카메라 OFF 아이콘을 보여준다.
- * 색은 닉네임 해시로 정해 사람마다 다르되 같은 사람은 항상 같은 색을 쓴다.
- */
 export interface VideoTilePlaceholderProps {
   readonly label: string;
 }
 
 /**
- * 다크 톤에 어울리는 (아바타, 타일 배경) 색 쌍. Tailwind JIT 가 스캔하도록 리터럴.
- * 색상환을 (대략) 균등 분할한 무지개 순서라 인접한 타일끼리 색이 잘 구별된다.
  * red → orange → yellow → green → cyan → blue → violet → magenta.
  */
 const PALETTE = [
@@ -35,6 +28,11 @@ const colorFor = (label: string): (typeof PALETTE)[number] => {
   return PALETTE[hash % PALETTE.length];
 };
 
+/**
+ * 비디오가 꺼진(또는 아직 없는) 타일을 덮는 오버레이.
+ * 검은 화면 대신 닉네임 이니셜 아바타 + 카메라 OFF 아이콘을 보여준다.
+ * 색은 닉네임 해시로 정해 사람마다 다르되 같은 사람은 항상 같은 색을 쓴다.
+ */
 export function VideoTilePlaceholder({ label }: VideoTilePlaceholderProps) {
   const initial = label.trim().charAt(0).toUpperCase() || '?';
   const color = colorFor(label);

@@ -10,16 +10,12 @@ import { RedisPartialTranscriptStore } from '@/recording/infrastructure/redis-pa
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 
 /**
- * Recording bounded context 의 NestJS 모듈.
+ * Recording 기능을 구성하는 NestJS 모듈.
  *
- * - `RecordingService` 는 비-Nest class 라 `useFactory` 로 묶는다
- *   (Meeting/Mediasoup/Reports BC 와 동일 패턴).
- * - `RecordingReportLifecycleListener` 는 Reports BC 가 발행한
- *   `report.transcription.requested` 를 구독해 STT 호출을 트리거한다.
- * - 오디오 버퍼는 redis(ioredis) LIST 로 누적하고 consume 시점에 즉시 폐기한다
- *   (PLAN.md §3). transcriber 는 ai-worker(FastAPI + faster-whisper) HTTP 어댑터
- *   `HttpTranscriber` 를 default provider 로 둔다. e2e 에서는 `overrideProvider`
- *   로 NoopTranscriber 를 주입해 ai-worker 컨테이너 없이도 통과시킨다.
+ * - `RecordingService`는 비-Nest class 라 `useFactory`로 묶는다.
+ * - `RecordingReportLifecycleListener`는 Reports BC가 발행한 이벤트를 구독해 STT 호출을 트리거한다.
+ * - 오디오 버퍼는 redis LIST로 누적하고 consume 시점에 즉시 폐기한다.
+ * - transcriber는 ai-worker HTTP 어댑터 `HttpTranscriber`를 default provider로 둔다.
  */
 @Module({
   providers: [
@@ -66,9 +62,7 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
       inject: [RedisAudioBufferRepository, HttpTranscriber, RedisPartialTranscriptStore],
     },
   ],
-  // Mediasoup BC 의 audio capture 어댑터(FfmpegAudioCaptureAdapter)가 같은
-  // AudioBufferRepository 인스턴스로 chunk 를 append 하기 위해 export 한다.
-  // cross-BC 결합은 Port 인터페이스 의존 한정 (CLAUDE.md hard rule 7).
+  // Mediasoup BC의 audio capture 어댑터가 같은 AudioBufferRepository 인스턴스로 chunk를 append 하기 위해 export 한다.
   exports: [RedisAudioBufferRepository],
 })
 export class RecordingModule {}

@@ -17,9 +17,7 @@ const item = (overrides: Partial<ReportListItem> = {}): ReportListItem => ({
   ...overrides,
 });
 
-const baseVm = (
-  overrides: Partial<UseReportListViewModel> = {},
-): UseReportListViewModel => ({
+const baseVm = (overrides: Partial<UseReportListViewModel> = {}): UseReportListViewModel => ({
   status: 'loaded',
   items: [],
   errorMessage: null,
@@ -28,7 +26,7 @@ const baseVm = (
 });
 
 describe('ReportList View', () => {
-  it('status="loading" 이면 로딩 안내(role="status") 만 노출한다', () => {
+  it('status="loading" 이면 로딩 안내(role="status")만 노출한다', () => {
     render(<ReportList {...baseVm({ status: 'loading' })} />);
     expect(screen.getByRole('status')).toHaveTextContent('불러오는 중');
     expect(screen.queryByTestId('report-list-item')).toBeNull();
@@ -36,11 +34,7 @@ describe('ReportList View', () => {
 
   it('status="error" 이면 alert + 다시 시도 버튼을 노출한다', () => {
     const refresh = vi.fn(async () => {});
-    render(
-      <ReportList
-        {...baseVm({ status: 'error', errorMessage: 'mongo down', refresh })}
-      />,
-    );
+    render(<ReportList {...baseVm({ status: 'error', errorMessage: 'mongo down', refresh })} />);
     expect(screen.getByRole('alert')).toHaveTextContent('mongo down');
     fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
     expect(refresh).toHaveBeenCalledTimes(1);
@@ -51,7 +45,7 @@ describe('ReportList View', () => {
     expect(screen.getByTestId('report-list-empty')).toBeInTheDocument();
   });
 
-  it('items 가 있으면 각 항목을 link 로 렌더한다 (제목/code/참가자 수 노출)', () => {
+  it('items가 있으면 각 항목을 link로 렌더한다 (제목/code/참가자 수 노출)', () => {
     render(
       <ReportList
         {...baseVm({

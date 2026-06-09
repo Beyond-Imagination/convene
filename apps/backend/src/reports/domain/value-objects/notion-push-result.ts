@@ -3,8 +3,7 @@
  *
  * v1.0.0에서는 항상 `null`로 두고 도큐먼트에 자리만 남긴다.
  * v2에서 `NotionPort.push(report)`가 성공하면 본 VO가 채워지며,
- * Aggregate는 이를 `attachNotionPushResult`로 받아 1회만 보존한다
- * (PLAN.md §5 / ARCHITECTURE.md §2.3).
+ * Aggregate는 이를 `attachNotionPushResult`로 받아 1회만 보존한다.
  */
 export interface NotionPushResult {
   readonly pageId: string;

@@ -2,22 +2,10 @@
 
 import { useRouter } from 'next/navigation';
 import { type BaseSyntheticEvent, useState } from 'react';
-import {
-  type FieldErrors,
-  useForm,
-  type UseFormRegisterReturn,
-} from 'react-hook-form';
+import { type FieldErrors, useForm, type UseFormRegisterReturn } from 'react-hook-form';
 
 import { saveNickname } from '@/shared/stores/nickname.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
-
-/**
- * 홈 페이지 "회의 입장" 폼의 ViewModel.
- *
- * 폼 입력 2종(code, nickname)을 react-hook-form 으로 검증하고, 통과 시 닉네임을
- * session store 에 저장한 뒤 `/meetings/[code]` 로 이동한다. View 는 본 hook 의
- * 반환만으로 input/submit/error 표시를 수행한다(ARCHITECTURE §4).
- */
 
 export const MEETING_CODE_PATTERN = /^[a-z0-9]{8}$/;
 export const NICKNAME_MIN = 1;
@@ -33,14 +21,19 @@ export interface JoinMeetingFormValues {
 export interface UseJoinMeetingViewModel {
   readonly status: JoinMeetingStatus;
   /**
-   * View 가 input 에 spread 하는 register helper.
-   * 검증 규칙은 ViewModel 안에 캡슐화되어 View 가 알 필요 없다.
+   * View가 input에 spread 하는 register helper.
    */
   readonly register: (name: keyof JoinMeetingFormValues) => UseFormRegisterReturn;
   readonly errors: FieldErrors<JoinMeetingFormValues>;
   readonly handleSubmit: (e?: BaseSyntheticEvent) => Promise<void>;
 }
 
+/**
+ * 홈 페이지 "회의 입장" 폼의 ViewModel.
+ *
+ * 폼 입력 2종(code, nickname)을 react-hook-form으로 검증하고, 통과 시 닉네임을 ession store에 저장한 뒤 `/meetings/[code]`로 이동한다.
+ * View는 본 hook의 반환만으로 input/submit/error 표시를 수행한다.
+ */
 export function useJoinMeetingViewModel(): UseJoinMeetingViewModel {
   const router = useRouter();
   const setNickname = useSessionStore((s) => s.setNickname);
@@ -58,7 +51,7 @@ export function useJoinMeetingViewModel(): UseJoinMeetingViewModel {
   const handleSubmit = rhfHandleSubmit((values) => {
     setStatus('submitting');
     const trimmed = values.nickname.trim();
-    // 닉네임을 code 별로 보관(리로드 생존) + reactive store 에도 set.
+    // 닉네임을 code 별로 보관(리로드 생존) + reactive store에도 set.
     saveNickname(values.code, trimmed);
     setNickname(trimmed);
     router.push(`/meetings/${values.code}`);

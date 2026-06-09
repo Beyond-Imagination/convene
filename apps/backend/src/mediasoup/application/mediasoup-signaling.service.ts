@@ -18,18 +18,7 @@ import { DomainEventPublisher } from '@/shared-kernel/domain/ports';
 
 import { ParticipantMediaNotFoundError, ScreenShareConflictError } from './mediasoup.errors';
 
-/**
- * Mediasoup Bounded Context 의 Application Service.
- *
- * Meeting BC 의 도메인 이벤트(`meeting.created` / `participant.joined` / ...)에
- * 반응해 회의 단위 라우터 풀과 참가자 단위 ParticipantMedia 를 관리하고,
- * WebSocket 시그널링 RPC(`mediasoup:*`) 진입점에서 호출되어 transport/producer/
- * consumer lifecycle 을 진행시킨다.
- *
- * 도메인 이벤트는 본 layer 에서 발행한다 (ARCHITECTURE.md §3).
- */
-
-export interface MediasoupSignalingServiceDeps {
+interface MediasoupSignalingServiceDeps {
   routerPort: MediaRouterPort;
   transportPort: MediaTransportPort;
   participantMediaRepository: ParticipantMediaRepository;
@@ -37,51 +26,56 @@ export interface MediasoupSignalingServiceDeps {
   eventPublisher: DomainEventPublisher;
 }
 
-export interface RoomCommand {
+interface RoomCommand {
   meetingCode: string;
 }
 
-export interface ParticipantCommand extends RoomCommand {
+interface ParticipantCommand extends RoomCommand {
   participantId: string;
 }
 
-export interface CreateTransportCommand extends ParticipantCommand {
+interface CreateTransportCommand extends ParticipantCommand {
   direction: TransportDirection;
 }
 
-export interface ConnectTransportCommand extends ParticipantCommand {
+interface ConnectTransportCommand extends ParticipantCommand {
   transportId: string;
   dtlsParameters: unknown;
 }
 
-export interface ProduceCommand extends ParticipantCommand {
+interface ProduceCommand extends ParticipantCommand {
   transportId: string;
   kind: 'audio' | 'video';
   source: MediaType;
   rtpParameters: unknown;
-  /** producer 를 paused(mute) 상태로 생성할지. 기본 OFF 입장 시 true. 생략하면 false. */
   paused?: boolean;
 }
 
-export interface ConsumeCommand extends ParticipantCommand {
+interface ConsumeCommand extends ParticipantCommand {
   transportId: string;
   producerId: string;
   rtpCapabilities: unknown;
 }
 
-export interface ResumeConsumerCommand extends ParticipantCommand {
+interface ResumeConsumerCommand extends ParticipantCommand {
   consumerId: string;
 }
 
-export interface ToggleProducerCommand extends ParticipantCommand {
+interface ToggleProducerCommand extends ParticipantCommand {
   producerId: string;
   paused: boolean;
 }
 
-export interface CloseProducerCommand extends ParticipantCommand {
+interface CloseProducerCommand extends ParticipantCommand {
   producerId: string;
 }
 
+/**
+ * mediasoup 시그널링을 처리하는 서비스.
+ *
+ * Meeting BC의 도메인 이벤트에 반응해 회의 단위 라우터 풀과 참가자 단위 ParticipantMedia를 관리하고,
+ * WebSocket 시그널링 RPC 진입점에서 호출되어 transport/producer/consumer lifecycle을 진행시키며 도메인 이벤트를 발행한다.
+ */
 export class MediasoupSignalingService {
   constructor(private readonly deps: MediasoupSignalingServiceDeps) {}
 
@@ -92,9 +86,8 @@ export class MediasoupSignalingService {
   }
 
   async closeRoom(command: RoomCommand): Promise<void> {
-    // 회의 단위로 모든 audio capture 종료(stdin end → SIGTERM 대비). 이후 router
-    // 정리 시 PlainTransport 도 함께 close 되지만 stopAll 이 명시적으로 ffmpeg
-    // subprocess 까지 cleanup 한다.
+    // 회의 단위로 모든 audio capture 종료(stdin end → SIGTERM 대비).
+    // 이후 router 정리 시 PlainTransport도 함께 close 되지만 stopAll이 명시적으로 ffmpeg subprocess까지 cleanup 한다.
     await this.deps.audioCapture.stopAll(command.meetingCode);
     await this.deps.participantMediaRepository.removeAllByMeetingCode(command.meetingCode);
     await this.deps.routerPort.closeRoom(command.meetingCode);
@@ -117,7 +110,7 @@ export class MediasoupSignalingService {
   }
 
   async dismissParticipant(command: ParticipantCommand): Promise<void> {
-    // audio capture 가 진행 중이라면 먼저 정리한다. capture context 가 없으면 no-op.
+    // audio capture가 진행 중이라면 먼저 정리한다. capture context가 없으면 no-op.
     await this.deps.audioCapture.stop(command.meetingCode, command.participantId);
     const existing = await this.deps.participantMediaRepository.findByParticipantId(
       command.participantId,
@@ -153,9 +146,9 @@ export class MediasoupSignalingService {
 
   async produce(command: ProduceCommand): Promise<{ producerId: string }> {
     const media = await this.requireParticipantMedia(command.participantId);
-    // 화면 공유는 회의당 동시 1인. 다른 참가자가 이미 screen producer 를 갖고 있으면
-    // 거부한다(자기 자신 제외). produce RPC 는 순차 처리되고 frontend 가 버튼을
-    // disabled 로 1차 차단하므로, 본 체크가 사실상의 단일 공유 보장점이다.
+    // 화면 공유는 회의당 동시 1인.
+    // 다른 참가자가 이미 screen producer를 갖고 있으면 거부한다(자기 자신 제외).
+    // produce RPC는 순차 처리되고 frontend가 버튼을 disabled로 1차 차단한다.
     if (command.source === 'screen') {
       const peers = await this.deps.participantMediaRepository.findByMeetingCode(
         command.meetingCode,
@@ -185,16 +178,15 @@ export class MediasoupSignalingService {
     });
     await this.deps.participantMediaRepository.save(media);
 
-    // plum eager pipe — 다른 모든 router 에 동일 producer 가 보이도록 즉시 pipe.
-    // routersPerRoom <= 1 이면 adapter 가 no-op.
+    // 다른 모든 router에 동일 producer가 보이도록 즉시 pipe. routersPerRoom <= 1이면 adapter가 no-op.
     await this.deps.routerPort.pipeProducerToAllRouters(
       command.meetingCode,
       producerId,
       media.routerIndex,
     );
 
-    // audio producer 만 STT 용으로 capture. video 는 capture 대상이 아니다.
-    // 같은 (meetingCode, participantId) 에 대한 중복 호출은 어댑터가 dedup.
+    // audio producer만 STT 용으로 capture. video는 capture 대상이 아니다.
+    // 같은 (meetingCode, participantId)에 대한 중복 호출은 어댑터가 dedup.
     if (command.kind === 'audio') {
       await this.deps.audioCapture.start({
         meetingCode: command.meetingCode,
@@ -209,8 +201,7 @@ export class MediasoupSignalingService {
       producerId,
       kind: command.kind,
       source: command.source,
-      // NEW_PRODUCER 브로드캐스트가 처음부터 정확한 mute 상태로 나가게 한다.
-      paused: command.paused ?? false,
+      paused: command.paused ?? false, // NEW_PRODUCER 브로드캐스트가 처음부터 mute 상태로 생성되도록 설정
     });
     return { producerId };
   }
@@ -239,11 +230,6 @@ export class MediasoupSignalingService {
     await this.deps.transportPort.resumeConsumer(command.consumerId);
   }
 
-  /**
-   * 자기 producer 를 mute(paused:true)/unmute(paused:false) 한다.
-   * 소유 검증: 호출자의 ParticipantMedia 에 없는 producerId 면 거부해
-   * 남의 producer 를 toggle 하지 못하게 막는다(plum `toggle_media` 와 동등).
-   */
   async toggleProducer(command: ToggleProducerCommand): Promise<void> {
     const media = await this.requireParticipantMedia(command.participantId);
     const owns = media.producers.some((p) => p.id === command.producerId);
@@ -257,16 +243,14 @@ export class MediasoupSignalingService {
     } else {
       await this.deps.transportPort.resumeProducer(command.producerId);
     }
-    // 도메인에도 mute 상태를 반영·저장해, 늦게 입장한 참가자의 LIST_PRODUCERS 응답에
-    // 정확한 paused 가 실리도록 한다(검은 화면 방지).
+    // 도메인에도 mute 상태를 반영·저장해, 늦게 입장한 참가자의 LIST_PRODUCERS 응답에 정확한 paused가 실리도록 한다(검은 화면 방지).
     media.setProducerPaused(command.producerId, command.paused);
     await this.deps.participantMediaRepository.save(media);
   }
 
   /**
-   * 자기 producer 를 닫는다(예: 화면 공유 중지). 서버 측 producer/pipe 를 정리하고
-   * ParticipantMedia 에서도 제거해, 화면 공유 동시 1인 제약(produce 충돌 체크)이
-   * 중지 후 정확히 풀리도록 한다. 소유하지 않은 producerId 는 거부한다.
+   * 자기 producer를 닫는다(예: 화면 공유 중지).
+   * 서버 측 producer/pipe를 정리하고 participantMedia에서도 제거해, 화면 공유 동시 1인 제약이 중지 후 정확히 풀리도록 한다.
    */
   async closeProducer(command: CloseProducerCommand): Promise<void> {
     const media = await this.requireParticipantMedia(command.participantId);
@@ -283,9 +267,7 @@ export class MediasoupSignalingService {
   }
 
   async listProducers(command: ParticipantCommand): Promise<ListProducersResponse> {
-    const peers = await this.deps.participantMediaRepository.findByMeetingCode(
-      command.meetingCode,
-    );
+    const peers = await this.deps.participantMediaRepository.findByMeetingCode(command.meetingCode);
     const producers: ListProducersResponse['producers'] = [];
     for (const peer of peers) {
       if (peer.participantId === command.participantId) continue;

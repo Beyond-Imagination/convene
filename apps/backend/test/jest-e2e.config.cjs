@@ -21,9 +21,8 @@ module.exports = {
   },
   testEnvironment: 'node',
   testTimeout: 30000,
-  // e2e 전 mongodb-memory-server 인스턴스를 띄우고 MONGO_URI 를 주입한다.
-  // RedisModule 은 lazyConnect 로 본 setup 이 없어도 부트되지만, mongoose 는
-  // createConnection 시점에 즉시 connect 를 시도해 실 mongo 가 필요하다.
+  // e2e 전 mongodb-memory-server 인스턴스를 띄우고 MONGO_URI를 주입한다.
+  // RedisModule은 lazyConnect로 본 setup 이 없어도 부트되지만, mongoose는 createConnection 시점에 즉시 connect를 시도해 실 mongo가 필요하다.
   globalSetup: '<rootDir>/test/jest-e2e.global-setup.cjs',
   globalTeardown: '<rootDir>/test/jest-e2e.global-teardown.cjs',
 };

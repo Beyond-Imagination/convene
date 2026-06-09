@@ -11,16 +11,12 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
 import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 
 /**
- * Meeting bounded context의 NestJS 모듈.
+ * Meeting 기능을 구성하는 NestJS 모듈.
  *
- * 회의 영속 상태(Meeting Aggregate + ChatEntry LIST)는 redis(ioredis) 기반
- * 어댑터로 저장한다. RedisModule(@Global) 이 ioredis 클라이언트 인스턴스를
- * 한 번 만들어 두고, 본 모듈의 Repository 가 같은 인스턴스를 inject 한다.
- *
- * SystemClock, NestEventBusDomainEventPublisher는 @Global()인 SharedKernelModule을
- * 통해 주입된다(AppModule에서 1회 import).
- *
- * MeetingService는 비-Nest 클래스(생성자에서 deps 객체를 받음)이므로 useFactory로 묶는다.
+ * MeetingService는 비-Nest 클래스이므로 useFactory로 묶는다.
+ * 회의 영속 상태는 redis 기반 어댑터로 저장한다.
+ * RedisModule(@Global)이 ioredis 클라이언트 인스턴스를 번 만들어 두고, 본 모듈의 Repository가 같은 인스턴스를 inject 한다.
+ * SystemClock, NestEventBusDomainEventPublisher는 @Global()인 SharedKernelModule을 통해 주입된다.
  */
 @Module({
   controllers: [MeetingController],

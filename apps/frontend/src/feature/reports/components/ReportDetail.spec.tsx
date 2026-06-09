@@ -5,9 +5,7 @@ import type { UseReportDetailViewModel } from '@/feature/reports/hooks/useReport
 
 import { ReportDetail } from './ReportDetail';
 
-const baseDetail = (
-  overrides: Partial<ReportDetailResponse> = {},
-): ReportDetailResponse => ({
+const baseDetail = (overrides: Partial<ReportDetailResponse> = {}): ReportDetailResponse => ({
   id: 'r1',
   meetingId: 'm1',
   code: 'abc12xyz',
@@ -25,9 +23,7 @@ const baseDetail = (
   ...overrides,
 });
 
-const baseVm = (
-  overrides: Partial<UseReportDetailViewModel> = {},
-): UseReportDetailViewModel => ({
+const baseVm = (overrides: Partial<UseReportDetailViewModel> = {}): UseReportDetailViewModel => ({
   status: 'loaded',
   report: baseDetail(),
   errorMessage: null,
@@ -35,7 +31,7 @@ const baseVm = (
 });
 
 describe('ReportDetail View', () => {
-  it('status="loading" 이면 로딩 안내(role="status") 만 노출', () => {
+  it('status="loading" 이면 로딩 안내(role="status")만 노출', () => {
     render(<ReportDetail {...baseVm({ status: 'loading', report: null })} />);
     expect(screen.getByRole('status')).toHaveTextContent('불러오는 중');
   });
@@ -45,11 +41,9 @@ describe('ReportDetail View', () => {
     expect(screen.getByTestId('report-not-found')).toBeInTheDocument();
   });
 
-  it('status="error" 이면 alert 로 errorMessage 노출', () => {
+  it('status="error" 이면 alert로 errorMessage 노출', () => {
     render(
-      <ReportDetail
-        {...baseVm({ status: 'error', report: null, errorMessage: 'mongo down' })}
-      />,
+      <ReportDetail {...baseVm({ status: 'error', report: null, errorMessage: 'mongo down' })} />,
     );
     expect(screen.getByRole('alert')).toHaveTextContent('mongo down');
   });
@@ -57,13 +51,11 @@ describe('ReportDetail View', () => {
   it('회의 제목(title)이 있으면 헤더에 노출하고, 없으면 "회의록 {code}" 를 쓴다', () => {
     const { rerender } = render(<ReportDetail {...baseVm()} />);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('회의록 abc12xyz');
-    rerender(
-      <ReportDetail {...baseVm({ report: baseDetail({ title: '주간 스프린트' }) })} />,
-    );
+    rerender(<ReportDetail {...baseVm({ report: baseDetail({ title: '주간 스프린트' }) })} />);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('주간 스프린트');
   });
 
-  it('summary 가 null 이면 "요약 진행 중" 안내를 노출한다', () => {
+  it('summary가 null 이면 "요약 진행 중" 안내를 노출한다', () => {
     render(
       <ReportDetail
         {...baseVm({
@@ -77,7 +69,7 @@ describe('ReportDetail View', () => {
     expect(screen.getByTestId('summary-pending')).toBeInTheDocument();
   });
 
-  it('summary 가 있으면 title/overview/decisions/actionItems/keyTopics 를 모두 노출한다', () => {
+  it('summary가 있으면 title/overview/decisions/actionItems/keyTopics를 모두 노출한다', () => {
     render(
       <ReportDetail
         {...baseVm({

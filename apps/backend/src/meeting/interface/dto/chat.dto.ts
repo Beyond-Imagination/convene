@@ -6,9 +6,6 @@ import { MeetingCode } from '@/meeting/domain/value-objects';
 const TEXT_MIN = 1;
 const TEXT_MAX = 1000;
 
-/**
- * `meeting:chat` WS payload DTO. shared-interfaces.ChatMessage를 implements한다.
- */
 export class ChatDto implements ChatMessage {
   @IsString()
   @Length(MeetingCode.LENGTH, MeetingCode.LENGTH)

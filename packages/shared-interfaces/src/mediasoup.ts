@@ -1,17 +1,15 @@
-/**
- * Mediasoup bounded context의 WebSocket wire format.
+/*
+ * Mediasoup의 WebSocket wire format.
  *
- * 본 파일은 frontend ↔ backend가 공유하는 **순수 TS 인터페이스 / literal 타입**만
- * 정의한다. mediasoup 라이브러리에 의존하지 않기 위해 RTP 관련 구조체는
- * `unknown` 으로 노출하고, 양측이 각자의 라이브러리 타입
- * (`mediasoup/node/lib/types` / `mediasoup-client/lib/types`)으로 cast 한다.
+ * 본 파일은 frontend ↔ backend가 공유하는 **순수 TS 인터페이스 / literal 타입**만 정의한다.
+ * mediasoup 라이브러리에 의존하지 않기 위해 RTP 관련 구조체는 `unknown`으로 노출하고, 양측이 각자의 라이브러리 타입으로 cast 한다.
  */
 
 export const MEDIA_TYPES = ['audio', 'video', 'screen'] as const;
 export type MediaType = (typeof MEDIA_TYPES)[number];
 
 /**
- * Mediasoup bounded context의 WebSocket 이벤트 이름.
+ * Mediasoup의 WebSocket 이벤트 이름.
  *
  * 도메인 이벤트(`meeting.*` dot prefix)와 구분하기 위해 colon prefix를 사용한다.
  *   - `mediasoup:getRtpCapabilities` / `mediasoup:createTransport` /
@@ -40,8 +38,7 @@ export const MEDIASOUP_WS_EVENTS = {
 export type MediasoupWsEventName = (typeof MEDIASOUP_WS_EVENTS)[keyof typeof MEDIASOUP_WS_EVENTS];
 
 /**
- * Transport 의 방향. mediasoup-client `Device.createSendTransport` /
- * `createRecvTransport` 에 대응.
+ * Transport의 방향. mediasoup-client `Device.createSendTransport` / `createRecvTransport`에 대응.
  */
 export const TRANSPORT_DIRECTIONS = ['send', 'recv'] as const;
 export type TransportDirection = (typeof TRANSPORT_DIRECTIONS)[number];
@@ -80,12 +77,6 @@ export interface ProduceRequest {
   kind: 'audio' | 'video';
   source: MediaType;
   rtpParameters: unknown;
-  /**
-   * 이 producer 를 일시정지(mute) 상태로 만들지. audio/video 는 기본 OFF 로 입장하므로
-   * true 로 produce 한다. 서버가 paused producer 를 생성하고 NEW_PRODUCER 브로드캐스트에
-   * 그대로 실어, 다른 참가자가 처음부터 mute(placeholder) 로 인지한다(produce 직후
-   * 별도 TOGGLE_PRODUCER 로 paused 를 전파할 때 생기던 race 를 제거). 생략하면 false.
-   */
   paused?: boolean;
 }
 
@@ -114,7 +105,7 @@ export interface ResumeConsumerRequest {
 
 /**
  * 회의에 늦게 입장한 참가자가 기존 producer 들을 받아오기 위해 호출하는 RPC.
- * 자기 자신의 producer 는 제외한다. 응답을 받은 클라이언트는 각 항목을
+ * 자기 자신의 producer는 제외한다. 응답을 받은 클라이언트는 각 항목을
  * `NEW_PRODUCER` 브로드캐스트와 동일하게 처리(`CONSUME` → resume)한다.
  */
 export interface ListProducersRequest {
@@ -126,9 +117,9 @@ export interface ListProducersResponse {
 }
 
 /**
- * 자기 자신의 producer 를 일시정지(mute)/재개(unmute)하는 RPC.
+ * 자기 자신의 producer를 일시정지(mute)/재개(unmute)하는 RPC.
  * `paused: true` 면 mediasoup `producer.pause()`, `false` 면 `producer.resume()`.
- * 처리 후 server 가 같은 회의의 다른 참가자에게 `PRODUCER_TOGGLED` 를 broadcast 한다.
+ * 처리 후 server가 같은 회의의 다른 참가자에게 `PRODUCER_TOGGLED`를 broadcast 한다.
  */
 export interface ToggleProducerRequest {
   code: string;
@@ -141,8 +132,8 @@ export interface ToggleProducerResponse {
 }
 
 /**
- * 자기 producer 를 닫는다(예: 화면 공유 중지). 서버가 producer 를 제거하고
- * 같은 회의에 `PRODUCER_CLOSED` 를 broadcast 해 다른 참가자가 정리하게 한다.
+ * 자기 producer를 닫는다(예: 화면 공유 중지).
+ * 서버가 producer를 제거하고 같은 회의에 `PRODUCER_CLOSED`를 broadcast 해 다른 참가자가 정리하게 한다.
  * 화면 공유 동시 1인 제약을 서버가 정확히 강제하려면 중지도 서버가 알아야 한다.
  */
 export interface CloseProducerRequest {
@@ -153,19 +144,14 @@ export interface CloseProducerRequest {
 // ---------- server → client: 브로드캐스트 ----------
 
 /**
- * 같은 회의의 다른 참가자가 새 Producer 를 만들었음을 알린다.
- * 수신 측은 `mediasoup:consume` 으로 이어서 구독한다.
+ * 같은 회의의 다른 참가자가 새 Producer를 만들었음을 알린다.
+ * 수신 측은 `mediasoup:consume`으로 이어서 구독한다.
  */
 export interface NewProducerBroadcast {
   peerSocketId: string;
   producerId: string;
   kind: 'audio' | 'video';
   source: MediaType;
-  /**
-   * 이 producer 가 현재 일시정지(mute) 상태인지. produce 시점의 paused 를 그대로
-   * 실어, 늦게 입장한 참가자(LIST_PRODUCERS)든 새 producer 알림(NEW_PRODUCER)이든
-   * 처음부터 정확한 mute 상태로 인지해 검은 화면 대신 placeholder 를 보여주게 한다.
-   */
   paused?: boolean;
 }
 
@@ -178,8 +164,8 @@ export interface ConsumerClosedBroadcast {
 }
 
 /**
- * 같은 회의의 다른 참가자가 자기 producer 를 mute/unmute 했음을 알린다.
- * 수신 측은 해당 producerId 의 remote tile 에 mute 상태를 반영한다.
+ * 같은 회의의 다른 참가자가 자기 producer를 mute/unmute 했음을 알린다.
+ * 수신 측은 해당 producerId의 remote tile에 mute 상태를 반영한다.
  */
 export interface ProducerToggledBroadcast {
   producerId: string;

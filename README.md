@@ -55,8 +55,8 @@ Bounded Context: `meeting`(채팅 포함) · `mediasoup` · `recording` · `repo
 ### 요구사항
 
 - Node.js 20+, pnpm 9+
-- ffmpeg (오디오 캡처/디코드 — `ffmpeg -version` 으로 확인)
-- Python 3.10+ (ai-worker), Docker (선택 — `docker-compose.local.yml` 로 일괄 실행)
+- ffmpeg (오디오 캡처/디코드 — `ffmpeg -version`으로 확인)
+- Python 3.10+ (ai-worker), Docker (선택 — `docker-compose.local.yml`로 일괄 실행)
 - MongoDB(로컬 또는 Atlas), Redis(로컬 6379)
 
 ### 설치
@@ -67,7 +67,7 @@ pnpm install
 
 ### 환경 변수
 
-각 앱의 `.env.template` 을 복사해 채운다.
+각 앱의 `.env.template`을 복사해 채운다.
 
 ```bash
 cp apps/backend/.env.template apps/backend/.env
@@ -78,7 +78,7 @@ cp apps/ai-worker/.env.template apps/ai-worker/.env   # 선택 — 모두 기본
 - **backend** 핵심: `GEMINI_API_KEY`(LLM 요약), `MONGO_URI`·`MONGO_DB_NAME`(회의록 저장).
   나머지(Redis·Mediasoup·CORS·포트 등)는 `.env.template` 주석 참조.
 - **frontend**: `NEXT_PUBLIC_API_URL`(기본 `http://localhost:5000`)로 백엔드를 가리킨다.
-  정적 export 라 빌드 타임에 인라인되므로 배포 빌드 시 운영 백엔드 URL 을 넣어야 한다.
+  정적 export 라 빌드 타임에 인라인되므로 배포 빌드 시 운영 백엔드 URL을 넣어야 한다.
 
 ### 개발 실행
 
@@ -86,7 +86,7 @@ cp apps/ai-worker/.env.template apps/ai-worker/.env   # 선택 — 모두 기본
 pnpm dev          # turbo — backend(5000) + frontend(3000) 동시 실행
 ```
 
-ai-worker 는 Python 이라 별도 실행한다:
+ai-worker는 Python이라 별도 실행한다:
 
 ```bash
 cd apps/ai-worker
@@ -94,15 +94,15 @@ pip install -r requirements.txt
 uvicorn main:app --port 8000
 ```
 
-Redis 는 로컬(6379)에 떠 있어야 한다(Docker 등).
+Redis는 로컬(6379)에 떠 있어야 한다(Docker 등).
 
-| 서비스        | 포트                  | 비고                                      |
-| ------------- | --------------------- | ----------------------------------------- |
-| backend       | 5000                  | HTTP + WebSocket(Socket.IO)               |
-| frontend      | 3000                  | Next.js dev                               |
-| ai-worker     | 8000                  | FastAPI(STT)                              |
-| redis         | 6379                  | 회의 진행 상태·오디오 버퍼                |
-| mediasoup RTC | 40000–49999 (UDP/TCP) | WebRTC 미디어. `RTC_MIN/MAX_PORT` 로 조정 |
+| 서비스        | 포트                  | 비고                                     |
+| ------------- | --------------------- | ---------------------------------------- |
+| backend       | 5000                  | HTTP + WebSocket(Socket.IO)              |
+| frontend      | 3000                  | Next.js dev                              |
+| ai-worker     | 8000                  | FastAPI(STT)                             |
+| redis         | 6379                  | 회의 진행 상태·오디오 버퍼               |
+| mediasoup RTC | 40000–49999 (UDP/TCP) | WebRTC 미디어. `RTC_MIN/MAX_PORT`로 조정 |
 
 ### 테스트 · 빌드 · 린트
 
@@ -111,26 +111,26 @@ pnpm test          # backend=jest, frontend·shared=vitest
 pnpm test:e2e      # backend e2e + frontend Playwright
 pnpm build         # shared 빌드 + 타입체크 + frontend 정적 export
 pnpm lint
-pnpm build:shared  # shared-interfaces 만 빌드 — 타입 변경 후 backend/frontend 가 참조한다
+pnpm build:shared  # shared-interfaces만 빌드 — 타입 변경 후 backend/frontend가 참조한다
 ```
 
-> 공유 타입(`packages/shared-interfaces`)을 수정하면 `pnpm build:shared` 로 먼저 빌드해야
-> backend·frontend 가 새 타입을 본다. vitest 는 타입체크를 하지 않으므로 타입 안전성은 `pnpm build` 로 확인한다.
+> 공유 타입(`packages/shared-interfaces`)을 수정하면 `pnpm build:shared`로 먼저 빌드해야
+> backend·frontend가 새 타입을 본다. vitest는 타입체크를 하지 않으므로 타입 안전성은 `pnpm build`로 확인한다.
 
 ## 사용 흐름
 
 1. 메인(`/`)에서 **회의 만들기**(닉네임 + 제목 선택) → 회의 생성자는 host 권한(종료 권한) 보유
-2. 회의 URL `/meetings/{code}` 을 공유 → 받은 사람은 메인의 **입장** 폼 또는 **링크 직접 접속 시 닉네임 모달**로 입장
-3. 회의 중 화상/음성/화면공유/채팅. 카메라·마이크는 기본 OFF 이며 버튼으로 켠다
-4. host 가 **회의 종료**(또는 전원 퇴장 후 idle 자동 종료) → STT·요약 파이프라인이 회의록 생성
+2. 회의 URL `/meetings/{code}`을 공유 → 받은 사람은 메인의 **입장** 폼 또는 **링크 직접 접속 시 닉네임 모달**로 입장
+3. 회의 중 화상/음성/화면공유/채팅. 카메라·마이크는 기본 OFF이며 버튼으로 켠다
+4. host가 **회의 종료**(또는 전원 퇴장 후 idle 자동 종료) → STT·요약 파이프라인이 회의록 생성
 5. `/reports` 목록 → `/reports/{id}` 상세에서 회의록(요약·결정사항·액션아이템·핵심토픽·채팅·transcript) 확인
 
 ## 아키텍처 (요약)
 
 - **Backend** — Layered MVC + DDD 4-layer. 의존 방향 `Interface → Application → Domain ← Infrastructure`.
-  Domain 은 프레임워크 import 0, Application 은 Port 로만 Infrastructure 와 통신. BC 간 결합은 도메인
-  이벤트(`@nestjs/event-emitter`) 또는 Port 로만.
-- **Frontend** — MVVM. View(`components/`)는 props 만 받는 dumb 컴포넌트. 상태·부수효과는
+  Domain은 프레임워크 import 0, Application은 Port로만 Infrastructure와 통신. BC 간 결합은 도메인
+  이벤트(`@nestjs/event-emitter`) 또는 Port로만.
+- **Frontend** — MVVM. View(`components/`)는 props만 받는 dumb 컴포넌트. 상태·부수효과는
   `useXxxViewModel` hook(ViewModel)에, 데이터는 zustand store + api/socket service(Model)에.
 - **회의록 파이프라인** — `meeting.ended` → STT(faster-whisper) → LLM 요약(Gemini) → MongoDB finalize.
 
@@ -141,10 +141,10 @@ pnpm build:shared  # shared-interfaces 만 빌드 — 타입 변경 후 backend/
 - **커밋 컨벤션**: `type(scope): 한국어 설명`. type = `feat`/`fix`/`test`/`refactor`/`docs`/`chore`,
   scope = BC·앱 이름(`meeting`, `reports`, `mediasoup`, `frontend` 등).
 - **TDD**: spec(red) → impl(green) 순서로 진행하고, 가능하면 커밋도 분리한다(`test(...)` → `feat(...)`).
-- **테스트 위치**: unit spec 은 `src/` 인라인(`*.spec.ts(x)`), e2e 는 `apps/*/test/`.
+- **테스트 위치**: unit spec은 `src/` 인라인(`*.spec.ts(x)`), e2e는 `apps/*/test/`.
 - **코드 주석·JSDoc·테스트 라벨은 한국어**로 쓴다(식별자·파일명은 영어 유지).
-- **DTO 규칙**: class-validator 데코레이터 DTO 는 backend 에만. `shared-interfaces` 는 순수 타입·상수만.
-- **View 규칙**: View 에서 `fetch`/`useEffect`/`useState`/socket/zustand setter 직접 호출 금지 — ViewModel hook 으로.
+- **DTO 규칙**: class-validator 데코레이터 DTO는 backend에만. `shared-interfaces`는 순수 타입·상수만.
+- **View 규칙**: View에서 `fetch`/`useEffect`/`useState`/socket/zustand setter 직접 호출 금지 — ViewModel hook으로.
 
 기여 절차(새 기능·새 BC·테스트 패턴)는 [`CODEBASE_GUIDE.md`](./CODEBASE_GUIDE.md) 섹션#3 참조.
 
@@ -152,8 +152,8 @@ pnpm build:shared  # shared-interfaces 만 빌드 — 타입 변경 후 backend/
 
 - **`EADDRINUSE` 또는 옛 코드 응답** — dev 재기동 시 좀비 node 프로세스. 포트(5000/3000/8000) LISTEN
   을 확인하고 남은 프로세스를 종료한다.
-- **오디오/STT 가 동작하지 않음** — 호스트에 `ffmpeg` 설치 여부, ai-worker(8000) 실행 여부 확인.
-- **회의록 요약이 비어 있음** — `GEMINI_API_KEY` 미설정 시 `NoopSummarizer` 로 동작(요약 없이 회의록만 생성). 정상.
+- **오디오/STT가 동작하지 않음** — 호스트에 `ffmpeg` 설치 여부, ai-worker(8000) 실행 여부 확인.
+- **회의록 요약이 비어 있음** — `GEMINI_API_KEY` 미설정 시 `NoopSummarizer`로 동작(요약 없이 회의록만 생성). 정상.
 - **회의 화면이 검게 보임** — 입장 시 카메라/마이크는 기본 OFF(lazy). 컨트롤 바에서 켠다.
-- **원격 미디어가 안 보임(로컬 외 네트워크)** — `ANNOUNCED_IP` 를 클라이언트가 접근 가능한 IP(운영=공인 IP)로 설정.
+- **원격 미디어가 안 보임(로컬 외 네트워크)** — `ANNOUNCED_IP`를 클라이언트가 접근 가능한 IP(운영=공인 IP)로 설정.
 - **타입 변경이 반영되지 않음** — `shared-interfaces` 수정 후 `pnpm build:shared` 실행.

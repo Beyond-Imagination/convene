@@ -9,15 +9,15 @@
 
 ## 2. v1 기능 (포함 / 제외)
 
-| 포함                                                 | 제외                         |
-|----------------------------------------------------|----------------------------|
-| 화상회의 (Mediasoup SFU)                               | 강의자료 등록, PDF               |
-| 실시간 채팅                                             | 제스처 인식, MediaPipe          |
-| 닉네임 참가 (회원 없음)                                     | 투표(Poll), Q&A              |
-| 회의 링크 단순 생성, hard limit 없음 + idle 1분 만료            | 호스트 권한                     |
-| **STT(faster-whisper) + LLM 요약 + 채팅 로그 → 정제된 회의록** | 참여도 점수, 랭킹                 |
-| 회의록 조회 페이지 (회의 목록 / 상세)                            | Prometheus/Grafana/Loki 스택 |
-| Socket.IO 단일 인스턴스 (in-process)                     |                            |
+| 포함                                                           | 제외                         |
+| -------------------------------------------------------------- | ---------------------------- |
+| 화상회의 (Mediasoup SFU)                                       | 강의자료 등록, PDF           |
+| 실시간 채팅                                                    | 제스처 인식, MediaPipe       |
+| 닉네임 참가 (회원 없음)                                        | 투표(Poll), Q&A              |
+| 회의 링크 단순 생성, hard limit 없음 + idle 1분 만료           | 호스트 권한                  |
+| **STT(faster-whisper) + LLM 요약 + 채팅 로그 → 정제된 회의록** | 참여도 점수, 랭킹            |
+| 회의록 조회 페이지 (회의 목록 / 상세)                          | Prometheus/Grafana/Loki 스택 |
+| Socket.IO 단일 인스턴스 (in-process)                           |                              |
 
 **회의록 산출물**은 "발화 타임라인 누적"이 아니라 회사 회의록처럼 **요약 + 결정 사항 + 액션 아이템 + 핵심 토픽 + 참석자**로 구조화된 도큐먼트(아래 섹션#5 스키마).
 
@@ -65,16 +65,16 @@ interface MeetingReport {
   _id: ObjectId;
   meetingId: string;
   code: string;
-  source: 'web' | 'notion-issue';   // v2 확장 지점
-  externalRef?: ExternalReference;        // v2 노션 연동에서 채움
+  source: 'web' | 'notion-issue'; // v2 확장 지점
+  externalRef?: ExternalReference; // v2 노션 연동에서 채움
   startedAt: Date;
   endedAt: Date;
 
   participants: ParticipantEntry[]; // ↓ 별도 인터페이스로 분리
   chat: ChatEntry[];
   transcript: TranscriptSegment[];
-  summary: ReportSummary;          // overview / decisions / actionItems / keyTopics
-  pipeline: PipelineState;          // stage 상태 + 실패 로그
+  summary: ReportSummary; // overview / decisions / actionItems / keyTopics
+  pipeline: PipelineState; // stage 상태 + 실패 로그
 
   pushedToNotion?: NotionPushResult; // v2에서 채움
 }

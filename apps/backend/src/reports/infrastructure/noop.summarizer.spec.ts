@@ -40,6 +40,6 @@ describe('NoopSummarizer', () => {
     expect(a).toEqual(b);
   });
 
-  // 사용하지 않는 import 경고 회피 (NO_EXTERNAL_REFERENCE 는 다른 spec 에서 사용)
+  // 사용하지 않는 import 경고 회피 (NO_EXTERNAL_REFERENCE는 다른 spec에서 사용)
   void NO_EXTERNAL_REFERENCE;
 });
