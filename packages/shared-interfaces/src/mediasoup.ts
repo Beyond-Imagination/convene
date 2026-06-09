@@ -1,5 +1,5 @@
 /**
- * Mediasoup bounded context의 WebSocket wire format.
+ * Mediasoup 의 WebSocket wire format.
  *
  * 본 파일은 frontend ↔ backend가 공유하는 **순수 TS 인터페이스 / literal 타입**만
  * 정의한다. mediasoup 라이브러리에 의존하지 않기 위해 RTP 관련 구조체는
@@ -11,7 +11,7 @@ export const MEDIA_TYPES = ['audio', 'video', 'screen'] as const;
 export type MediaType = (typeof MEDIA_TYPES)[number];
 
 /**
- * Mediasoup bounded context의 WebSocket 이벤트 이름.
+ * Mediasoup 의 WebSocket 이벤트 이름.
  *
  * 도메인 이벤트(`meeting.*` dot prefix)와 구분하기 위해 colon prefix를 사용한다.
  *   - `mediasoup:getRtpCapabilities` / `mediasoup:createTransport` /

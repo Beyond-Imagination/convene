@@ -1,5 +1,5 @@
 /**
- * Meeting bounded context의 HTTP wire format.
+ * Meeting 의 HTTP wire format.
  *
  * 본 파일은 frontend ↔ backend가 공유하는 **순수 TS 인터페이스 / literal 타입**만
  * 정의한다. class-validator 데코레이터는 backend `dto/` 클래스가 본 인터페이스를
@@ -51,7 +51,7 @@ export interface CloseMeetingResponse {
 }
 
 /**
- * Meeting bounded context의 WebSocket 이벤트 이름.
+ * Meeting 의 WebSocket 이벤트 이름.
  *
  * 도메인 이벤트(`meeting.*` dot prefix)와 구분하기 위해 **colon** prefix를 사용한다.
  *   - `meeting:join` / `meeting:leave` / `meeting:chat` — client → server 요청

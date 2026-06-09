@@ -2,9 +2,9 @@
  * 도메인 이벤트 이름 상수.
  *
  * Prefix 규칙:
- *   - `meeting.*`   — Meeting bounded context.
- *   - `report.*`    — Report bounded context.
- *   - `mediasoup.*` — Mediasoup bounded context.
+ *   - `meeting.*`   — Meeting 도메인.
+ *   - `report.*`    — Report 도메인.
+ *   - `mediasoup.*` — Mediasoup 도메인.
  *
  * 백엔드의 `@nestjs/event-emitter`와 향후 다른 이벤트 버스가 사용할
  * 이벤트 이름 문자열의 단일 진실원(single source of truth).

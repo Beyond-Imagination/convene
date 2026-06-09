@@ -1,5 +1,5 @@
 /**
- * 회의 종료 권한자(host) 토큰의 클라이언트 보관소 (Model 레이어).
+ * 회의 종료 권한자(host) 토큰의 클라이언트 보관소.
  *
  * 회의 생성 응답으로 받은 hostToken 을 회의 code 별로 sessionStorage 에 저장한다.
  * zustand 메모리 스토어가 아니라 sessionStorage 를 쓰는 이유는, 새로고침/재접속

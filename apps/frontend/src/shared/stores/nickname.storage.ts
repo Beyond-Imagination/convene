@@ -1,5 +1,5 @@
 /**
- * 입장 닉네임의 클라이언트 보관소 (Model 레이어) — 회의 code 별 sessionStorage.
+ * 입장 닉네임의 클라이언트 보관소 — 회의 code 별 sessionStorage.
  *
  * session.store(zustand)는 in-memory 라 새로고침/페이지 이동 시 소실된다. 정적
  * 호스팅에선 `create/join → /meetings/{code}` 이동이 사실상 풀
