@@ -16,8 +16,6 @@ import { useSessionStore } from '@/shared/stores/session.store';
  * 회의 코드는 URL(`/meetings/[code]`)에서 이미 정해지므로 닉네임만 받는다.
  * submit 성공 시 session store 에 닉네임을 set 하면, `useMeetingViewModel` 이
  * 그 nickname 을 보고 socket 을 만들어 정상 입장한다(라우팅 이동 없음).
- *
- * 검증 규칙은 useJoinMeetingViewModel 의 닉네임 규칙과 동일하다.
  */
 
 export const NICKNAME_MIN = 1;
