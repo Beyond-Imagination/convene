@@ -5,8 +5,7 @@
  * `RedisModule` 의 useFactory 에서는 본 파일의 순수 함수로 환경변수를 읽는다
  * (`server.config.ts` 와 동일 패턴).
  *
- * 키 분리는 `keyPrefix` 옵션으로 처리한다. 같은 redis 인스턴스를 다른 환경
- * (예: 로컬·CI·운영) 이 공유하더라도 prefix 만 바꿔주면 충돌하지 않는다.
+ * 키 분리는 `keyPrefix` 옵션으로 처리한다.
  */
 
 export const DEFAULT_REDIS_URL = 'redis://localhost:6379';
