@@ -9,7 +9,7 @@ export function resolveAiWorkerBaseUrl(env: NodeJS.ProcessEnv = process.env): st
   if (raw === undefined || raw.trim() === '') return DEFAULT_AI_WORKER_BASE_URL;
   const trimmed = raw.trim().replace(/\/+$/, '');
   if (!/^https?:\/\//.test(trimmed)) {
-    throw new Error(`AI_WORKER_BASE_URL은 http:// 또는 https:// 스킴이어야 합니다: "${raw}"`);
+    throw new Error(`AI_WORKER_BASE_URL must use the http:// or https:// scheme: "${raw}"`);
   }
   return trimmed;
 }

@@ -43,14 +43,12 @@ export class AdminGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     if (this.token === null) {
-      throw new ForbiddenException(
-        '관리자 엔드포인트가 비활성화되어 있습니다(ADMIN_API_TOKEN 미설정).',
-      );
+      throw new ForbiddenException('Admin endpoints are disabled (ADMIN_API_TOKEN not set).');
     }
     const request = context.switchToHttp().getRequest<{ headers: Record<string, unknown> }>();
     const provided = extractBearerToken(request.headers.authorization);
     if (provided === null || !safeTokenEqual(provided, this.token)) {
-      throw new UnauthorizedException('유효한 관리자 토큰이 필요합니다.');
+      throw new UnauthorizedException('A valid admin token is required.');
     }
     return true;
   }

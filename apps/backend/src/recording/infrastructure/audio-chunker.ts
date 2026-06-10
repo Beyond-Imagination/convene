@@ -58,7 +58,7 @@ export function splitPcmIntoWavChunks(pcm: Buffer, options: ChunkOptions = {}): 
   const chunkMs = options.chunkMs ?? DEFAULT_CHUNK_MS;
   const overlapMs = options.overlapMs ?? DEFAULT_OVERLAP_MS;
   if (overlapMs >= chunkMs) {
-    throw new Error(`overlapMs(${overlapMs})는 chunkMs(${chunkMs})보다 작아야 합니다.`);
+    throw new Error(`overlapMs (${overlapMs}) must be smaller than chunkMs (${chunkMs}).`);
   }
 
   const chunkBytes = msToBytes(chunkMs);

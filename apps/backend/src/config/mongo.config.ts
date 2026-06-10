@@ -6,7 +6,7 @@ export function resolveMongoUri(env: NodeJS.ProcessEnv = process.env): string {
   if (raw === undefined || raw.trim() === '') return DEFAULT_MONGO_URI;
   const trimmed = raw.trim();
   if (!/^mongodb(\+srv)?:\/\//.test(trimmed)) {
-    throw new Error(`MONGO_URI는 mongodb:// 또는 mongodb+srv:// 스킴이어야 합니다: "${raw}"`);
+    throw new Error(`MONGO_URI must use the mongodb:// or mongodb+srv:// scheme: "${raw}"`);
   }
   return trimmed;
 }

@@ -12,7 +12,7 @@ export function resolvePort(env: NodeJS.ProcessEnv = process.env): number {
   if (raw === undefined || raw.trim() === '') return DEFAULT_PORT;
   const parsed = Number(raw);
   if (!Number.isInteger(parsed) || parsed <= 0 || parsed > 65535) {
-    throw new Error(`PORT 환경변수가 유효한 포트 번호가 아닙니다: "${raw}"`);
+    throw new Error(`PORT must be a valid port number: "${raw}"`);
   }
   return parsed;
 }

@@ -6,7 +6,7 @@ export function resolveRedisUrl(env: NodeJS.ProcessEnv = process.env): string {
   if (raw === undefined || raw.trim() === '') return DEFAULT_REDIS_URL;
   const trimmed = raw.trim();
   if (!/^rediss?:\/\//.test(trimmed)) {
-    throw new Error(`REDIS_URL은 redis:// 또는 rediss:// 스킴이어야 합니다: "${raw}"`);
+    throw new Error(`REDIS_URL must use the redis:// or rediss:// scheme: "${raw}"`);
   }
   return trimmed;
 }

@@ -421,10 +421,10 @@ describe('ReportFinalizationService.resummarize', () => {
   });
 
   it('재요약 Summarizer가 throw 하면 에러를 그대로 전파한다(동기 HTTP → 5xx)', async () => {
-    const { service } = makeService(makeReport('done'), {
-      summarizerError: new Error('LLM 503'),
-    });
-    await expect(service.resummarize(reportId)).rejects.toThrow('LLM 503');
+    const summarizerError = new Error('LLM 503');
+    const { service } = makeService(makeReport('done'), { summarizerError });
+    // 메시지 문구가 아니라 던져진 에러 인스턴스가 그대로 전파되는지(동일성)를 단언한다.
+    await expect(service.resummarize(reportId)).rejects.toBe(summarizerError);
   });
 
   it('done 회의록 재요약 실패 시 done 상태를 보존하고 저장/이벤트를 하지 않는다(격하 방지)', async () => {

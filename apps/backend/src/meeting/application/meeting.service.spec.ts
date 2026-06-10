@@ -252,7 +252,7 @@ describe('MeetingService.leaveMeeting', () => {
   it('Repository에 없는 code면 throw', async () => {
     const { service } = makeService(null);
     await expect(service.leaveMeeting({ code: 'abc12xyz', participantId: 's1' })).rejects.toThrow(
-      /not found/,
+      MeetingNotFoundError,
     );
   });
 
@@ -333,7 +333,7 @@ describe('MeetingService.postChat', () => {
     const { service, appended } = makeService(null);
     await expect(
       service.postChat({ code: 'abc12xyz', participantId: 's1', text: 'hi' }),
-    ).rejects.toThrow(/not found/);
+    ).rejects.toThrow(MeetingNotFoundError);
     expect(appended).toHaveLength(0);
   });
 
@@ -452,7 +452,7 @@ describe('MeetingService.closeMeeting', () => {
     const { service, events } = makeService(null);
     await expect(
       service.closeMeeting({ code: 'abc12xyz', reason: 'manual', hostToken: 'host-token-1' }),
-    ).rejects.toThrow(/not found/);
+    ).rejects.toThrow(MeetingNotFoundError);
     expect(events).toHaveLength(0);
   });
 
@@ -574,7 +574,9 @@ describe('MeetingService.detectIdleAndClose', () => {
 
   it('Repository에 없는 code면 throw, 이벤트 발행 안 됨', async () => {
     const { service, events } = makeService(null, tIdleElapsed);
-    await expect(service.detectIdleAndClose({ code: 'abc12xyz' })).rejects.toThrow(/not found/);
+    await expect(service.detectIdleAndClose({ code: 'abc12xyz' })).rejects.toThrow(
+      MeetingNotFoundError,
+    );
     expect(events).toHaveLength(0);
   });
 });
