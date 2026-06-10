@@ -3,8 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_REPORT_LIST_LIMIT,
   MAX_REPORT_LIST_LIMIT,
-  REPORT_PIPELINE_STAGES,
-  REPORT_PIPELINE_STATUSES,
   type ReportDetailResponse,
   type ReportListItem,
   type ReportListResponse,
@@ -13,14 +11,6 @@ import {
 } from './reports.js';
 
 describe('Reports wire format constants', () => {
-  it('REPORT_PIPELINE_STATUSES는 pending|done|failed 3종이다', () => {
-    expect(REPORT_PIPELINE_STATUSES).toEqual(['pending', 'done', 'failed']);
-  });
-
-  it('REPORT_PIPELINE_STAGES는 stt|summary 2종이다', () => {
-    expect(REPORT_PIPELINE_STAGES).toEqual(['stt', 'summary']);
-  });
-
   it('listRecent 기본/최대 limit 상수를 노출한다', () => {
     expect(DEFAULT_REPORT_LIST_LIMIT).toBe(20);
     expect(MAX_REPORT_LIST_LIMIT).toBe(100);

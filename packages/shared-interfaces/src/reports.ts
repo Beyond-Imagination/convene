@@ -10,11 +10,8 @@ import type { Source } from './meeting.js';
  *   - 누락 가능 필드(`null` 허용)는 backend 도메인 모델의 `null`을 그대로 반영한다.
  */
 
-export const REPORT_PIPELINE_STATUSES = ['pending', 'done', 'failed'] as const;
-export type ReportPipelineStatus = (typeof REPORT_PIPELINE_STATUSES)[number];
-
-export const REPORT_PIPELINE_STAGES = ['stt', 'summary'] as const;
-export type ReportPipelineStage = (typeof REPORT_PIPELINE_STAGES)[number];
+export type ReportPipelineStatus = 'pending' | 'done' | 'failed';
+export type ReportPipelineStage = 'stt' | 'summary';
 
 export interface ReportPipelineFailureWire {
   stage: ReportPipelineStage;

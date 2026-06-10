@@ -4,11 +4,8 @@
  * 두 stage(STT, Summary)가 독립적으로 `pending → done | failed` 한 방향 전이를 한 번씩만 수행한다.
  * done/failed에 도달하면 다시 pending으로 돌아갈 수 없다.
  */
-export const PIPELINE_STAGE_STATUSES = ['pending', 'done', 'failed'] as const;
-type PipelineStageStatus = (typeof PIPELINE_STAGE_STATUSES)[number];
-
-export const PIPELINE_STAGES = ['stt', 'summary'] as const;
-type PipelineStage = (typeof PIPELINE_STAGES)[number];
+type PipelineStageStatus = 'pending' | 'done' | 'failed';
+type PipelineStage = 'stt' | 'summary';
 
 export interface PipelineFailure {
   readonly stage: PipelineStage;
