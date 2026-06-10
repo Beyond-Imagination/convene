@@ -9,8 +9,8 @@ export abstract class DomainError extends Error {
 
   constructor(message: string) {
     super(message);
-    // 구체 하위 클래스명을 name으로(스택/로그 식별용). 하위가 다시 설정할 필요 없다.
     this.name = new.target.name;
+    Error.captureStackTrace(this, new.target);
   }
 }
 
