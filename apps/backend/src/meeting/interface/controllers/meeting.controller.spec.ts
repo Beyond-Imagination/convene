@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 
 import { MeetingNotFoundError, NotHostError } from '@/meeting/application/meeting.errors';
 import { Meeting } from '@/meeting/domain/meeting';
@@ -131,7 +131,7 @@ describe('MeetingController.closeMeeting', () => {
     });
   });
 
-  it('service가 NotHostError를 던지면 ForbiddenException(403)으로 매핑된다', async () => {
+  it('service가 던진 NotHostError를 그대로 전파한다(HTTP 매핑은 DomainExceptionFilter 담당)', async () => {
     const service = {
       closeMeeting: jest.fn(async () => {
         throw new NotHostError('abc12xyz');
@@ -139,9 +139,7 @@ describe('MeetingController.closeMeeting', () => {
     };
 
     const controller = new MeetingController(service as any);
-    await expect(controller.closeMeeting('abc12xyz', 'wrong')).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(controller.closeMeeting('abc12xyz', 'wrong')).rejects.toBeInstanceOf(NotHostError);
   });
 
   it('잘못된 code 형식(대문자·길이 등)은 BadRequestException으로 거부하고 service를 호출하지 않는다', async () => {
@@ -150,7 +148,7 @@ describe('MeetingController.closeMeeting', () => {
     expect(service.closeMeeting).not.toHaveBeenCalled();
   });
 
-  it('service가 MeetingNotFoundError를 던지면 NotFoundException으로 매핑된다', async () => {
+  it('service가 던진 MeetingNotFoundError를 그대로 전파한다', async () => {
     const service = {
       closeMeeting: jest.fn(async () => {
         throw new MeetingNotFoundError('abc12xyz');
@@ -158,7 +156,7 @@ describe('MeetingController.closeMeeting', () => {
     };
 
     const controller = new MeetingController(service as any);
-    await expect(controller.closeMeeting('abc12xyz')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(controller.closeMeeting('abc12xyz')).rejects.toBeInstanceOf(MeetingNotFoundError);
   });
 
   it('service의 기타 도메인 에러는 그대로 전파된다(NotFoundException으로 감싸지 않음)', async () => {

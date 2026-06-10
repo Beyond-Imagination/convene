@@ -28,7 +28,7 @@ export function resolveGeminiConfig(env: NodeJS.ProcessEnv = process.env): Gemin
   if (timeoutRaw !== undefined && timeoutRaw.length > 0) {
     const parsed = Number(timeoutRaw);
     if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0) {
-      throw new Error(`GEMINI_TIMEOUT_MS는 양의 정수(ms)여야 합니다: "${timeoutRaw}"`);
+      throw new Error(`GEMINI_TIMEOUT_MS must be a positive integer (ms): "${timeoutRaw}"`);
     }
     timeoutMs = parsed;
   }
@@ -36,7 +36,7 @@ export function resolveGeminiConfig(env: NodeJS.ProcessEnv = process.env): Gemin
   let baseUrl = DEFAULT_GEMINI_BASE_URL;
   if (baseUrlRaw !== undefined && baseUrlRaw.length > 0) {
     if (!/^https?:\/\//.test(baseUrlRaw)) {
-      throw new Error(`GEMINI_BASE_URL은 http:// 또는 https:// 스킴이어야 합니다: "${baseUrlRaw}"`);
+      throw new Error(`GEMINI_BASE_URL must use the http:// or https:// scheme: "${baseUrlRaw}"`);
     }
     baseUrl = baseUrlRaw.replace(/\/+$/, '');
   }

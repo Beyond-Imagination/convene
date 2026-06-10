@@ -38,8 +38,6 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
   private readonly routers = new Map<string, Router[]>();
   /** participantId → routerIndex (per meeting). */
   private readonly assignments = new Map<string, Map<string, number>>();
-  /** routerIndex → 현재 참가자 수 (per meeting). assignments와 redundant 하지만 O(1) capacity 검사를 위해 분리. */
-  private readonly routerLoads = new Map<string, Map<number, number>>();
   /** originalProducerId → RouterPipeRegistry (per meeting). */
   private readonly producerPipes = new Map<string, Map<string, RouterPipeRegistry>>();
   /** 회의별로 점유 중인 worker 인덱스 Set. 같은 회의의 두 router가 같은 worker에 들어가지 않게 하기 위한 affinity tracking. */
@@ -61,7 +59,6 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
     const first = await this.spawnRouter(meetingCode);
     this.routers.set(meetingCode, [first]);
     this.assignments.set(meetingCode, new Map());
-    this.routerLoads.set(meetingCode, new Map([[0, 0]]));
     this.producerPipes.set(meetingCode, new Map());
     this.logger.log(`room created (code=${meetingCode}, routers=1)`);
   }
@@ -81,7 +78,6 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
     }
     this.routers.delete(meetingCode);
     this.assignments.delete(meetingCode);
-    this.routerLoads.delete(meetingCode);
     this.producerPipes.delete(meetingCode);
     this.workerIdxByRoom.delete(meetingCode);
   }
@@ -97,20 +93,27 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
 
   async assignParticipant(meetingCode: string, participantId: string): Promise<number> {
     const list = this.routers.get(meetingCode);
-    const loads = this.routerLoads.get(meetingCode);
-    if (!list || !loads) {
+    const assignments = this.assignments.get(meetingCode);
+    if (!list || !assignments) {
       throw new Error(`MediasoupRouterAdapter: room "${meetingCode}" not opened`);
     }
     const capacity = this.options.participantsPerRouter;
 
-    // 빈 자리 있는 router가 있으면 가장 낮은 인덱스 router에 할당 (균등 분배).
-    let target = -1;
-    for (let i = 0; i < list.length; i += 1) {
-      if ((loads.get(i) ?? 0) < capacity) {
-        target = i;
-        break;
+    const loadByRouter = new Array<number>(list.length).fill(0);
+    for (const idx of assignments.values()) {
+      // 정상 경로에선 idx가 항상 list 범위 내(router는 추가만 되고 제거 안 됨).
+      // 상태 불일치 시 loadByRouter가 NaN으로 오염돼 findIndex/최소부하 탐색이 오작동하는 것을 막는 방어 가드.
+      if (!Number.isInteger(idx) || idx < 0 || idx >= loadByRouter.length) {
+        this.logger.warn(
+          `assignments has invalid routerIndex=${idx} (code=${meetingCode}, routers=${list.length}) — excluded from load tally`,
+        );
+        continue;
       }
+      loadByRouter[idx] += 1;
     }
+
+    // 빈 자리(capacity 미달) 있는 가장 낮은 인덱스 router에 할당(균등 분배).
+    let target = loadByRouter.findIndex((load) => load < capacity);
 
     if (target === -1) {
       // 모든 router가 가득 참.
@@ -119,15 +122,10 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
         // 이 회의가 아직 점유하지 않은 worker가 있음 → 새 router 추가.
         target = await this.addRouter(meetingCode);
       } else {
-        // 이 회의가 모든 worker를 점유 중. 그래서 가장 한가한 기존 router에 over-allocate.
-        let minLoad = Number.POSITIVE_INFINITY;
+        // 이 회의가 모든 worker를 점유 중. 가장 한가한 기존 router에 over-allocate.
         let minIdx = 0;
-        for (let i = 0; i < list.length; i += 1) {
-          const load = loads.get(i) ?? 0;
-          if (load < minLoad) {
-            minLoad = load;
-            minIdx = i;
-          }
+        for (let i = 1; i < loadByRouter.length; i += 1) {
+          if (loadByRouter[i] < loadByRouter[minIdx]) minIdx = i;
         }
         target = minIdx;
         this.logger.warn(
@@ -136,25 +134,22 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
       }
     }
 
-    loads.set(target, (loads.get(target) ?? 0) + 1);
-    this.assignments.get(meetingCode)!.set(participantId, target);
+    assignments.set(participantId, target);
+    const newLoad = (loadByRouter[target] ?? 0) + 1;
     this.logger.log(
-      `participant assigned (code=${meetingCode}, pid=${participantId}, routerIndex=${target}, load=${loads.get(target)}/${capacity})`,
+      `participant assigned (code=${meetingCode}, pid=${participantId}, routerIndex=${target}, load=${newLoad}/${capacity})`,
     );
     return target;
   }
 
   async releaseParticipant(meetingCode: string, participantId: string): Promise<void> {
     const assignments = this.assignments.get(meetingCode);
-    const loads = this.routerLoads.get(meetingCode);
-    if (!assignments || !loads) return;
+    if (!assignments) return;
     const idx = assignments.get(participantId);
     if (idx === undefined) return;
     assignments.delete(participantId);
-    const prev = loads.get(idx) ?? 0;
-    loads.set(idx, Math.max(0, prev - 1));
     this.logger.log(
-      `participant released (code=${meetingCode}, pid=${participantId}, routerIndex=${idx}, load=${loads.get(idx)})`,
+      `participant released (code=${meetingCode}, pid=${participantId}, routerIndex=${idx})`,
     );
   }
 
@@ -263,7 +258,6 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
     const newRouter = await this.spawnRouter(meetingCode);
     const newIndex = list.length;
     list.push(newRouter);
-    this.routerLoads.get(meetingCode)!.set(newIndex, 0);
 
     // 기존 모든 producer를 새 router로 pipe.
     const roomPipes = this.producerPipes.get(meetingCode);

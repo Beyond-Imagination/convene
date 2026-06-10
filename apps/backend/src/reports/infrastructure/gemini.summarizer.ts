@@ -111,16 +111,16 @@ export class GeminiSummarizer implements SummarizerPort {
 
     if (!response.ok) {
       throw new Error(
-        `Gemini generateContent 응답이 실패했습니다: ${response.status} ${response.statusText}`,
+        `Gemini generateContent request failed: ${response.status} ${response.statusText}`,
       );
     }
 
     const payload = (await response.json()) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
     };
-    const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (typeof text !== 'string' || text.length === 0) {
-      throw new Error('Gemini generateContent 응답에 candidates 텍스트가 없습니다');
+      throw new Error('Gemini generateContent response has no candidate text');
     }
 
     const parsed = JSON.parse(text) as {
@@ -200,18 +200,18 @@ function buildPrompt(input: SummarizerInput): string {
 
 function asString(value: unknown, field: string): string {
   if (typeof value !== 'string') {
-    throw new Error(`Gemini 응답의 ${field} 가 string이 아닙니다`);
+    throw new Error(`Gemini response field "${field}" is not a string`);
   }
   return value;
 }
 
 function asStringArray(value: unknown, field: string): string[] {
   if (!Array.isArray(value)) {
-    throw new Error(`Gemini 응답의 ${field} 가 배열이 아닙니다`);
+    throw new Error(`Gemini response field "${field}" is not an array`);
   }
   return value.map((v, i) => {
     if (typeof v !== 'string') {
-      throw new Error(`Gemini 응답의 ${field}[${i}]가 string이 아닙니다`);
+      throw new Error(`Gemini response field "${field}[${i}]" is not a string`);
     }
     return v;
   });
@@ -219,26 +219,26 @@ function asStringArray(value: unknown, field: string): string[] {
 
 function asActionItemArray(value: unknown): Array<{ owner?: string; task: string; due?: string }> {
   if (!Array.isArray(value)) {
-    throw new Error('Gemini 응답의 actionItems가 배열이 아닙니다');
+    throw new Error('Gemini response field "actionItems" is not an array');
   }
   return value.map((v, i) => {
     if (typeof v !== 'object' || v === null) {
-      throw new Error(`Gemini 응답의 actionItems[${i}]가 객체가 아닙니다`);
+      throw new Error(`Gemini response field "actionItems[${i}]" is not an object`);
     }
     const item = v as { owner?: unknown; task?: unknown; due?: unknown };
     if (typeof item.task !== 'string') {
-      throw new Error(`Gemini 응답의 actionItems[${i}].task가 string이 아닙니다`);
+      throw new Error(`Gemini response field "actionItems[${i}].task" is not a string`);
     }
     const result: { owner?: string; task: string; due?: string } = { task: item.task };
     if (item.owner !== undefined) {
       if (typeof item.owner !== 'string') {
-        throw new Error(`Gemini 응답의 actionItems[${i}].owner가 string이 아닙니다`);
+        throw new Error(`Gemini response field "actionItems[${i}].owner" is not a string`);
       }
       result.owner = item.owner;
     }
     if (item.due !== undefined) {
       if (typeof item.due !== 'string') {
-        throw new Error(`Gemini 응답의 actionItems[${i}].due가 string이 아닙니다`);
+        throw new Error(`Gemini response field "actionItems[${i}].due" is not a string`);
       }
       result.due = item.due;
     }
@@ -248,15 +248,15 @@ function asActionItemArray(value: unknown): Array<{ owner?: string; task: string
 
 function asKeyTopicArray(value: unknown): Array<{ topic: string; points: string[] }> {
   if (!Array.isArray(value)) {
-    throw new Error('Gemini 응답의 keyTopics가 배열이 아닙니다');
+    throw new Error('Gemini response field "keyTopics" is not an array');
   }
   return value.map((v, i) => {
     if (typeof v !== 'object' || v === null) {
-      throw new Error(`Gemini 응답의 keyTopics[${i}]가 객체가 아닙니다`);
+      throw new Error(`Gemini response field "keyTopics[${i}]" is not an object`);
     }
     const item = v as { topic?: unknown; points?: unknown };
     if (typeof item.topic !== 'string') {
-      throw new Error(`Gemini 응답의 keyTopics[${i}].topic이 string이 아닙니다`);
+      throw new Error(`Gemini response field "keyTopics[${i}].topic" is not a string`);
     }
     const points = asStringArray(item.points, `keyTopics[${i}].points`);
     return { topic: item.topic, points };

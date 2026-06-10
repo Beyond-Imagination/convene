@@ -1,13 +1,13 @@
-export class ParticipantMediaNotFoundError extends Error {
+import { ConflictError, NotFoundError } from '@/shared-kernel/domain/errors';
+
+export class ParticipantMediaNotFoundError extends NotFoundError {
   constructor(public readonly participantId: string) {
     super(`ParticipantMedia for "${participantId}" not found`);
-    this.name = 'ParticipantMediaNotFoundError';
   }
 }
 
-export class ScreenShareConflictError extends Error {
+export class ScreenShareConflictError extends ConflictError {
   constructor(public readonly meetingCode: string) {
     super(`Another participant is already sharing the screen in meeting "${meetingCode}"`);
-    this.name = 'ScreenShareConflictError';
   }
 }

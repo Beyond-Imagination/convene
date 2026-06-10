@@ -5,15 +5,11 @@ import type {
 } from '@convene/shared-interfaces';
 
 import { API_BASE_URL } from './config';
+import { ApiError } from './errors';
 
-export class ReportsApiError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'ReportsApiError';
-  }
+export class ReportsApiError extends ApiError {
+  // minify-safe: 하위 클래스도 자기 name을 하드코딩(상속받은 'ApiError'를 덮어씀).
+  readonly name = 'ReportsApiError';
 }
 
 export interface ListReportsParams {

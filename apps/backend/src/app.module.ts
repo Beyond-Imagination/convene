@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_FILTER } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 
 import { MediasoupModule } from '@/mediasoup/mediasoup.module';
@@ -8,6 +9,7 @@ import { MongoModule } from '@/mongo/mongo.module';
 import { RecordingModule } from '@/recording/recording.module';
 import { RedisModule } from '@/redis/redis.module';
 import { ReportsModule } from '@/reports/reports.module';
+import { DomainExceptionFilter } from '@/shared-kernel/interface/domain-exception.filter';
 import { SharedKernelModule } from '@/shared-kernel/shared-kernel.module';
 
 @Module({
@@ -22,5 +24,6 @@ import { SharedKernelModule } from '@/shared-kernel/shared-kernel.module';
     ReportsModule,
     RecordingModule,
   ],
+  providers: [{ provide: APP_FILTER, useClass: DomainExceptionFilter }],
 })
 export class AppModule {}

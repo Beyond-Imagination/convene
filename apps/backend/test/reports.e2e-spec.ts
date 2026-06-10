@@ -14,11 +14,12 @@ import request from 'supertest';
 
 import { AppModule } from '@/app.module';
 import { FfmpegAudioCaptureAdapter } from '@/mediasoup/infrastructure/ffmpeg-audio-capture.adapter';
-import { NoopAudioCapture } from '@/mediasoup/infrastructure/noop-audio-capture.adapter';
 import { HttpTranscriber } from '@/recording/infrastructure/http.transcriber';
-import { NoopTranscriber } from '@/recording/infrastructure/noop.transcriber';
 import { GeminiSummarizer } from '@/reports/infrastructure/gemini.summarizer';
 import { NoopSummarizer } from '@/reports/infrastructure/noop.summarizer';
+
+import { NoopTranscriber } from './support/noop.transcriber';
+import { NoopAudioCapture } from './support/noop-audio-capture';
 
 /**
  * Reports의 e2e 통합 테스트.
