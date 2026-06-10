@@ -7,7 +7,10 @@ import type {
 import { API_BASE_URL } from './config';
 import { ApiError } from './errors';
 
-export class MeetingApiError extends ApiError {}
+export class MeetingApiError extends ApiError {
+  // minify-safe: 하위 클래스도 자기 name을 하드코딩(상속받은 'ApiError'를 덮어씀).
+  readonly name = 'MeetingApiError';
+}
 
 export async function createMeeting(input: CreateMeetingRequest): Promise<CreateMeetingResponse> {
   const res = await fetch(`${API_BASE_URL}/meetings`, {

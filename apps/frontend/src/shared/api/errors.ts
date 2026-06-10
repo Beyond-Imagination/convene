@@ -10,6 +10,7 @@ export class ApiError extends Error {
     message: string,
   ) {
     super(message);
-    this.name = new.target.name;
+    // 프로덕션 minify가 클래스명을 mangle 하므로 new.target.name 대신 하드코딩.
+    this.name = 'ApiError';
   }
 }

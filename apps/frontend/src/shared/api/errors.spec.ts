@@ -11,8 +11,10 @@ describe('ApiError', () => {
     expect(e.name).toBe('ApiError');
   });
 
-  it('하위 client 에러는 ApiError로 식별되며 자기 클래스명을 name으로 가진다', () => {
-    class MeetingApiError extends ApiError {}
+  it('하위 client 에러는 ApiError로 식별되며 name 하드코딩 시 그 값을 가진다(minify-safe)', () => {
+    class MeetingApiError extends ApiError {
+      readonly name = 'MeetingApiError';
+    }
     const e = new MeetingApiError(403, 'forbidden');
     expect(e).toBeInstanceOf(ApiError);
     expect(e.status).toBe(403);
