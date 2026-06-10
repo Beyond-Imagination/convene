@@ -10,8 +10,8 @@
 3. 이 문서 섹션#2 핵심 흐름 — 실제 코드를 흐름 따라
 4. 기여할 BC의 `domain/` → `application/` → `interface/`/`infrastructure/` 순으로 그 모듈만
 
-읽기 팁: **wire 계약은 항상 `packages/shared-interfaces/src/`** 에 있다(이벤트 이름·HTTP/WS
-타입). 백엔드 ↔ 프런트가 이 타입으로만 약속하므로, 한 기능을 추적할 때 여기서 타입을 먼저 본다.
+읽기 팁: **wire 계약은 항상 `packages/shared-interfaces/src/`** 에 있다(이벤트 이름·HTTP/WS 타입).
+백엔드 ↔ 프런트가 이 타입으로만 약속하므로, 한 기능을 추적할 때 여기서 타입을 먼저 본다.
 
 ## 1. 디렉토리 맵
 
@@ -21,85 +21,90 @@ apps/backend/src/<context>/        meeting · mediasoup · recording · reports
   ├── application/  *.service.ts · *.listener.ts
   ├── domain/       {aggregate}.ts · value-objects/ · ports/  (프레임워크 import 0)
   └── infrastructure/  repository·adapter 구현
-  + shared-kernel/(공유 VO·이벤트 payload·Clock·EventPublisher), config/ redis/ mongo/
+  + shared-kernel/(공유 VO·이벤트 payload·Clock·EventPublisher·DomainError·DomainExceptionFilter), config/ redis/ mongo/
 
 apps/frontend/src/
   ├── app/          라우트(정적 export): page.tsx, meetings/[code], reports, reports/[id]
   ├── feature/<name>/{components(View), hooks(ViewModel)}    meeting · reports
-  └── shared/{api(fetch), socket(io+device), stores(zustand)}
+  └── shared/{api(fetch + ApiError), socket(io+device), stores(zustand+sessionStorage), hooks(useRouteSegment)}
 
 apps/ai-worker/    FastAPI main.py — POST /transcribe (faster-whisper)
 packages/shared-interfaces/src/   meeting.ts · mediasoup.ts · reports.ts · events.ts
 ```
 
-## 2. 핵심 흐름 (파일:함수 경로)
+## 2. 핵심 흐름
 
-화살표는 호출/이벤트 방향. `→` 직접 호출, `⇢` 도메인 이벤트(event bus).
+레이어 라벨로 단계를 읽는다. 기호: `→` 직접 호출, `⇢` 도메인 이벤트(event bus), `«` 응답/broadcast.
+레이어: **View** · **VM**(ViewModel) · **API**(fetch) · **Ctrl**(controller) · **GW**(gateway) · **Svc**(service) · **Repo**.
 
-### 2.1 회의 생성 (HTTP)
+### 2.1 회의 생성 — `POST /meetings`
 
-```
-CreateMeetingForm.tsx (View)
-→ useCreateMeetingViewModel.ts  handleSubmit: createMeeting({source,title}) + setNickname + saveHostToken + router.push
-→ shared/api/meeting.api.ts  createMeeting  →  POST /meetings
-→ meeting/interface/controllers/meeting.controller.ts  createMeeting
-→ meeting/application/meeting.service.ts  createMeeting  →  Meeting.create + repository.save + publish meeting.created
-→ meeting/infrastructure/redis-meeting.repository.ts  save
-응답: { code, source, startedAt, hostToken }   (hostToken은 생성자만 보관 = host 권한)
-```
+1. **View** `CreateMeetingForm`
+2. **VM** `useCreateMeetingViewModel`
+   — createMeeting({source,title}) · setNickname · saveHostToken · router.push
+3. **API** `meeting.api.createMeeting` → `POST /meetings`
+4. **Ctrl** `meeting.controller.createMeeting`
+5. **Svc** `meeting.service.createMeeting`
+   — Meeting.create · repo.save · ⇢ `meeting.created`
+6. **Repo** `redis-meeting.repository.save`
 
-### 2.2 회의 입장 (닉네임 게이트 포함)
+« 응답 `{ code, source, startedAt, hostToken }` — hostToken 보유자 = host 권한
 
-```
-홈에서: JoinMeetingForm.tsx → useJoinMeetingViewModel.ts  setNickname + router.push('/meetings/{code}')
-링크 직접: MeetingPageClient.tsx가 nickname 없으면 NicknameGate.tsx + useNicknameGateViewModel.ts (setNickname)
-→ MeetingPageClient.tsx  nickname 생기면 useMeetingViewModel이 socket 생성
-→ useMeetingViewModel.ts  connectMeetingSocket() + emit meeting:join
-→ meeting/interface/gateways/meeting.gateway.ts  handleJoin
-→ meeting.service.ts  joinMeeting  →  Meeting.addParticipant + publish meeting.participant.joined
-broadcast: meeting:participantJoined(전체) + meeting:participants(본인, 기존 목록)
-```
+### 2.2 회의 입장 (닉네임 게이트)
+
+1. **View** `JoinMeetingForm` → `useJoinMeetingViewModel` (setNickname · router.push `'/meetings/{code}'`)
+   - 직접 링크 시 nickname 없으면 `MeetingPageClient`가 `NicknameGate` + `useNicknameGateViewModel`
+2. **VM** `useMeetingViewModel` — connectMeetingSocket() · emit `meeting:join`
+3. **GW** `meeting.gateway.handleJoin`
+4. **Svc** `meeting.service.joinMeeting`
+   — Meeting.addParticipant · ⇢ `meeting.participant.joined`
+
+« `meeting:participantJoined`(전체) · `meeting:participants`(본인 = 기존 목록)
 
 ### 2.3 미디어 (Mediasoup SFU)
 
-```
-useMediasoupViewModel.ts  — getRtpCapabilities → createTransport(send/recv) → produce/consume RPC
-  · 미디어 lazy: 입장 시 getUserMedia 안 함. toggleAudio/Video가 켤 때 취득+produce, 끄면 close+CLOSE_PRODUCER
-→ mediasoup/interface/gateways/mediasoup.gateway.ts  mediasoup:* RPC 핸들러
-→ mediasoup/application/mediasoup-signaling.service.ts  produce/consume/…
-→ domain/participant-media.ts (상태) + infrastructure/ worker pool·router·transport 어댑터
-admit: meeting.participant.joined ⇢ mediasoup lifecycle listener가 room/participant 준비
-produce 시: publish mediasoup.producer.created ⇢ gateway가 mediasoup:newProducer로 broadcast
-오디오: produce(audio) → FfmpegAudioCaptureAdapter가 ffmpeg로 PCM 추출 → Redis 버퍼(STT용)
-```
+1. **VM** `useMediasoupViewModel`
+   — getRtpCapabilities → createTransport(send/recv) → produce/consume RPC
+   - lazy: 입장 시 getUserMedia 안 함 — toggle이 켤 때 취득+produce, 끄면 close + `CLOSE_PRODUCER`
+2. **GW** `mediasoup.gateway` (mediasoup:\* RPC)
+3. **Svc** `mediasoup-signaling.service` produce/consume/…
+   — **Domain** `participant-media`(상태) · **Infra** worker pool·router·transport 어댑터
+
+보조 흐름:
+
+- **admit**: `meeting.participant.joined` ⇢ mediasoup lifecycle listener가 room/participant 준비
+- **produce**: ⇢ `mediasoup.producer.created` → gateway가 « `mediasoup:newProducer`
+- **audio**: produce(audio) → `FfmpegAudioCaptureAdapter`(ffmpeg PCM) → Redis 버퍼(STT용)
 
 ### 2.4 채팅 (Meeting BC 내)
 
-```
-ChatPanel.tsx (View)
-→ useChatViewModel.ts  emit meeting:chat / 수신 meeting:chatPosted
-→ meeting.gateway.ts  handleChat
-→ meeting.service.ts  postChat  →  ChatEntry 생성 + markActive(idle 리셋) + ChatRepository.append(Redis)
-→ broadcast meeting:chatPosted (회의록에는 종료 시 meeting.ended payload로 이관)
-```
+1. **View** `ChatPanel` → `useChatViewModel` (emit `meeting:chat` · 수신 `meeting:chatPosted`)
+2. **GW** `meeting.gateway.handleChat`
+3. **Svc** `meeting.service.postChat`
+   — ChatEntry · markActive(idle 리셋) · ChatRepository.append(Redis)
+
+« `meeting:chatPosted` — 회의록엔 종료 시 `meeting.ended` payload로 이관
 
 ### 2.5 회의록 (종료 → STT → 요약 → 조회)
 
-```
-종료: meeting.service.ts  closeMeeting(host, DELETE /meetings/:code) 또는 detectIdleAndClose(idle 스케줄러)
-      →  publish meeting.ended (payload: 참가자·chat·title 스냅숏)
-draft: reports/application/report-meeting-lifecycle.listener.ts  onMeetingEnded
-      →  report-finalization.service.ts  createDraft  →  MeetingReport.fromEndedMeeting + MongoReportRepository.save
-      →  publish report.transcription.requested
-STT:  recording/application/recording.service.ts (requested 구독)  →  TranscriberPort.transcribe
-      →  recording/infrastructure/http.transcriber.ts  →  ai-worker POST /transcribe (faster-whisper)
-      →  publish report.transcription.completed   (회의 중엔 PartialTranscriptionScheduler가 30s 마다 부분 STT 누적)
-요약: report-finalization.service.ts  completeTranscription  →  SummarizerPort.summarize (GeminiSummarizer)
-      →  MeetingReport.applySummary → finalize → publish report.finalized
-조회: reports/interface/controllers  GET /reports, /reports/:id  →  report-serialize.ts (도메인→wire)
-      →  frontend useReportListViewModel / useReportDetailViewModel → ReportList / ReportDetail
-회의록 제목: 사용자 지정 title ?? summary.title ?? null (report-serialize.ts)
-```
+1. **종료** `meeting.service.closeMeeting`(host, DELETE) | `detectIdleAndClose`(idle)
+   — ⇢ `meeting.ended` (참가자·chat·title 스냅숏)
+2. **draft** `report-meeting-lifecycle.listener` → `report-finalization.service.createDraft`
+   — MeetingReport.fromEndedMeeting · Mongo save · ⇢ `report.transcription.requested`
+3. **STT** `recording.service`(requested 구독) → TranscriberPort → ai-worker `POST /transcribe`
+   — ⇢ `report.transcription.completed` (회의 중엔 `PartialTranscriptionScheduler`가 30s마다 부분 STT 누적)
+4. **요약** `report-finalization.service.completeTranscription` → SummarizerPort.summarize(Gemini)
+   — MeetingReport.applySummary · finalize · ⇢ `report.finalized`
+5. **조회** `GET /reports` · `/reports/:id` → report-serialize(도메인→wire)
+   — `useReportListViewModel` / `useReportDetailViewModel` → ReportList / ReportDetail
+
+재요약(관리자):
+
+1. `POST /reports/:id/resummarize` — AdminGuard(Bearer `ADMIN_API_TOKEN`, 상수 시간 비교)
+2. `report-finalization.service.resummarize` — STT done & 요약 종료 시에만 저장 transcript+chat을 이용해 재요약
+3. `MeetingReport.replaceSummary`(실패 시 상태 요약 문서 상태 미변경) · ⇢ `report.summary.completed` + `report.finalized`
+
+> 회의록 제목 규칙: 사용자 지정 `title ?? summary.title ?? null` (report-serialize).
 
 ## 3. 기여 절차
 
@@ -133,7 +138,8 @@ STT:  recording/application/recording.service.ts (requested 구독)  →  Transc
 
 - **wire 계약**: `packages/shared-interfaces/src/{meeting,mediasoup,reports,events}.ts`
 - **env 해석**: `apps/backend/src/config/*.ts`(키·기본값의 단일 진실원), 템플릿은 `apps/*/.env.template`
-- **전역 파이프/CORS**: `apps/backend/src/main.ts`
+- **전역 파이프/CORS**: `apps/backend/src/main.ts`. 도메인 에러 → HTTP 매핑은 `shared-kernel/interface/domain-exception.filter.ts`(`DomainError.httpStatus` 사용)
+- 재요약 401/403: `ADMIN_API_TOKEN` 미설정시 엔드포인트 비활성(403), 설정 시 `Authorization: Bearer <token>` 불일치는 401(`reports/interface/guards/admin.guard.ts`)
 - `EADDRINUSE`/옛 코드 응답: dev 재기동 시 좀비 node 프로세스 — 포트(5000/3000/8000) LISTEN 확인 후 종료
 - 오디오/STT 동작 안 함: 호스트에 `ffmpeg` 설치 확인, ai-worker(8000) 실행 확인
 - 회의록 요약이 비어 있음: `GEMINI_API_KEY` 미설정 시 `NoopSummarizer`로 동작(정상)

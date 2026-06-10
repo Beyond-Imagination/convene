@@ -65,6 +65,8 @@
 - **컨텍스트 간 결합은 Domain Event(`@nestjs/event-emitter`) 또는 Port로만.** Aggregate·Service·
   Repository를 BC 간 직접 import 하지 않는다(CLAUDE.md hard rule 7).
 - 여러 BC가 공유하는 read-only VO·이벤트 payload는 `shared-kernel/domain/`에 둔다(DDD Shared Kernel).
+- 전 BC 공통 에러 계층(framework-free `DomainError` + 의미 기반 `NotFoundError`/`ForbiddenError`/`ConflictError`)은
+  `shared-kernel/domain/errors.ts`, 이를 HTTP로 번역하는 글로벌 `DomainExceptionFilter`는 `shared-kernel/interface/`에 둔다.
 - **chat은 별도 모듈이 아니라 Meeting BC 안**에서 처리된다(gateway `meeting:chat` → `MeetingService.postChat`
   → Redis `ChatRepository`). 회의 종료 시 누적 chat이 `meeting.ended` payload로 Reports에 이관된다.
 
@@ -118,19 +120,20 @@
 
 ### 3.1 모듈 ↔ Bounded Context
 
-| 모듈                | 역할                               | 주요 구성요소                                                                                                                                                                                                                                    |
-| ------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `meeting/`          | 회의 생성·입장·퇴장·채팅·idle·종료 | `MeetingController`(POST/DELETE `/meetings`), `MeetingGateway`(`meeting:join/leave/chat` + `meeting:ended` broadcast), `MeetingService`, `Meeting`/`Participant`, Redis `meeting`/`chat` repo, `RandomMeetingCodeGenerator`·`HostTokenGenerator` |
-| `mediasoup/`        | WebRTC SFU 시그널링                | `MediasoupGateway`(`mediasoup:*` RPC), `MediasoupSignalingService`, `ParticipantMedia`, worker pool · router · transport 어댑터, `FfmpegAudioCaptureAdapter`, meeting 이벤트 구독 lifecycle listener                                             |
-| `recording/`        | 음성 STT(오디오 즉시 폐기)         | `PartialTranscriptionScheduler`(회의 중 30s 주기), `RecordingService`(종료 시 chunk transcribe), `TranscriberPort`(`HttpTranscriber`→ai-worker), audio-buffer · partial-transcript store(Redis)                                                  |
-| `reports/`          | 회의록 finalize·조회               | `ReportsController`(GET `/reports`, `/reports/:id`), `ReportFinalizationService`, `MeetingReport`, `SummarizerPort`(`GeminiSummarizer`/`NoopSummarizer`), `NotionPort`(`NoopNotion`), `ReportRepository`(`MongoReportRepository`)                |
-| `shared-kernel/`    | 공유 커널(@Global)                 | `SystemClock`, `NestEventBusDomainEventPublisher`, 공유 VO(`Source`·`ExternalReference`·`ChatEntry`), cross-BC 이벤트 payload(`MeetingEndedPayload` 등)                                                                                          |
-| `redis/` · `mongo/` | 인프라 모듈(@Global)               | ioredis 클라이언트, mongoose connection                                                                                                                                                                                                          |
-| `config/`           | 부트스트랩 env 해석                | `server`·`mongo`·`redis`·`gemini`·`ai-worker`·`mediasoup` config 순수 함수                                                                                                                                                                       |
+| 모듈                | 역할                               | 주요 구성요소                                                                                                                                                                                                                                                                           |
+| ------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `meeting/`          | 회의 생성·입장·퇴장·채팅·idle·종료 | `MeetingController`(POST/DELETE `/meetings`), `MeetingGateway`(`meeting:join/leave/chat` + `meeting:ended` broadcast), `MeetingService`, `Meeting`/`Participant`, Redis `meeting`/`chat` repo, `RandomMeetingCodeGenerator`·`HostTokenGenerator`                                        |
+| `mediasoup/`        | WebRTC SFU 시그널링                | `MediasoupGateway`(`mediasoup:*` RPC), `MediasoupSignalingService`, `ParticipantMedia`, worker pool · router · transport 어댑터, `FfmpegAudioCaptureAdapter`, meeting 이벤트 구독 lifecycle listener                                                                                    |
+| `recording/`        | 음성 STT(오디오 즉시 폐기)         | `PartialTranscriptionScheduler`(회의 중 30s 주기), `RecordingService`(종료 시 chunk transcribe), `TranscriberPort`(`HttpTranscriber`→ai-worker), audio-buffer · partial-transcript store(Redis)                                                                                         |
+| `reports/`          | 회의록 finalize·조회·재요약        | `ReportsController`(GET `/reports`·`/reports/:id`, POST `/reports/:id/resummarize` — `AdminGuard`로 보호), `ReportFinalizationService`, `MeetingReport`, `SummarizerPort`(`GeminiSummarizer`/`NoopSummarizer`), `NotionPort`(`NoopNotion`), `ReportRepository`(`MongoReportRepository`) |
+| `shared-kernel/`    | 공유 커널                          | `SystemClock`·`NestEventBusDomainEventPublisher`(@Global `SharedKernelModule`), 공유 VO(`Source`·`ExternalReference`·`ChatEntry`), cross-BC 이벤트 payload(`MeetingEndedPayload` 등), 에러 계층(`DomainError`)과 글로벌 `DomainExceptionFilter`(AppModule `APP_FILTER`)                 |
+| `redis/` · `mongo/` | 인프라 모듈(@Global)               | ioredis 클라이언트, mongoose connection                                                                                                                                                                                                                                                 |
+| `config/`           | 부트스트랩 env 해석                | `server`·`mongo`·`redis`·`gemini`·`ai-worker`·`mediasoup`·`admin` config 순수 함수                                                                                                                                                                                                      |
 
 전역 설정: `ConfigModule.forRoot({ isGlobal: true })`, `EventEmitterModule.forRoot({ wildcard: true })`,
 글로벌 `ValidationPipe({ whitelist, forbidNonWhitelisted, transform })`(`main.ts`), WS는 게이트웨이의
-`@UsePipes`로 동일 ValidationPipe + `WsException` exceptionFactory 적용.
+`@UsePipes`로 동일 ValidationPipe + `WsException` exceptionFactory 적용. 글로벌 `DomainExceptionFilter`(`APP_FILTER`)가
+`DomainError`의 `httpStatus`만 읽어 HTTP 응답으로 매핑하므로, 컨트롤러는 도메인 에러를 try/catch 하지 않는다.
 
 ### 3.2 Port / Adapter
 
@@ -157,9 +160,10 @@ feature/<name>/
 ├── components/   View — props만. (MeetingScreen, ChatPanel, RemoteVideoTile, NicknameGate, …)
 ├── hooks/        ViewModel — useXxxViewModel (useMeetingViewModel, useMediasoupViewModel, …)
 shared/
-├── api/          Model — fetch (meeting.api, reports.api, config)
+├── api/          Model — fetch (meeting.api, reports.api, config) + ApiError 계층(errors.ts)
 ├── socket/       Model — socket.io 클라이언트 싱글톤 + mediasoup device factory
-└── stores/       Model — zustand (session.store, host-token.storage)
+├── stores/       Model — zustand (session.store) + sessionStorage(host-token, nickname)
+└── hooks/        useRouteSegment — 정적 export 동적 라우트의 코드/id를 URL에서 직접 읽기
 ```
 
 - **View 규칙(강제)**: View는 `useState`/`useEffect`/`fetch`/socket/zustand setter를 직접 호출하지
@@ -168,7 +172,9 @@ shared/
 - **페이지 합성**: `MeetingPageClient`가 `useMeetingViewModel`(socket·참가자) + `useMediasoupViewModel`
   (미디어) + `useChatViewModel`(채팅) + `useMeetingLayoutViewModel`(레이아웃)을 합성한다.
 - **정적 export 제약**: `output: 'export'`. server component 데이터 fetch·`route.ts`·middleware 금지.
-  동적 라우트는 client + `useParams()`, 데이터는 `fetch(NEXT_PUBLIC_API_URL/...)`. CloudFront `/404 → /index.html` fallback.
+  동적 라우트는 placeholder HTML 한 장만 빌드되므로 `useParams()`가 빌드 타임 값을 돌려준다 → `useRouteSegment`가
+  `window.location.pathname`에서 실제 코드/id를 읽는다(`useParams` 폴백). 데이터는 `fetch(NEXT_PUBLIC_API_URL/...)`.
+  CloudFront `/404 → /index.html` fallback.
 
 ---
 
@@ -255,12 +261,13 @@ sequenceDiagram
 
 ## 8. 결정 로그 (ADR-lite)
 
-| #   | 결정                                           | 근거                                                |
-| --- | ---------------------------------------------- | --------------------------------------------------- |
-| 1   | Backend Layered MVC + DDD 4-layer              | 현 구조 연속성, 테스트 친화, v2 확장 지점 명확화    |
-| 2   | Frontend MVVM (View = dumb)                    | "데이터만 보여주는 View" 요구, hooks 관용과 일치    |
-| 3   | Domain Event + Port로 BC 분리                  | 직접 의존 차단, v2 Notion 어댑터 추가 비용 최소화   |
-| 4   | 실시간 상태 Redis, 영속 Mongo                  | 책임 분리(회의 진행 상태 vs 회의록 영속)            |
-| 5   | 오디오 즉시 폐기(S3 미사용)                    | 개인정보·비용. ffmpeg→Redis 버퍼→STT 후 삭제        |
-| 6   | LLM/STT는 Port 경유                            | Gemini/faster-whisper로 시작하되 교체 가능          |
-| 7   | DomainEventPublisher.publish = emitAsync await | admit race 회피(미디어가 join 이벤트를 놓치지 않게) |
+| #   | 결정                                           | 근거                                                         |
+| --- | ---------------------------------------------- | ------------------------------------------------------------ |
+| 1   | Backend Layered MVC + DDD 4-layer              | 현 구조 연속성, 테스트 친화, v2 확장 지점 명확화             |
+| 2   | Frontend MVVM (View = dumb)                    | "데이터만 보여주는 View" 요구, hooks 관용과 일치             |
+| 3   | Domain Event + Port로 BC 분리                  | 직접 의존 차단, v2 Notion 어댑터 추가 비용 최소화            |
+| 4   | 실시간 상태 Redis, 영속 Mongo                  | 책임 분리(회의 진행 상태 vs 회의록 영속)                     |
+| 5   | 오디오 즉시 폐기(S3 미사용)                    | 개인정보·비용. ffmpeg→Redis 버퍼→STT 후 삭제                 |
+| 6   | LLM/STT는 Port 경유                            | Gemini/faster-whisper로 시작하되 교체 가능                   |
+| 7   | DomainEventPublisher.publish = emitAsync await | admit race 회피(미디어가 join 이벤트를 놓치지 않게)          |
+| 8   | `DomainError`(httpStatus 보유) + 글로벌 필터   | 컨트롤러 try/catch 제거, 분기·매핑 테이블 없이 status만 변환 |
