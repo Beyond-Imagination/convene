@@ -19,12 +19,14 @@ class FakeTrack {
     arr.push(cb);
     this.handlers.set(event, arr);
   });
+
+  constructor(kind: 'audio' | 'video') {
+    this.kind = kind;
+  }
+
   /** 브라우저가 발화하는 이벤트(예: 화면 공유 native '공유 중지' 의 'ended')를 흉내낸다. */
   emit(event: string): void {
     for (const cb of this.handlers.get(event) ?? []) cb();
-  }
-  constructor(kind: 'audio' | 'video') {
-    this.kind = kind;
   }
 }
 

@@ -24,6 +24,7 @@ Re-read both at the start of every session. This file is just an English index f
 
 - **Backend**: Layered MVC + DDD 4-layer. Dependency direction: Interface → Application → Domain ← Infrastructure. Domain layer has **zero framework imports**. Application talks to Infrastructure only through Ports.
 - **Frontend**: MVVM. View = `'use client'` component, props only. ViewModel = `useXxxViewModel` hook. Model = zustand store + api service + socket client. **View components do not call `fetch`, `useEffect`, `useState`, socket APIs, or zustand setters directly.**
+- **File member order** (deps-first, bottom-up): imports → module constants → supporting types/interfaces/helpers → the file's main class/aggregate/function **last**. Class-internal order (`field → constructor → method`) is enforced by `@typescript-eslint/member-ordering`. Multi-export files with no single namesake (e.g. sibling `*.errors.ts`, wire-type modules) are exempt.
 
 ## Naming (locked)
 

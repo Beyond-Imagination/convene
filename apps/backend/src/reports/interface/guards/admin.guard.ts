@@ -11,6 +11,25 @@ import {
 
 export const ADMIN_API_TOKEN = Symbol('ADMIN_API_TOKEN');
 
+/** `Authorization: Bearer <token>` 헤더에서 토큰만 추출한다. 형식이 아니면 null. */
+export function extractBearerToken(header: unknown): string | null {
+  if (typeof header !== 'string') return null;
+  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
+  return match ? match[1].trim() : null;
+}
+
+/**
+ * 타이밍 공격을 막기 위한 상수 시간 토큰 비교.
+ *
+ * 두 토큰을 먼저 SHA-256(고정 32바이트)으로 해시한 뒤 비교한다.
+ * 길이가 다른 입력에서도 항상 같은 길이 버퍼를 비교하므로 timingSafeEqual 예외를 피하고, 길이 차이로 토큰 길이가 노출되는 타이밍 누출도 없앤다.
+ */
+export function safeTokenEqual(a: string, b: string): boolean {
+  const hashA = createHash('sha256').update(a).digest();
+  const hashB = createHash('sha256').update(b).digest();
+  return timingSafeEqual(hashA, hashB);
+}
+
 /**
  * 관리자 전용 엔드포인트(회의록 재요약 등)를 단일 운영자 시크릿으로 보호하는 Guard.
  *
@@ -35,23 +54,4 @@ export class AdminGuard implements CanActivate {
     }
     return true;
   }
-}
-
-/** `Authorization: Bearer <token>` 헤더에서 토큰만 추출한다. 형식이 아니면 null. */
-export function extractBearerToken(header: unknown): string | null {
-  if (typeof header !== 'string') return null;
-  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
-  return match ? match[1].trim() : null;
-}
-
-/**
- * 타이밍 공격을 막기 위한 상수 시간 토큰 비교.
- *
- * 두 토큰을 먼저 SHA-256(고정 32바이트)으로 해시한 뒤 비교한다.
- * 길이가 다른 입력에서도 항상 같은 길이 버퍼를 비교하므로 timingSafeEqual 예외를 피하고, 길이 차이로 토큰 길이가 노출되는 타이밍 누출도 없앤다.
- */
-export function safeTokenEqual(a: string, b: string): boolean {
-  const hashA = createHash('sha256').update(a).digest();
-  const hashB = createHash('sha256').update(b).digest();
-  return timingSafeEqual(hashA, hashB);
 }

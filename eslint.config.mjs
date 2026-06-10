@@ -49,6 +49,11 @@ export default tseslint.config(
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
       '@typescript-eslint/no-explicit-any': 'warn',
+      // 클래스 내부 멤버 순서: 필드 → constructor → 메서드. getter/setter는 위치 자유.
+      '@typescript-eslint/member-ordering': [
+        'error',
+        { default: ['field', 'constructor', 'method'] },
+      ],
     },
   },
   {
