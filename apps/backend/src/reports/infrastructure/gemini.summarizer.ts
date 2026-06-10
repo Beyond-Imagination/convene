@@ -118,7 +118,7 @@ export class GeminiSummarizer implements SummarizerPort {
     const payload = (await response.json()) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
     };
-    const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (typeof text !== 'string' || text.length === 0) {
       throw new Error('Gemini generateContent response has no candidate text');
     }
