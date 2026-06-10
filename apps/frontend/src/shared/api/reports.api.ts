@@ -5,16 +5,9 @@ import type {
 } from '@convene/shared-interfaces';
 
 import { API_BASE_URL } from './config';
+import { ApiError } from './errors';
 
-export class ReportsApiError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'ReportsApiError';
-  }
-}
+export class ReportsApiError extends ApiError {}
 
 export interface ListReportsParams {
   readonly limit?: number;

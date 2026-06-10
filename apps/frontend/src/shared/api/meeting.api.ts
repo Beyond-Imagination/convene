@@ -5,16 +5,9 @@ import type {
 } from '@convene/shared-interfaces';
 
 import { API_BASE_URL } from './config';
+import { ApiError } from './errors';
 
-export class MeetingApiError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'MeetingApiError';
-  }
-}
+export class MeetingApiError extends ApiError {}
 
 export async function createMeeting(input: CreateMeetingRequest): Promise<CreateMeetingResponse> {
   const res = await fetch(`${API_BASE_URL}/meetings`, {
