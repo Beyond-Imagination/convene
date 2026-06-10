@@ -103,9 +103,9 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
     for (const idx of assignments.values()) {
       // 정상 경로에선 idx가 항상 list 범위 내(router는 추가만 되고 제거 안 됨).
       // 상태 불일치 시 loadByRouter가 NaN으로 오염돼 findIndex/최소부하 탐색이 오작동하는 것을 막는 방어 가드.
-      if (idx < 0 || idx >= loadByRouter.length) {
+      if (!Number.isInteger(idx) || idx < 0 || idx >= loadByRouter.length) {
         this.logger.warn(
-          `assignments has out-of-range routerIndex=${idx} (code=${meetingCode}, routers=${list.length}) — excluded from load tally`,
+          `assignments has invalid routerIndex=${idx} (code=${meetingCode}, routers=${list.length}) — excluded from load tally`,
         );
         continue;
       }
