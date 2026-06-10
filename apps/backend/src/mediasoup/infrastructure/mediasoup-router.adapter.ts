@@ -99,9 +99,18 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
     }
     const capacity = this.options.participantsPerRouter;
 
-    // 단일 진실원 assignments에서 router별 현재 부하를 즉석 집계(O(N), join당 1회라 무시 가능).
     const loadByRouter = new Array<number>(list.length).fill(0);
-    for (const idx of assignments.values()) loadByRouter[idx] += 1;
+    for (const idx of assignments.values()) {
+      // 정상 경로에선 idx가 항상 list 범위 내(router는 추가만 되고 제거 안 됨).
+      // 상태 불일치 시 loadByRouter가 NaN으로 오염돼 findIndex/최소부하 탐색이 오작동하는 것을 막는 방어 가드.
+      if (idx < 0 || idx >= loadByRouter.length) {
+        this.logger.warn(
+          `assignments has out-of-range routerIndex=${idx} (code=${meetingCode}, routers=${list.length}) — excluded from load tally`,
+        );
+        continue;
+      }
+      loadByRouter[idx] += 1;
+    }
 
     // 빈 자리(capacity 미달) 있는 가장 낮은 인덱스 router에 할당(균등 분배).
     let target = loadByRouter.findIndex((load) => load < capacity);
