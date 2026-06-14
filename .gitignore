@@ -18,9 +18,6 @@ pnpm-debug.log*
 .env.local
 .env.*.local
 
-# 로컬 전용 운영 런북(공유 안 함)
-DEPLOY.md
-
 # editor
 .idea/
 .vscode/
