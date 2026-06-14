@@ -1,12 +1,12 @@
 # Codebase Guide
 
-신규 협업자가 **코드를 따라 읽고 기여**하기 위한 실무 가이드. "왜 이렇게 설계했나"는
-[`ARCHITECTURE.md`](./ARCHITECTURE.md), 범위·계획은 [`PLAN.md`](./PLAN.md)를 본다.
+신규 협업자가 **코드를 따라 읽고 기여**하기 위한 실무 가이드. "왜 이렇게 설계했나"(아키텍처)는
+Notion 문서(구 `ARCHITECTURE.md`)를 본다.
 
 ## 0. 어디서부터 읽나
 
 1. [`README.md`](./README.md) — 실행/스크립트
-2. [`ARCHITECTURE.md`](./ARCHITECTURE.md) 섹션#2~4 — BC·레이어·MVVM
+2. Notion 아키텍처 문서 — BC·레이어·MVVM
 3. 이 문서 섹션#2 핵심 흐름 — 실제 코드를 흐름 따라
 4. 기여할 BC의 `domain/` → `application/` → `interface/`/`infrastructure/` 순으로 그 모듈만
 

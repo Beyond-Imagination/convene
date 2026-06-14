@@ -14,24 +14,23 @@
 
 ## 문서
 
-| 문서                                       | 내용                                                                         |
-| ------------------------------------------ | ---------------------------------------------------------------------------- |
-| [`README.md`](./README.md)                 | 이 문서 — 실행·스크립트·트러블슈팅                                           |
-| [`ARCHITECTURE.md`](./ARCHITECTURE.md)     | 아키텍처 패턴·도메인 모델·BC 맵·레이어·시퀀스·상태도·ADR                     |
+| 문서                                         | 내용                                            |
+|--------------------------------------------|-----------------------------------------------|
+| [`README.md`](./README.md)                 | 이 문서 — 실행·스크립트·트러블슈팅                          |
 | [`CODEBASE_GUIDE.md`](./CODEBASE_GUIDE.md) | 코드를 따라 읽고 기여하는 실무 가이드 — 디렉토리 맵·핵심 흐름 경로·기여 절차 |
-| [`PLAN.md`](./PLAN.md)                     | v1 범위·기술 결정·회의록 스키마·작업 단계                                    |
-| [`CLAUDE.md`](./CLAUDE.md)                 | AI 협업(Claude Code)용 컨텍스트와 하드 룰                                    |
+| [`CLAUDE.md`](./CLAUDE.md)                 | AI 협업(Claude Code)용 컨텍스트와 하드 룰                |
+| Notion (외부)                                | 아키텍처 패턴·도메인 모델·BC 맵·레이어·시퀀스·상태도·ADR           |
 
-> 처음이라면 README → ARCHITECTURE(섹션#2~4) → CODEBASE_GUIDE(섹션#2 핵심 흐름) 순서를 권장한다.
+> 처음이라면 README → Notion(아키텍처) → CODEBASE_GUIDE(섹션#2 핵심 흐름) 순서를 권장한다.
 
 ## 기술 스택
 
-| 영역      | 스택                                                                                        |
-| --------- | ------------------------------------------------------------------------------------------- |
-| Backend   | NestJS 11 (CommonJS) · Mediasoup 3 · Socket.IO 4 · Redis(ioredis) · MongoDB(mongoose)       |
+| 영역        | 스택                                                                                        |
+|-----------|-------------------------------------------------------------------------------------------|
+| Backend   | NestJS 11 (CommonJS) · Mediasoup 3 · Socket.IO 4 · Redis(ioredis) · MongoDB(mongoose)     |
 | Frontend  | Next.js 14 App Router · TypeScript · Zustand · mediasoup-client · Tailwind v3 (정적 export) |
 | AI Worker | FastAPI · faster-whisper (STT, small 모델)                                                  |
-| 모노레포  | pnpm 9 + Turborepo. 공유 타입은 `packages/shared-interfaces`                                |
+| 모노레포      | pnpm 9 + Turborepo. 공유 타입은 `packages/shared-interfaces`                                   |
 
 ## 모노레포 구조
 
@@ -44,11 +43,11 @@ convene/
 ├── packages/
 │   └── shared-interfaces/   frontend ↔ backend 공유 wire 타입 + 이벤트 상수 (데코레이터 없음)
 ├── docker-compose.local.yml
-└── README · ARCHITECTURE · CODEBASE_GUIDE · PLAN · CLAUDE
+└── README · CODEBASE_GUIDE · CLAUDE   (아키텍처·계획 문서는 Notion)
 ```
 
 Bounded Context: `meeting`(채팅 포함) · `mediasoup` · `recording` · `reports` + `shared-kernel`.
-자세한 매핑은 [`ARCHITECTURE.md`](./ARCHITECTURE.md) 섹션#3, 코드 흐름은 [`CODEBASE_GUIDE.md`](./CODEBASE_GUIDE.md) 섹션#2.
+자세한 매핑은 Notion 아키텍처 문서, 코드 흐름은 [`CODEBASE_GUIDE.md`](./CODEBASE_GUIDE.md) 섹션#2.
 
 ## 빠른 시작
 
@@ -96,12 +95,12 @@ uvicorn main:app --port 8000
 
 Redis는 로컬(6379)에 떠 있어야 한다(Docker 등).
 
-| 서비스        | 포트                  | 비고                                     |
-| ------------- | --------------------- | ---------------------------------------- |
-| backend       | 5000                  | HTTP + WebSocket(Socket.IO)              |
-| frontend      | 3000                  | Next.js dev                              |
-| ai-worker     | 8000                  | FastAPI(STT)                             |
-| redis         | 6379                  | 회의 진행 상태·오디오 버퍼               |
+| 서비스           | 포트                    | 비고                                 |
+|---------------|-----------------------|------------------------------------|
+| backend       | 5000                  | HTTP + WebSocket(Socket.IO)        |
+| frontend      | 3000                  | Next.js dev                        |
+| ai-worker     | 8000                  | FastAPI(STT)                       |
+| redis         | 6379                  | 회의 진행 상태·오디오 버퍼                    |
 | mediasoup RTC | 40000–49999 (UDP/TCP) | WebRTC 미디어. `RTC_MIN/MAX_PORT`로 조정 |
 
 ### 테스트 · 빌드 · 린트
@@ -134,7 +133,7 @@ pnpm build:shared  # shared-interfaces만 빌드 — 타입 변경 후 backend/f
   `useXxxViewModel` hook(ViewModel)에, 데이터는 zustand store + api/socket service(Model)에.
 - **회의록 파이프라인** — `meeting.ended` → STT(faster-whisper) → LLM 요약(Gemini) → MongoDB finalize.
 
-상세: [`ARCHITECTURE.md`](./ARCHITECTURE.md)(설계·시퀀스·상태도), [`CODEBASE_GUIDE.md`](./CODEBASE_GUIDE.md)(코드 흐름).
+상세: Notion 아키텍처 문서(설계·시퀀스·상태도), [`CODEBASE_GUIDE.md`](./CODEBASE_GUIDE.md)(코드 흐름).
 
 ## 협업 가이드
 
