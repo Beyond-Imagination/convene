@@ -8,10 +8,10 @@ This file is for Claude Code. Read it before editing anything in this repo.
 
 ## Source-of-truth docs
 
-- `PLAN.md` — scope, stack, directory layout, task order. **Korean, written for the human user.**
-- `ARCHITECTURE.md` — patterns (Backend = Layered MVC + DDD 4-layer, Frontend = MVVM), domain model, layer mapping, sequence + state diagrams. **Korean.**
+- **Notion (external)** — architecture patterns, domain model, layer mapping, sequence + state diagrams (formerly `ARCHITECTURE.md`). Korean, written for the human user. **Ask the user for the link** when you need it; it is not in the repo.
+- `CODEBASE_GUIDE.md` (in-repo) — maps the running code to those patterns.
 
-Re-read both at the start of every session. This file is just an English index for fast context recovery.
+This file (CLAUDE.md) is the English index for fast context recovery.
 
 ## Stack (locked)
 
@@ -64,7 +64,7 @@ Domain VO/Entity/Aggregate may collapse into a single `test(...)` commit when th
 
 ## Workflow
 
-1. `PLAN.md` + `ARCHITECTURE.md` agreed. ✅
+1. Scope + architecture agreed (architecture now in Notion, formerly `ARCHITECTURE.md`). ✅
 2. **Scaffolding** — pnpm + turbo + ESLint/Prettier + empty skeletons; build passes. ← current step
 3. **Tests first (spec only)**, in this order:
    1. `shared-interfaces`: event name constants + type compile checks.
@@ -82,7 +82,7 @@ After each step, summarize in Korean to the user and wait for confirmation.
 
 ```
 convene/
-├── PLAN.md, ARCHITECTURE.md, CLAUDE.md
+├── CLAUDE.md, README.md, CODEBASE_GUIDE.md   (scope·architecture → Notion)
 ├── package.json, pnpm-workspace.yaml, turbo.json, tsconfig.base.json
 ├── eslint.config.mjs, .prettierrc, .editorconfig, .gitignore
 ├── apps/
@@ -118,8 +118,8 @@ feature/<name>/
 
 ## When you (Claude) come back to this repo cold
 
-1. Read `CLAUDE.md` (this file) → `PLAN.md` → `ARCHITECTURE.md`.
+1. Read `CLAUDE.md` (this file) → `CODEBASE_GUIDE.md`. Scope/architecture detail lives in Notion (ask the user for the link).
 2. Check `git log -10 --oneline` for recent progress.
 3. Locate the current task: failing specs, TODO comments, or ask the user.
-4. **Speak Korean to the user.** Code identifiers (class/function/variable/event names, file paths) stay English. **All code comments, JSDoc bodies, and test (`it`/`describe`) labels are written in Korean** so non-Claude collaborators can read them. PLAN/ARCHITECTURE stay Korean. This file (CLAUDE.md) stays English because it is for future Claude sessions.
+4. **Speak Korean to the user.** Code identifiers (class/function/variable/event names, file paths) stay English. **All code comments, JSDoc bodies, and test (`it`/`describe`) labels are written in Korean** so non-Claude collaborators can read them. The Notion docs stay Korean. This file (CLAUDE.md) stays English because it is for future Claude sessions.
 5. Memory in `~/.claude/projects/D--programming-boostcamp-2025-membership-migration/memory/` carries user preferences and project state across sessions; check `MEMORY.md` there. (Folder rename to `convene` is pending — flip this to `...-convene` when the rename happens.)
