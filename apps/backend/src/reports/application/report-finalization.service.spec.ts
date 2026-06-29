@@ -2,6 +2,7 @@ import { REPORT_EVENTS } from '@convene/shared-interfaces';
 
 import { participantEntry, transcriptSegment } from '@/reports/domain/entries';
 import { ReportSummary, reportSummary } from '@/reports/domain/value-objects';
+import { LoggerPort } from '@/shared-kernel/domain/ports';
 import {
   chatEntry,
   externalReference,
@@ -37,6 +38,13 @@ const noopNotion = () => ({
   push: jest.fn(),
 });
 
+const noopLogger = (): LoggerPort => ({
+  debug: () => {},
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+});
+
 describe('ReportFinalizationService.createDraft', () => {
   const startedAt = new Date('2026-01-01T00:00:00Z');
   const endedAt = new Date('2026-01-01T00:30:00Z');
@@ -61,6 +69,7 @@ describe('ReportFinalizationService.createDraft', () => {
       idGenerator: { next: () => generatedId },
       clock: { now: () => endedAt },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     return { service, saved, events, summarizer, notion };
   };
@@ -212,6 +221,7 @@ describe('ReportFinalizationService.completeTranscription', () => {
       idGenerator: { next: () => 'unused' },
       clock: { now: () => failedAt },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     return { service, store, saves, events, summarizer, notion };
   };
@@ -349,6 +359,7 @@ describe('ReportFinalizationService.resummarize', () => {
       idGenerator: { next: () => 'unused' },
       clock: { now: () => now },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     return { service, store, saves, events, summarizer };
   };
@@ -488,6 +499,7 @@ describe('ReportFinalizationService.listRecent', () => {
       idGenerator: { next: () => 'unused' },
       clock: { now: () => startedAt },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     return { service, repoListMock };
   };
@@ -540,6 +552,7 @@ describe('ReportFinalizationService.getById', () => {
       idGenerator: { next: () => 'unused' },
       clock: { now: () => endedAt },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     return { service };
   };
@@ -595,6 +608,7 @@ describe('ReportFinalizationService.failTranscription', () => {
       idGenerator: { next: () => 'unused' },
       clock: { now: () => failedAt },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     return { service, store, events, summarizer, notion };
   };
