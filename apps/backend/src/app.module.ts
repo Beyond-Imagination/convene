@@ -2,7 +2,9 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { LoggerModule } from 'nestjs-pino';
 
+import { isPrettyLoggingEnabled, resolveLogLevel } from '@/config/logger.config';
 import { MediasoupModule } from '@/mediasoup/mediasoup.module';
 import { MeetingModule } from '@/meeting/meeting.module';
 import { MongoModule } from '@/mongo/mongo.module';
@@ -15,6 +17,19 @@ import { SharedKernelModule } from '@/shared-kernel/shared-kernel.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: resolveLogLevel(),
+        transport: isPrettyLoggingEnabled()
+          ? {
+              target: 'pino-pretty',
+              options: { singleLine: true, translateTime: 'SYS:standard', ignore: 'pid,hostname' },
+            }
+          : undefined,
+        // 민감 헤더는 로그에서 가린다. (newrelic 등 외부로 전달되기 전에 차단)
+        redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers["set-cookie"]'],
+      },
+    }),
     EventEmitterModule.forRoot({ wildcard: true, delimiter: '.' }),
     SharedKernelModule,
     RedisModule,
