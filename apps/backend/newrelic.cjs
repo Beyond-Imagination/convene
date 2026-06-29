@@ -4,7 +4,7 @@
  * New Relic agent 설정.
  */
 exports.config = {
-  app_name: [process.env.NEW_RELIC_APP_NAME || 'convene-backend'],
+  app_name: 'convene-backend',
   agent_enabled: Boolean(process.env.NEW_RELIC_LICENSE_KEY),
   distributed_tracing: {
     enabled: true,
