@@ -1,5 +1,5 @@
 import { MEETING_EVENTS } from '@convene/shared-interfaces';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 
 import { MediasoupSignalingService } from './mediasoup-signaling.service';
@@ -24,8 +24,6 @@ interface MeetingEndedPayload {
  */
 @Injectable()
 export class MediasoupMeetingLifecycleListener {
-  private readonly logger = new Logger(MediasoupMeetingLifecycleListener.name);
-
   constructor(private readonly service: MediasoupSignalingService) {}
 
   @OnEvent(MEETING_EVENTS.CREATED)

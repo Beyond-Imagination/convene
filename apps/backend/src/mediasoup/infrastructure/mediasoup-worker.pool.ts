@@ -1,6 +1,8 @@
-import { Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import * as mediasoup from 'mediasoup';
 import { Worker, WorkerLogLevel, WorkerLogTag } from 'mediasoup/node/lib/types';
+
+import { LoggerPort } from '@/shared-kernel/domain/ports';
 
 export interface MediasoupWorkerPoolOptions {
   numWorkers: number;
@@ -18,11 +20,13 @@ export interface MediasoupWorkerPoolOptions {
  * Worker가 `died` 이벤트로 죽으면 무결성 보장이 불가하므로 프로세스를 종료한다.
  */
 export class MediasoupWorkerPool implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(MediasoupWorkerPool.name);
   private readonly workers: Worker[] = [];
   private nextIdx = 0;
 
-  constructor(private readonly options: MediasoupWorkerPoolOptions) {}
+  constructor(
+    private readonly options: MediasoupWorkerPoolOptions,
+    private readonly logger: LoggerPort,
+  ) {}
 
   async onModuleInit(): Promise<void> {
     for (let i = 0; i < this.options.numWorkers; i += 1) {
@@ -34,13 +38,14 @@ export class MediasoupWorkerPool implements OnModuleInit, OnModuleDestroy {
       });
       worker.on('died', () => {
         this.logger.error(
-          `mediasoup worker (pid=${worker.pid}) died — exiting process for supervisor restart`,
+          { pid: worker.pid },
+          'mediasoup worker died, exiting process for supervisor restart',
         );
         process.exit(1);
       });
       this.workers.push(worker);
     }
-    this.logger.log(`mediasoup workers ready (count=${this.workers.length})`);
+    this.logger.info({ count: this.workers.length }, 'mediasoup workers ready');
   }
 
   async onModuleDestroy(): Promise<void> {

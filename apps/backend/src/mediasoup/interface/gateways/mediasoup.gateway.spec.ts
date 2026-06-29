@@ -78,10 +78,12 @@ const makeService = () => {
 
 const makeClient = (id: string): Socket => ({ id }) as unknown as Socket;
 
+const fakeLogger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
+
 const setup = () => {
   const { calls, service } = makeService();
   const emits: CapturedEmit[] = [];
-  const gateway = new MediasoupGateway(service);
+  const gateway = new MediasoupGateway(service, fakeLogger as any);
   gateway.server = makeServer(emits);
   return { gateway, calls, emits };
 };

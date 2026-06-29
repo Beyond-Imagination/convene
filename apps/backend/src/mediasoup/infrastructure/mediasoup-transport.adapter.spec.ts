@@ -1,8 +1,12 @@
 import { RtpCodecCapability, WorkerLogLevel, WorkerLogTag } from 'mediasoup/node/lib/types';
 
+import { LoggerPort } from '@/shared-kernel/domain/ports';
+
 import { MediasoupRouterAdapter } from './mediasoup-router.adapter';
 import { MediasoupTransportAdapter } from './mediasoup-transport.adapter';
 import { MediasoupWorkerPool } from './mediasoup-worker.pool';
+
+const noopLogger: LoggerPort = { debug() {}, info() {}, warn() {}, error() {} };
 
 const mediaCodecs = [
   { kind: 'audio', mimeType: 'audio/opus', clockRate: 48000, channels: 2 },
@@ -10,20 +14,27 @@ const mediaCodecs = [
 ] as RtpCodecCapability[];
 
 const setup = async () => {
-  const pool = new MediasoupWorkerPool({
-    numWorkers: 1,
-    worker: {
-      rtcMinPort: 40000,
-      rtcMaxPort: 49999,
-      logLevel: 'error' as WorkerLogLevel,
-      logTags: ['info'] as WorkerLogTag[],
+  const pool = new MediasoupWorkerPool(
+    {
+      numWorkers: 1,
+      worker: {
+        rtcMinPort: 40000,
+        rtcMaxPort: 49999,
+        logLevel: 'error' as WorkerLogLevel,
+        logTags: ['info'] as WorkerLogTag[],
+      },
     },
-  });
+    noopLogger,
+  );
   await pool.onModuleInit();
-  const routerAdapter = new MediasoupRouterAdapter(pool, {
-    participantsPerRouter: 5,
-    mediaCodecs,
-  });
+  const routerAdapter = new MediasoupRouterAdapter(
+    pool,
+    {
+      participantsPerRouter: 5,
+      mediaCodecs,
+    },
+    noopLogger,
+  );
   const transportAdapter = new MediasoupTransportAdapter(routerAdapter, {
     listenIps: [{ ip: '127.0.0.1', announcedIp: '127.0.0.1' }],
     enableUdp: true,

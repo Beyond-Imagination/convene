@@ -1,5 +1,4 @@
 import { ConsumeResponse, CreateTransportResponse } from '@convene/shared-interfaces';
-import { Logger } from '@nestjs/common';
 import {
   Consumer,
   DtlsParameters,
@@ -33,7 +32,6 @@ interface MediasoupTransportAdapterOptions {
  * mediasoup 객체는 본 어댑터 내부 Map에만 보관되고, application/domain으로는 식별자(string)와 wire format 응답만 노출한다.
  */
 export class MediasoupTransportAdapter implements MediaTransportPort {
-  private readonly logger = new Logger(MediasoupTransportAdapter.name);
   private readonly transports = new Map<string, WebRtcTransport>();
   private readonly producers = new Map<string, Producer>();
   private readonly consumers = new Map<string, Consumer>();
