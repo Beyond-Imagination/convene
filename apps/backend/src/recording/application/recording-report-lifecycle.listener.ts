@@ -1,5 +1,5 @@
 import { REPORT_EVENTS } from '@convene/shared-interfaces';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 
 import { ReportTranscriptionRequestedPayload } from '@/shared-kernel/domain/events';
@@ -11,8 +11,6 @@ import { RecordingService } from './recording.service';
  */
 @Injectable()
 export class RecordingReportLifecycleListener {
-  private readonly logger = new Logger(RecordingReportLifecycleListener.name);
-
   constructor(private readonly service: RecordingService) {}
 
   @OnEvent(REPORT_EVENTS.TRANSCRIPTION_REQUESTED)

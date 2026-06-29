@@ -7,7 +7,7 @@ import {
   TranscriberPort,
 } from '@/recording/domain/ports';
 import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events';
-import { DomainEventPublisher } from '@/shared-kernel/domain/ports';
+import { DomainEventPublisher, LoggerPort } from '@/shared-kernel/domain/ports';
 
 import { dropOverlapHeadSegments, splitPcmIntoWavChunks } from '../infrastructure/audio-chunker';
 
@@ -33,6 +33,7 @@ export interface RecordingServiceDeps {
   partialTranscriptStore: PartialTranscriptStore;
   transcriber: TranscriberPort;
   eventPublisher: DomainEventPublisher;
+  logger: LoggerPort;
 }
 
 /**
@@ -61,6 +62,10 @@ export class RecordingService {
           reportId: command.reportId,
           transcript: [],
         });
+        this.deps.logger.info(
+          { reportId: command.reportId, meetingCode: command.meetingCode, segments: 0 },
+          'transcription completed',
+        );
         return;
       }
 
@@ -117,8 +122,16 @@ export class RecordingService {
         reportId: command.reportId,
         transcript: merged,
       });
+      this.deps.logger.info(
+        { reportId: command.reportId, meetingCode: command.meetingCode, segments: merged.length },
+        'transcription completed',
+      );
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
+      this.deps.logger.error(
+        { reportId: command.reportId, meetingCode: command.meetingCode, err },
+        'transcription failed',
+      );
       await this.deps.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_FAILED, {
         reportId: command.reportId,
         error,

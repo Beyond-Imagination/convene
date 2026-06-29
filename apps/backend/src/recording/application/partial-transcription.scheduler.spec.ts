@@ -5,6 +5,7 @@ import {
   TranscriberPort,
 } from '@/recording/domain/ports';
 import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events';
+import { LoggerPort } from '@/shared-kernel/domain/ports';
 
 import { WAV_HEADER_BYTES } from '../infrastructure/audio-chunker';
 import { KEEP_LAST_BYTES, PartialTranscriptionScheduler } from './partial-transcription.scheduler';
@@ -52,6 +53,13 @@ const makeStore = (): PartialTranscriptStore & {
   };
 };
 
+const noopLogger = (): LoggerPort => ({
+  debug: () => {},
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+});
+
 describe('PartialTranscriptionScheduler.tick', () => {
   it('active 회의가 없으면 transcribe 호출 없음', async () => {
     const repo = makeRepo({ activeMeetings: [] });
@@ -61,6 +69,7 @@ describe('PartialTranscriptionScheduler.tick', () => {
       audioBufferRepository: repo,
       transcriber,
       partialTranscriptStore: store,
+      logger: noopLogger(),
     });
     await scheduler.tick();
     expect(transcriber.transcribe).not.toHaveBeenCalled();
@@ -79,6 +88,7 @@ describe('PartialTranscriptionScheduler.tick', () => {
       audioBufferRepository: repo,
       transcriber,
       partialTranscriptStore: store,
+      logger: noopLogger(),
     });
     await scheduler.tick();
     expect(transcriber.transcribe).not.toHaveBeenCalled();
@@ -98,6 +108,7 @@ describe('PartialTranscriptionScheduler.tick', () => {
       audioBufferRepository: repo,
       transcriber,
       partialTranscriptStore: store,
+      logger: noopLogger(),
     });
     await scheduler.tick();
     expect(transcriber.transcribe).toHaveBeenCalledTimes(1);
@@ -128,6 +139,7 @@ describe('PartialTranscriptionScheduler.tick', () => {
       audioBufferRepository: repo,
       transcriber,
       partialTranscriptStore: store,
+      logger: noopLogger(),
     });
     await scheduler.tick();
     expect(store.appended).toEqual([
@@ -167,6 +179,7 @@ describe('PartialTranscriptionScheduler.tick', () => {
       audioBufferRepository: repo,
       transcriber,
       partialTranscriptStore: store,
+      logger: noopLogger(),
     });
     await scheduler.tick();
     expect(store.appended.map((a) => `${a.code}/${a.segments[0].speaker}`)).toEqual([
@@ -199,6 +212,7 @@ describe('PartialTranscriptionScheduler.tick', () => {
       audioBufferRepository: repo,
       transcriber,
       partialTranscriptStore: store,
+      logger: noopLogger(),
     });
     await expect(scheduler.tick()).resolves.toBeUndefined();
     expect(store.appended).toHaveLength(1);
@@ -226,6 +240,7 @@ describe('PartialTranscriptionScheduler.tick', () => {
       audioBufferRepository: repo,
       transcriber,
       partialTranscriptStore: store,
+      logger: noopLogger(),
     });
     await scheduler.tick();
     expect(store.appended[0].segments.map((s) => s.text)).toEqual(['keep', 'keep2']);
@@ -248,6 +263,7 @@ describe('PartialTranscriptionScheduler.tick', () => {
       audioBufferRepository: repo,
       transcriber,
       partialTranscriptStore: store,
+      logger: noopLogger(),
     });
     await scheduler.tick();
     expect(store.appended[0].segments.map((s) => s.text)).toEqual(['first', 'second', 'third']);
@@ -266,6 +282,7 @@ describe('PartialTranscriptionScheduler.tick', () => {
       audioBufferRepository: repo,
       transcriber,
       partialTranscriptStore: store,
+      logger: noopLogger(),
     });
     await scheduler.tick();
     expect(store.appended[0].segments[0]).toEqual({
@@ -287,6 +304,7 @@ describe('PartialTranscriptionScheduler lifecycle', () => {
       audioBufferRepository: repo,
       transcriber,
       partialTranscriptStore: store,
+      logger: noopLogger(),
     });
     scheduler.onModuleInit();
     expect(jest.getTimerCount()).toBe(1);
