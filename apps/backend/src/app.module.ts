@@ -17,18 +17,26 @@ import { SharedKernelModule } from '@/shared-kernel/shared-kernel.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    LoggerModule.forRoot({
-      pinoHttp: {
-        level: resolveLogLevel(),
-        transport: isPrettyLoggingEnabled()
-          ? {
-              target: 'pino-pretty',
-              options: { singleLine: true, translateTime: 'SYS:standard', ignore: 'pid,hostname' },
-            }
-          : undefined,
-        // 민감 헤더는 로그에서 가린다. (newrelic 등 외부로 전달되기 전에 차단)
-        redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers["set-cookie"]'],
-      },
+    // forRootAsync: useFactory를 ConfigModule의 .env 로딩 완료 후 실행해
+    // resolveLogLevel/isPrettyLoggingEnabled가 .env 값을 읽도록 한다.
+    LoggerModule.forRootAsync({
+      useFactory: () => ({
+        pinoHttp: {
+          level: resolveLogLevel(),
+          transport: isPrettyLoggingEnabled()
+            ? {
+                target: 'pino-pretty',
+                options: {
+                  singleLine: true,
+                  translateTime: 'SYS:standard',
+                  ignore: 'pid,hostname',
+                },
+              }
+            : undefined,
+          // 민감 헤더는 로그에서 가린다. (newrelic 등 외부로 전달되기 전에 차단)
+          redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers["set-cookie"]'],
+        },
+      }),
     }),
     EventEmitterModule.forRoot({ wildcard: true, delimiter: '.' }),
     SharedKernelModule,
