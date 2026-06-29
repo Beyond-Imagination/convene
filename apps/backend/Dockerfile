@@ -67,6 +67,7 @@ WORKDIR /app
 COPY --from=builder /app/package.json /app/pnpm-workspace.yaml ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/backend/package.json ./apps/backend/
+COPY --from=builder /app/apps/backend/newrelic.cjs ./apps/backend/
 COPY --from=builder /app/apps/backend/node_modules ./apps/backend/node_modules
 COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
 COPY --from=builder /app/packages/shared-interfaces/package.json ./packages/shared-interfaces/
@@ -75,9 +76,13 @@ COPY --from=builder /app/packages/shared-interfaces/dist ./packages/shared-inter
 WORKDIR /app/apps/backend
 
 ENV NODE_ENV=production
+ENV NEW_RELIC_DISTRIBUTED_TRACING_ENABLED=true
+ENV NEW_RELIC_LOG=stdout
 
 # HTTP/WS 포트(server.config.ts DEFAULT_PORT). mediasoup RTC 포트 범위는 docker-compose 에서
 # RTC_MIN_PORT/RTC_MAX_PORT env 와 함께 별도 노출한다.
 EXPOSE 5000
 
-CMD ["node", "dist/main.js"]
+# New Relic agent 는 다른 모듈보다 먼저 로드돼야 계측이 걸리므로 -r 로 preload 한다.
+# 설정은 cwd(apps/backend)의 newrelic.cjs, license key 미설정 시 agent_enabled=false 로 no-op.
+CMD ["node", "-r", "newrelic", "dist/main.js"]

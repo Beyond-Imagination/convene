@@ -56,7 +56,7 @@ services:
       - redis
       - ai-worker
     env_file:
-      - ./.env # GEMINI_API_KEY / MONGO_URI / MONGO_DB_NAME 등
+      - ./.env
     environment:
       - NODE_ENV=production
       - PORT=5000
