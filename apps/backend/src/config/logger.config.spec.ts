@@ -22,16 +22,17 @@ describe('resolveLogLevel', () => {
 });
 
 describe('isPrettyLoggingEnabled', () => {
-  it('production이면 false (JSON 출력 유지)', () => {
-    expect(isPrettyLoggingEnabled({ NODE_ENV: 'production' })).toBe(false);
-  });
-
-  it('production이 아니면 기본 true', () => {
-    expect(isPrettyLoggingEnabled({})).toBe(true);
-    expect(isPrettyLoggingEnabled({ NODE_ENV: 'development' })).toBe(true);
-  });
-
-  it('LOG_PRETTY=false면 비-production에서도 false', () => {
+  it('기본은 JSON(false) — pino-pretty 미설치 환경에서도 안전', () => {
+    expect(isPrettyLoggingEnabled({})).toBe(false);
+    expect(isPrettyLoggingEnabled({ NODE_ENV: 'development' })).toBe(false);
     expect(isPrettyLoggingEnabled({ LOG_PRETTY: 'false' })).toBe(false);
+  });
+
+  it('비-production에서 LOG_PRETTY=true면 pretty', () => {
+    expect(isPrettyLoggingEnabled({ LOG_PRETTY: 'true' })).toBe(true);
+  });
+
+  it('production이면 LOG_PRETTY=true여도 JSON 유지', () => {
+    expect(isPrettyLoggingEnabled({ NODE_ENV: 'production', LOG_PRETTY: 'true' })).toBe(false);
   });
 });

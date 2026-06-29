@@ -23,9 +23,10 @@ export function resolveLogLevel(env: NodeJS.ProcessEnv = process.env): LogLevel 
 
 /**
  * pino-pretty(사람이 읽는 컬러 출력) 사용 여부.
- * production은 항상 JSON, 그 외 환경은 `LOG_PRETTY=false`로 끌 수 있다.
+ * pino-pretty는 devDependency라 prod 이미지엔 없으므로, 기본은 JSON(opt-out 아닌 opt-in).
+ * production은 항상 JSON, 그 외 환경에서 `LOG_PRETTY=true`일 때만 pretty.
  */
 export function isPrettyLoggingEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   if (env.NODE_ENV === 'production') return false;
-  return env.LOG_PRETTY !== 'false';
+  return env.LOG_PRETTY === 'true';
 }
