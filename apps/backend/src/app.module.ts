@@ -34,7 +34,12 @@ import { SharedKernelModule } from '@/shared-kernel/shared-kernel.module';
               }
             : undefined,
           // 민감 헤더는 로그에서 가린다. (newrelic 등 외부로 전달되기 전에 차단)
-          redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers["set-cookie"]'],
+          // set-cookie는 요청이 아니라 응답 헤더이므로 res 경로로 가린다.
+          redact: [
+            'req.headers.authorization',
+            'req.headers.cookie',
+            'res.headers["set-cookie"]',
+          ],
         },
       }),
     }),
