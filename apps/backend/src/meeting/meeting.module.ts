@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { PinoLogger } from 'nestjs-pino';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
 import { RandomHostTokenGenerator } from '@/meeting/infrastructure/random-host-token.generator';
@@ -8,6 +9,7 @@ import { RedisMeetingRepository } from '@/meeting/infrastructure/redis-meeting.r
 import { MeetingController } from '@/meeting/interface/controllers/meeting.controller';
 import { MeetingGateway } from '@/meeting/interface/gateways/meeting.gateway';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 
 /**
@@ -35,6 +37,7 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
         hostTokenGenerator: RandomHostTokenGenerator,
         clock: SystemClock,
         eventPublisher: NestEventBusDomainEventPublisher,
+        logger: PinoLogger,
       ) =>
         new MeetingService({
           repository,
@@ -43,6 +46,7 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
           hostTokenGenerator,
           clock,
           eventPublisher,
+          logger: new PinoLoggerAdapter(logger, MeetingService.name),
         }),
       inject: [
         RedisMeetingRepository,
@@ -51,6 +55,7 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
         RandomHostTokenGenerator,
         SystemClock,
         NestEventBusDomainEventPublisher,
+        PinoLogger,
       ],
     },
   ],

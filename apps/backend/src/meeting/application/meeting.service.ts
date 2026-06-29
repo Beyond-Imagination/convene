@@ -11,7 +11,7 @@ import {
 } from '@/meeting/domain/ports';
 import { IdleTimeout } from '@/meeting/domain/value-objects';
 import { MeetingEndedPayload, MeetingEndedReason } from '@/shared-kernel/domain/events';
-import { Clock, DomainEventPublisher } from '@/shared-kernel/domain/ports';
+import { Clock, DomainEventPublisher, LoggerPort } from '@/shared-kernel/domain/ports';
 import {
   ChatEntry,
   chatEntry,
@@ -26,6 +26,7 @@ interface MeetingServiceDeps {
   hostTokenGenerator: HostTokenGenerator;
   clock: Clock;
   eventPublisher: DomainEventPublisher;
+  logger: LoggerPort;
 }
 
 interface CreateMeetingCommand {
@@ -94,6 +95,7 @@ export class MeetingService {
       source: command.source,
       startedAt,
     });
+    this.deps.logger.info({ meetingCode: code.value, source: command.source }, 'meeting created');
     return meeting;
   }
 
@@ -111,6 +113,10 @@ export class MeetingService {
       nickname: participant.nickname,
       joinedAt: participant.joinedAt,
     });
+    this.deps.logger.info(
+      { meetingCode: command.code, participantId: participant.id },
+      'participant joined',
+    );
     return { meeting, participant };
   }
 
@@ -123,6 +129,10 @@ export class MeetingService {
       participantId: participant.id,
       leftAt: participant.leftAt,
     });
+    this.deps.logger.info(
+      { meetingCode: command.code, participantId: participant.id },
+      'participant left',
+    );
     return { meeting, participant };
   }
 
@@ -139,6 +149,10 @@ export class MeetingService {
     meeting.markActive(now);
     await this.deps.chatRepository.append(command.code, entry);
     await this.deps.repository.save(meeting);
+    this.deps.logger.debug(
+      { meetingCode: command.code, participantId: command.participantId },
+      'chat posted',
+    );
     return entry;
   }
 
@@ -153,6 +167,7 @@ export class MeetingService {
     await this.deps.repository.save(meeting);
     const payload = await this.buildEndedPayload(meeting, command.code, endedAt, command.reason);
     await this.deps.eventPublisher.publish(MEETING_EVENTS.ENDED, payload);
+    this.deps.logger.info({ meetingCode: command.code, reason: command.reason }, 'meeting closed');
     return meeting;
   }
 
@@ -173,6 +188,7 @@ export class MeetingService {
     });
     const payload = await this.buildEndedPayload(meeting, command.code, now, 'idle');
     await this.deps.eventPublisher.publish(MEETING_EVENTS.ENDED, payload);
+    this.deps.logger.info({ meetingCode: command.code }, 'meeting closed by idle timeout');
     return true;
   }
 

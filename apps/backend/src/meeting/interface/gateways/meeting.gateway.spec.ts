@@ -10,6 +10,8 @@ import { chatEntry, externalReference } from '@/shared-kernel/domain/value-objec
 
 import { MeetingGateway } from './meeting.gateway';
 
+const fakeLogger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
+
 const fakeCode = MeetingCode.from('abc12xyz');
 const t0 = new Date('2026-01-01T00:00:00Z');
 const t1 = new Date('2026-01-01T00:01:00Z');
@@ -111,7 +113,7 @@ describe('MeetingGateway.handleJoin', () => {
       ),
     };
 
-    const gateway = new MeetingGateway(service as any);
+    const gateway = new MeetingGateway(service as any, fakeLogger as any);
     return { gateway, service, calls };
   };
 
@@ -169,7 +171,7 @@ describe('MeetingGateway.handleLeave', () => {
       }),
     };
 
-    const gateway = new MeetingGateway(service as any);
+    const gateway = new MeetingGateway(service as any, fakeLogger as any);
     return { gateway, service, calls };
   };
 
@@ -211,7 +213,7 @@ describe('MeetingGateway.handleLeave', () => {
       }),
     };
 
-    const gateway = new MeetingGateway(service as any);
+    const gateway = new MeetingGateway(service as any, fakeLogger as any);
     const { socket, broadcasts, joined } = makeSocket('s1');
     joined.add('meeting:abc12xyz');
     const result = await gateway.handleLeave(leaveDtoOf(), socket as unknown as Socket);
@@ -225,7 +227,7 @@ describe('MeetingGateway.onMeetingEnded', () => {
   const tEnded = new Date('2026-01-01T00:30:00Z');
 
   const makeGateway = () => {
-    const gateway = new MeetingGateway({} as any);
+    const gateway = new MeetingGateway({} as any, fakeLogger as any);
     const { server, broadcasts: serverBroadcasts } = makeServer();
 
     gateway.server = server as any;
@@ -272,7 +274,7 @@ describe('MeetingGateway.handleChat', () => {
       }),
     };
 
-    const gateway = new MeetingGateway(service as any);
+    const gateway = new MeetingGateway(service as any, fakeLogger as any);
     const { server, broadcasts: serverBroadcasts } = makeServer();
 
     gateway.server = server as any;
@@ -335,7 +337,7 @@ describe('MeetingGateway.handleDisconnect', () => {
       leaveMeeting: overrides?.leave ?? defaultLeave,
     };
 
-    const gateway = new MeetingGateway(service as any);
+    const gateway = new MeetingGateway(service as any, fakeLogger as any);
     return { gateway, service, calls };
   };
 

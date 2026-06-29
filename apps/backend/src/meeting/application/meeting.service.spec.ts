@@ -2,6 +2,7 @@ import { MEETING_EVENTS } from '@convene/shared-interfaces';
 
 import { Meeting } from '@/meeting/domain/meeting';
 import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';
+import { LoggerPort } from '@/shared-kernel/domain/ports';
 import {
   ChatEntry,
   chatEntry,
@@ -28,6 +29,13 @@ const makeEventPublisher = () => {
     },
   };
 };
+
+const noopLogger = (): LoggerPort => ({
+  debug: () => {},
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+});
 
 const code = MeetingCode.from('abc12xyz');
 
@@ -65,6 +73,7 @@ describe('MeetingService.createMeeting', () => {
       hostTokenGenerator: { next: () => 'host-token-generated' },
       clock: { now: () => fakeNow },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     return { service, saved, events };
   };
@@ -151,6 +160,7 @@ describe('MeetingService.joinMeeting', () => {
       hostTokenGenerator: { next: () => 'host-token-generated' },
       clock: { now: () => t1 },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     return { service, saved, events };
   };
@@ -233,6 +243,7 @@ describe('MeetingService.leaveMeeting', () => {
       hostTokenGenerator: { next: () => 'host-token-generated' },
       clock: { now: () => t2 },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     return { service, saved, events };
   };
@@ -309,6 +320,7 @@ describe('MeetingService.postChat', () => {
       hostTokenGenerator: { next: () => 'host-token-generated' },
       clock: { now: () => t2 },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     return { service, saved, appended };
   };
@@ -386,6 +398,7 @@ describe('MeetingService.closeMeeting', () => {
       hostTokenGenerator: { next: () => 'host-token-generated' },
       clock: { now: () => tClose },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     return { service, saved, events };
   };
@@ -442,6 +455,7 @@ describe('MeetingService.closeMeeting', () => {
       hostTokenGenerator: { next: () => 'host-token-generated' },
       clock: { now: () => tClose },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     await service.closeMeeting({ code: 'abc12xyz', reason: 'manual', hostToken: 'host-token-1' });
     const endedEvent = events.find((e) => e.name === MEETING_EVENTS.ENDED);
@@ -501,6 +515,7 @@ describe('MeetingService.detectIdleAndClose', () => {
       hostTokenGenerator: { next: () => 'host-token-generated' },
       clock: { now: () => now },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     return { service, saved, events };
   };
