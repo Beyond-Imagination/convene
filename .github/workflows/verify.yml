@@ -18,10 +18,10 @@ jobs:
         with:
           version: 9.15.0
 
-      - name: Node 20 + pnpm store 캐시
+      - name: Node 22 + pnpm store 캐시
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - name: 의존성 설치

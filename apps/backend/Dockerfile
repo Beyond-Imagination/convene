@@ -11,7 +11,7 @@
 #   - shared-interfaces → backend 순으로 빌드
 #   - 마지막에 pnpm prune --prod 로 dev deps 제거(빌드된 mediasoup worker 바이너리는 유지)
 # ============================================================================
-FROM node:20-bookworm-slim AS builder
+FROM node:22-bookworm-slim AS builder
 
 # mediasoup 가 prebuilt binary 다운로드에 실패하면 source 빌드로 fallback 한다.
 # 이때 python3 + build-essential 이 필요하므로 안전망으로 설치한다.
@@ -52,7 +52,7 @@ RUN HUSKY=0 pnpm prune --prod
 #   - pnpm workspace 의 symlink(node_modules/@convene/shared-interfaces → packages/...)
 #     를 유지하기 위해 monorepo 디렉터리 구조를 그대로 보존한다.
 # ============================================================================
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \

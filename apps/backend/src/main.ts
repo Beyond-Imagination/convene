@@ -29,7 +29,8 @@ async function bootstrap() {
 
   const port = resolvePort();
   await app.listen(port);
-  app.get(PinoLogger).info({ port, origins: corsOrigins }, 'backend listening');
+  const logger = await app.resolve(PinoLogger);
+  logger.info({ port, origins: corsOrigins }, 'backend listening');
 }
 
 bootstrap().catch((err) => {
