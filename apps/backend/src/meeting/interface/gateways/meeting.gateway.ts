@@ -7,7 +7,7 @@ import {
   type ParticipantJoinedBroadcast,
   type ParticipantLeftBroadcast,
 } from '@convene/shared-interfaces';
-import { Logger, UsePipes, ValidationPipe } from '@nestjs/common';
+import { UsePipes, ValidationPipe } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   ConnectedSocket,
@@ -18,6 +18,7 @@ import {
   WebSocketServer,
   WsException,
 } from '@nestjs/websockets';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import type { Server, Socket } from 'socket.io';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
@@ -53,12 +54,13 @@ const roomOf = (code: string): string => `meeting:${code}`;
   }),
 )
 export class MeetingGateway implements OnGatewayDisconnect {
-  private readonly logger = new Logger(MeetingGateway.name);
-
   @WebSocketServer()
   server!: Server;
 
-  constructor(private readonly service: MeetingService) {}
+  constructor(
+    private readonly service: MeetingService,
+    @InjectPinoLogger(MeetingGateway.name) private readonly logger: PinoLogger,
+  ) {}
 
   @SubscribeMessage(MEETING_WS_EVENTS.JOIN)
   async handleJoin(
@@ -121,7 +123,8 @@ export class MeetingGateway implements OnGatewayDisconnect {
       // emit 할 수 있다(또는 idle 자동 종료와 leave 충돌). 이미 종료된 회의나
       // 이미 leave 한 참가자에 대한 leave는 best-effort로 swallow.
       this.logger.debug(
-        `handleLeave swallow for code=${dto.code} sid=${client.id}: ${(error as Error).message}`,
+        { meetingCode: dto.code, participantId: client.id, err: error },
+        'handleLeave swallowed',
       );
     }
     await client.leave(room);
@@ -146,7 +149,8 @@ export class MeetingGateway implements OnGatewayDisconnect {
     } catch (error) {
       // disconnect는 best-effort: 이미 leave했거나 회의가 종료된 경우 swallow.
       this.logger.debug(
-        `handleDisconnect swallow for code=${code} sid=${client.id}: ${(error as Error).message}`,
+        { meetingCode: code, participantId: client.id, err: error },
+        'handleDisconnect swallowed',
       );
     }
   }

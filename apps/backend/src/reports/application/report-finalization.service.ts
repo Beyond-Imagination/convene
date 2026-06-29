@@ -8,7 +8,7 @@ import {
   ReportRepository,
   SummarizerPort,
 } from '@/reports/domain/ports';
-import { Clock, DomainEventPublisher } from '@/shared-kernel/domain/ports';
+import { Clock, DomainEventPublisher, LoggerPort } from '@/shared-kernel/domain/ports';
 import { ChatEntry, ExternalReference, Source } from '@/shared-kernel/domain/value-objects';
 
 import { ReportNotFoundError, ReportNotResummarizableError } from './report.errors';
@@ -20,6 +20,7 @@ interface ReportFinalizationServiceDeps {
   idGenerator: ReportIdGenerator;
   clock: Clock;
   eventPublisher: DomainEventPublisher;
+  logger: LoggerPort;
 }
 
 export interface CreateDraftCommand {
@@ -80,6 +81,10 @@ export class ReportFinalizationService {
       meetingStartedAtMs: report.startedAt.getTime(),
       participantNames,
     });
+    this.deps.logger.info(
+      { reportId: report.id, meetingCode: report.code },
+      'report draft created',
+    );
     return report;
   }
 
@@ -104,16 +109,19 @@ export class ReportFinalizationService {
       await this.deps.eventPublisher.publish(REPORT_EVENTS.SUMMARY_COMPLETED, {
         reportId: report.id,
       });
+      this.deps.logger.info({ reportId: report.id }, 'report summary completed');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       report.markSummaryFailed(message, this.deps.clock.now());
       await this.deps.repository.save(report);
+      this.deps.logger.error({ reportId: report.id, err }, 'report summary failed');
     }
 
     if (report.isFinalized) {
       await this.deps.eventPublisher.publish(REPORT_EVENTS.FINALIZED, {
         reportId: report.id,
       });
+      this.deps.logger.info({ reportId: report.id }, 'report finalized');
     }
   }
 
@@ -164,6 +172,7 @@ export class ReportFinalizationService {
     await this.deps.eventPublisher.publish(REPORT_EVENTS.FINALIZED, {
       reportId: report.id,
     });
+    this.deps.logger.info({ reportId }, 'report resummarized');
     return report;
   }
 
@@ -182,11 +191,16 @@ export class ReportFinalizationService {
     // STT가 실패하면 summary 입력이 없으므로 cascade로 종료 처리(재시도 없음).
     report.markSummaryFailed(`Skipped due to transcription failure: ${command.error}`, at);
     await this.deps.repository.save(report);
+    this.deps.logger.warn(
+      { reportId: command.reportId, error: command.error },
+      'report transcription failed',
+    );
 
     if (report.isFinalized) {
       await this.deps.eventPublisher.publish(REPORT_EVENTS.FINALIZED, {
         reportId: report.id,
       });
+      this.deps.logger.info({ reportId: report.id }, 'report finalized');
     }
   }
 

@@ -1,6 +1,7 @@
 import { REPORT_EVENTS } from '@convene/shared-interfaces';
 
 import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events';
+import { LoggerPort } from '@/shared-kernel/domain/ports';
 
 import {
   PCM_BYTES_PER_SECOND,
@@ -25,6 +26,13 @@ const makeEventPublisher = () => {
     },
   };
 };
+
+const noopLogger = (): LoggerPort => ({
+  debug: () => {},
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+});
 
 /** transcribe input.audio가 wav(RIFF)인지 가정하고, PCM body의 text 식별값을 돌려준다. */
 const wavBodyText = (audio: Buffer): string => audio.subarray(WAV_HEADER_BYTES).toString();
@@ -68,6 +76,7 @@ describe('RecordingService.requestTranscription', () => {
       },
       transcriber: { transcribe: transcribeMock },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     return { service, consumeMock, transcribeMock, events };
   };
@@ -184,6 +193,7 @@ describe('RecordingService.requestTranscription', () => {
       },
       transcriber: { transcribe: async () => [] },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     await service.requestTranscription({
       reportId,
@@ -233,6 +243,7 @@ describe('RecordingService.requestTranscription', () => {
       partialTranscriptStore: { append: async () => {}, consume: async () => [] },
       transcriber: { transcribe: transcribeMock },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
@@ -271,6 +282,7 @@ describe('RecordingService.requestTranscription', () => {
       partialTranscriptStore: { append: async () => {}, consume: async () => [] },
       transcriber: { transcribe: transcribeMock },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
@@ -304,6 +316,7 @@ describe('RecordingService.requestTranscription', () => {
       partialTranscriptStore: { append: async () => {}, consume: async () => [] },
       transcriber: { transcribe: transcribeMock },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
     expect(transcribeMock).toHaveBeenCalledTimes(2);
@@ -348,6 +361,7 @@ describe('RecordingService.requestTranscription', () => {
       partialTranscriptStore: { append: async () => {}, consume: async () => [] },
       transcriber: { transcribe: transcribeMock },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
@@ -378,6 +392,7 @@ describe('RecordingService.requestTranscription', () => {
       partialTranscriptStore: { append: async () => {}, consume: async () => [] },
       transcriber: { transcribe: transcribeMock },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
@@ -410,6 +425,7 @@ describe('RecordingService.requestTranscription', () => {
       partialTranscriptStore: { append: async () => {}, consume: async () => [] },
       transcriber: { transcribe: transcribeMock },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
@@ -444,6 +460,7 @@ describe('RecordingService.requestTranscription', () => {
       partialTranscriptStore: { append: async () => {}, consume: async () => [] },
       transcriber: { transcribe: transcribeMock },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
@@ -474,6 +491,7 @@ describe('RecordingService.requestTranscription', () => {
         transcribe: async () => [{ text: 'a0', startMs: 100, endMs: 400 }],
       },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
@@ -500,6 +518,7 @@ describe('RecordingService.requestTranscription', () => {
         transcribe: async () => [{ text: 'a0', startMs: 0, endMs: 500 }],
       },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
@@ -537,6 +556,7 @@ describe('RecordingService.requestTranscription', () => {
       },
       transcriber: { transcribe: async () => [] },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
@@ -583,6 +603,7 @@ describe('RecordingService.requestTranscription', () => {
         transcribe: async () => [{ text: 'tail', startMs: 2500, endMs: 3000 }],
       },
       eventPublisher: publisher,
+      logger: noopLogger(),
     });
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };

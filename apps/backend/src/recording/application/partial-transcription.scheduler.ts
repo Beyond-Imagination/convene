@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 
 import {
   AbsoluteTranscriptSegment,
@@ -6,6 +6,7 @@ import {
   PartialTranscriptStore,
   TranscriberPort,
 } from '@/recording/domain/ports';
+import { LoggerPort } from '@/shared-kernel/domain/ports';
 
 import {
   dropOverlapHeadSegments,
@@ -21,6 +22,7 @@ interface PartialTranscriptionSchedulerDeps {
   audioBufferRepository: AudioBufferRepository;
   transcriber: TranscriberPort;
   partialTranscriptStore: PartialTranscriptStore;
+  logger: LoggerPort;
 }
 
 /**
@@ -40,16 +42,13 @@ interface PartialTranscriptionSchedulerDeps {
  */
 @Injectable()
 export class PartialTranscriptionScheduler implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(PartialTranscriptionScheduler.name);
   private timer?: NodeJS.Timeout;
 
   constructor(private readonly deps: PartialTranscriptionSchedulerDeps) {}
 
   onModuleInit(): void {
     this.timer = setInterval(() => {
-      this.tick().catch((err) =>
-        this.logger.error(`partial tick failed: ${(err as Error).message}`),
-      );
+      this.tick().catch((err) => this.deps.logger.error({ err }, 'partial tick failed'));
     }, PARTIAL_INTERVAL_MS);
     // Node.js가 본 timer 때문에 프로세스 종료를 막지 않도록 unref.
     this.timer.unref?.();
@@ -99,8 +98,9 @@ export class PartialTranscriptionScheduler implements OnModuleInit, OnModuleDest
       }));
       await this.deps.partialTranscriptStore.append(meetingCode, absolute);
     } catch (err) {
-      this.logger.error(
-        `partial transcribe failed (code=${meetingCode}, pid=${participantId}): ${(err as Error).message}`,
+      this.deps.logger.error(
+        { meetingCode, participantId, err },
+        'partial transcribe failed',
       );
     }
   }

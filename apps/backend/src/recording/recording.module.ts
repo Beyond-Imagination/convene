@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { PinoLogger } from 'nestjs-pino';
 
 import { resolveAiWorkerBaseUrl } from '@/config/ai-worker.config';
 import { PartialTranscriptionScheduler } from '@/recording/application/partial-transcription.scheduler';
@@ -8,6 +9,7 @@ import { HttpTranscriber } from '@/recording/infrastructure/http.transcriber';
 import { RedisAudioBufferRepository } from '@/recording/infrastructure/redis-audio-buffer.repository';
 import { RedisPartialTranscriptStore } from '@/recording/infrastructure/redis-partial-transcript.store';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 /**
  * Recording 기능을 구성하는 NestJS 모듈.
@@ -33,18 +35,21 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
         partialTranscriptStore: RedisPartialTranscriptStore,
         transcriber: HttpTranscriber,
         eventPublisher: NestEventBusDomainEventPublisher,
+        logger: PinoLogger,
       ) =>
         new RecordingService({
           audioBufferRepository,
           partialTranscriptStore,
           transcriber,
           eventPublisher,
+          logger: new PinoLoggerAdapter(logger, RecordingService.name),
         }),
       inject: [
         RedisAudioBufferRepository,
         RedisPartialTranscriptStore,
         HttpTranscriber,
         NestEventBusDomainEventPublisher,
+        PinoLogger,
       ],
     },
     {
@@ -53,13 +58,15 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
         audioBufferRepository: RedisAudioBufferRepository,
         transcriber: HttpTranscriber,
         partialTranscriptStore: RedisPartialTranscriptStore,
+        logger: PinoLogger,
       ) =>
         new PartialTranscriptionScheduler({
           audioBufferRepository,
           transcriber,
           partialTranscriptStore,
+          logger: new PinoLoggerAdapter(logger, PartialTranscriptionScheduler.name),
         }),
-      inject: [RedisAudioBufferRepository, HttpTranscriber, RedisPartialTranscriptStore],
+      inject: [RedisAudioBufferRepository, HttpTranscriber, RedisPartialTranscriptStore, PinoLogger],
     },
   ],
   // Mediasoup BC의 audio capture 어댑터가 같은 AudioBufferRepository 인스턴스로 chunk를 append 하기 위해 export 한다.

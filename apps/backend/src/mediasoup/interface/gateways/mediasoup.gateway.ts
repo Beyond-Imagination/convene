@@ -12,7 +12,7 @@ import {
   type ProducerToggledBroadcast,
   type ToggleProducerResponse,
 } from '@convene/shared-interfaces';
-import { Logger, UsePipes, ValidationPipe } from '@nestjs/common';
+import { UsePipes, ValidationPipe } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   ConnectedSocket,
@@ -22,6 +22,7 @@ import {
   WebSocketServer,
   WsException,
 } from '@nestjs/websockets';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import type { Server, Socket } from 'socket.io';
 
 import { MediasoupSignalingService } from '@/mediasoup/application/mediasoup-signaling.service';
@@ -70,12 +71,13 @@ interface ProducerCreatedPayload {
   }),
 )
 export class MediasoupGateway {
-  private readonly logger = new Logger(MediasoupGateway.name);
-
   @WebSocketServer()
   server!: Server;
 
-  constructor(private readonly service: MediasoupSignalingService) {}
+  constructor(
+    private readonly service: MediasoupSignalingService,
+    @InjectPinoLogger(MediasoupGateway.name) private readonly logger: PinoLogger,
+  ) {}
 
   @SubscribeMessage(MEDIASOUP_WS_EVENTS.GET_RTP_CAPABILITIES)
   async handleGetRtpCapabilities(
@@ -112,12 +114,15 @@ export class MediasoupGateway {
         transportId: dto.transportId,
         dtlsParameters: dto.dtlsParameters,
       });
-      this.logger.log(`[connectTransport] ok (sid=${client.id}, transportId=${dto.transportId})`);
+      this.logger.info(
+        { participantId: client.id, transportId: dto.transportId },
+        'connectTransport completed',
+      );
       return { ok: true };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
       this.logger.error(
-        `[connectTransport] FAIL (sid=${client.id}, transportId=${dto.transportId}): ${message}`,
+        { participantId: client.id, transportId: dto.transportId, err },
+        'connectTransport failed',
       );
       throw err;
     }
@@ -138,13 +143,18 @@ export class MediasoupGateway {
         rtpParameters: dto.rtpParameters,
         paused: dto.paused,
       });
-      this.logger.log(
-        `[produce] ok (sid=${client.id}, kind=${dto.kind}, source=${dto.source}, producerId=${res.producerId})`,
+      this.logger.info(
+        {
+          participantId: client.id,
+          kind: dto.kind,
+          source: dto.source,
+          producerId: res.producerId,
+        },
+        'produce completed',
       );
       return res;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.logger.error(`[produce] FAIL (sid=${client.id}, kind=${dto.kind}): ${message}`);
+      this.logger.error({ participantId: client.id, kind: dto.kind, err }, 'produce failed');
       throw err;
     }
   }
@@ -162,14 +172,15 @@ export class MediasoupGateway {
         producerId: dto.producerId,
         rtpCapabilities: dto.rtpCapabilities,
       });
-      this.logger.log(
-        `[consume] ok (sid=${client.id}, producerId=${dto.producerId}, consumerId=${res.id})`,
+      this.logger.info(
+        { participantId: client.id, producerId: dto.producerId, consumerId: res.id },
+        'consume completed',
       );
       return res;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
       this.logger.error(
-        `[consume] FAIL (sid=${client.id}, producerId=${dto.producerId}): ${message}`,
+        { participantId: client.id, producerId: dto.producerId, err },
+        'consume failed',
       );
       throw err;
     }

@@ -1,5 +1,5 @@
 import { MEETING_EVENTS } from '@convene/shared-interfaces';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 
 import { MeetingEndedPayload } from '@/shared-kernel/domain/events';
@@ -11,8 +11,6 @@ import { ReportFinalizationService } from './report-finalization.service';
  */
 @Injectable()
 export class ReportMeetingLifecycleListener {
-  private readonly logger = new Logger(ReportMeetingLifecycleListener.name);
-
   constructor(private readonly service: ReportFinalizationService) {}
 
   @OnEvent(MEETING_EVENTS.ENDED)

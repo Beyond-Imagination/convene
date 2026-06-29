@@ -1,7 +1,7 @@
-import { Logger } from '@nestjs/common';
 import { Producer, Router, RtpCodecCapability } from 'mediasoup/node/lib/types';
 
 import { MediaRouterPort } from '@/mediasoup/domain/ports';
+import { LoggerPort } from '@/shared-kernel/domain/ports';
 
 import { MediasoupWorkerPool } from './mediasoup-worker.pool';
 
@@ -34,7 +34,6 @@ interface RouterPipeRegistry {
  * `cleanupPipeProducers`는 producer close 시 호출.
  */
 export class MediasoupRouterAdapter implements MediaRouterPort {
-  private readonly logger = new Logger(MediasoupRouterAdapter.name);
   private readonly routers = new Map<string, Router[]>();
   /** participantId → routerIndex (per meeting). */
   private readonly assignments = new Map<string, Map<string, number>>();
@@ -48,6 +47,7 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
   constructor(
     private readonly workerPool: MediasoupWorkerPool,
     private readonly options: MediasoupRouterAdapterOptions,
+    private readonly logger: LoggerPort,
   ) {}
 
   async createRoom(meetingCode: string): Promise<void> {
@@ -60,7 +60,7 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
     this.routers.set(meetingCode, [first]);
     this.assignments.set(meetingCode, new Map());
     this.producerPipes.set(meetingCode, new Map());
-    this.logger.log(`room created (code=${meetingCode}, routers=1)`);
+    this.logger.info({ meetingCode, routers: 1 }, 'room created');
   }
 
   async closeRoom(meetingCode: string): Promise<void> {
@@ -105,7 +105,8 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
       // 상태 불일치 시 loadByRouter가 NaN으로 오염돼 findIndex/최소부하 탐색이 오작동하는 것을 막는 방어 가드.
       if (!Number.isInteger(idx) || idx < 0 || idx >= loadByRouter.length) {
         this.logger.warn(
-          `assignments has invalid routerIndex=${idx} (code=${meetingCode}, routers=${list.length}) — excluded from load tally`,
+          { meetingCode, routerIndex: idx, routers: list.length },
+          'invalid routerIndex excluded from load tally',
         );
         continue;
       }
@@ -129,15 +130,22 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
         }
         target = minIdx;
         this.logger.warn(
-          `worker cap reached (code=${meetingCode}, usedWorkers=${usedWorkers.size}/${this.workerPool.size}) — over-allocating participant to router#${target}`,
+          {
+            meetingCode,
+            usedWorkers: usedWorkers.size,
+            workerPoolSize: this.workerPool.size,
+            routerIndex: target,
+          },
+          'worker cap reached, over-allocating participant',
         );
       }
     }
 
     assignments.set(participantId, target);
     const newLoad = (loadByRouter[target] ?? 0) + 1;
-    this.logger.log(
-      `participant assigned (code=${meetingCode}, pid=${participantId}, routerIndex=${target}, load=${newLoad}/${capacity})`,
+    this.logger.info(
+      { meetingCode, participantId, routerIndex: target, load: newLoad, capacity },
+      'participant assigned to router',
     );
     return target;
   }
@@ -148,8 +156,9 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
     const idx = assignments.get(participantId);
     if (idx === undefined) return;
     assignments.delete(participantId);
-    this.logger.log(
-      `participant released (code=${meetingCode}, pid=${participantId}, routerIndex=${idx})`,
+    this.logger.info(
+      { meetingCode, participantId, routerIndex: idx },
+      'participant released from router',
     );
   }
 
@@ -199,16 +208,15 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
     for (const r of results) {
       if (r.status === 'fulfilled') ok.push(r.value);
       else
-        this.logger.error(
-          `pipe FAIL (code=${meetingCode}, producerId=${producerId}): ${(r.reason as Error).message}`,
-        );
+        this.logger.error({ meetingCode, producerId, err: r.reason }, 'pipe failed');
     }
     roomPipes.set(producerId, {
       sourceRouterIndex,
       pipes: [...(existing?.pipes ?? []), ...ok],
     });
-    this.logger.log(
-      `pipe ok (code=${meetingCode}, producerId=${producerId}, src=#${sourceRouterIndex}, +${ok.length} targets)`,
+    this.logger.debug(
+      { meetingCode, producerId, sourceRouterIndex, added: ok.length },
+      'producer piped to routers',
     );
   }
 
@@ -221,9 +229,7 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
       try {
         if (!info.pipeProducer.closed) info.pipeProducer.close();
       } catch (err) {
-        this.logger.error(
-          `pipeProducer close 실패 (code=${meetingCode}, producerId=${producerId}): ${(err as Error).message}`,
-        );
+        this.logger.error({ meetingCode, producerId, err }, 'pipeProducer close failed');
       }
     }
     roomPipes.delete(producerId);
@@ -276,16 +282,15 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
           record.pipes.push({ targetRouter: newRouter, pipeProducer });
         } catch (err) {
           this.logger.error(
-            `addRouter pipe FAIL (code=${meetingCode}, producerId=${producerId}, newIndex=${newIndex}): ${(err as Error).message}`,
+            { meetingCode, producerId, newIndex, err },
+            'addRouter pipe failed',
           );
         }
       });
       await Promise.allSettled(pipeOps);
     }
 
-    this.logger.log(
-      `router added (code=${meetingCode}, newIndex=${newIndex}, existing pipes pre-loaded)`,
-    );
+    this.logger.info({ meetingCode, newIndex }, 'router added');
     return newIndex;
   }
 

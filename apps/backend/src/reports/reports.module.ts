@@ -1,4 +1,5 @@
-import { Logger, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
+import { PinoLogger } from 'nestjs-pino';
 
 import { resolveAdminConfig } from '@/config/admin.config';
 import { resolveGeminiConfig } from '@/config/gemini.config';
@@ -14,6 +15,7 @@ import { UuidReportIdGenerator } from '@/reports/infrastructure/uuid-report-id.g
 import { ReportsController } from '@/reports/interface/controllers/reports.controller';
 import { ADMIN_API_TOKEN, AdminGuard } from '@/reports/interface/guards/admin.guard';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 
 /**
@@ -40,16 +42,18 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
     },
     {
       provide: GeminiSummarizer,
-      useFactory: (): SummarizerPort => {
+      useFactory: (logger: PinoLogger): SummarizerPort => {
         const config = resolveGeminiConfig();
         if (config === null) {
-          new Logger('ReportsModule').warn(
-            'GEMINI_API_KEY 미설정 — SummarizerPort는 NoopSummarizer로 fallback 됩니다(요약 미적용).',
+          logger.warn(
+            { context: 'ReportsModule' },
+            'GEMINI_API_KEY missing, SummarizerPort falls back to NoopSummarizer',
           );
           return new NoopSummarizer();
         }
         return new GeminiSummarizer(config);
       },
+      inject: [PinoLogger],
     },
     {
       provide: ReportFinalizationService,
@@ -60,6 +64,7 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
         idGenerator: UuidReportIdGenerator,
         clock: SystemClock,
         eventPublisher: NestEventBusDomainEventPublisher,
+        logger: PinoLogger,
       ) =>
         new ReportFinalizationService({
           repository,
@@ -68,6 +73,7 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
           idGenerator,
           clock,
           eventPublisher,
+          logger: new PinoLoggerAdapter(logger, ReportFinalizationService.name),
         }),
       inject: [
         MongoReportRepository,
@@ -76,6 +82,7 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
         UuidReportIdGenerator,
         SystemClock,
         NestEventBusDomainEventPublisher,
+        PinoLogger,
       ],
     },
   ],

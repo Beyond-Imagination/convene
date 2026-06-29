@@ -1,11 +1,12 @@
 import { ChildProcess, spawn } from 'node:child_process';
 import { AddressInfo, createServer } from 'node:net';
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Consumer, PlainTransport } from 'mediasoup/node/lib/types';
 
 import { AudioCapturePort, AudioCaptureStartInput } from '@/mediasoup/domain/ports';
 import { AudioBufferRepository } from '@/recording/domain/ports';
+import { LoggerPort } from '@/shared-kernel/domain/ports';
 
 import { MediasoupRouterAdapter } from './mediasoup-router.adapter';
 
@@ -35,20 +36,22 @@ const SIGTERM_DELAY_MS = 2000;
  */
 @Injectable()
 export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
-  private readonly logger = new Logger(FfmpegAudioCaptureAdapter.name);
-
   private readonly contexts = new Map<string, CaptureContext>();
   private readonly inflight = new Set<string>();
 
   constructor(
     private readonly routerAdapter: MediasoupRouterAdapter,
     private readonly audioBufferRepository: AudioBufferRepository,
+    private readonly logger: LoggerPort,
   ) {}
 
   async start(input: AudioCaptureStartInput): Promise<void> {
     const key = this.key(input.meetingCode, input.participantId);
     if (this.contexts.has(key) || this.inflight.has(key)) {
-      this.logger.debug(`capture dedup (${key})`);
+      this.logger.debug(
+        { meetingCode: input.meetingCode, participantId: input.participantId },
+        'capture dedup',
+      );
       return;
     }
     this.inflight.add(key);
@@ -60,11 +63,19 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
         return;
       }
       this.contexts.set(key, ctx);
-      this.logger.log(
-        `capture started (code=${input.meetingCode}, pid=${input.participantId}, producerId=${input.producerId})`,
+      this.logger.info(
+        {
+          meetingCode: input.meetingCode,
+          participantId: input.participantId,
+          producerId: input.producerId,
+        },
+        'capture started',
       );
     } catch (err) {
-      this.logger.error(`capture start failed (${key}): ${(err as Error).message}`);
+      this.logger.error(
+        { meetingCode: input.meetingCode, participantId: input.participantId, err },
+        'capture start failed',
+      );
     } finally {
       this.inflight.delete(key);
     }
@@ -126,7 +137,8 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
         .append(input.meetingCode, input.participantId, chunk)
         .catch((err) =>
           this.logger.error(
-            `audio buffer append failed (code=${input.meetingCode}, pid=${input.participantId}): ${(err as Error).message}`,
+            { meetingCode: input.meetingCode, participantId: input.participantId, err },
+            'audio buffer append failed',
           ),
         );
     });
@@ -136,7 +148,8 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
         .resume()
         .catch((err) =>
           this.logger.error(
-            `consumer.resume failed (${input.meetingCode}/${input.participantId}): ${(err as Error).message}`,
+            { meetingCode: input.meetingCode, participantId: input.participantId, err },
+            'consumer resume failed',
           ),
         );
     }, RESUME_DELAY_MS);
@@ -147,7 +160,8 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
       .markStarted(input.meetingCode, input.participantId, Date.now())
       .catch((err) =>
         this.logger.error(
-          `markStarted failed (${input.meetingCode}/${input.participantId}): ${(err as Error).message}`,
+          { meetingCode: input.meetingCode, participantId: input.participantId, err },
+          'markStarted failed',
         ),
       );
 
@@ -225,16 +239,17 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
       'pipe:1',
     ]);
     ffmpeg.on('error', (err) => {
-      this.logger.error(
-        `ffmpeg spawn error (code=${meetingCode}, pid=${participantId}): ${err.message}`,
-      );
+      this.logger.error({ meetingCode, participantId, err }, 'ffmpeg spawn error');
     });
     ffmpeg.on('close', (exit) => {
-      this.logger.log(`ffmpeg closed (code=${meetingCode}, pid=${participantId}, exit=${exit})`);
+      this.logger.info({ meetingCode, participantId, exit }, 'ffmpeg closed');
     });
     if (ffmpeg.stderr) {
       ffmpeg.stderr.on('data', (data: Buffer) => {
-        this.logger.debug(`[ffmpeg ${meetingCode}/${participantId}] ${data.toString().trim()}`);
+        this.logger.debug(
+          { meetingCode, participantId, line: data.toString().trim() },
+          'ffmpeg stderr',
+        );
       });
     }
     return ffmpeg;

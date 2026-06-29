@@ -1,5 +1,5 @@
 import { REPORT_EVENTS } from '@convene/shared-interfaces';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 
 import { transcriptSegment } from '@/reports/domain/entries';
@@ -15,8 +15,6 @@ import { ReportFinalizationService } from './report-finalization.service';
  */
 @Injectable()
 export class ReportPipelineListener {
-  private readonly logger = new Logger(ReportPipelineListener.name);
-
   constructor(private readonly service: ReportFinalizationService) {}
 
   @OnEvent(REPORT_EVENTS.TRANSCRIPTION_COMPLETED)

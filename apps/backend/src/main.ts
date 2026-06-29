@@ -2,13 +2,16 @@ import 'reflect-metadata';
 
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { Logger, PinoLogger } from 'nestjs-pino';
+import pino from 'pino';
 
 import { AppModule } from './app.module';
 import { resolveCorsOrigins, resolvePort } from './config/server.config';
 import { CorsIoAdapter } from './shared-kernel/infrastructure/cors-io.adapter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.useLogger(app.get(Logger));
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -22,13 +25,14 @@ async function bootstrap() {
   app.enableCors({ origin: corsOrigins, credentials: true });
   app.useWebSocketAdapter(new CorsIoAdapter(app, corsOrigins));
 
-  // RedisModule.onApplicationShutdown에서 quit()을 호출하므로 hook 활성화.
   app.enableShutdownHooks();
 
-  await app.listen(resolvePort());
+  const port = resolvePort();
+  await app.listen(port);
+  app.get(PinoLogger).info({ port, origins: corsOrigins }, 'backend listening');
 }
 
 bootstrap().catch((err) => {
-  console.error('bootstrap failed', err);
+  pino().fatal({ err }, 'bootstrap failed');
   process.exit(1);
 });
