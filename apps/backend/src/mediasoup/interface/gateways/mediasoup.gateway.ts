@@ -116,7 +116,7 @@ export class MediasoupGateway {
       });
       this.logger.info(
         { participantId: client.id, transportId: dto.transportId },
-        'connectTransport ok',
+        'connectTransport completed',
       );
       return { ok: true };
     } catch (err) {
@@ -150,7 +150,7 @@ export class MediasoupGateway {
           source: dto.source,
           producerId: res.producerId,
         },
-        'produce ok',
+        'produce completed',
       );
       return res;
     } catch (err) {
@@ -174,7 +174,7 @@ export class MediasoupGateway {
       });
       this.logger.info(
         { participantId: client.id, producerId: dto.producerId, consumerId: res.id },
-        'consume ok',
+        'consume completed',
       );
       return res;
     } catch (err) {

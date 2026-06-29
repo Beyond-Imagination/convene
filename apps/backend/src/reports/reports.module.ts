@@ -1,4 +1,4 @@
-import { Logger, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 
 import { resolveAdminConfig } from '@/config/admin.config';
@@ -42,16 +42,18 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
     },
     {
       provide: GeminiSummarizer,
-      useFactory: (): SummarizerPort => {
+      useFactory: (logger: PinoLogger): SummarizerPort => {
         const config = resolveGeminiConfig();
         if (config === null) {
-          new Logger('ReportsModule').warn(
-            'GEMINI_API_KEY 미설정 — SummarizerPort는 NoopSummarizer로 fallback 됩니다(요약 미적용).',
+          logger.warn(
+            { context: 'ReportsModule' },
+            'GEMINI_API_KEY missing, SummarizerPort falls back to NoopSummarizer',
           );
           return new NoopSummarizer();
         }
         return new GeminiSummarizer(config);
       },
+      inject: [PinoLogger],
     },
     {
       provide: ReportFinalizationService,

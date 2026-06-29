@@ -143,7 +143,7 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
 
     assignments.set(participantId, target);
     const newLoad = (loadByRouter[target] ?? 0) + 1;
-    this.logger.debug(
+    this.logger.info(
       { meetingCode, participantId, routerIndex: target, load: newLoad, capacity },
       'participant assigned to router',
     );
@@ -156,7 +156,7 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
     const idx = assignments.get(participantId);
     if (idx === undefined) return;
     assignments.delete(participantId);
-    this.logger.debug(
+    this.logger.info(
       { meetingCode, participantId, routerIndex: idx },
       'participant released from router',
     );

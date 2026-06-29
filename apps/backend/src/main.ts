@@ -2,7 +2,7 @@ import 'reflect-metadata';
 
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { Logger } from 'nestjs-pino';
+import { Logger, PinoLogger } from 'nestjs-pino';
 import pino from 'pino';
 
 import { AppModule } from './app.module';
@@ -29,7 +29,7 @@ async function bootstrap() {
 
   const port = resolvePort();
   await app.listen(port);
-  app.get(Logger).log(`backend listening (port=${port}, origins=${corsOrigins.join(',')})`);
+  app.get(PinoLogger).info({ port, origins: corsOrigins }, 'backend listening');
 }
 
 bootstrap().catch((err) => {
