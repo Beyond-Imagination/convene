@@ -14,18 +14,18 @@ export class PinoLoggerAdapter implements LoggerPort {
   ) {}
 
   debug(obj: LogContext, message: string): void {
-    this.logger.debug({ context: this.context, ...obj }, message);
+    this.logger.debug({ ...obj, context: this.context }, message);
   }
 
   info(obj: LogContext, message: string): void {
-    this.logger.info({ context: this.context, ...obj }, message);
+    this.logger.info({ ...obj, context: this.context }, message);
   }
 
   warn(obj: LogContext, message: string): void {
-    this.logger.warn({ context: this.context, ...obj }, message);
+    this.logger.warn({ ...obj, context: this.context }, message);
   }
 
   error(obj: LogContext, message: string): void {
-    this.logger.error({ context: this.context, ...obj }, message);
+    this.logger.error({ ...obj, context: this.context }, message);
   }
 }
