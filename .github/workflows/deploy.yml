@@ -131,14 +131,10 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: GHCR_TOKEN,GHCR_USER,DOMAIN,ACME_EMAIL,CORS_ORIGIN,RTC_MIN_PORT,RTC_MAX_PORT,MEDIASOUP_WORKER_NUM,STT_MODEL_SIZE,MONGO_DB_NAME,IMAGE_TAG,GEMINI_API_KEY,GEMINI_MODEL,MONGO_URI,ADMIN_API_TOKEN,NEW_RELIC_LICENSE_KEY
+          envs: GHCR_TOKEN,GHCR_USER,DOMAIN,ACME_EMAIL,CORS_ORIGIN,ANNOUNCED_IP,RTC_MIN_PORT,RTC_MAX_PORT,MEDIASOUP_WORKER_NUM,STT_MODEL_SIZE,MONGO_DB_NAME,IMAGE_TAG,GEMINI_API_KEY,GEMINI_MODEL,MONGO_URI,ADMIN_API_TOKEN,NEW_RELIC_LICENSE_KEY
           script: |
             set -e
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-
-            # EC2 public IP 자동 조회(IMDSv2)
-            IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 120")
-            PUBIP=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
 
             cd /opt/convene
             git pull --ff-only
@@ -149,7 +145,7 @@ jobs:
               echo "DOMAIN=$DOMAIN"
               echo "ACME_EMAIL=$ACME_EMAIL"
               echo "CORS_ORIGIN=$CORS_ORIGIN"
-              echo "ANNOUNCED_IP=$PUBIP"
+              echo "ANNOUNCED_IP=$ANNOUNCED_IP"
               echo "RTC_MIN_PORT=${RTC_MIN_PORT:-40000}"
               echo "RTC_MAX_PORT=${RTC_MAX_PORT:-40199}"
               echo "MEDIASOUP_WORKER_NUM=${MEDIASOUP_WORKER_NUM:-1}"
@@ -172,6 +168,7 @@ jobs:
           DOMAIN: ${{ vars.DOMAIN }}
           ACME_EMAIL: ${{ vars.ACME_EMAIL }}
           CORS_ORIGIN: ${{ vars.CORS_ORIGIN }}
+          ANNOUNCED_IP: ${{ vars.ANNOUNCED_IP }}
           RTC_MIN_PORT: ${{ vars.RTC_MIN_PORT }}
           RTC_MAX_PORT: ${{ vars.RTC_MAX_PORT }}
           MEDIASOUP_WORKER_NUM: ${{ vars.MEDIASOUP_WORKER_NUM }}

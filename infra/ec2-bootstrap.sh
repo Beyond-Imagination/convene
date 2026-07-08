@@ -40,9 +40,10 @@ cat <<'NEXT'
 
 ==> 부트스트랩 완료(docker + repo clone). 남은 단계는 모두 GitHub 쪽:
     1) Secrets:   EC2_HOST / EC2_USER / EC2_SSH_KEY / GEMINI_API_KEY / MONGO_URI
-       Variables: DOMAIN / CORS_ORIGIN / RTC_MIN_PORT / RTC_MAX_PORT / MONGO_DB_NAME
+       Variables: DOMAIN / CORS_ORIGIN / ANNOUNCED_IP / RTC_MIN_PORT / RTC_MAX_PORT / MONGO_DB_NAME
                   (선택) GEMINI_MODEL / MEDIASOUP_WORKER_NUM / STT_MODEL_SIZE / DEPLOY_ENABLED=true
-    2) Deploy 워크플로 실행 → .env 생성 + 빌드·배포 (GHCR 로그인·ANNOUNCED_IP 자동)
-    3) 보안그룹: 443/tcp, 40000-40199/udp, 40000-40199/tcp, 22/tcp(admin) 오픈.
+                  ANNOUNCED_IP = 이 호스트의 고정 퍼블릭 IP(EC2 EIP / Lightsail 정적 IP).
+    2) Deploy 워크플로 실행 → .env 생성 + 빌드·배포 (GHCR 로그인 자동)
+    3) 방화벽: 443/tcp, 443/udp, 40000-40199/udp, 40000-40199/tcp, 22/tcp(admin) 오픈.
        5000/8000/6379 는 열지 말 것(내부망 전용).
 NEXT
