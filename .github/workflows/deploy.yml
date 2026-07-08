@@ -168,7 +168,8 @@ jobs:
           DOMAIN: ${{ vars.DOMAIN }}
           ACME_EMAIL: ${{ vars.ACME_EMAIL }}
           CORS_ORIGIN: ${{ vars.CORS_ORIGIN }}
-          ANNOUNCED_IP: ${{ vars.ANNOUNCED_IP }}
+          # 단일 인스턴스 SFU: SSH 대상 IP = mediasoup 가 광고할 퍼블릭 IP 로 동일하므로 EC2_HOST 를 재사용(단일 출처).
+          ANNOUNCED_IP: ${{ secrets.EC2_HOST }}
           RTC_MIN_PORT: ${{ vars.RTC_MIN_PORT }}
           RTC_MAX_PORT: ${{ vars.RTC_MAX_PORT }}
           MEDIASOUP_WORKER_NUM: ${{ vars.MEDIASOUP_WORKER_NUM }}
