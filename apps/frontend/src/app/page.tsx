@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 
 import { CreateMeetingForm } from '@/feature/meeting/components/CreateMeetingForm';
@@ -23,10 +24,7 @@ export default function HomePage() {
       <div className="w-full max-w-md">
         <header className="mb-8 text-center">
           <div className="inline-flex items-center gap-2">
-            <span
-              className="bg-accent inline-block h-7 w-7 rounded-full"
-              aria-hidden
-            />
+            <Image src="/logo.svg" alt="" width={28} height={28} priority aria-hidden />
             <span className="text-text text-2xl font-extrabold tracking-tight">Convene</span>
           </div>
           <p className="text-muted mt-2 text-sm">링크 하나로 시작하는 화상회의 · 채팅 · 회의록</p>
