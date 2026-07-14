@@ -61,9 +61,10 @@ export class NotionHttpClient {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.config.timeoutMs);
 
-    let response: Response;
+    // 응답 body 읽기(response.json())도 타임아웃 보호를 받도록 try 범위에 포함한다.
+    // body 전송 중 hang 시에도 controller.abort()가 스트림을 끊는다.
     try {
-      response = await this.fetchFn(url, {
+      const response = await this.fetchFn(url, {
         method,
         headers: {
           Authorization: `Bearer ${this.config.token}`,
@@ -73,20 +74,21 @@ export class NotionHttpClient {
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: controller.signal,
       });
+
+      if (!response.ok) {
+        const errorBody = (await response.json().catch(() => null)) as {
+          code?: unknown;
+          message?: unknown;
+        } | null;
+        const code = typeof errorBody?.code === 'string' ? errorBody.code : null;
+        const detail =
+          typeof errorBody?.message === 'string' ? errorBody.message : response.statusText;
+        throw new NotionApiError(response.status, code, `Notion API ${response.status}: ${detail}`);
+      }
+
+      return (await response.json()) as T;
     } finally {
       clearTimeout(timer);
     }
-
-    if (!response.ok) {
-      const errorBody = (await response.json().catch(() => null)) as {
-        code?: unknown;
-        message?: unknown;
-      } | null;
-      const code = typeof errorBody?.code === 'string' ? errorBody.code : null;
-      const detail = typeof errorBody?.message === 'string' ? errorBody.message : response.statusText;
-      throw new NotionApiError(response.status, code, `Notion API ${response.status}: ${detail}`);
-    }
-
-    return (await response.json()) as T;
   }
 }
