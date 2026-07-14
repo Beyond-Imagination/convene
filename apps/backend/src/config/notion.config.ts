@@ -2,7 +2,8 @@
  * 노션 REST API 어댑터의 환경변수 해석 모듈.
  *
  * - `NOTION_TOKEN`이 비어 있으면 노션 기능 dormant 신호로 `null` 반환(gate).
- * - version/baseUrl/timeout은 미설정 시 디폴트. `databaseId`(폴링용)는 미설정 시 `null`.
+ * - version/baseUrl/timeout은 미설정 시 디폴트. `databaseIds`(폴링용)는 미설정 시 빈 배열.
+ *   이슈 관리 DB는 여럿(팀/프로젝트)이라 `NOTION_DB_IDS`를 콤마 구분 복수로 받는다.
  * - 노션 REST 는 SDK 없이 직접 호출한다(base `https://api.notion.com`, `Authorization: Bearer`,
  *   `Notion-Version` 헤더 필수).
  */
@@ -16,7 +17,7 @@ export interface NotionConfig {
   readonly version: string;
   readonly baseUrl: string;
   readonly timeoutMs: number;
-  readonly databaseId: string | null;
+  readonly databaseIds: ReadonlyArray<string>;
 }
 
 export function resolveNotionConfig(env: NodeJS.ProcessEnv = process.env): NotionConfig | null {
@@ -26,7 +27,10 @@ export function resolveNotionConfig(env: NodeJS.ProcessEnv = process.env): Notio
   const versionRaw = env.NOTION_VERSION?.trim();
   const baseUrlRaw = env.NOTION_BASE_URL?.trim();
   const timeoutRaw = env.NOTION_TIMEOUT_MS?.trim();
-  const databaseIdRaw = env.NOTION_DB_ID?.trim();
+  const databaseIds = (env.NOTION_DB_IDS ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
 
   let timeoutMs = DEFAULT_NOTION_TIMEOUT_MS;
   if (timeoutRaw !== undefined && timeoutRaw.length > 0) {
@@ -50,6 +54,6 @@ export function resolveNotionConfig(env: NodeJS.ProcessEnv = process.env): Notio
     version: versionRaw === undefined || versionRaw.length === 0 ? DEFAULT_NOTION_VERSION : versionRaw,
     baseUrl,
     timeoutMs,
-    databaseId: databaseIdRaw === undefined || databaseIdRaw.length === 0 ? null : databaseIdRaw,
+    databaseIds,
   };
 }
