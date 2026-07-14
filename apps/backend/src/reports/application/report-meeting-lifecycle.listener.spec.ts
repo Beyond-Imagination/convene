@@ -11,6 +11,7 @@ const endedAt = new Date('2026-01-01T00:30:00Z');
 const payload: MeetingEndedPayload = {
   code: 'abc12xyz',
   source: 'web',
+  meetingType: 'general',
   externalReference: NO_EXTERNAL_REFERENCE,
   startedAt,
   endedAt,

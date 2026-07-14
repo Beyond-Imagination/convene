@@ -15,6 +15,7 @@ describe('NoopNotion', () => {
       meetingId: 'mtg-x',
       code: 'code-x',
       source: 'web',
+      meetingType: 'general',
       externalReference: NO_EXTERNAL_REFERENCE,
       startedAt,
       endedAt,

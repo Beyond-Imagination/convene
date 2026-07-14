@@ -18,6 +18,7 @@ interface MeetingReportDoc {
   meetingId: string;
   code: string;
   source: MeetingReportSnapshot['source'];
+  meetingType: MeetingReportSnapshot['meetingType'];
   title: MeetingReportSnapshot['title'];
   externalReference: MeetingReportSnapshot['externalReference'];
   startedAt: Date;
@@ -93,6 +94,7 @@ export class MongoReportRepository implements ReportRepository {
       meetingId: snapshot.meetingId,
       code: snapshot.code,
       source: snapshot.source,
+      meetingType: snapshot.meetingType,
       title: snapshot.title,
       externalReference: snapshot.externalReference,
       startedAt: snapshot.startedAt,
@@ -116,6 +118,7 @@ export class MongoReportRepository implements ReportRepository {
       meetingId: doc.meetingId,
       code: doc.code,
       source: doc.source,
+      meetingType: doc.meetingType,
       title: doc.title ?? null,
       externalReference: doc.externalReference,
       startedAt: doc.startedAt,

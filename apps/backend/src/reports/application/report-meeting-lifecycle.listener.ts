@@ -19,6 +19,7 @@ export class ReportMeetingLifecycleListener {
       meetingId: payload.code,
       code: payload.code,
       source: payload.source,
+      meetingType: payload.meetingType,
       externalReference: payload.externalReference,
       startedAt: payload.startedAt,
       endedAt: payload.endedAt,

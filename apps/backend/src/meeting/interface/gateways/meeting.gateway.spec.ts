@@ -239,6 +239,7 @@ describe('MeetingGateway.onMeetingEnded', () => {
   const payload = {
     code: 'abc12xyz',
     source: 'web' as const,
+    meetingType: 'general' as const,
     externalReference: externalReference(),
     startedAt: t0,
     endedAt: tEnded,
