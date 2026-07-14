@@ -12,32 +12,47 @@ describe('resolveNotionConfig', () => {
     expect(resolveNotionConfig({ NOTION_TOKEN: '   ' })).toBeNull();
   });
 
-  it('NOTION_TOKEN만 있으면 version/baseUrl/timeout은 디폴트, databaseId는 null', () => {
+  it('NOTION_TOKEN만 있으면 version/baseUrl/timeout은 디폴트, databaseIds는 빈 배열', () => {
     expect(resolveNotionConfig({ NOTION_TOKEN: 't' })).toEqual({
       token: 't',
       version: DEFAULT_NOTION_VERSION,
       baseUrl: DEFAULT_NOTION_BASE_URL,
       timeoutMs: DEFAULT_NOTION_TIMEOUT_MS,
-      databaseId: null,
+      databaseIds: [],
     });
   });
 
-  it('NOTION_VERSION / NOTION_BASE_URL / NOTION_TIMEOUT_MS / NOTION_DB_ID를 적용한다', () => {
+  it('NOTION_VERSION / NOTION_BASE_URL / NOTION_TIMEOUT_MS를 적용한다', () => {
     expect(
       resolveNotionConfig({
         NOTION_TOKEN: 't',
         NOTION_VERSION: '2022-06-28',
         NOTION_BASE_URL: 'https://api.notion.com/',
         NOTION_TIMEOUT_MS: '15000',
-        NOTION_DB_ID: 'db-123',
       }),
-    ).toEqual({
+    ).toMatchObject({
       token: 't',
       version: '2022-06-28',
       baseUrl: 'https://api.notion.com',
       timeoutMs: 15000,
-      databaseId: 'db-123',
     });
+  });
+
+  it('NOTION_DB_IDS는 콤마 구분 복수 DB(팀/프로젝트 이슈 관리)를 파싱한다', () => {
+    expect(resolveNotionConfig({ NOTION_TOKEN: 't', NOTION_DB_IDS: 'team-db' })?.databaseIds).toEqual(
+      ['team-db'],
+    );
+    expect(
+      resolveNotionConfig({ NOTION_TOKEN: 't', NOTION_DB_IDS: 'team-db, project-db , extra-db' })
+        ?.databaseIds,
+    ).toEqual(['team-db', 'project-db', 'extra-db']);
+  });
+
+  it('NOTION_DB_IDS의 빈 항목/공백은 제거한다', () => {
+    expect(
+      resolveNotionConfig({ NOTION_TOKEN: 't', NOTION_DB_IDS: 'team-db,,  ,project-db,' })
+        ?.databaseIds,
+    ).toEqual(['team-db', 'project-db']);
   });
 
   it('NOTION_TIMEOUT_MS가 양의 정수가 아니면 throw', () => {
