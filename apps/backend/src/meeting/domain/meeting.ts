@@ -1,4 +1,9 @@
-import { ExternalReference, Source } from '@/shared-kernel/domain/value-objects';
+import {
+  DEFAULT_MEETING_TYPE,
+  ExternalReference,
+  MeetingType,
+  Source,
+} from '@/shared-kernel/domain/value-objects';
 
 import { Participant, ParticipantSnapshot } from './participant';
 import { IdleTimeout, MeetingCode } from './value-objects';
@@ -6,6 +11,7 @@ import { IdleTimeout, MeetingCode } from './value-objects';
 export interface MeetingSnapshot {
   readonly code: string;
   readonly source: Source;
+  readonly meetingType: MeetingType;
   readonly externalReference: ExternalReference;
   readonly idleTimeoutMs: number;
   readonly startedAt: Date;
@@ -19,6 +25,7 @@ export interface MeetingSnapshot {
 interface CreateMeetingInput {
   code: MeetingCode;
   source: Source;
+  meetingType?: MeetingType;
   externalReference: ExternalReference;
   idleTimeout: IdleTimeout;
   startedAt: Date;
@@ -42,6 +49,7 @@ export class Meeting {
   private constructor(
     public readonly code: MeetingCode,
     public readonly source: Source,
+    public readonly meetingType: MeetingType,
     public readonly externalReference: ExternalReference,
     public readonly idleTimeout: IdleTimeout,
     public readonly startedAt: Date,
@@ -55,6 +63,7 @@ export class Meeting {
     return new Meeting(
       input.code,
       input.source,
+      input.meetingType ?? DEFAULT_MEETING_TYPE,
       input.externalReference,
       input.idleTimeout,
       input.startedAt,
@@ -74,6 +83,7 @@ export class Meeting {
     const meeting = new Meeting(
       MeetingCode.from(snapshot.code),
       snapshot.source,
+      snapshot.meetingType,
       snapshot.externalReference,
       IdleTimeout.of(snapshot.idleTimeoutMs),
       snapshot.startedAt,
@@ -183,6 +193,7 @@ export class Meeting {
     return {
       code: this.code.value,
       source: this.source,
+      meetingType: this.meetingType,
       externalReference: this.externalReference,
       idleTimeoutMs: this.idleTimeout.milliseconds,
       startedAt: this.startedAt,

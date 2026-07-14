@@ -1,4 +1,9 @@
-import { ChatEntry, ExternalReference, Source } from '@/shared-kernel/domain/value-objects';
+import {
+  ChatEntry,
+  ExternalReference,
+  MeetingType,
+  Source,
+} from '@/shared-kernel/domain/value-objects';
 
 import { ParticipantEntry, TranscriptSegment } from './entries';
 import { NotionPushResult, PipelineState, ReportSummary } from './value-objects';
@@ -8,6 +13,7 @@ export interface CreateMeetingReportInput {
   meetingId: string;
   code: string;
   source: Source;
+  meetingType: MeetingType;
   externalReference: ExternalReference;
   startedAt: Date;
   endedAt: Date;
@@ -33,6 +39,7 @@ export interface MeetingReportSnapshot {
   readonly meetingId: string;
   readonly code: string;
   readonly source: Source;
+  readonly meetingType: MeetingType;
   readonly externalReference: ExternalReference;
   readonly startedAt: Date;
   readonly endedAt: Date;
@@ -56,6 +63,7 @@ export class MeetingReport {
     public readonly meetingId: string,
     public readonly code: string,
     public readonly source: Source,
+    public readonly meetingType: MeetingType,
     public readonly externalReference: ExternalReference,
     public readonly startedAt: Date,
     public readonly endedAt: Date,
@@ -81,6 +89,7 @@ export class MeetingReport {
       snapshot.meetingId,
       snapshot.code,
       snapshot.source,
+      snapshot.meetingType,
       snapshot.externalReference,
       snapshot.startedAt,
       snapshot.endedAt,
@@ -113,6 +122,7 @@ export class MeetingReport {
       meetingId,
       code,
       input.source,
+      input.meetingType,
       input.externalReference,
       input.startedAt,
       input.endedAt,
@@ -195,6 +205,7 @@ export class MeetingReport {
       meetingId: this.meetingId,
       code: this.code,
       source: this.source,
+      meetingType: this.meetingType,
       externalReference: this.externalReference,
       startedAt: this.startedAt,
       endedAt: this.endedAt,

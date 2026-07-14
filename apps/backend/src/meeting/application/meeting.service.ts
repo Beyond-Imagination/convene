@@ -16,6 +16,7 @@ import {
   ChatEntry,
   chatEntry,
   ExternalReference,
+  MeetingType,
   Source,
 } from '@/shared-kernel/domain/value-objects';
 
@@ -31,6 +32,7 @@ interface MeetingServiceDeps {
 
 interface CreateMeetingCommand {
   source: Source;
+  meetingType?: MeetingType;
   externalReference: ExternalReference;
   title?: string | null;
 }
@@ -83,6 +85,7 @@ export class MeetingService {
     const meeting = Meeting.create({
       code,
       source: command.source,
+      meetingType: command.meetingType,
       externalReference: command.externalReference,
       idleTimeout: IdleTimeout.default(),
       startedAt,
@@ -203,6 +206,7 @@ export class MeetingService {
     return {
       code,
       source: snapshot.source,
+      meetingType: snapshot.meetingType,
       externalReference: snapshot.externalReference,
       startedAt: snapshot.startedAt,
       endedAt,

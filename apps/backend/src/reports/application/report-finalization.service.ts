@@ -9,7 +9,12 @@ import {
   SummarizerPort,
 } from '@/reports/domain/ports';
 import { Clock, DomainEventPublisher, LoggerPort } from '@/shared-kernel/domain/ports';
-import { ChatEntry, ExternalReference, Source } from '@/shared-kernel/domain/value-objects';
+import {
+  ChatEntry,
+  ExternalReference,
+  MeetingType,
+  Source,
+} from '@/shared-kernel/domain/value-objects';
 
 import { ReportNotFoundError, ReportNotResummarizableError } from './report.errors';
 
@@ -27,6 +32,7 @@ export interface CreateDraftCommand {
   meetingId: string;
   code: string;
   source: Source;
+  meetingType: MeetingType;
   externalReference: ExternalReference;
   startedAt: Date;
   endedAt: Date;
@@ -61,6 +67,7 @@ export class ReportFinalizationService {
       meetingId: command.meetingId,
       code: command.code,
       source: command.source,
+      meetingType: command.meetingType,
       externalReference: command.externalReference,
       startedAt: command.startedAt,
       endedAt: command.endedAt,

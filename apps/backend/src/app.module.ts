@@ -8,6 +8,7 @@ import { isPrettyLoggingEnabled, resolveLogLevel } from '@/config/logger.config'
 import { MediasoupModule } from '@/mediasoup/mediasoup.module';
 import { MeetingModule } from '@/meeting/meeting.module';
 import { MongoModule } from '@/mongo/mongo.module';
+import { NotionModule } from '@/notion/notion.module';
 import { RecordingModule } from '@/recording/recording.module';
 import { RedisModule } from '@/redis/redis.module';
 import { ReportsModule } from '@/reports/reports.module';
@@ -51,6 +52,7 @@ import { SharedKernelModule } from '@/shared-kernel/shared-kernel.module';
     MediasoupModule,
     ReportsModule,
     RecordingModule,
+    NotionModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: DomainExceptionFilter }],
 })

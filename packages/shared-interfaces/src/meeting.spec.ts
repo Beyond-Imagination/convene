@@ -5,8 +5,10 @@ import {
   type CreateMeetingRequest,
   type CreateMeetingResponse,
   type ExternalReferencePayload,
+  MEETING_TYPES,
   MEETING_WS_EVENTS,
   type MeetingEndedBroadcast,
+  type MeetingType,
   type MeetingWsEventName,
   type Source,
   SOURCES,
@@ -30,6 +32,20 @@ describe('meeting wire format', () => {
       externalReference: { issueId: 'NTN-1' } satisfies ExternalReferencePayload,
     };
     expect([r1.source, r2.externalReference?.issueId]).toEqual(['web', 'NTN-1']);
+  });
+
+  it('MEETING_TYPES는 general/retrospective/weekly-sync 세 가지를 가진다', () => {
+    expect(MEETING_TYPES).toEqual(['general', 'retrospective', 'weekly-sync']);
+  });
+
+  it('MeetingType은 MEETING_TYPES의 literal union이다 (컴파일 체크)', () => {
+    const t: MeetingType = 'retrospective';
+    expect(MEETING_TYPES).toContain(t);
+  });
+
+  it('CreateMeetingRequest.meetingType은 선택이다(미지정 시 서버가 general로 채움)', () => {
+    const r: CreateMeetingRequest = { source: 'notion-issue', meetingType: 'retrospective' };
+    expect(r.meetingType).toBe('retrospective');
   });
 
   it('CreateMeetingResponse는 code / source / startedAt(ISO) / hostToken을 가진다', () => {

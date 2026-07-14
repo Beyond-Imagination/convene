@@ -1,4 +1,4 @@
-import { ChatEntry, ExternalReference, Source } from '../value-objects';
+import { ChatEntry, ExternalReference, MeetingType, Source } from '../value-objects';
 
 export type MeetingEndedReason = 'manual' | 'idle';
 
@@ -15,6 +15,7 @@ export interface MeetingEndedParticipant {
 export interface MeetingEndedPayload {
   readonly code: string;
   readonly source: Source;
+  readonly meetingType: MeetingType;
   readonly externalReference: ExternalReference;
   readonly startedAt: Date;
   readonly endedAt: Date;

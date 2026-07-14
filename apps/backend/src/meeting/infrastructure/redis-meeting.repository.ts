@@ -4,7 +4,7 @@ import Redis from 'ioredis';
 import { Meeting, MeetingSnapshot } from '@/meeting/domain/meeting';
 import { ParticipantSnapshot } from '@/meeting/domain/participant';
 import { MeetingRepository } from '@/meeting/domain/ports';
-import { ExternalReference, Source } from '@/shared-kernel/domain/value-objects';
+import { ExternalReference, MeetingType, Source } from '@/shared-kernel/domain/value-objects';
 
 const KEY_PREFIX = 'meeting:';
 
@@ -24,6 +24,7 @@ interface ParticipantWire {
 interface MeetingWire {
   readonly code: string;
   readonly source: Source;
+  readonly meetingType: MeetingType;
   readonly externalReference: ExternalReference;
   readonly idleTimeoutMs: number;
   readonly startedAt: string;
@@ -67,6 +68,7 @@ export class RedisMeetingRepository implements MeetingRepository {
     return {
       code: snapshot.code,
       source: snapshot.source,
+      meetingType: snapshot.meetingType,
       externalReference: snapshot.externalReference,
       idleTimeoutMs: snapshot.idleTimeoutMs,
       startedAt: snapshot.startedAt.toISOString(),
@@ -89,6 +91,7 @@ export class RedisMeetingRepository implements MeetingRepository {
     return {
       code: wire.code,
       source: wire.source,
+      meetingType: wire.meetingType,
       externalReference: wire.externalReference,
       idleTimeoutMs: wire.idleTimeoutMs,
       startedAt: new Date(wire.startedAt),

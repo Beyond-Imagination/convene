@@ -139,6 +139,18 @@ describe('MeetingService.createMeeting', () => {
     });
     expect(result.hostToken).toBe('host-token-generated');
   });
+
+  it('meetingType을 지정하면 Meeting에 싣고, 미지정 시 general로 채운다', async () => {
+    const { service } = makeService();
+    const retro = await service.createMeeting({
+      source: 'notion-issue',
+      meetingType: 'retrospective',
+      externalReference: externalReference(),
+    });
+    expect(retro.meetingType).toBe('retrospective');
+    const def = await service.createMeeting({ source: 'web', externalReference: externalReference() });
+    expect(def.meetingType).toBe('general');
+  });
 });
 
 describe('MeetingService.joinMeeting', () => {
@@ -422,6 +434,7 @@ describe('MeetingService.closeMeeting', () => {
         payload: {
           code: 'abc12xyz',
           source: 'web',
+          meetingType: 'general',
           externalReference: NO_EXTERNAL_REFERENCE,
           startedAt: t0,
           endedAt: tClose,
@@ -565,6 +578,7 @@ describe('MeetingService.detectIdleAndClose', () => {
         payload: {
           code: 'abc12xyz',
           source: 'web',
+          meetingType: 'general',
           externalReference: NO_EXTERNAL_REFERENCE,
           startedAt: t0,
           endedAt: tIdleElapsed,

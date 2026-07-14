@@ -29,6 +29,7 @@ export class MeetingController {
     const ref = externalReference({ issueId: dto.externalReference?.issueId });
     const meeting = await this.service.createMeeting({
       source: dto.source,
+      meetingType: dto.meetingType,
       externalReference: ref,
       title: dto.title ?? null,
     });

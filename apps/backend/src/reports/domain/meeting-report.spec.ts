@@ -14,6 +14,7 @@ describe('MeetingReport (Aggregate Root)', () => {
     meetingId: 'meeting-1',
     code: 'abc12xyz',
     source: 'web' as const,
+    meetingType: 'general' as const,
     externalReference: externalReference(),
     startedAt,
     endedAt,
@@ -34,6 +35,12 @@ describe('MeetingReport (Aggregate Root)', () => {
     });
 
   describe('fromEndedMeeting', () => {
+    it('meetingType을 보존한다', () => {
+      const r = MeetingReport.fromEndedMeeting({ ...baseInput(), meetingType: 'retrospective' });
+      expect(r.meetingType).toBe('retrospective');
+      expect(r.snapshot().meetingType).toBe('retrospective');
+    });
+
     it('draft 상태로 생성된다(transcript 비어 있음, pipeline 모두 pending)', () => {
       const r = MeetingReport.fromEndedMeeting(baseInput());
       expect(r.id).toBe('report-1');
