@@ -7,6 +7,9 @@
 export const SOURCES = ['web', 'notion-issue'] as const;
 export type Source = (typeof SOURCES)[number];
 
+export const MEETING_TYPES = ['general', 'retrospective', 'weekly-sync'] as const;
+export type MeetingType = (typeof MEETING_TYPES)[number];
+
 /**
  * 회의를 만들어낸 외부 시스템의 식별자.
  *   - v1.0.0: 항상 비어 있거나 미전송.
@@ -18,6 +21,7 @@ export interface ExternalReferencePayload {
 
 export interface CreateMeetingRequest {
   source: Source;
+  meetingType?: MeetingType;
   externalReference?: ExternalReferencePayload;
   title?: string;
 }
