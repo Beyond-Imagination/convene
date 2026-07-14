@@ -4,8 +4,6 @@
  * - `NOTION_TOKEN`이 비어 있으면 노션 기능 dormant 신호로 `null` 반환(gate).
  * - version/baseUrl/timeout은 미설정 시 디폴트. `databaseIds`(폴링용)는 미설정 시 빈 배열.
  *   이슈 관리 DB는 여럿(팀/프로젝트)이라 `NOTION_DB_IDS`를 콤마 구분 복수로 받는다.
- * - 노션 REST 는 SDK 없이 직접 호출한다(base `https://api.notion.com`, `Authorization: Bearer`,
- *   `Notion-Version` 헤더 필수).
  */
 
 export const DEFAULT_NOTION_VERSION = '2026-03-11';
