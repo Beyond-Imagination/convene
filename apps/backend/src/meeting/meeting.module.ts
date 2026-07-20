@@ -2,12 +2,14 @@ import { Module } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
+import { MeetingCreationAdapter } from '@/meeting/application/meeting-creation.adapter';
 import { RandomHostTokenGenerator } from '@/meeting/infrastructure/random-host-token.generator';
 import { RandomMeetingCodeGenerator } from '@/meeting/infrastructure/random-meeting-code.generator';
 import { RedisChatRepository } from '@/meeting/infrastructure/redis-chat.repository';
 import { RedisMeetingRepository } from '@/meeting/infrastructure/redis-meeting.repository';
 import { MeetingController } from '@/meeting/interface/controllers/meeting.controller';
 import { MeetingGateway } from '@/meeting/interface/gateways/meeting.gateway';
+import { MEETING_CREATION_PORT } from '@/shared-kernel/domain/ports';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
@@ -58,6 +60,13 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
         PinoLogger,
       ],
     },
+    {
+      // notion 등 다른 BC가 회의 생성을 호출하기 위한 Port. MeetingService에 위임한다.
+      provide: MEETING_CREATION_PORT,
+      useFactory: (service: MeetingService) => new MeetingCreationAdapter(service),
+      inject: [MeetingService],
+    },
   ],
+  exports: [MEETING_CREATION_PORT],
 })
 export class MeetingModule {}

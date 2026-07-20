@@ -4,9 +4,11 @@
  * - `NOTION_TOKEN`이 비어 있으면 노션 기능 dormant 신호로 `null` 반환(gate).
  * - version/baseUrl/timeout은 미설정 시 디폴트. `databaseIds`(폴링용)는 미설정 시 빈 배열.
  *   이슈 관리 DB는 여럿(팀/프로젝트)이라 `NOTION_DB_IDS`를 콤마 구분 복수로 받는다.
+ * - `signingSecret`(즉시 버튼 HMAC 검증)은 N-B 즉시 경로용. 없으면 컨트롤러 미등록.
  */
 
-export const DEFAULT_NOTION_VERSION = '2026-03-11';
+// 2025-09-03: 멀티소스 DB 도입. 조회는 databases/{id}/query가 아니라 data_sources/{id}/query.
+export const DEFAULT_NOTION_VERSION = '2025-09-03';
 export const DEFAULT_NOTION_BASE_URL = 'https://api.notion.com';
 export const DEFAULT_NOTION_TIMEOUT_MS = 30_000;
 
@@ -16,6 +18,7 @@ export interface NotionConfig {
   readonly baseUrl: string;
   readonly timeoutMs: number;
   readonly databaseIds: ReadonlyArray<string>;
+  readonly signingSecret: string | null;
 }
 
 export function resolveNotionConfig(env: NodeJS.ProcessEnv = process.env): NotionConfig | null {
@@ -47,11 +50,16 @@ export function resolveNotionConfig(env: NodeJS.ProcessEnv = process.env): Notio
     baseUrl = baseUrlRaw.replace(/\/+$/, '');
   }
 
+  const signingSecretRaw = env.NOTION_SIGNING_SECRET?.trim();
+  const signingSecret =
+    signingSecretRaw === undefined || signingSecretRaw.length === 0 ? null : signingSecretRaw;
+
   return {
     token,
     version: versionRaw === undefined || versionRaw.length === 0 ? DEFAULT_NOTION_VERSION : versionRaw,
     baseUrl,
     timeoutMs,
     databaseIds,
+    signingSecret,
   };
 }

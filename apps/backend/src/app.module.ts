@@ -52,7 +52,7 @@ import { SharedKernelModule } from '@/shared-kernel/shared-kernel.module';
     MediasoupModule,
     ReportsModule,
     RecordingModule,
-    NotionModule,
+    NotionModule.register(),
   ],
   providers: [{ provide: APP_FILTER, useClass: DomainExceptionFilter }],
 })

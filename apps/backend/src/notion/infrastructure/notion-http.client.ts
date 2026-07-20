@@ -41,8 +41,12 @@ export class NotionHttpClient {
     return this.request<NotionListPage>('GET', `/blocks/${blockId}/children${query}`);
   }
 
-  async queryDatabase(databaseId: string, body: unknown): Promise<NotionListPage> {
-    return this.request<NotionListPage>('POST', `/databases/${databaseId}/query`, body);
+  async retrieveDatabase(databaseId: string): Promise<Record<string, unknown>> {
+    return this.request('GET', `/databases/${databaseId}`);
+  }
+
+  async queryDataSource(dataSourceId: string, body: unknown): Promise<NotionListPage> {
+    return this.request<NotionListPage>('POST', `/data_sources/${dataSourceId}/query`, body);
   }
 
   async updatePageProperties(
