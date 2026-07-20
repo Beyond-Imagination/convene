@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 
+import { resolveNotionPollCron } from '@/config/notion.config';
 import { NotionMeetingProvisioningService } from '@/notion/application/notion-meeting-provisioning.service';
 import { Clock, LoggerPort } from '@/shared-kernel/domain/ports';
 
@@ -15,7 +16,7 @@ export class NotionPollingScheduler {
     private readonly logger: LoggerPort,
   ) {}
 
-  @Cron(CronExpression.EVERY_MINUTE)
+  @Cron(resolveNotionPollCron())
   async poll(): Promise<void> {
     if (this.running) return;
     this.running = true;

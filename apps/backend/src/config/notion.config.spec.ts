@@ -1,8 +1,10 @@
 import {
   DEFAULT_NOTION_BASE_URL,
+  DEFAULT_NOTION_POLL_CRON,
   DEFAULT_NOTION_TIMEOUT_MS,
   DEFAULT_NOTION_VERSION,
   resolveNotionConfig,
+  resolveNotionPollCron,
 } from './notion.config';
 
 describe('resolveNotionConfig', () => {
@@ -83,5 +85,13 @@ describe('resolveNotionConfig', () => {
     );
     expect(resolveNotionConfig({ NOTION_TOKEN: 't' })?.signingSecret).toBeNull();
     expect(resolveNotionConfig({ NOTION_TOKEN: 't', NOTION_SIGNING_SECRET: '   ' })?.signingSecret).toBeNull();
+  });
+});
+
+describe('resolveNotionPollCron', () => {
+  it('기본은 30분마다, NOTION_POLL_CRON이 있으면 그 값을 쓴다', () => {
+    expect(resolveNotionPollCron({})).toBe(DEFAULT_NOTION_POLL_CRON);
+    expect(resolveNotionPollCron({ NOTION_POLL_CRON: '0 */5 * * * *' })).toBe('0 */5 * * * *');
+    expect(resolveNotionPollCron({ NOTION_POLL_CRON: '   ' })).toBe(DEFAULT_NOTION_POLL_CRON);
   });
 });
