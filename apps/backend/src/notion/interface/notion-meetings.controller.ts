@@ -28,19 +28,38 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
+// Convene 프론트(홈/입장) 라이트 테마와 통일: surface 카드 + accent 프라이머리 버튼.
 function renderConfirmPage(issueId: string, sig: string): string {
   const id = escapeHtml(issueId);
   const s = escapeHtml(sig);
   return `<!doctype html>
 <html lang="ko">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>회의 생성</title></head>
-<body style="font-family:sans-serif;display:flex;min-height:90vh;align-items:center;justify-content:center">
-  <form method="post" action="/notion/meetings" style="text-align:center">
-    <p>이 이슈의 회의를 생성합니다.</p>
-    <input type="hidden" name="issueId" value="${id}" />
-    <input type="hidden" name="sig" value="${s}" />
-    <button type="submit" style="padding:.75rem 1.5rem;font-size:1rem;cursor:pointer">회의 생성하기</button>
-  </form>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>회의 생성 · Convene</title>
+<style>
+  :root{--bg:#fff;--surface:#f5f5f5;--border:#e5e5e5;--text:#171717;--muted:#737373;--accent:#3b82f6;--accent-hover:#2563eb;--accent-active:#1d4ed8}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:3rem 1rem;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .card{width:100%;max-width:28rem;border:1px solid var(--border);background:var(--surface);border-radius:.75rem;box-shadow:0 1px 2px 0 rgb(0 0 0/.05);padding:2rem;text-align:center}
+  .brand{font-size:1.5rem;font-weight:800;letter-spacing:-.025em}
+  .subtitle{margin:.5rem 0 1.75rem;font-size:.875rem;color:var(--muted)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;width:100%;border:0;border-radius:.5rem;padding:.7rem 1rem;font-size:.9rem;font-weight:600;color:#fff;background:var(--accent);cursor:pointer;transition:background-color .15s}
+  .btn:hover{background:var(--accent-hover)}
+  .btn:active{background:var(--accent-active)}
+</style>
+</head>
+<body>
+  <main class="card">
+    <div class="brand">Convene</div>
+    <p class="subtitle">이 노션 이슈의 회의를 생성합니다.</p>
+    <form method="post" action="/notion/meetings">
+      <input type="hidden" name="issueId" value="${id}" />
+      <input type="hidden" name="sig" value="${s}" />
+      <button type="submit" class="btn">회의 생성하기</button>
+    </form>
+  </main>
 </body>
 </html>`;
 }
