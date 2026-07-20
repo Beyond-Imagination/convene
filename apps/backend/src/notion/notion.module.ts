@@ -1,5 +1,4 @@
 import { DynamicModule, Module, Provider, Type } from '@nestjs/common';
-import { ScheduleModule } from '@nestjs/schedule';
 import { PinoLogger } from 'nestjs-pino';
 
 import { resolveNotionConfig } from '@/config/notion.config';
@@ -51,7 +50,11 @@ export class NotionModule {
         ) =>
           new NotionMeetingProvisioningService({
             meetingCreation,
-            notionIssue: new NotionIssueAdapter(client, databaseIds),
+            notionIssue: new NotionIssueAdapter(
+              client,
+              databaseIds,
+              new PinoLoggerAdapter(logger, NotionIssueAdapter.name),
+            ),
             meetingLinkBase,
             logger: new PinoLoggerAdapter(logger, NotionMeetingProvisioningService.name),
           }),
@@ -70,7 +73,8 @@ export class NotionModule {
     }
 
     if (databaseIds.length > 0) {
-      imports.push(ScheduleModule.forRoot());
+      // ScheduleModule.forRoot()는 AppModule 루트에 있다. 여기선 스케줄러 provider만 등록하면
+      // 루트의 SchedulerExplorer가 @Cron을 감지해 스케줄한다.
       providers.push({
         provide: NotionPollingScheduler,
         useFactory: (

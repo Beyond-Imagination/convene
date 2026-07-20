@@ -3,8 +3,14 @@ import {
   buildPendingIssuesFilter,
   NotionIssueAdapter,
 } from '@/notion/infrastructure/notion-issue.adapter';
+import { LoggerPort } from '@/shared-kernel/domain/ports';
 
 const NOW = new Date('2026-07-20T12:00:00.000Z');
+
+function silentLogger(): LoggerPort {
+  const noop = (): void => undefined;
+  return { debug: noop, info: noop, warn: noop, error: noop } as unknown as LoggerPort;
+}
 
 function titleIssue(id: string, title: string): Record<string, unknown> {
   return { id, properties: { 이름: { type: 'title', title: [{ plain_text: title }] } } };
@@ -56,7 +62,7 @@ describe('NotionIssueAdapter.findPendingIssues', () => {
       },
     } as unknown as NotionHttpClient;
 
-    const adapter = new NotionIssueAdapter(client, ['team-db', 'proj-db']);
+    const adapter = new NotionIssueAdapter(client, ['team-db', 'proj-db'], silentLogger());
     const result = await adapter.findPendingIssues(NOW);
 
     expect(result).toEqual([
@@ -81,9 +87,27 @@ describe('NotionIssueAdapter.findPendingIssues', () => {
       },
     } as unknown as NotionHttpClient;
 
-    await new NotionIssueAdapter(client, ['db']).findPendingIssues(NOW);
+    await new NotionIssueAdapter(client, ['db'], silentLogger()).findPendingIssues(NOW);
 
     expect(queried).toEqual(['ds-1', 'ds-2']);
+  });
+
+  it('한 DB 조회가 실패해도 나머지 DB는 계속 폴링한다(예외 격리)', async () => {
+    const client = {
+      retrieveDatabase: async (dbId: string): Promise<Record<string, unknown>> => {
+        if (dbId === 'bad-db') throw new Error('object_not_found');
+        return { data_sources: [{ id: 'good-ds' }] };
+      },
+      queryDataSource: async (): Promise<NotionListPage> => page([titleIssue('ok', 'OK')]),
+    } as unknown as NotionHttpClient;
+
+    const result = await new NotionIssueAdapter(
+      client,
+      ['bad-db', 'good-db'],
+      silentLogger(),
+    ).findPendingIssues(NOW);
+
+    expect(result).toEqual([{ issueId: 'ok', title: 'OK' }]);
   });
 
   it('title 타입 속성이 없으면 title은 null', async () => {
@@ -92,7 +116,7 @@ describe('NotionIssueAdapter.findPendingIssues', () => {
       queryDataSource: async (): Promise<NotionListPage> => page([{ id: 'no-title', properties: {} }]),
     } as unknown as NotionHttpClient;
 
-    const result = await new NotionIssueAdapter(client, ['db']).findPendingIssues(NOW);
+    const result = await new NotionIssueAdapter(client, ['db'], silentLogger()).findPendingIssues(NOW);
 
     expect(result).toEqual([{ issueId: 'no-title', title: null }]);
   });
@@ -108,7 +132,7 @@ describe('NotionIssueAdapter.writeMeetingLink', () => {
       },
     } as unknown as NotionHttpClient;
 
-    await new NotionIssueAdapter(client, []).writeMeetingLink(
+    await new NotionIssueAdapter(client, [], silentLogger()).writeMeetingLink(
       'page-1',
       'https://convene.example.com/meetings/ABC123',
     );

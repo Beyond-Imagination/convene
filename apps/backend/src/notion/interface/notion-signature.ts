@@ -6,6 +6,8 @@ export function signIssue(secret: string, issueId: string): string {
 }
 
 export function verifyIssueSignature(secret: string, issueId: string, sig: string): boolean {
+  // 런타임에 sig가 string이 아니면(undefined 등) Buffer.from이 던진다. 방어적으로 차단.
+  if (typeof sig !== 'string' || typeof issueId !== 'string') return false;
   const expected = Buffer.from(signIssue(secret, issueId));
   const provided = Buffer.from(sig);
   // timingSafeEqual은 길이가 같아야 하며, 상수시간 비교로 타이밍 누출을 막는다.

@@ -20,6 +20,11 @@ describe('signIssue / verifyIssueSignature', () => {
     expect(verifyIssueSignature('s3cr3t', 'issue-1', 'deadbeef')).toBe(false);
   });
 
+  it('sig가 string이 아니면(undefined 등) throw 없이 false', () => {
+    expect(verifyIssueSignature('s3cr3t', 'issue-1', undefined as unknown as string)).toBe(false);
+    expect(verifyIssueSignature('s3cr3t', 'issue-1', 123 as unknown as string)).toBe(false);
+  });
+
   it('NotionSignatureVerifier는 secret을 품고 검증만 노출한다', () => {
     const verifier = new NotionSignatureVerifier('s3cr3t');
     expect(verifier.verify('issue-1', signIssue('s3cr3t', 'issue-1'))).toBe(true);
