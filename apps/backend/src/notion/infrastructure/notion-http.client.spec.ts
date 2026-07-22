@@ -4,10 +4,11 @@ import { NotionApiError, NotionHttpClient } from './notion-http.client';
 
 const config: NotionConfig = {
   token: 'secret-token',
-  version: '2026-03-11',
+  version: '2025-09-03',
   baseUrl: 'https://api.notion.com',
   timeoutMs: 30_000,
   databaseIds: [],
+  signingSecret: null,
 };
 
 function okResponse(body: unknown): Response {
@@ -29,7 +30,7 @@ describe('NotionHttpClient', () => {
     const init = fetchFn.mock.calls[0][1];
     expect(init.headers).toMatchObject({
       Authorization: 'Bearer secret-token',
-      'Notion-Version': '2026-03-11',
+      'Notion-Version': '2025-09-03',
       'Content-Type': 'application/json',
     });
   });
@@ -59,12 +60,21 @@ describe('NotionHttpClient', () => {
     expect(fetchFn.mock.calls[0][0]).toBe('https://api.notion.com/v1/blocks/block-1/children');
   });
 
-  it('queryDatabase는 POST /v1/databases/{id}/query 로 body를 보낸다', async () => {
-    const fetchFn = jest.fn().mockResolvedValue(okResponse({ results: [], has_more: false, next_cursor: null }));
-    const body = { filter: { property: '회의 필요', checkbox: { equals: true } } };
-    await makeClient(fetchFn).queryDatabase('db-1', body);
+  it('retrieveDatabase는 GET /v1/databases/{id} 로 data source 목록을 조회한다', async () => {
+    const fetchFn = jest.fn().mockResolvedValue(okResponse({ data_sources: [{ id: 'ds-1' }] }));
+    await makeClient(fetchFn).retrieveDatabase('db-1');
     const [url, init] = fetchFn.mock.calls[0];
-    expect(url).toBe('https://api.notion.com/v1/databases/db-1/query');
+    expect(url).toBe('https://api.notion.com/v1/databases/db-1');
+    expect(init.method).toBe('GET');
+    expect(init.body).toBeUndefined();
+  });
+
+  it('queryDataSource는 POST /v1/data_sources/{id}/query 로 body를 보낸다', async () => {
+    const fetchFn = jest.fn().mockResolvedValue(okResponse({ results: [], has_more: false, next_cursor: null }));
+    const body = { filter: { property: '유형', multi_select: { contains: '회의' } } };
+    await makeClient(fetchFn).queryDataSource('ds-1', body);
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe('https://api.notion.com/v1/data_sources/ds-1/query');
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body)).toEqual(body);
   });
@@ -93,6 +103,6 @@ describe('NotionHttpClient', () => {
   it('성공 응답 본문(JSON)을 그대로 돌려준다', async () => {
     const payload = { results: [{ id: 'p1' }], has_more: false, next_cursor: null };
     const fetchFn = jest.fn().mockResolvedValue(okResponse(payload));
-    await expect(makeClient(fetchFn).queryDatabase('db-1', {})).resolves.toEqual(payload);
+    await expect(makeClient(fetchFn).queryDataSource('ds-1', {})).resolves.toEqual(payload);
   });
 });

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { LoggerModule } from 'nestjs-pino';
 
 import { isPrettyLoggingEnabled, resolveLogLevel } from '@/config/logger.config';
@@ -45,6 +46,8 @@ import { SharedKernelModule } from '@/shared-kernel/shared-kernel.module';
       }),
     }),
     EventEmitterModule.forRoot({ wildcard: true, delimiter: '.' }),
+    // @Cron 스케줄러 인프라는 루트에서 한 번만 초기화. notion 폴링 등 각 모듈의 @Cron을 자동 감지한다.
+    ScheduleModule.forRoot(),
     SharedKernelModule,
     RedisModule,
     MongoModule,
@@ -52,7 +55,7 @@ import { SharedKernelModule } from '@/shared-kernel/shared-kernel.module';
     MediasoupModule,
     ReportsModule,
     RecordingModule,
-    NotionModule,
+    NotionModule.register(),
   ],
   providers: [{ provide: APP_FILTER, useClass: DomainExceptionFilter }],
 })

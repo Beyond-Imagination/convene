@@ -1,8 +1,10 @@
 import {
   DEFAULT_NOTION_BASE_URL,
+  DEFAULT_NOTION_POLL_CRON,
   DEFAULT_NOTION_TIMEOUT_MS,
   DEFAULT_NOTION_VERSION,
   resolveNotionConfig,
+  resolveNotionPollCron,
 } from './notion.config';
 
 describe('resolveNotionConfig', () => {
@@ -12,13 +14,14 @@ describe('resolveNotionConfig', () => {
     expect(resolveNotionConfig({ NOTION_TOKEN: '   ' })).toBeNull();
   });
 
-  it('NOTION_TOKEN만 있으면 version/baseUrl/timeout은 디폴트, databaseIds는 빈 배열', () => {
+  it('NOTION_TOKEN만 있으면 version/baseUrl/timeout은 디폴트, databaseIds는 빈 배열, 서명은 null', () => {
     expect(resolveNotionConfig({ NOTION_TOKEN: 't' })).toEqual({
       token: 't',
       version: DEFAULT_NOTION_VERSION,
       baseUrl: DEFAULT_NOTION_BASE_URL,
       timeoutMs: DEFAULT_NOTION_TIMEOUT_MS,
       databaseIds: [],
+      signingSecret: null,
     });
   });
 
@@ -26,13 +29,13 @@ describe('resolveNotionConfig', () => {
     expect(
       resolveNotionConfig({
         NOTION_TOKEN: 't',
-        NOTION_VERSION: '2022-06-28',
+        NOTION_VERSION: '2025-09-03',
         NOTION_BASE_URL: 'https://api.notion.com/',
         NOTION_TIMEOUT_MS: '15000',
       }),
     ).toMatchObject({
       token: 't',
-      version: '2022-06-28',
+      version: '2025-09-03',
       baseUrl: 'https://api.notion.com',
       timeoutMs: 15000,
     });
@@ -74,5 +77,21 @@ describe('resolveNotionConfig', () => {
     expect(() =>
       resolveNotionConfig({ NOTION_TOKEN: 't', NOTION_BASE_URL: 'ftp://x' }),
     ).toThrow(/NOTION_BASE_URL/);
+  });
+
+  it('NOTION_SIGNING_SECRET을 파싱한다(즉시 버튼 HMAC 검증용). 미설정/공백이면 null', () => {
+    expect(resolveNotionConfig({ NOTION_TOKEN: 't', NOTION_SIGNING_SECRET: 's3cr3t' })?.signingSecret).toBe(
+      's3cr3t',
+    );
+    expect(resolveNotionConfig({ NOTION_TOKEN: 't' })?.signingSecret).toBeNull();
+    expect(resolveNotionConfig({ NOTION_TOKEN: 't', NOTION_SIGNING_SECRET: '   ' })?.signingSecret).toBeNull();
+  });
+});
+
+describe('resolveNotionPollCron', () => {
+  it('기본은 30분마다, NOTION_POLL_CRON이 있으면 그 값을 쓴다', () => {
+    expect(resolveNotionPollCron({})).toBe(DEFAULT_NOTION_POLL_CRON);
+    expect(resolveNotionPollCron({ NOTION_POLL_CRON: '0 */5 * * * *' })).toBe('0 */5 * * * *');
+    expect(resolveNotionPollCron({ NOTION_POLL_CRON: '   ' })).toBe(DEFAULT_NOTION_POLL_CRON);
   });
 });
