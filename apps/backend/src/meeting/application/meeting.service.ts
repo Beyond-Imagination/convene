@@ -46,6 +46,8 @@ interface JoinMeetingCommand {
 interface JoinMeetingResult {
   meeting: Meeting;
   participant: Participant;
+  /** host 권한을 가져간 참가자에게만 준다. 아니면 null. */
+  hostToken: string | null;
 }
 
 interface LeaveMeetingCommand {
@@ -126,7 +128,7 @@ export class MeetingService {
       { meetingCode: command.code, participantId: participant.id },
       'participant joined',
     );
-    return { meeting, participant };
+    return { meeting, participant, hostToken: null };
   }
 
   async leaveMeeting(command: LeaveMeetingCommand): Promise<LeaveMeetingResult> {

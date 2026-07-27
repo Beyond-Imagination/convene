@@ -229,6 +229,42 @@ describe('MeetingService.joinMeeting', () => {
       },
     ]);
   });
+
+  it('빈 방에 처음 들어온 참가자는 hostToken을 받는다', async () => {
+    const meeting = makeMeeting(t0);
+    const { service } = makeService(meeting);
+    const result = await service.joinMeeting({
+      code: 'abc12xyz',
+      participantId: 's1',
+      nickname: 'alice',
+    });
+    expect(result.hostToken).toBe('host-token-1');
+  });
+
+  it('이미 참가자가 있는 방에 들어오면 hostToken을 받지 못한다', async () => {
+    const meeting = makeMeeting(t0);
+    meeting.addParticipant('s1', 'alice', t0);
+    const { service } = makeService(meeting);
+    const result = await service.joinMeeting({
+      code: 'abc12xyz',
+      participantId: 's2',
+      nickname: 'bob',
+    });
+    expect(result.hostToken).toBeNull();
+  });
+
+  it('모두 나간 방에 다시 들어오면 host를 다시 가져간다', async () => {
+    const meeting = makeMeeting(t0);
+    meeting.addParticipant('s1', 'alice', t0);
+    meeting.removeParticipant('s1', t0);
+    const { service } = makeService(meeting);
+    const result = await service.joinMeeting({
+      code: 'abc12xyz',
+      participantId: 's2',
+      nickname: 'bob',
+    });
+    expect(result.hostToken).toBe('host-token-1');
+  });
 });
 
 describe('MeetingService.leaveMeeting', () => {
