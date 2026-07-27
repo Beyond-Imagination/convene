@@ -67,6 +67,7 @@ describe('MeetingService.createMeeting', () => {
           saved.push(m);
         },
         findByCode: async () => null,
+        listOpenCodes: async () => [],
       },
       chatRepository: noopChatRepository(),
       codeGenerator: { next: () => code },
@@ -163,6 +164,7 @@ describe('MeetingService.joinMeeting', () => {
     const service = new MeetingService({
       repository: {
         findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
+        listOpenCodes: async () => [],
         save: async (m) => {
           saved.push(m);
         },
@@ -246,6 +248,7 @@ describe('MeetingService.leaveMeeting', () => {
     const service = new MeetingService({
       repository: {
         findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
+        listOpenCodes: async () => [],
         save: async (m) => {
           saved.push(m);
         },
@@ -318,6 +321,7 @@ describe('MeetingService.postChat', () => {
     const service = new MeetingService({
       repository: {
         findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
+        listOpenCodes: async () => [],
         save: async (m) => {
           saved.push(m);
         },
@@ -401,6 +405,7 @@ describe('MeetingService.closeMeeting', () => {
     const service = new MeetingService({
       repository: {
         findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
+        listOpenCodes: async () => [],
         save: async (m) => {
           saved.push(m);
         },
@@ -456,6 +461,7 @@ describe('MeetingService.closeMeeting', () => {
     const service = new MeetingService({
       repository: {
         findByCode: async (c) => (c === 'abc12xyz' ? meeting : null),
+        listOpenCodes: async () => [],
         save: async (m) => {
           saved.push(m);
         },
@@ -519,6 +525,7 @@ describe('MeetingService.detectIdleAndClose', () => {
     const service = new MeetingService({
       repository: {
         findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
+        listOpenCodes: async () => [],
         save: async (m) => {
           saved.push(m);
         },

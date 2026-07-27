@@ -7,6 +7,7 @@ import { MeetingRepository } from '@/meeting/domain/ports';
 import { ExternalReference, MeetingType, Source } from '@/shared-kernel/domain/value-objects';
 
 const KEY_PREFIX = 'meeting:';
+const OPEN_CODES_KEY = 'meeting:open';
 
 /**
  * Redis에 저장하는 직렬화 형태. Date는 ISO string으로, 나머지는 snapshot과 동일.
@@ -56,12 +57,19 @@ export class RedisMeetingRepository implements MeetingRepository {
   }
 
   async save(meeting: Meeting): Promise<void> {
+    const code = meeting.code.value;
     const payload = JSON.stringify(this.toWire(meeting.snapshot()));
-    await this.redis.set(this.key(meeting.code.value), payload);
+    // 종료된 회의 key도 남기 때문에 SCAN으로는 열린 회의를 골라낼 수 없다.
+    // 열린 회의 code만 별도 set으로 들고 있다가 종료 시 빼낸다.
+    const pipeline = this.redis.pipeline().set(this.key(code), payload);
+    await (meeting.isOpen
+      ? pipeline.sadd(OPEN_CODES_KEY, code)
+      : pipeline.srem(OPEN_CODES_KEY, code)
+    ).exec();
   }
 
   async listOpenCodes(): Promise<string[]> {
-    throw new Error('not implemented');
+    return this.redis.smembers(OPEN_CODES_KEY);
   }
 
   private key(code: string): string {
