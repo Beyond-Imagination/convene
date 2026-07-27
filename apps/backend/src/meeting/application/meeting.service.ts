@@ -185,7 +185,16 @@ export class MeetingService {
    * 한 회의의 실패가 나머지 순회를 막지 않는다.
    */
   async sweepIdleMeetings(): Promise<IdleSweepOutcome> {
-    throw new Error('not implemented');
+    const codes = await this.deps.repository.listOpenCodes();
+    let closed = 0;
+    for (const code of codes) {
+      try {
+        if (await this.detectIdleAndClose({ code })) closed += 1;
+      } catch (error) {
+        this.deps.logger.error({ meetingCode: code, err: error }, 'idle 판정 실패');
+      }
+    }
+    return { scanned: codes.length, closed };
   }
 
   /**
