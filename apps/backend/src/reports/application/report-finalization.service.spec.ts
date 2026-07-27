@@ -35,10 +35,6 @@ const noopSummarizer = () => ({
   summarize: jest.fn(),
 });
 
-const noopNotion = () => ({
-  push: jest.fn(),
-});
-
 const noopLogger = (): LoggerPort => ({
   debug: () => {},
   info: () => {},
@@ -55,7 +51,6 @@ describe('ReportFinalizationService.createDraft', () => {
     const saved: MeetingReport[] = [];
     const { events, publisher } = makeEventPublisher();
     const summarizer = noopSummarizer();
-    const notion = noopNotion();
     const service = new ReportFinalizationService({
       repository: {
         save: async (r) => {
@@ -66,13 +61,12 @@ describe('ReportFinalizationService.createDraft', () => {
         listRecent: async () => [],
       },
       summarizer,
-      notion,
       idGenerator: { next: () => generatedId },
       clock: { now: () => endedAt },
       eventPublisher: publisher,
       logger: noopLogger(),
     });
-    return { service, saved, events, summarizer, notion };
+    return { service, saved, events, summarizer };
   };
 
   const validCommand = () => ({
@@ -156,11 +150,10 @@ describe('ReportFinalizationService.createDraft', () => {
     ]);
   });
 
-  it('Summarizer/Notion 포트는 draft 단계에서 호출하지 않는다', async () => {
-    const { service, summarizer, notion } = makeService();
+  it('Summarizer 포트는 draft 단계에서 호출하지 않는다', async () => {
+    const { service, summarizer } = makeService();
     await service.createDraft(validCommand());
     expect(summarizer.summarize).not.toHaveBeenCalled();
-    expect(notion.push).not.toHaveBeenCalled();
   });
 });
 
@@ -208,7 +201,6 @@ describe('ReportFinalizationService.completeTranscription', () => {
         return opts.summarizerResult ?? summaryResult;
       }),
     };
-    const notion = noopNotion();
     const service = new ReportFinalizationService({
       repository: {
         save: async (r) => {
@@ -220,13 +212,12 @@ describe('ReportFinalizationService.completeTranscription', () => {
         listRecent: async () => [],
       },
       summarizer,
-      notion,
       idGenerator: { next: () => 'unused' },
       clock: { now: () => failedAt },
       eventPublisher: publisher,
       logger: noopLogger(),
     });
-    return { service, store, saves, events, summarizer, notion };
+    return { service, store, saves, events, summarizer };
   };
 
   it('존재하지 않는 reportId면 ReportNotFoundError를 던진다', async () => {
@@ -359,7 +350,6 @@ describe('ReportFinalizationService.resummarize', () => {
         listRecent: async () => [],
       },
       summarizer,
-      notion: noopNotion(),
       idGenerator: { next: () => 'unused' },
       clock: { now: () => now },
       eventPublisher: publisher,
@@ -501,7 +491,6 @@ describe('ReportFinalizationService.listRecent', () => {
         listRecent: repoListMock,
       },
       summarizer: noopSummarizer(),
-      notion: noopNotion(),
       idGenerator: { next: () => 'unused' },
       clock: { now: () => startedAt },
       eventPublisher: publisher,
@@ -555,7 +544,6 @@ describe('ReportFinalizationService.getById', () => {
         listRecent: async () => [],
       },
       summarizer: noopSummarizer(),
-      notion: noopNotion(),
       idGenerator: { next: () => 'unused' },
       clock: { now: () => endedAt },
       eventPublisher: publisher,
@@ -601,7 +589,6 @@ describe('ReportFinalizationService.failTranscription', () => {
     store.set(reportId, makeDraft());
     const { events, publisher } = makeEventPublisher();
     const summarizer = noopSummarizer();
-    const notion = noopNotion();
     const service = new ReportFinalizationService({
       repository: {
         save: async (r) => {
@@ -612,13 +599,12 @@ describe('ReportFinalizationService.failTranscription', () => {
         listRecent: async () => [],
       },
       summarizer,
-      notion,
       idGenerator: { next: () => 'unused' },
       clock: { now: () => failedAt },
       eventPublisher: publisher,
       logger: noopLogger(),
     });
-    return { service, store, events, summarizer, notion };
+    return { service, store, events, summarizer };
   };
 
   it('존재하지 않는 reportId면 ReportNotFoundError를 던진다', async () => {

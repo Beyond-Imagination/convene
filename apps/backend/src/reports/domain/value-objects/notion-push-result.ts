@@ -1,9 +1,10 @@
 /**
- * v2 노션 어댑터가 회의록을 노션 페이지에 push한 결과 영수증.
+ * notion BC가 회의록을 노션 페이지에 push한 결과 영수증.
  *
- * v1.0.0에서는 항상 `null`로 두고 도큐먼트에 자리만 남긴다.
- * v2에서 `NotionPort.push(report)`가 성공하면 본 VO가 채워지며,
- * Aggregate는 이를 `attachNotionPushResult`로 받아 1회만 보존한다.
+ * 현재는 항상 `null`로 두고 도큐먼트에 자리만 남긴다. push는 notion BC가 `report.finalized`를
+ * 구독해 수행하고 멱등은 노션 앵커 조회로 보장하므로 reports는 결과를 되받지 않는다.
+ * "노션에 올림" 표식이 UI에 필요해지면 notion BC가 완료 이벤트를 발행하고
+ * Aggregate가 `attachNotionPushResult`로 1회만 보존한다.
  */
 export interface NotionPushResult {
   readonly pageId: string;
