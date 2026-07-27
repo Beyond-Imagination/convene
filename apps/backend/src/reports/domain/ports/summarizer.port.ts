@@ -1,7 +1,6 @@
-import { ChatEntry } from '@/shared-kernel/domain/value-objects';
+import { ChatEntry, ReportSummary } from '@/shared-kernel/domain/value-objects';
 
 import { TranscriptSegment } from '../entries';
-import { ReportSummary } from '../value-objects';
 
 /**
  * LLM 기반 회의록 요약 어댑터의 도메인 포트.

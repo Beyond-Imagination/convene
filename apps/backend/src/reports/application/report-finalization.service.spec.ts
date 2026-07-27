@@ -1,12 +1,13 @@
 import { REPORT_EVENTS } from '@convene/shared-interfaces';
 
 import { participantEntry, transcriptSegment } from '@/reports/domain/entries';
-import { ReportSummary, reportSummary } from '@/reports/domain/value-objects';
 import { LoggerPort } from '@/shared-kernel/domain/ports';
 import {
   chatEntry,
   externalReference,
   NO_EXTERNAL_REFERENCE,
+  ReportSummary,
+  reportSummary,
 } from '@/shared-kernel/domain/value-objects';
 
 import { MeetingReport } from '../domain/meeting-report';

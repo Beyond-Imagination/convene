@@ -1,8 +1,12 @@
-import { chatEntry, externalReference } from '@/shared-kernel/domain/value-objects';
+import {
+  chatEntry,
+  externalReference,
+  reportSummary,
+} from '@/shared-kernel/domain/value-objects';
 
 import { participantEntry, transcriptSegment } from './entries';
 import { MeetingReport } from './meeting-report';
-import { notionPushResult, reportSummary } from './value-objects';
+import { notionPushResult } from './value-objects';
 
 describe('MeetingReport (Aggregate Root)', () => {
   const startedAt = new Date('2026-01-01T00:00:00Z');
