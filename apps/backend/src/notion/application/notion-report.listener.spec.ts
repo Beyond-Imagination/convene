@@ -1,7 +1,7 @@
 import { ReportFinalizedPayload } from '@/shared-kernel/domain/events';
 
-import { NotionReportPushService } from './notion-report-push.service';
 import { NotionReportListener } from './notion-report.listener';
+import { NotionReportPushService } from './notion-report-push.service';
 
 describe('NotionReportListener.onReportFinalized', () => {
   it('payload.reportId를 push 유스케이스에 위임한다', async () => {

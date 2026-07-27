@@ -32,7 +32,7 @@ This file (CLAUDE.md) is the English index for fast context recovery.
 - Module / folder / REST path: `reports/`, `/reports`.
 - Domain event prefix: `report.*` (singular). Meeting events: `meeting.*`. Examples: `report.transcription.completed`, `report.summary.completed`, `report.finalized`, `meeting.created`, `meeting.participant.joined`, `meeting.chat.posted`, `meeting.idle.detected`, `meeting.ended`.
 - VOs: `ReportSummary`, `IdleTimeout`, `ExternalReference`, `NotionPushResult`, `MeetingCode`, `Source`.
-- Ports: `TranscriberPort`, `SummarizerPort`, `NotionPort`, `MeetingRepository`, `ReportRepository`.
+- Ports: `TranscriberPort`, `SummarizerPort`, `MeetingRepository`, `ReportRepository`. Cross-BC ports live in `shared-kernel/domain/ports` (`MeetingCreationPort`, `ReportLookupPort`); `notion/` owns `NotionIssuePort`, `NotionReportPort`.
 - Frontend hooks: `useMeetingViewModel`, `useChatViewModel`, `useMeetingReportViewModel`.
 
 ## Bounded contexts

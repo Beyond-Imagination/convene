@@ -11,7 +11,6 @@
 export const DEFAULT_NOTION_VERSION = '2025-09-03';
 export const DEFAULT_NOTION_BASE_URL = 'https://api.notion.com';
 export const DEFAULT_NOTION_TIMEOUT_MS = 30_000;
-// 자동 폴링 기본 주기(cron, 초 포함 6필드) = 30분마다. 즉시성은 버튼 경로가 담당.
 export const DEFAULT_NOTION_POLL_CRON = '0 */30 * * * *';
 
 export interface NotionConfig {

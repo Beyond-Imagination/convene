@@ -2,6 +2,8 @@ import { Test } from '@nestjs/testing';
 
 import { NotionMeetingProvisioningService } from '@/notion/application/notion-meeting-provisioning.service';
 import { NotionPollingScheduler } from '@/notion/application/notion-polling.scheduler';
+import { NotionReportListener } from '@/notion/application/notion-report.listener';
+import { NotionReportPushService } from '@/notion/application/notion-report-push.service';
 import { NotionMeetingsController } from '@/notion/interface/notion-meetings.controller';
 
 import { NotionHttpClient } from './infrastructure/notion-http.client';
@@ -38,6 +40,13 @@ describe('NotionModule.register (gate)', () => {
     expect(module.controllers ?? []).toEqual([]);
     expect(providerTokens(module)).toContain(NotionMeetingProvisioningService);
     expect(providerTokens(module)).not.toContain(NotionPollingScheduler);
+  });
+
+  it('토큰만 있어도 회의록 노션 삽입(report.finalized 구독) 조각은 등록한다', () => {
+    const module = registerWith({ NOTION_TOKEN: 't' });
+    expect(providerTokens(module)).toEqual(
+      expect.arrayContaining([NotionReportPushService, NotionReportListener]),
+    );
   });
 
   it('서명 시크릿이 있으면 즉시 경로 컨트롤러를 등록한다(링크 베이스는 CORS_ORIGIN 파생)', () => {
