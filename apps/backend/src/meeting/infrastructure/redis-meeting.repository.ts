@@ -60,6 +60,10 @@ export class RedisMeetingRepository implements MeetingRepository {
     await this.redis.set(this.key(meeting.code.value), payload);
   }
 
+  async listOpenCodes(): Promise<string[]> {
+    throw new Error('not implemented');
+  }
+
   private key(code: string): string {
     return `${KEY_PREFIX}${code}`;
   }
