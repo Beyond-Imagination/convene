@@ -32,9 +32,9 @@ const makeListener = () => {
 describe('MediasoupMeetingLifecycleListener', () => {
   const code = 'abc12xyz';
 
-  it('meeting.created → MediasoupSignalingService.openRoom을 호출한다', async () => {
+  it('meeting.opened → MediasoupSignalingService.openRoom을 호출한다', async () => {
     const { listener, calls } = makeListener();
-    await listener.onMeetingCreated({ code });
+    await listener.onMeetingOpened({ code });
     expect(calls).toEqual([{ name: 'openRoom', args: [{ meetingCode: code }] }]);
   });
 

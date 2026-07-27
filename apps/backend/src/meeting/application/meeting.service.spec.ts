@@ -121,7 +121,7 @@ describe('MeetingService.createMeeting', () => {
     expect(result.source).toBe('notion-issue');
   });
 
-  it('생성 후 meeting.created 도메인 이벤트를 발행한다', async () => {
+  it('생성 후 meeting.created와 meeting.opened를 발행한다', async () => {
     const { service, events } = makeService();
     await service.createMeeting({ source: 'web', externalReference: externalReference() });
     expect(events).toEqual([
@@ -129,7 +129,20 @@ describe('MeetingService.createMeeting', () => {
         name: MEETING_EVENTS.CREATED,
         payload: { code: code.value, source: 'web', startedAt: fakeNow },
       },
+      { name: MEETING_EVENTS.OPENED, payload: { code: code.value } },
     ]);
+  });
+
+  it('예약 생성(scheduled)은 방을 열지 않아 meeting.opened를 발행하지 않는다', async () => {
+    const { service, events } = makeService();
+    const meeting = await service.createMeeting({
+      source: 'notion-issue',
+      externalReference: externalReference({ issueId: 'NTN-1' }),
+      scheduled: true,
+    });
+    expect(meeting.status).toBe('scheduled');
+    expect(meeting.isOpen).toBe(false);
+    expect(events.map((e) => e.name)).toEqual([MEETING_EVENTS.CREATED]);
   });
 
   it('HostTokenGenerator가 발급한 hostToken을 Meeting에 부여한다', async () => {

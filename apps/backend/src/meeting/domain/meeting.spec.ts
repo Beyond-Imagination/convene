@@ -269,4 +269,69 @@ describe('Meeting (Aggregate Root)', () => {
       expect(restored.isIdleSince(T_10m_after_T_1m)).toBe(true);
     });
   });
+  describe('createScheduled (lazy 방)', () => {
+    const newScheduled = () =>
+      Meeting.createScheduled({
+        code: MeetingCode.from('abc12xyz'),
+        source: 'notion-issue',
+        externalReference: externalReference(),
+        idleTimeout: IdleTimeout.default(),
+        createdAt: T_0,
+        hostToken: 'host-token-1',
+        title: null,
+      });
+
+    it('scheduled 상태로 발급되고 아직 열린 회의가 아니다', () => {
+      const m = newScheduled();
+      expect(m.status).toBe('scheduled');
+      expect(m.isOpen).toBe(false);
+      expect(m.endedAt).toBeNull();
+      expect(m.activeParticipantCount).toBe(0);
+    });
+
+    it('아무도 들어오지 않은 예약 회의는 idle 만료 대상이 아니다', () => {
+      const m = newScheduled();
+      expect(m.isIdleSince(T_10m_after_T_1m)).toBe(false);
+    });
+
+    it('첫 참가자가 들어오면 open으로 전이하고 startedAt이 그 시각이 된다', () => {
+      const m = newScheduled();
+      m.addParticipant('s1', 'alice', T_1m);
+      expect(m.status).toBe('open');
+      expect(m.startedAt).toBe(T_1m);
+      expect(m.lastActiveAt).toBe(T_1m);
+      expect(m.activeParticipantCount).toBe(1);
+    });
+
+    it('열린 뒤에는 참가자가 더 들어와도 startedAt이 바뀌지 않는다', () => {
+      const m = newScheduled();
+      m.addParticipant('s1', 'alice', T_1m);
+      m.addParticipant('s2', 'bob', T_10m_after_T_1m);
+      expect(m.startedAt).toBe(T_1m);
+    });
+
+    it('열린 뒤 전원이 나가면 idle 만료 대상이 된다', () => {
+      const m = newScheduled();
+      m.addParticipant('s1', 'alice', T_0);
+      m.removeParticipant('s1', T_0);
+      expect(m.isIdleSince(T_1m)).toBe(true);
+    });
+
+    it('status는 snapshot round-trip에서 보존된다', () => {
+      const m = newScheduled();
+      const restored = Meeting.fromSnapshot(m.snapshot());
+      expect(restored.status).toBe('scheduled');
+      expect(restored.isOpen).toBe(false);
+    });
+  });
+
+  describe('status', () => {
+    it('즉시 생성한 회의는 open, 종료하면 closed가 된다', () => {
+      const m = newMeeting();
+      expect(m.status).toBe('open');
+      m.close(T_1m);
+      expect(m.status).toBe('closed');
+      expect(m.isOpen).toBe(false);
+    });
+  });
 });

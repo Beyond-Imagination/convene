@@ -29,14 +29,14 @@ describe('도메인 이벤트 이름', () => {
     }
   });
 
-  it('meeting 6 + report 5 + mediasoup 3 = 14개, 모두 서로 다르다', () => {
+  it('meeting 7 + report 5 + mediasoup 3 = 15개, 모두 서로 다르다', () => {
     const meeting = Object.values(MEETING_EVENTS);
     const report = Object.values(REPORT_EVENTS);
     const mediasoup = Object.values(MEDIASOUP_EVENTS);
-    expect(meeting).toHaveLength(6);
+    expect(meeting).toHaveLength(7);
     expect(report).toHaveLength(5);
     expect(mediasoup).toHaveLength(3);
-    expect(new Set([...meeting, ...report, ...mediasoup]).size).toBe(14);
+    expect(new Set([...meeting, ...report, ...mediasoup]).size).toBe(15);
   });
 
   it('report.transcription.failed가 노출되어 Recording BC가 STT 실패를 보고할 수 있다', () => {

@@ -9,6 +9,8 @@ export interface CreateMeetingInput {
   readonly meetingType?: MeetingType;
   readonly externalReference: ExternalReference;
   readonly title?: string | null;
+  /** true면 코드·링크만 발급하고 방은 첫 참가자가 들어올 때 열린다. */
+  readonly scheduled?: boolean;
 }
 
 export interface CreatedMeeting {

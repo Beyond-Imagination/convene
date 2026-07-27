@@ -10,6 +10,7 @@ export class MeetingCreationAdapter implements MeetingCreationPort {
       meetingType: input.meetingType,
       externalReference: input.externalReference,
       title: input.title ?? null,
+      scheduled: input.scheduled,
     });
     return {
       code: meeting.code.value,

@@ -35,6 +35,9 @@ export class NotionMeetingProvisioningService {
       meetingType: 'general',
       externalReference: externalReference({ issueId }),
       title,
+      // 링크만 먼저 이슈에 걸어두고, 사람이 들어오는 순간 방이 열린다.
+      // 즉시 열면 아무도 오기 전에 idle로 닫혀 링크가 죽는다.
+      scheduled: true,
     });
     const url = `${this.deps.meetingLinkBase}/meetings/${meeting.code}`;
     try {

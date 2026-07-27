@@ -35,6 +35,8 @@ interface CreateMeetingCommand {
   meetingType?: MeetingType;
   externalReference: ExternalReference;
   title?: string | null;
+  /** true면 코드만 발급하고 방은 첫 참가자가 들어올 때 연다. */
+  scheduled?: boolean;
 }
 
 interface JoinMeetingCommand {
@@ -89,24 +91,34 @@ export class MeetingService {
 
   async createMeeting(command: CreateMeetingCommand): Promise<Meeting> {
     const code = this.deps.codeGenerator.next();
-    const startedAt = this.deps.clock.now();
-    const meeting = Meeting.create({
+    const now = this.deps.clock.now();
+    const input = {
       code,
       source: command.source,
       meetingType: command.meetingType,
       externalReference: command.externalReference,
       idleTimeout: IdleTimeout.default(),
-      startedAt,
       hostToken: this.deps.hostTokenGenerator.next(),
       title: command.title ?? null,
-    });
+    };
+    // 예약 회의는 코드만 발급하고 방은 첫 참가자가 열게 둔다. 아무도 오지 않는 동안
+    // 미디어 리소스를 잡지 않고 idle 만료로 죽지도 않는다.
+    const meeting = command.scheduled
+      ? Meeting.createScheduled({ ...input, createdAt: now })
+      : Meeting.create({ ...input, startedAt: now });
     await this.deps.repository.save(meeting);
     await this.deps.eventPublisher.publish(MEETING_EVENTS.CREATED, {
       code: code.value,
       source: command.source,
-      startedAt,
+      startedAt: now,
     });
-    this.deps.logger.info({ meetingCode: code.value, source: command.source }, 'meeting created');
+    if (meeting.isOpen) {
+      await this.deps.eventPublisher.publish(MEETING_EVENTS.OPENED, { code: code.value });
+    }
+    this.deps.logger.info(
+      { meetingCode: code.value, source: command.source, status: meeting.status },
+      'meeting created',
+    );
     return meeting;
   }
 
@@ -115,12 +127,17 @@ export class MeetingService {
     // 빈 방에 들어오는 사람이 방장이 된다. 노션이 만든 회의는 생성자(백엔드)가 접속하지 않아
     // 이 승격이 없으면 아무도 회의를 종료할 수 없다.
     const claimsHost = meeting.activeParticipantCount === 0;
+    const wasScheduled = meeting.status === 'scheduled';
     const participant = meeting.addParticipant(
       command.participantId,
       command.nickname,
       this.deps.clock.now(),
     );
     await this.deps.repository.save(meeting);
+    // 참가자 입장을 알리기 전에 방부터 연다(미디어 리소스가 먼저 준비돼야 한다).
+    if (wasScheduled) {
+      await this.deps.eventPublisher.publish(MEETING_EVENTS.OPENED, { code: command.code });
+    }
     await this.deps.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_JOINED, {
       code: command.code,
       participantId: participant.id,

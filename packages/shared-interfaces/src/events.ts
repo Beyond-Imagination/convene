@@ -11,6 +11,11 @@
 
 export const MEETING_EVENTS = {
   CREATED: 'meeting.created',
+  /**
+   * 회의 방이 실제로 열렸다. 즉시 생성은 `created`와 같은 시점, 예약 회의는 첫 참가자가 들어온 시점.
+   * 미디어 리소스는 이 이벤트를 받고 만든다(아무도 오지 않은 예약 회의가 워커를 점유하지 않도록).
+   */
+  OPENED: 'meeting.opened',
   PARTICIPANT_JOINED: 'meeting.participant.joined',
   PARTICIPANT_LEFT: 'meeting.participant.left',
   CHAT_POSTED: 'meeting.chat.posted',

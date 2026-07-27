@@ -6,7 +6,7 @@ import {
 } from '@/shared-kernel/domain/value-objects';
 
 import { Participant, ParticipantSnapshot } from './participant';
-import { IdleTimeout, MeetingCode } from './value-objects';
+import { IdleTimeout, MeetingCode, MeetingStatus } from './value-objects';
 
 export interface MeetingSnapshot {
   readonly code: string;
@@ -14,6 +14,7 @@ export interface MeetingSnapshot {
   readonly meetingType: MeetingType;
   readonly externalReference: ExternalReference;
   readonly idleTimeoutMs: number;
+  readonly status: MeetingStatus;
   readonly startedAt: Date;
   readonly endedAt: Date | null;
   readonly lastActiveAt: Date;
@@ -33,6 +34,11 @@ interface CreateMeetingInput {
   title: string | null;
 }
 
+/** 예약 발급 입력. 실제 시작 시각은 첫 참가자가 들어올 때 정해진다. */
+interface CreateScheduledMeetingInput extends Omit<CreateMeetingInput, 'startedAt'> {
+  createdAt: Date;
+}
+
 /**
  * 회의 한 건.
  *
@@ -43,6 +49,8 @@ interface CreateMeetingInput {
  */
 export class Meeting {
   private readonly participants = new Map<string, Participant>();
+  private _status: MeetingStatus;
+  private _startedAt: Date;
   private _lastActiveAt: Date;
   private _endedAt: Date | null = null;
 
@@ -52,10 +60,13 @@ export class Meeting {
     public readonly meetingType: MeetingType,
     public readonly externalReference: ExternalReference,
     public readonly idleTimeout: IdleTimeout,
-    public readonly startedAt: Date,
+    startedAt: Date,
+    status: MeetingStatus,
     public readonly hostToken: string,
     public readonly title: string | null,
   ) {
+    this._status = status;
+    this._startedAt = startedAt;
     this._lastActiveAt = startedAt;
   }
 
@@ -67,6 +78,25 @@ export class Meeting {
       input.externalReference,
       input.idleTimeout,
       input.startedAt,
+      'open',
+      input.hostToken,
+      input.title,
+    );
+  }
+
+  /**
+   * 코드·hostToken만 미리 발급한다. 방(mediasoup 리소스)은 첫 참가자가 들어올 때 열린다.
+   * 아무도 오지 않은 동안은 idle 만료 대상이 아니므로 회의 시각 전에 방이 죽지 않는다.
+   */
+  static createScheduled(input: CreateScheduledMeetingInput): Meeting {
+    return new Meeting(
+      input.code,
+      input.source,
+      input.meetingType ?? DEFAULT_MEETING_TYPE,
+      input.externalReference,
+      input.idleTimeout,
+      input.createdAt,
+      'scheduled',
       input.hostToken,
       input.title,
     );
@@ -87,6 +117,7 @@ export class Meeting {
       snapshot.externalReference,
       IdleTimeout.of(snapshot.idleTimeoutMs),
       snapshot.startedAt,
+      snapshot.status,
       snapshot.hostToken,
       snapshot.title,
     );
@@ -104,6 +135,12 @@ export class Meeting {
     this.assertOpen('addParticipant');
     if (this.participants.has(id)) {
       throw new Error(`Participant with id "${id}" already exists in this meeting`);
+    }
+    // 예약 회의는 첫 참가자가 들어오는 순간 열리고, 그 시각이 회의 시작 시각이 된다.
+    if (this._status === 'scheduled') {
+      this._status = 'open';
+      this._startedAt = at;
+      this._lastActiveAt = at;
     }
     const participant = Participant.join(id, nickname, at);
     this.participants.set(id, participant);
@@ -135,9 +172,10 @@ export class Meeting {
     if (this._endedAt !== null) {
       throw new Error('Meeting is already closed');
     }
-    if (at.getTime() < this.startedAt.getTime()) {
+    if (at.getTime() < this._startedAt.getTime()) {
       throw new Error('Meeting.endedAt cannot be earlier than startedAt');
     }
+    this._status = 'closed';
     // 운영 강제 종료에 대비해 활성 참가자는 모두 같은 시각으로 leave 처리한다.
     for (const p of this.participants.values()) {
       if (p.isActive) {
@@ -149,6 +187,14 @@ export class Meeting {
 
   // ---------- queries ----------
 
+  get status(): MeetingStatus {
+    return this._status;
+  }
+
+  get startedAt(): Date {
+    return this._startedAt;
+  }
+
   get endedAt(): Date | null {
     return this._endedAt;
   }
@@ -157,8 +203,9 @@ export class Meeting {
     return this._lastActiveAt;
   }
 
+  /** 진행 중인 회의. 아직 열리지 않은 예약 회의는 false. */
   get isOpen(): boolean {
-    return this._endedAt === null;
+    return this._status === 'open';
   }
 
   isHost(token: string): boolean {
@@ -184,6 +231,8 @@ export class Meeting {
    * 활성 참가자가 한 명이라도 있으면 항상 false.
    */
   isIdleSince(now: Date): boolean {
+    // 아직 아무도 오지 않은 예약 회의는 만료시키지 않는다.
+    if (this._status !== 'open') return false;
     if (this.activeParticipantCount > 0) return false;
     const elapsed = now.getTime() - this._lastActiveAt.getTime();
     return elapsed >= this.idleTimeout.milliseconds;
@@ -196,7 +245,8 @@ export class Meeting {
       meetingType: this.meetingType,
       externalReference: this.externalReference,
       idleTimeoutMs: this.idleTimeout.milliseconds,
-      startedAt: this.startedAt,
+      status: this._status,
+      startedAt: this._startedAt,
       endedAt: this._endedAt,
       lastActiveAt: this._lastActiveAt,
       participants: Array.from(this.participants.values()).map((p) => p.snapshot()),

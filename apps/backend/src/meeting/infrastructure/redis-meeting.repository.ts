@@ -4,6 +4,7 @@ import Redis from 'ioredis';
 import { Meeting, MeetingSnapshot } from '@/meeting/domain/meeting';
 import { ParticipantSnapshot } from '@/meeting/domain/participant';
 import { MeetingRepository } from '@/meeting/domain/ports';
+import { asMeetingStatus, MeetingStatus } from '@/meeting/domain/value-objects';
 import { ExternalReference, MeetingType, Source } from '@/shared-kernel/domain/value-objects';
 
 const KEY_PREFIX = 'meeting:';
@@ -28,6 +29,7 @@ interface MeetingWire {
   readonly meetingType: MeetingType;
   readonly externalReference: ExternalReference;
   readonly idleTimeoutMs: number;
+  readonly status: MeetingStatus;
   readonly startedAt: string;
   readonly endedAt: string | null;
   readonly lastActiveAt: string;
@@ -83,6 +85,7 @@ export class RedisMeetingRepository implements MeetingRepository {
       meetingType: snapshot.meetingType,
       externalReference: snapshot.externalReference,
       idleTimeoutMs: snapshot.idleTimeoutMs,
+      status: snapshot.status,
       startedAt: snapshot.startedAt.toISOString(),
       endedAt: snapshot.endedAt ? snapshot.endedAt.toISOString() : null,
       lastActiveAt: snapshot.lastActiveAt.toISOString(),
@@ -106,6 +109,7 @@ export class RedisMeetingRepository implements MeetingRepository {
       meetingType: wire.meetingType,
       externalReference: wire.externalReference,
       idleTimeoutMs: wire.idleTimeoutMs,
+      status: asMeetingStatus(wire.status),
       startedAt: new Date(wire.startedAt),
       endedAt: wire.endedAt ? new Date(wire.endedAt) : null,
       lastActiveAt: new Date(wire.lastActiveAt),
