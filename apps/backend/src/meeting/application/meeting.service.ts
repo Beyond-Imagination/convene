@@ -35,6 +35,8 @@ interface CreateMeetingCommand {
   meetingType?: MeetingType;
   externalReference: ExternalReference;
   title?: string | null;
+  /** true면 코드만 발급하고 방은 첫 참가자가 들어올 때 연다. */
+  scheduled?: boolean;
 }
 
 interface JoinMeetingCommand {
@@ -46,6 +48,8 @@ interface JoinMeetingCommand {
 interface JoinMeetingResult {
   meeting: Meeting;
   participant: Participant;
+  /** host 권한을 가져간 참가자에게만 준다. 아니면 null. */
+  hostToken: string | null;
 }
 
 interface LeaveMeetingCommand {
@@ -76,40 +80,64 @@ interface DetectIdleAndCloseCommand {
   code: string;
 }
 
+export interface IdleSweepOutcome {
+  /** 훑은 열린 회의 수. */
+  readonly scanned: number;
+  readonly closed: number;
+}
+
 export class MeetingService {
   constructor(private readonly deps: MeetingServiceDeps) {}
 
   async createMeeting(command: CreateMeetingCommand): Promise<Meeting> {
     const code = this.deps.codeGenerator.next();
-    const startedAt = this.deps.clock.now();
-    const meeting = Meeting.create({
+    const now = this.deps.clock.now();
+    const input = {
       code,
       source: command.source,
       meetingType: command.meetingType,
       externalReference: command.externalReference,
       idleTimeout: IdleTimeout.default(),
-      startedAt,
       hostToken: this.deps.hostTokenGenerator.next(),
       title: command.title ?? null,
-    });
+    };
+    // 예약 회의는 코드만 발급하고 방은 첫 참가자가 열게 둔다. 아무도 오지 않는 동안
+    // 미디어 리소스를 잡지 않고 idle 만료로 죽지도 않는다.
+    const meeting = command.scheduled
+      ? Meeting.createScheduled({ ...input, createdAt: now })
+      : Meeting.create({ ...input, startedAt: now });
     await this.deps.repository.save(meeting);
     await this.deps.eventPublisher.publish(MEETING_EVENTS.CREATED, {
       code: code.value,
       source: command.source,
-      startedAt,
+      startedAt: now,
     });
-    this.deps.logger.info({ meetingCode: code.value, source: command.source }, 'meeting created');
+    if (meeting.isOpen) {
+      await this.deps.eventPublisher.publish(MEETING_EVENTS.OPENED, { code: code.value });
+    }
+    this.deps.logger.info(
+      { meetingCode: code.value, source: command.source, status: meeting.status },
+      'meeting created',
+    );
     return meeting;
   }
 
   async joinMeeting(command: JoinMeetingCommand): Promise<JoinMeetingResult> {
     const meeting = await this.requireMeeting(command.code);
+    // 빈 방에 들어오는 사람이 방장이 된다. 노션이 만든 회의는 생성자(백엔드)가 접속하지 않아
+    // 이 승격이 없으면 아무도 회의를 종료할 수 없다.
+    const claimsHost = meeting.activeParticipantCount === 0;
+    const wasScheduled = meeting.status === 'scheduled';
     const participant = meeting.addParticipant(
       command.participantId,
       command.nickname,
       this.deps.clock.now(),
     );
     await this.deps.repository.save(meeting);
+    // 참가자 입장을 알리기 전에 방부터 연다(미디어 리소스가 먼저 준비돼야 한다).
+    if (wasScheduled) {
+      await this.deps.eventPublisher.publish(MEETING_EVENTS.OPENED, { code: command.code });
+    }
     await this.deps.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_JOINED, {
       code: command.code,
       participantId: participant.id,
@@ -120,7 +148,7 @@ export class MeetingService {
       { meetingCode: command.code, participantId: participant.id },
       'participant joined',
     );
-    return { meeting, participant };
+    return { meeting, participant, hostToken: claimsHost ? meeting.hostToken : null };
   }
 
   async leaveMeeting(command: LeaveMeetingCommand): Promise<LeaveMeetingResult> {
@@ -172,6 +200,23 @@ export class MeetingService {
     await this.deps.eventPublisher.publish(MEETING_EVENTS.ENDED, payload);
     this.deps.logger.info({ meetingCode: command.code, reason: command.reason }, 'meeting closed');
     return meeting;
+  }
+
+  /**
+   * 열린 회의를 한 번 훑어 idle인 회의를 닫는다. 스케줄러가 주기적으로 호출한다.
+   * 한 회의의 실패가 나머지 순회를 막지 않는다.
+   */
+  async sweepIdleMeetings(): Promise<IdleSweepOutcome> {
+    const codes = await this.deps.repository.listOpenCodes();
+    let closed = 0;
+    for (const code of codes) {
+      try {
+        if (await this.detectIdleAndClose({ code })) closed += 1;
+      } catch (error) {
+        this.deps.logger.error({ meetingCode: code, err: error }, 'idle 판정 실패');
+      }
+    }
+    return { scanned: codes.length, closed };
   }
 
   /**

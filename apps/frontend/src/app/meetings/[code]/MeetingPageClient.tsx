@@ -21,7 +21,12 @@ import { useRouteSegment } from '@/shared/hooks/useRouteSegment';
 export function MeetingPageClient() {
   const code = useRouteSegment('meetings', 'code');
   const meetingVm = useMeetingViewModel(code);
-  const mediasoupVm = useMediasoupViewModel(meetingVm.socket, code);
+  // 예약 회의는 join이 처리되는 순간 방이 열린다. 입장이 확인되기 전에는 socket을 넘기지 않아
+  // 미디어 협상이 방보다 먼저 도착하는 것을 막는다.
+  const mediasoupVm = useMediasoupViewModel(
+    meetingVm.status === 'joined' ? meetingVm.socket : null,
+    code,
+  );
   const chatVm = useChatViewModel(meetingVm.socket, code);
   // self 타일(항상 1) + 원격 참가자 수 = 전체 비디오 타일 수.
   const totalTiles = 1 + meetingVm.remoteParticipants.length;

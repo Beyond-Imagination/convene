@@ -1,7 +1,7 @@
-import { MEETING_WS_EVENTS } from '@convene/shared-interfaces';
+import { type JoinMeetingAck, MEETING_WS_EVENTS } from '@convene/shared-interfaces';
 import { act, renderHook, waitFor } from '@testing-library/react';
 
-import { saveHostToken } from '@/shared/stores/host-token.storage';
+import { getHostToken, saveHostToken } from '@/shared/stores/host-token.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
 import { useMeetingViewModel } from './useMeetingViewModel';
@@ -17,6 +17,11 @@ class FakeSocket {
   readonly disconnect = vi.fn(() => {
     this.connected = false;
   });
+
+  // socket.io의 timeout().emit() 체이닝. 같은 emit mock으로 이어지게 self를 돌려준다.
+  timeout(_ms: number): this {
+    return this;
+  }
 
   on(event: string, fn: (...args: unknown[]) => void): this {
     const list = this.listeners.get(event) ?? [];
@@ -75,11 +80,21 @@ const setup = (nickname: string | null = '준') => {
   return renderHook(() => useMeetingViewModel(code));
 };
 
-const connect = (): void => {
+/** join emit에 실린 ack 콜백을 꺼내 서버 응답을 흉내낸다. */
+const ackJoin = (ack: JoinMeetingAck | null, err: Error | null = null): void => {
+  const call = fakeSocket.emit.mock.calls.find((c) => c[0] === MEETING_WS_EVENTS.JOIN);
+  act(() => {
+    (call?.[2] as (e: Error | null, payload?: JoinMeetingAck) => void)(err, ack ?? undefined);
+  });
+};
+
+/** connect 후 서버가 join을 승인한 상태까지 진행한다. */
+const connect = (ack: JoinMeetingAck = { ok: true, hostToken: null }): void => {
   act(() => {
     fakeSocket.connected = true;
     fakeSocket.trigger('connect');
   });
+  ackJoin(ack);
 };
 
 describe('useMeetingViewModel', () => {
@@ -97,10 +112,11 @@ describe('useMeetingViewModel', () => {
   it('mount + connect 시 meeting:join을 emit 한다', () => {
     const { result } = setup('준');
     connect();
-    expect(fakeSocket.emit).toHaveBeenCalledWith(MEETING_WS_EVENTS.JOIN, {
-      code,
-      nickname: '준',
-    });
+    expect(fakeSocket.emit).toHaveBeenCalledWith(
+      MEETING_WS_EVENTS.JOIN,
+      { code, nickname: '준' },
+      expect.any(Function),
+    );
     expect(result.current.status).toBe('joined');
   });
 
@@ -204,6 +220,59 @@ describe('useMeetingViewModel', () => {
     it('hostToken이 없으면 isHost=false(회의 입장자/비-host)', () => {
       const { result } = setup('준');
       expect(result.current.isHost).toBe(false);
+    });
+
+    it('빈 방에 처음 들어가 join 응답으로 hostToken을 받으면 host가 된다', () => {
+      const { result } = setup('준');
+
+      connect({ ok: true, hostToken: 'tok-granted' });
+
+      expect(result.current.isHost).toBe(true);
+      expect(getHostToken(code)).toBe('tok-granted');
+    });
+
+    it('host를 못 받은 응답(null)은 기존 토큰을 지우지 않는다', () => {
+      saveHostToken(code, 'tok-host');
+      const { result } = setup('준');
+
+      connect({ ok: true, hostToken: null });
+
+      expect(result.current.isHost).toBe(true);
+      expect(getHostToken(code)).toBe('tok-host');
+    });
+
+    it('host가 아닌 참가자는 join 응답 후에도 non-host로 남는다', () => {
+      const { result } = setup('준');
+
+      connect({ ok: true, hostToken: null });
+
+      expect(result.current.isHost).toBe(false);
+    });
+  });
+
+  describe('join 응답 대기', () => {
+    it('응답을 받기 전에는 joined가 아니다 (방이 열리기 전 미디어 협상 방지)', () => {
+      const { result } = setup('준');
+
+      act(() => {
+        fakeSocket.connected = true;
+        fakeSocket.trigger('connect');
+      });
+
+      expect(result.current.status).toBe('connecting');
+    });
+
+    it('join 응답이 실패하면 error 상태가 된다', () => {
+      const { result } = setup('준');
+      act(() => {
+        fakeSocket.connected = true;
+        fakeSocket.trigger('connect');
+      });
+
+      ackJoin(null, new Error('operation has timed out'));
+
+      expect(result.current.status).toBe('error');
+      expect(result.current.errorMessage).not.toBeNull();
     });
   });
 
@@ -334,10 +403,11 @@ describe('useMeetingViewModel', () => {
     act(() => {
       fakeSocket.trigger('connect'); // 재연결 시뮬
     });
-    expect(fakeSocket.emit).toHaveBeenCalledWith(MEETING_WS_EVENTS.JOIN, {
-      code,
-      nickname: '준',
-    });
+    expect(fakeSocket.emit).toHaveBeenCalledWith(
+      MEETING_WS_EVENTS.JOIN,
+      { code, nickname: '준' },
+      expect.any(Function),
+    );
   });
 
   it('자동 재연결 시 remoteParticipants가 초기화되어 stale 항목이 제거된다', () => {

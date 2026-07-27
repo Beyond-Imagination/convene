@@ -42,6 +42,29 @@ describe('RedisMeetingRepository', () => {
     expect(await repo.findByCode('unknown0')).toBeNull();
   });
 
+  it('listOpenCodes는 아직 종료되지 않은 회의 code만 돌려준다', async () => {
+    const open = makeMeeting('abc12xyz');
+    const closed = makeMeeting('def34uvw');
+    closed.close(t1m);
+    await repo.save(open);
+    await repo.save(closed);
+
+    await expect(repo.listOpenCodes()).resolves.toEqual(['abc12xyz']);
+  });
+
+  it('회의를 종료해 다시 저장하면 listOpenCodes에서 빠진다', async () => {
+    const meeting = makeMeeting('abc12xyz');
+    await repo.save(meeting);
+    meeting.close(t1m);
+    await repo.save(meeting);
+
+    await expect(repo.listOpenCodes()).resolves.toEqual([]);
+  });
+
+  it('열린 회의가 없으면 빈 배열을 돌려준다', async () => {
+    await expect(repo.listOpenCodes()).resolves.toEqual([]);
+  });
+
   it('save 후 findByCode는 동일한 snapshot의 Meeting을 돌려준다', async () => {
     const meeting = makeMeeting('abc12xyz');
     meeting.addParticipant('s1', 'alice', t30s);

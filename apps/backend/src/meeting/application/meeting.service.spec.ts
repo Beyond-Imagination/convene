@@ -67,6 +67,7 @@ describe('MeetingService.createMeeting', () => {
           saved.push(m);
         },
         findByCode: async () => null,
+        listOpenCodes: async () => [],
       },
       chatRepository: noopChatRepository(),
       codeGenerator: { next: () => code },
@@ -120,7 +121,7 @@ describe('MeetingService.createMeeting', () => {
     expect(result.source).toBe('notion-issue');
   });
 
-  it('생성 후 meeting.created 도메인 이벤트를 발행한다', async () => {
+  it('생성 후 meeting.created와 meeting.opened를 발행한다', async () => {
     const { service, events } = makeService();
     await service.createMeeting({ source: 'web', externalReference: externalReference() });
     expect(events).toEqual([
@@ -128,7 +129,20 @@ describe('MeetingService.createMeeting', () => {
         name: MEETING_EVENTS.CREATED,
         payload: { code: code.value, source: 'web', startedAt: fakeNow },
       },
+      { name: MEETING_EVENTS.OPENED, payload: { code: code.value } },
     ]);
+  });
+
+  it('예약 생성(scheduled)은 방을 열지 않아 meeting.opened를 발행하지 않는다', async () => {
+    const { service, events } = makeService();
+    const meeting = await service.createMeeting({
+      source: 'notion-issue',
+      externalReference: externalReference({ issueId: 'NTN-1' }),
+      scheduled: true,
+    });
+    expect(meeting.status).toBe('scheduled');
+    expect(meeting.isOpen).toBe(false);
+    expect(events.map((e) => e.name)).toEqual([MEETING_EVENTS.CREATED]);
   });
 
   it('HostTokenGenerator가 발급한 hostToken을 Meeting에 부여한다', async () => {
@@ -163,6 +177,7 @@ describe('MeetingService.joinMeeting', () => {
     const service = new MeetingService({
       repository: {
         findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
+        listOpenCodes: async () => [],
         save: async (m) => {
           saved.push(m);
         },
@@ -227,6 +242,42 @@ describe('MeetingService.joinMeeting', () => {
       },
     ]);
   });
+
+  it('빈 방에 처음 들어온 참가자는 hostToken을 받는다', async () => {
+    const meeting = makeMeeting(t0);
+    const { service } = makeService(meeting);
+    const result = await service.joinMeeting({
+      code: 'abc12xyz',
+      participantId: 's1',
+      nickname: 'alice',
+    });
+    expect(result.hostToken).toBe('host-token-1');
+  });
+
+  it('이미 참가자가 있는 방에 들어오면 hostToken을 받지 못한다', async () => {
+    const meeting = makeMeeting(t0);
+    meeting.addParticipant('s1', 'alice', t0);
+    const { service } = makeService(meeting);
+    const result = await service.joinMeeting({
+      code: 'abc12xyz',
+      participantId: 's2',
+      nickname: 'bob',
+    });
+    expect(result.hostToken).toBeNull();
+  });
+
+  it('모두 나간 방에 다시 들어오면 host를 다시 가져간다', async () => {
+    const meeting = makeMeeting(t0);
+    meeting.addParticipant('s1', 'alice', t0);
+    meeting.removeParticipant('s1', t0);
+    const { service } = makeService(meeting);
+    const result = await service.joinMeeting({
+      code: 'abc12xyz',
+      participantId: 's2',
+      nickname: 'bob',
+    });
+    expect(result.hostToken).toBe('host-token-1');
+  });
 });
 
 describe('MeetingService.leaveMeeting', () => {
@@ -246,6 +297,7 @@ describe('MeetingService.leaveMeeting', () => {
     const service = new MeetingService({
       repository: {
         findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
+        listOpenCodes: async () => [],
         save: async (m) => {
           saved.push(m);
         },
@@ -318,6 +370,7 @@ describe('MeetingService.postChat', () => {
     const service = new MeetingService({
       repository: {
         findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
+        listOpenCodes: async () => [],
         save: async (m) => {
           saved.push(m);
         },
@@ -401,6 +454,7 @@ describe('MeetingService.closeMeeting', () => {
     const service = new MeetingService({
       repository: {
         findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
+        listOpenCodes: async () => [],
         save: async (m) => {
           saved.push(m);
         },
@@ -456,6 +510,7 @@ describe('MeetingService.closeMeeting', () => {
     const service = new MeetingService({
       repository: {
         findByCode: async (c) => (c === 'abc12xyz' ? meeting : null),
+        listOpenCodes: async () => [],
         save: async (m) => {
           saved.push(m);
         },
@@ -519,6 +574,7 @@ describe('MeetingService.detectIdleAndClose', () => {
     const service = new MeetingService({
       repository: {
         findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
+        listOpenCodes: async () => [],
         save: async (m) => {
           saved.push(m);
         },
@@ -606,6 +662,76 @@ describe('MeetingService.detectIdleAndClose', () => {
     await expect(service.detectIdleAndClose({ code: 'abc12xyz' })).rejects.toThrow(
       MeetingNotFoundError,
     );
+    expect(events).toHaveLength(0);
+  });
+});
+
+describe('MeetingService.sweepIdleMeetings', () => {
+  const t0 = new Date('2026-01-01T00:00:00Z');
+  const tJoin = new Date('2026-01-01T00:01:00Z');
+  const tLeave = new Date('2026-01-01T00:02:00Z');
+  const tIdleElapsed = new Date('2026-01-01T00:03:30Z');
+
+  /** idle=true면 참가자가 모두 나간 상태(= 만료 대상). */
+  const meetingOf = (codeStr: string, idle: boolean) => {
+    const m = Meeting.create({
+      code: MeetingCode.from(codeStr),
+      source: 'web',
+      externalReference: externalReference(),
+      idleTimeout: IdleTimeout.default(),
+      startedAt: t0,
+      hostToken: 'host-token-1',
+      title: null,
+    });
+    m.addParticipant('s1', 'alice', tJoin);
+    if (idle) m.removeParticipant('s1', tLeave);
+    return m;
+  };
+
+  const makeService = (meetings: Meeting[], brokenCode?: string) => {
+    const byCode = new Map(meetings.map((m) => [m.code.value, m]));
+    const { publisher, events } = makeEventPublisher();
+    const service = new MeetingService({
+      repository: {
+        findByCode: async (c) => {
+          if (c === brokenCode) throw new Error('redis down');
+          return byCode.get(c) ?? null;
+        },
+        listOpenCodes: async () => [...byCode.keys(), ...(brokenCode ? [brokenCode] : [])],
+        save: async () => {},
+      },
+      chatRepository: noopChatRepository(),
+      codeGenerator: { next: () => code },
+      hostTokenGenerator: { next: () => 'host-token-generated' },
+      clock: { now: () => tIdleElapsed },
+      eventPublisher: publisher,
+      logger: noopLogger(),
+    });
+    return { service, events };
+  };
+
+  it('열린 회의를 훑어 idle인 회의만 닫고 조회·종료 건수를 돌려준다', async () => {
+    const idle = meetingOf('aaa11aaa', true);
+    const busy = meetingOf('bbb22bbb', false);
+    const { service } = makeService([idle, busy]);
+
+    await expect(service.sweepIdleMeetings()).resolves.toEqual({ scanned: 2, closed: 1 });
+    expect(idle.isOpen).toBe(false);
+    expect(busy.isOpen).toBe(true);
+  });
+
+  it('한 회의 처리가 실패해도 나머지 회의를 계속 훑는다', async () => {
+    const idle = meetingOf('aaa11aaa', true);
+    const { service } = makeService([idle], 'ccc33ccc');
+
+    await expect(service.sweepIdleMeetings()).resolves.toEqual({ scanned: 2, closed: 1 });
+    expect(idle.isOpen).toBe(false);
+  });
+
+  it('열린 회의가 없으면 아무것도 닫지 않는다', async () => {
+    const { service, events } = makeService([]);
+
+    await expect(service.sweepIdleMeetings()).resolves.toEqual({ scanned: 0, closed: 0 });
     expect(events).toHaveLength(0);
   });
 });

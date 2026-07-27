@@ -3,6 +3,7 @@ import { PinoLogger } from 'nestjs-pino';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
 import { MeetingCreationAdapter } from '@/meeting/application/meeting-creation.adapter';
+import { MeetingIdleScheduler } from '@/meeting/application/meeting-idle.scheduler';
 import { RandomHostTokenGenerator } from '@/meeting/infrastructure/random-host-token.generator';
 import { RandomMeetingCodeGenerator } from '@/meeting/infrastructure/random-meeting-code.generator';
 import { RedisChatRepository } from '@/meeting/infrastructure/redis-chat.repository';
@@ -59,6 +60,12 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
         NestEventBusDomainEventPublisher,
         PinoLogger,
       ],
+    },
+    {
+      provide: MeetingIdleScheduler,
+      useFactory: (service: MeetingService, logger: PinoLogger) =>
+        new MeetingIdleScheduler(service, new PinoLoggerAdapter(logger, MeetingIdleScheduler.name)),
+      inject: [MeetingService, PinoLogger],
     },
     {
       // notion 등 다른 BC가 회의 생성을 호출하기 위한 Port. MeetingService에 위임한다.

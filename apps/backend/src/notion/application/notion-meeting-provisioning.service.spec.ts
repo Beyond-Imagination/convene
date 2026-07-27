@@ -46,7 +46,7 @@ function throwingLinkWriter(): NotionIssuePort {
 }
 
 describe('NotionMeetingProvisioningService.provisionForIssue', () => {
-  it('notion-issue 회의를 general로 생성하고 링크를 조립·기입한다', async () => {
+  it('notion-issue 회의를 예약 발급하고 링크를 조립·기입한다', async () => {
     const meetingCreation = fakeMeetingCreation('ABC123');
     const notionIssue = fakeNotionIssue([]);
     const service = new NotionMeetingProvisioningService({
@@ -63,6 +63,8 @@ describe('NotionMeetingProvisioningService.provisionForIssue', () => {
       meetingType: 'general',
       externalReference: { issueId: 'issue-1' },
       title: '스프린트 회고',
+      // 사람이 들어오기 전에 방이 idle로 죽지 않도록 예약 발급한다.
+      scheduled: true,
     });
     expect(notionIssue.writes[0]).toEqual({
       issueId: 'issue-1',

@@ -4,7 +4,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 
 import { MediasoupSignalingService } from './mediasoup-signaling.service';
 
-interface MeetingCreatedPayload {
+interface MeetingOpenedPayload {
   code: string;
 }
 interface ParticipantJoinedPayload {
@@ -26,8 +26,9 @@ interface MeetingEndedPayload {
 export class MediasoupMeetingLifecycleListener {
   constructor(private readonly service: MediasoupSignalingService) {}
 
-  @OnEvent(MEETING_EVENTS.CREATED)
-  async onMeetingCreated(payload: MeetingCreatedPayload): Promise<void> {
+  // 회의 발급(created)이 아니라 방이 열리는 시점에 만든다. 예약 회의는 첫 참가자가 들어와야 열린다.
+  @OnEvent(MEETING_EVENTS.OPENED)
+  async onMeetingOpened(payload: MeetingOpenedPayload): Promise<void> {
     await this.service.openRoom({ meetingCode: payload.code });
   }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  type JoinMeetingAck,
   MEETING_WS_EVENTS,
   type MeetingEndedBroadcast,
   type MeetingParticipantsBroadcast,
@@ -13,11 +14,14 @@ import type { Socket } from 'socket.io-client';
 
 import { closeMeeting } from '@/shared/api/meeting.api';
 import { connectMeetingSocket } from '@/shared/socket/meeting.socket';
-import { getHostToken } from '@/shared/stores/host-token.storage';
+import { getHostToken, saveHostToken } from '@/shared/stores/host-token.storage';
 import { clearStoredNickname, getNickname } from '@/shared/stores/nickname.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
 export type MeetingConnectionStatus = 'connecting' | 'joined' | 'error';
+
+// 응답이 오지 않으면 화면이 '연결 중'에 멈추므로 상한을 둔다.
+const JOIN_ACK_TIMEOUT_MS = 10_000;
 
 export interface RemoteParticipant {
   readonly socketId: string;
@@ -84,8 +88,8 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [reconnectGen, setReconnectGen] = useState(0);
-  // host 여부는 회의 진입 시점의 저장된 토큰으로 1회 판정한다(렌더 중 안정적).
-  const [isHost] = useState(() => getHostToken(code) !== null);
+  // 저장된 토큰(회의를 만든 본인)으로 시작하고, 빈 방에 처음 들어가 host를 넘겨받으면 갱신된다.
+  const [isHost, setIsHost] = useState(() => getHostToken(code) !== null);
   const socketRef = useRef<Socket | null>(null);
   const connectCountRef = useRef(0);
   /**
@@ -130,8 +134,26 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
         setRemoteParticipants([]);
         setReconnectGen(connectCountRef.current - 1);
       }
-      socket.emit(MEETING_WS_EVENTS.JOIN, { code, nickname });
-      setStatus('joined');
+      // 예약 회의는 이 join이 처리되면서 방이 열린다. 그래서 응답을 받고 나서야
+      // 'joined'가 되고, 미디어 협상은 그 뒤에 시작한다(방 없는 상태로 RPC 금지).
+      socket
+        .timeout(JOIN_ACK_TIMEOUT_MS)
+        .emit(
+          MEETING_WS_EVENTS.JOIN,
+          { code, nickname },
+          (err: Error | null, ack?: JoinMeetingAck) => {
+            if (err !== null || ack === undefined) {
+              setErrorMessage('회의에 입장하지 못했습니다. 링크가 유효한지 확인해 주세요.');
+              setStatus('error');
+              return;
+            }
+            setStatus('joined');
+            // 빈 방에 처음 들어간 경우에만 토큰이 온다. null이면 기존 토큰을 그대로 둔다.
+            if (ack.hostToken == null) return;
+            saveHostToken(code, ack.hostToken);
+            setIsHost(true);
+          },
+        );
     };
     const onConnectError = (err: Error): void => {
       setErrorMessage(err.message);
