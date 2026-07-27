@@ -118,24 +118,23 @@ describe('NotionReportAdapter.pushReport', () => {
 
   it('본문 블록이 요청당 상한을 넘으면 나눠 보낸다', async () => {
     const { client, calls } = makeClient();
-    const manyDecisions = Array.from({ length: 120 }, (_, i) => `결정 ${i}`);
 
     await new NotionReportAdapter(client).pushReport(
       ISSUE_ID,
       report({
+        // 요약 2 + (heading + 결정 50) + (heading + 액션 50) = 104 블록.
         summary: reportSummary({
           title: '요약 제목',
           overview: '개요',
-          decisions: manyDecisions,
-          actionItems: [],
+          decisions: Array.from({ length: 50 }, (_, i) => `결정 ${i}`),
+          actionItems: Array.from({ length: 50 }, (_, i) => ({ task: `할 일 ${i}` })),
           keyTopics: [],
         }),
       }),
     );
 
-    // wrapper 1회 + children 2회(100 + 나머지).
     const childAppends = calls.appended.slice(1);
-    expect(childAppends.map((c) => c.children.length)).toEqual([100, 23]);
+    expect(childAppends.map((c) => c.children.length)).toEqual([100, 4]);
     expect(childAppends.every((c) => c.blockId === 'wrapper-1')).toBe(true);
   });
 
