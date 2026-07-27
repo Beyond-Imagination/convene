@@ -1,5 +1,6 @@
 import {
   type ChatPostedBroadcast,
+  type JoinMeetingAck,
   MEETING_EVENTS,
   MEETING_WS_EVENTS,
   type MeetingEndedBroadcast,
@@ -66,9 +67,9 @@ export class MeetingGateway implements OnGatewayDisconnect {
   async handleJoin(
     @MessageBody() dto: JoinMeetingDto,
     @ConnectedSocket() client: Socket,
-  ): Promise<{ ok: true }> {
+  ): Promise<JoinMeetingAck> {
     // Promise<void> 는 NestJS socket.io가 ack 미호출 → emitWithAck 영원 대기.
-    const { meeting, participant } = await this.service.joinMeeting({
+    const { meeting, participant, hostToken } = await this.service.joinMeeting({
       code: dto.code,
       participantId: client.id,
       nickname: dto.nickname,
@@ -97,7 +98,7 @@ export class MeetingGateway implements OnGatewayDisconnect {
         })),
     };
     client.emit(MEETING_WS_EVENTS.PARTICIPANTS, existing);
-    return { ok: true };
+    return { ok: true, hostToken };
   }
 
   @SubscribeMessage(MEETING_WS_EVENTS.LEAVE)

@@ -1,7 +1,7 @@
-import { MEETING_WS_EVENTS } from '@convene/shared-interfaces';
+import { type JoinMeetingAck, MEETING_WS_EVENTS } from '@convene/shared-interfaces';
 import { act, renderHook, waitFor } from '@testing-library/react';
 
-import { saveHostToken } from '@/shared/stores/host-token.storage';
+import { getHostToken, saveHostToken } from '@/shared/stores/host-token.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
 import { useMeetingViewModel } from './useMeetingViewModel';
@@ -82,6 +82,14 @@ const connect = (): void => {
   });
 };
 
+/** join emit에 실린 ack 콜백을 꺼내 서버 응답을 흉내낸다. */
+const ackJoin = (ack: JoinMeetingAck): void => {
+  const call = fakeSocket.emit.mock.calls.find((c) => c[0] === MEETING_WS_EVENTS.JOIN);
+  act(() => {
+    (call?.[2] as (payload: JoinMeetingAck) => void)(ack);
+  });
+};
+
 describe('useMeetingViewModel', () => {
   beforeEach(() => {
     window.sessionStorage.clear();
@@ -97,10 +105,11 @@ describe('useMeetingViewModel', () => {
   it('mount + connect 시 meeting:join을 emit 한다', () => {
     const { result } = setup('준');
     connect();
-    expect(fakeSocket.emit).toHaveBeenCalledWith(MEETING_WS_EVENTS.JOIN, {
-      code,
-      nickname: '준',
-    });
+    expect(fakeSocket.emit).toHaveBeenCalledWith(
+      MEETING_WS_EVENTS.JOIN,
+      { code, nickname: '준' },
+      expect.any(Function),
+    );
     expect(result.current.status).toBe('joined');
   });
 
@@ -203,6 +212,36 @@ describe('useMeetingViewModel', () => {
 
     it('hostToken이 없으면 isHost=false(회의 입장자/비-host)', () => {
       const { result } = setup('준');
+      expect(result.current.isHost).toBe(false);
+    });
+
+    it('빈 방에 처음 들어가 join 응답으로 hostToken을 받으면 host가 된다', () => {
+      const { result } = setup('준');
+      connect();
+
+      ackJoin({ ok: true, hostToken: 'tok-granted' });
+
+      expect(result.current.isHost).toBe(true);
+      expect(getHostToken(code)).toBe('tok-granted');
+    });
+
+    it('host를 못 받은 응답(null)은 기존 토큰을 지우지 않는다', () => {
+      saveHostToken(code, 'tok-host');
+      const { result } = setup('준');
+      connect();
+
+      ackJoin({ ok: true, hostToken: null });
+
+      expect(result.current.isHost).toBe(true);
+      expect(getHostToken(code)).toBe('tok-host');
+    });
+
+    it('host가 아닌 참가자는 join 응답 후에도 non-host로 남는다', () => {
+      const { result } = setup('준');
+      connect();
+
+      ackJoin({ ok: true, hostToken: null });
+
       expect(result.current.isHost).toBe(false);
     });
   });

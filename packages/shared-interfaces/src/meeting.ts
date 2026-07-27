@@ -88,6 +88,19 @@ export interface ChatMessage {
   text: string;
 }
 
+// ---------- server → client (ack) ----------
+
+/**
+ * `meeting:join` 요청에 대한 응답.
+ *
+ * 빈 방에 처음 들어온 참가자는 방장이 되어 `hostToken`을 받는다. 그 외에는 null이며,
+ * 이미 토큰을 갖고 있던 클라이언트(회의를 만든 본인·재연결)는 기존 토큰을 유지하면 된다.
+ */
+export interface JoinMeetingAck {
+  ok: true;
+  hostToken: string | null;
+}
+
 // ---------- server → client (broadcast) ----------
 
 export interface ParticipantJoinedBroadcast {

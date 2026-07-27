@@ -112,6 +112,9 @@ export class MeetingService {
 
   async joinMeeting(command: JoinMeetingCommand): Promise<JoinMeetingResult> {
     const meeting = await this.requireMeeting(command.code);
+    // 빈 방에 들어오는 사람이 방장이 된다. 노션이 만든 회의는 생성자(백엔드)가 접속하지 않아
+    // 이 승격이 없으면 아무도 회의를 종료할 수 없다.
+    const claimsHost = meeting.activeParticipantCount === 0;
     const participant = meeting.addParticipant(
       command.participantId,
       command.nickname,
@@ -128,7 +131,7 @@ export class MeetingService {
       { meetingCode: command.code, participantId: participant.id },
       'participant joined',
     );
-    return { meeting, participant, hostToken: null };
+    return { meeting, participant, hostToken: claimsHost ? meeting.hostToken : null };
   }
 
   async leaveMeeting(command: LeaveMeetingCommand): Promise<LeaveMeetingResult> {
