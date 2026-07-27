@@ -76,6 +76,12 @@ interface DetectIdleAndCloseCommand {
   code: string;
 }
 
+export interface IdleSweepOutcome {
+  /** 훑은 열린 회의 수. */
+  readonly scanned: number;
+  readonly closed: number;
+}
+
 export class MeetingService {
   constructor(private readonly deps: MeetingServiceDeps) {}
 
@@ -172,6 +178,14 @@ export class MeetingService {
     await this.deps.eventPublisher.publish(MEETING_EVENTS.ENDED, payload);
     this.deps.logger.info({ meetingCode: command.code, reason: command.reason }, 'meeting closed');
     return meeting;
+  }
+
+  /**
+   * 열린 회의를 한 번 훑어 idle인 회의를 닫는다. 스케줄러가 주기적으로 호출한다.
+   * 한 회의의 실패가 나머지 순회를 막지 않는다.
+   */
+  async sweepIdleMeetings(): Promise<IdleSweepOutcome> {
+    throw new Error('not implemented');
   }
 
   /**

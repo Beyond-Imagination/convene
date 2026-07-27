@@ -616,3 +616,73 @@ describe('MeetingService.detectIdleAndClose', () => {
     expect(events).toHaveLength(0);
   });
 });
+
+describe('MeetingService.sweepIdleMeetings', () => {
+  const t0 = new Date('2026-01-01T00:00:00Z');
+  const tJoin = new Date('2026-01-01T00:01:00Z');
+  const tLeave = new Date('2026-01-01T00:02:00Z');
+  const tIdleElapsed = new Date('2026-01-01T00:03:30Z');
+
+  /** idle=true면 참가자가 모두 나간 상태(= 만료 대상). */
+  const meetingOf = (codeStr: string, idle: boolean) => {
+    const m = Meeting.create({
+      code: MeetingCode.from(codeStr),
+      source: 'web',
+      externalReference: externalReference(),
+      idleTimeout: IdleTimeout.default(),
+      startedAt: t0,
+      hostToken: 'host-token-1',
+      title: null,
+    });
+    m.addParticipant('s1', 'alice', tJoin);
+    if (idle) m.removeParticipant('s1', tLeave);
+    return m;
+  };
+
+  const makeService = (meetings: Meeting[], brokenCode?: string) => {
+    const byCode = new Map(meetings.map((m) => [m.code.value, m]));
+    const { publisher, events } = makeEventPublisher();
+    const service = new MeetingService({
+      repository: {
+        findByCode: async (c) => {
+          if (c === brokenCode) throw new Error('redis down');
+          return byCode.get(c) ?? null;
+        },
+        listOpenCodes: async () => [...byCode.keys(), ...(brokenCode ? [brokenCode] : [])],
+        save: async () => {},
+      },
+      chatRepository: noopChatRepository(),
+      codeGenerator: { next: () => code },
+      hostTokenGenerator: { next: () => 'host-token-generated' },
+      clock: { now: () => tIdleElapsed },
+      eventPublisher: publisher,
+      logger: noopLogger(),
+    });
+    return { service, events };
+  };
+
+  it('열린 회의를 훑어 idle인 회의만 닫고 조회·종료 건수를 돌려준다', async () => {
+    const idle = meetingOf('aaa11aaa', true);
+    const busy = meetingOf('bbb22bbb', false);
+    const { service } = makeService([idle, busy]);
+
+    await expect(service.sweepIdleMeetings()).resolves.toEqual({ scanned: 2, closed: 1 });
+    expect(idle.isOpen).toBe(false);
+    expect(busy.isOpen).toBe(true);
+  });
+
+  it('한 회의 처리가 실패해도 나머지 회의를 계속 훑는다', async () => {
+    const idle = meetingOf('aaa11aaa', true);
+    const { service } = makeService([idle], 'ccc33ccc');
+
+    await expect(service.sweepIdleMeetings()).resolves.toEqual({ scanned: 2, closed: 1 });
+    expect(idle.isOpen).toBe(false);
+  });
+
+  it('열린 회의가 없으면 아무것도 닫지 않는다', async () => {
+    const { service, events } = makeService([]);
+
+    await expect(service.sweepIdleMeetings()).resolves.toEqual({ scanned: 0, closed: 0 });
+    expect(events).toHaveLength(0);
+  });
+});
