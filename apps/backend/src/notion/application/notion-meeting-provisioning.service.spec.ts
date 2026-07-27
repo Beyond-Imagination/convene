@@ -103,7 +103,7 @@ describe('NotionMeetingProvisioningService.provisionForIssue', () => {
 });
 
 describe('NotionMeetingProvisioningService.pollPendingIssues', () => {
-  it('대상 이슈마다 회의를 생성하고 생성 건수를 돌려준다', async () => {
+  it('대상 이슈마다 회의를 생성하고 조회·생성 건수를 돌려준다', async () => {
     const meetingCreation = fakeMeetingCreation('CODE');
     const notionIssue = fakeNotionIssue([
       { issueId: 'a', title: 'A' },
@@ -116,9 +116,9 @@ describe('NotionMeetingProvisioningService.pollPendingIssues', () => {
       logger: silentLogger(),
     });
 
-    const count = await service.pollPendingIssues(new Date());
+    const outcome = await service.pollPendingIssues(new Date());
 
-    expect(count).toBe(2);
+    expect(outcome).toEqual({ found: 2, provisioned: 2 });
     expect(notionIssue.writes.map((w) => w.issueId)).toEqual(['a', 'b']);
   });
 
@@ -142,9 +142,10 @@ describe('NotionMeetingProvisioningService.pollPendingIssues', () => {
       logger: silentLogger(),
     });
 
-    const count = await service.pollPendingIssues(new Date());
+    const outcome = await service.pollPendingIssues(new Date());
 
-    expect(count).toBe(1);
+    // 실패한 이슈도 조회 건수에는 잡혀야 로그로 "찾았지만 못 만들었다"를 구분할 수 있다.
+    expect(outcome).toEqual({ found: 2, provisioned: 1 });
     expect(notionIssue.writes.map((w) => w.issueId)).toEqual(['ok']);
   });
 });
