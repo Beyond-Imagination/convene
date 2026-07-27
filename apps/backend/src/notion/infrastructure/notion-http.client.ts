@@ -41,6 +41,10 @@ export class NotionHttpClient {
     return this.request<NotionListPage>('GET', `/blocks/${blockId}/children${query}`);
   }
 
+  async deleteBlock(blockId: string): Promise<Record<string, unknown>> {
+    return this.request('DELETE', `/blocks/${blockId}`);
+  }
+
   async retrieveDatabase(databaseId: string): Promise<Record<string, unknown>> {
     return this.request('GET', `/databases/${databaseId}`);
   }

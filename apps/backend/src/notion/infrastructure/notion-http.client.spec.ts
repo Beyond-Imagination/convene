@@ -60,6 +60,15 @@ describe('NotionHttpClient', () => {
     expect(fetchFn.mock.calls[0][0]).toBe('https://api.notion.com/v1/blocks/block-1/children');
   });
 
+  it('deleteBlock는 DELETE /v1/blocks/{id} 로 블록을 지운다', async () => {
+    const fetchFn = jest.fn().mockResolvedValue(okResponse({ id: 'block-1', archived: true }));
+    await makeClient(fetchFn).deleteBlock('block-1');
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe('https://api.notion.com/v1/blocks/block-1');
+    expect(init.method).toBe('DELETE');
+    expect(init.body).toBeUndefined();
+  });
+
   it('retrieveDatabase는 GET /v1/databases/{id} 로 data source 목록을 조회한다', async () => {
     const fetchFn = jest.fn().mockResolvedValue(okResponse({ data_sources: [{ id: 'ds-1' }] }));
     await makeClient(fetchFn).retrieveDatabase('db-1');
