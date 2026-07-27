@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  type JoinMeetingAck,
   MEETING_WS_EVENTS,
   type MeetingEndedBroadcast,
   type MeetingParticipantsBroadcast,
@@ -13,7 +14,7 @@ import type { Socket } from 'socket.io-client';
 
 import { closeMeeting } from '@/shared/api/meeting.api';
 import { connectMeetingSocket } from '@/shared/socket/meeting.socket';
-import { getHostToken } from '@/shared/stores/host-token.storage';
+import { getHostToken, saveHostToken } from '@/shared/stores/host-token.storage';
 import { clearStoredNickname, getNickname } from '@/shared/stores/nickname.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
@@ -84,8 +85,8 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [reconnectGen, setReconnectGen] = useState(0);
-  // host 여부는 회의 진입 시점의 저장된 토큰으로 1회 판정한다(렌더 중 안정적).
-  const [isHost] = useState(() => getHostToken(code) !== null);
+  // 저장된 토큰(회의를 만든 본인)으로 시작하고, 빈 방에 처음 들어가 host를 넘겨받으면 갱신된다.
+  const [isHost, setIsHost] = useState(() => getHostToken(code) !== null);
   const socketRef = useRef<Socket | null>(null);
   const connectCountRef = useRef(0);
   /**
@@ -130,7 +131,12 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
         setRemoteParticipants([]);
         setReconnectGen(connectCountRef.current - 1);
       }
-      socket.emit(MEETING_WS_EVENTS.JOIN, { code, nickname });
+      socket.emit(MEETING_WS_EVENTS.JOIN, { code, nickname }, (ack: JoinMeetingAck) => {
+        // 빈 방에 처음 들어간 경우에만 토큰이 온다. null이면 기존 토큰을 그대로 둔다.
+        if (ack?.hostToken == null) return;
+        saveHostToken(code, ack.hostToken);
+        setIsHost(true);
+      });
       setStatus('joined');
     };
     const onConnectError = (err: Error): void => {

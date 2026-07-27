@@ -373,10 +373,11 @@ describe('useMeetingViewModel', () => {
     act(() => {
       fakeSocket.trigger('connect'); // 재연결 시뮬
     });
-    expect(fakeSocket.emit).toHaveBeenCalledWith(MEETING_WS_EVENTS.JOIN, {
-      code,
-      nickname: '준',
-    });
+    expect(fakeSocket.emit).toHaveBeenCalledWith(
+      MEETING_WS_EVENTS.JOIN,
+      { code, nickname: '준' },
+      expect.any(Function),
+    );
   });
 
   it('자동 재연결 시 remoteParticipants가 초기화되어 stale 항목이 제거된다', () => {
