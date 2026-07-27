@@ -4,7 +4,20 @@ import { FinalizedReport, ReportLookupPort } from '@/shared-kernel/domain/ports'
 export class ReportLookupAdapter implements ReportLookupPort {
   constructor(private readonly repository: ReportRepository) {}
 
-  async findFinalizedReport(_reportId: string): Promise<FinalizedReport | null> {
-    throw new Error('not implemented');
+  async findFinalizedReport(reportId: string): Promise<FinalizedReport | null> {
+    const report = await this.repository.findById(reportId);
+    if (report === null || !report.isFinalized) return null;
+
+    const snapshot = report.snapshot();
+    return {
+      reportId: snapshot.id,
+      meetingType: snapshot.meetingType,
+      issueId: snapshot.externalReference.issueId ?? null,
+      // 회의록 화면과 같은 규칙: 사용자가 지정한 회의 제목 우선, 없으면 LLM 요약 제목.
+      title: snapshot.title ?? snapshot.summary?.title ?? null,
+      startedAt: snapshot.startedAt,
+      endedAt: snapshot.endedAt,
+      summary: snapshot.summary,
+    };
   }
 }

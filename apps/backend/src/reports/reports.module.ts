@@ -4,6 +4,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { resolveAdminConfig } from '@/config/admin.config';
 import { resolveGeminiConfig } from '@/config/gemini.config';
 import { ReportFinalizationService } from '@/reports/application/report-finalization.service';
+import { ReportLookupAdapter } from '@/reports/application/report-lookup.adapter';
 import { ReportMeetingLifecycleListener } from '@/reports/application/report-meeting-lifecycle.listener';
 import { ReportPipelineListener } from '@/reports/application/report-pipeline.listener';
 import { SummarizerPort } from '@/reports/domain/ports';
@@ -13,6 +14,7 @@ import { NoopSummarizer } from '@/reports/infrastructure/noop.summarizer';
 import { UuidReportIdGenerator } from '@/reports/infrastructure/uuid-report-id.generator';
 import { ReportsController } from '@/reports/interface/controllers/reports.controller';
 import { ADMIN_API_TOKEN, AdminGuard } from '@/reports/interface/guards/admin.guard';
+import { REPORT_LOOKUP_PORT } from '@/shared-kernel/domain/ports';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
@@ -25,6 +27,7 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
  * - 회의록 영속화는 mongoose 기반 `MongoReportRepository`가 책임진다.
  * - SummarizerPort default는 `GeminiSummarizer`. `GEMINI_API_KEY` 미설정 시 `NoopSummarizer`로 fallback.
  * - 회의록의 노션 push는 `notion` BC가 `report.finalized`를 구독해 수행한다(본 모듈 밖).
+ *   그 BC가 회의록 본문을 읽도록 `REPORT_LOOKUP_PORT`를 export한다.
  */
 @Module({
   controllers: [ReportsController],
@@ -37,6 +40,11 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
     {
       provide: ADMIN_API_TOKEN,
       useFactory: (): string | null => resolveAdminConfig()?.token ?? null,
+    },
+    {
+      provide: REPORT_LOOKUP_PORT,
+      useFactory: (repository: MongoReportRepository) => new ReportLookupAdapter(repository),
+      inject: [MongoReportRepository],
     },
     {
       provide: GeminiSummarizer,
@@ -81,5 +89,6 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
       ],
     },
   ],
+  exports: [REPORT_LOOKUP_PORT],
 })
 export class ReportsModule {}
