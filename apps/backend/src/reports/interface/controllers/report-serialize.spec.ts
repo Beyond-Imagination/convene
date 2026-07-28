@@ -1,10 +1,11 @@
 import { participantEntry, transcriptSegment } from '@/reports/domain/entries';
 import { MeetingReport } from '@/reports/domain/meeting-report';
-import { notionPushResult, reportSummary } from '@/reports/domain/value-objects';
+import { notionPushResult } from '@/reports/domain/value-objects';
 import {
   chatEntry,
   externalReference,
   NO_EXTERNAL_REFERENCE,
+  reportSummary,
 } from '@/shared-kernel/domain/value-objects';
 
 import { toReportDetailResponse, toReportListItem } from './report-serialize';

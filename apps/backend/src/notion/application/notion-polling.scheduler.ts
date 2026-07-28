@@ -21,7 +21,13 @@ export class NotionPollingScheduler {
     if (this.running) return;
     this.running = true;
     try {
-      await this.provisioning.pollPendingIssues(this.clock.now());
+      const { found, provisioned } = await this.provisioning.pollPendingIssues(this.clock.now());
+      // 대상이 없는 주기는 debug로 흘려 로그를 채우지 않는다.
+      if (found === 0) {
+        this.logger.debug({ found, provisioned }, 'notion 폴링 완료');
+      } else {
+        this.logger.info({ found, provisioned }, 'notion 폴링 완료');
+      }
     } catch (error) {
       // 폴링 전체 실패(예: DB query 자체 실패)가 프로세스를 죽이지 않도록 삼킨다.
       this.logger.error({ err: error }, 'notion 폴링 실패');

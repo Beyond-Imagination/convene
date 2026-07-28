@@ -3,8 +3,12 @@ import { Connection, createConnection } from 'mongoose';
 
 import { participantEntry, transcriptSegment } from '@/reports/domain/entries';
 import { MeetingReport } from '@/reports/domain/meeting-report';
-import { notionPushResult, reportSummary } from '@/reports/domain/value-objects';
-import { externalReference, NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects';
+import { notionPushResult } from '@/reports/domain/value-objects';
+import {
+  externalReference,
+  NO_EXTERNAL_REFERENCE,
+  reportSummary,
+} from '@/shared-kernel/domain/value-objects';
 
 import { MongoReportRepository } from './mongo-report.repository';
 

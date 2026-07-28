@@ -6,18 +6,27 @@ import { resolveCorsOrigins } from '@/config/server.config';
 import { MeetingModule } from '@/meeting/meeting.module';
 import { NotionMeetingProvisioningService } from '@/notion/application/notion-meeting-provisioning.service';
 import { NotionPollingScheduler } from '@/notion/application/notion-polling.scheduler';
+import { NotionReportListener } from '@/notion/application/notion-report.listener';
+import { NotionReportPushService } from '@/notion/application/notion-report-push.service';
 import { NotionHttpClient } from '@/notion/infrastructure/notion-http.client';
 import { NotionIssueAdapter } from '@/notion/infrastructure/notion-issue.adapter';
+import { NotionReportAdapter } from '@/notion/infrastructure/notion-report.adapter';
 import { NotionMeetingsController } from '@/notion/interface/notion-meetings.controller';
 import { NotionSignatureVerifier } from '@/notion/interface/notion-signature';
-import { MEETING_CREATION_PORT, MeetingCreationPort } from '@/shared-kernel/domain/ports';
+import { ReportsModule } from '@/reports/reports.module';
+import {
+  MEETING_CREATION_PORT,
+  MeetingCreationPort,
+  REPORT_LOOKUP_PORT,
+  ReportLookupPort,
+} from '@/shared-kernel/domain/ports';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 
 export const NOTION_CLIENT = Symbol('NOTION_CLIENT');
 
 /**
- * env gate에 따라 조각을 조건부 등록한다(prod-safe): 토큰→provisioning 코어,
+ * env gate에 따라 조각을 조건부 등록한다(prod-safe): 토큰→provisioning + 회의록 push 코어,
  * +서명 시크릿→즉시 경로 컨트롤러, +DB id→폴링 스케줄러.
  * register()는 메타데이터 평가 시점 process.env를 읽으므로 운영 env 주입으로만 켜진다.
  */
@@ -60,9 +69,24 @@ export class NotionModule {
           }),
         inject: [NOTION_CLIENT, MEETING_CREATION_PORT, PinoLogger],
       },
+      {
+        provide: NotionReportPushService,
+        useFactory: (
+          client: NotionHttpClient,
+          reportLookup: ReportLookupPort,
+          logger: PinoLogger,
+        ) =>
+          new NotionReportPushService({
+            reportLookup,
+            notionReport: new NotionReportAdapter(client),
+            logger: new PinoLoggerAdapter(logger, NotionReportPushService.name),
+          }),
+        inject: [NOTION_CLIENT, REPORT_LOOKUP_PORT, PinoLogger],
+      },
+      NotionReportListener,
     ];
     const controllers: Type<unknown>[] = [];
-    const imports: DynamicModule['imports'] = [MeetingModule];
+    const imports: DynamicModule['imports'] = [MeetingModule, ReportsModule];
 
     if (signingSecret !== null) {
       providers.push({

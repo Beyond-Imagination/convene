@@ -1,4 +1,7 @@
-import { NotionMeetingProvisioningService } from '@/notion/application/notion-meeting-provisioning.service';
+import {
+  NotionMeetingProvisioningService,
+  PollOutcome,
+} from '@/notion/application/notion-meeting-provisioning.service';
 import { NotionPollingScheduler } from '@/notion/application/notion-polling.scheduler';
 import { Clock, LoggerPort } from '@/shared-kernel/domain/ports';
 
@@ -11,14 +14,16 @@ function fixedClock(now: Date): Clock {
   return { now: () => now };
 }
 
+const NOTHING_FOUND: PollOutcome = { found: 0, provisioned: 0 };
+
 describe('NotionPollingScheduler.poll', () => {
   it('clock 시각으로 provisioning.pollPendingIssues를 호출한다', async () => {
     const now = new Date('2026-07-20T00:00:00.000Z');
     const times: Date[] = [];
     const provisioning = {
-      pollPendingIssues: async (t: Date): Promise<number> => {
+      pollPendingIssues: async (t: Date): Promise<PollOutcome> => {
         times.push(t);
-        return 0;
+        return NOTHING_FOUND;
       },
     } as unknown as NotionMeetingProvisioningService;
 
@@ -34,10 +39,10 @@ describe('NotionPollingScheduler.poll', () => {
       release = resolve;
     });
     const provisioning = {
-      pollPendingIssues: async (): Promise<number> => {
+      pollPendingIssues: async (): Promise<PollOutcome> => {
         calls += 1;
         await gate;
-        return 0;
+        return NOTHING_FOUND;
       },
     } as unknown as NotionMeetingProvisioningService;
     const scheduler = new NotionPollingScheduler(provisioning, fixedClock(new Date()), silentLogger());
@@ -53,7 +58,7 @@ describe('NotionPollingScheduler.poll', () => {
   it('폴링 전체가 throw해도 삼키고 running을 해제해 다음 폴링을 허용한다', async () => {
     let calls = 0;
     const provisioning = {
-      pollPendingIssues: async (): Promise<number> => {
+      pollPendingIssues: async (): Promise<PollOutcome> => {
         calls += 1;
         throw new Error('notion down');
       },

@@ -21,6 +21,12 @@ interface ProvisionOptions {
   readonly bestEffortLink?: boolean;
 }
 
+export interface PollOutcome {
+  /** 필터에 걸린 이슈 수. found > provisioned면 일부가 실패했다는 뜻. */
+  readonly found: number;
+  readonly provisioned: number;
+}
+
 // 즉시 경로(컨트롤러)와 자동 경로(폴링)가 공유하는 회의 생성+링크 기입 use-case.
 export class NotionMeetingProvisioningService {
   constructor(private readonly deps: NotionMeetingProvisioningDeps) {}
@@ -50,7 +56,7 @@ export class NotionMeetingProvisioningService {
     return { issueId, code: meeting.code, url };
   }
 
-  async pollPendingIssues(now: Date): Promise<number> {
+  async pollPendingIssues(now: Date): Promise<PollOutcome> {
     const issues = await this.deps.notionIssue.findPendingIssues(now);
     let provisioned = 0;
     for (const issue of issues) {
@@ -62,6 +68,6 @@ export class NotionMeetingProvisioningService {
         this.deps.logger.error({ issueId: issue.issueId, err: error }, 'notion 회의 생성 실패');
       }
     }
-    return provisioned;
+    return { found: issues.length, provisioned };
   }
 }

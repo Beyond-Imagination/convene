@@ -2,11 +2,12 @@ import {
   ChatEntry,
   ExternalReference,
   MeetingType,
+  ReportSummary,
   Source,
 } from '@/shared-kernel/domain/value-objects';
 
 import { ParticipantEntry, TranscriptSegment } from './entries';
-import { NotionPushResult, PipelineState, ReportSummary } from './value-objects';
+import { NotionPushResult, PipelineState } from './value-objects';
 
 export interface CreateMeetingReportInput {
   id: string;

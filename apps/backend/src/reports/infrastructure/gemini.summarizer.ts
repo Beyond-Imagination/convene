@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { SummarizerInput, SummarizerPort } from '@/reports/domain/ports';
-import { ReportSummary, reportSummary } from '@/reports/domain/value-objects';
+import { ReportSummary, reportSummary } from '@/shared-kernel/domain/value-objects';
 
 export interface GeminiSummarizerOptions {
   readonly apiKey: string;

@@ -2,12 +2,7 @@ import { REPORT_EVENTS } from '@convene/shared-interfaces';
 
 import { ParticipantEntry, TranscriptSegment } from '@/reports/domain/entries';
 import { MeetingReport } from '@/reports/domain/meeting-report';
-import {
-  NotionPort,
-  ReportIdGenerator,
-  ReportRepository,
-  SummarizerPort,
-} from '@/reports/domain/ports';
+import { ReportIdGenerator, ReportRepository, SummarizerPort } from '@/reports/domain/ports';
 import { Clock, DomainEventPublisher, LoggerPort } from '@/shared-kernel/domain/ports';
 import {
   ChatEntry,
@@ -21,7 +16,6 @@ import { ReportNotFoundError, ReportNotResummarizableError } from './report.erro
 interface ReportFinalizationServiceDeps {
   repository: ReportRepository;
   summarizer: SummarizerPort;
-  notion: NotionPort;
   idGenerator: ReportIdGenerator;
   clock: Clock;
   eventPublisher: DomainEventPublisher;
