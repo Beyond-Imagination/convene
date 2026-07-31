@@ -2,6 +2,7 @@ import type {
   CloseMeetingResponse,
   CreateMeetingRequest,
   CreateMeetingResponse,
+  MeetingDetailResponse,
 } from '@convene/shared-interfaces';
 
 import { API_BASE_URL } from './config';
@@ -23,6 +24,17 @@ export async function createMeeting(input: CreateMeetingRequest): Promise<Create
     throw new MeetingApiError(res.status, text || `POST /meetings failed (${res.status})`);
   }
   return (await res.json()) as CreateMeetingResponse;
+}
+
+export async function getMeeting(code: string): Promise<MeetingDetailResponse> {
+  const res = await fetch(`${API_BASE_URL}/meetings/${encodeURIComponent(code)}`, {
+    method: 'GET',
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new MeetingApiError(res.status, text || `GET /meetings/${code} failed (${res.status})`);
+  }
+  return (await res.json()) as MeetingDetailResponse;
 }
 
 export async function closeMeeting(

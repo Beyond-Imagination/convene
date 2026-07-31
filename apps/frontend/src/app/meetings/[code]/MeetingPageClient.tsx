@@ -7,6 +7,7 @@ import { NicknameGate } from '@/feature/meeting/components/NicknameGate';
 import { useChatViewModel } from '@/feature/meeting/hooks/useChatViewModel';
 import { useEmbedGateViewModel } from '@/feature/meeting/hooks/useEmbedGateViewModel';
 import { useMediasoupViewModel } from '@/feature/meeting/hooks/useMediasoupViewModel';
+import { useMeetingCardViewModel } from '@/feature/meeting/hooks/useMeetingCardViewModel';
 import { useMeetingLayoutViewModel } from '@/feature/meeting/hooks/useMeetingLayoutViewModel';
 import { useMeetingViewModel } from '@/feature/meeting/hooks/useMeetingViewModel';
 import { useNicknameGateViewModel } from '@/feature/meeting/hooks/useNicknameGateViewModel';
@@ -72,10 +73,23 @@ function MeetingSession({ code }: { readonly code: string }) {
   );
 }
 
+/** 임베드 진입 카드. 회의에 들어가지 않고 상태만 조회해 보여준다. */
+function EmbedGateSection({ code, pageUrl }: { readonly code: string; readonly pageUrl: string }) {
+  const card = useMeetingCardViewModel(code);
+  return (
+    <EmbedGate
+      code={code}
+      pageUrl={pageUrl}
+      status={card.status}
+      meeting={card.meeting}
+    />
+  );
+}
+
 /**
  * `/meetings/[code]`의 client wrapper.
  *
- * URL에서 회의 코드를 읽고, 임베드 여부에 따라 회의 세션과 진입 안내를 가른다.
+ * URL에서 회의 코드를 읽고, 임베드 여부에 따라 회의 세션과 진입 카드를 가른다.
  * 임베드 판정 전에 세션을 마운트하면 소켓·미디어가 붙었다가 곧바로 정리되므로
  * 판정이 끝난 뒤에만 `MeetingSession`을 그린다.
  */
@@ -86,7 +100,7 @@ export function MeetingPageClient() {
   if (embed.status === 'checking') return null;
   if (embed.status === 'embedded') {
     return (
-      <EmbedGate
+      <EmbedGateSection
         code={code}
         pageUrl={embed.pageUrl}
       />
