@@ -29,11 +29,14 @@ export class NotionHttpClient {
     private readonly fetchFn: typeof fetch = globalThis.fetch,
   ) {}
 
+  /** position 미지정이면 노션 기본값(맨 뒤에 append). `{ type: 'start' }`로 맨 앞에 넣는다. */
   async appendBlockChildren(
     blockId: string,
     children: ReadonlyArray<unknown>,
+    position?: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
-    return this.request('PATCH', `/blocks/${blockId}/children`, { children });
+    const body = position === undefined ? { children } : { children, position };
+    return this.request('PATCH', `/blocks/${blockId}/children`, body);
   }
 
   async getBlockChildren(blockId: string, startCursor?: string): Promise<NotionListPage> {

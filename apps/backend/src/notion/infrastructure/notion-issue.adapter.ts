@@ -48,6 +48,8 @@ export class NotionIssueAdapter implements NotionIssuePort {
     private readonly client: NotionHttpClient,
     private readonly databaseIds: ReadonlyArray<string>,
     private readonly logger: LoggerPort,
+    /** 이전 회의 카드를 식별하는 기준. 이 주소로 시작하는 embed만 우리 것으로 본다. */
+    private readonly meetingLinkBase: string,
   ) {}
 
   async findPendingIssues(now: Date): Promise<PendingIssue[]> {
@@ -70,6 +72,13 @@ export class NotionIssueAdapter implements NotionIssuePort {
     });
   }
 
+  async embedMeetingCard(issueId: string, url: string): Promise<void> {
+    await this.removeStaleMeetingCards(issueId);
+    await this.client.appendBlockChildren(issueId, [{ type: 'embed', embed: { url } }], {
+      type: 'start',
+    });
+  }
+
   private async collectFromDatabase(
     databaseId: string,
     filter: Record<string, unknown>,
@@ -88,6 +97,17 @@ export class NotionIssueAdapter implements NotionIssuePort {
       } while (cursor !== undefined);
     }
     return issues;
+  }
+
+  // 카드는 항상 맨 앞에 심으므로 첫 페이지만 훑어도 이전 카드를 찾을 수 있다.
+  private async removeStaleMeetingCards(issueId: string): Promise<void> {
+    const { results } = await this.client.getBlockChildren(issueId);
+    for (const block of results) {
+      const embed = (block as { embed?: { url?: unknown } }).embed;
+      if (block.type !== 'embed' || typeof embed?.url !== 'string') continue;
+      if (!embed.url.startsWith(this.meetingLinkBase)) continue;
+      await this.client.deleteBlock(block.id as string);
+    }
   }
 
   // 2025-09-03부터 조회는 DB가 아닌 data source 단위. 단일 소스 DB면 항목 하나.

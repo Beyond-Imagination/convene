@@ -25,15 +25,20 @@ function fakeMeetingCreation(code: string): {
 function fakeNotionIssue(pending: PendingIssue[]): {
   port: NotionIssuePort;
   writes: { issueId: string; url: string }[];
+  cards: { issueId: string; url: string }[];
 } {
   const writes: { issueId: string; url: string }[] = [];
+  const cards: { issueId: string; url: string }[] = [];
   const port: NotionIssuePort = {
     findPendingIssues: async (): Promise<PendingIssue[]> => pending,
     writeMeetingLink: async (issueId: string, url: string): Promise<void> => {
       writes.push({ issueId, url });
     },
+    embedMeetingCard: async (issueId: string, url: string): Promise<void> => {
+      cards.push({ issueId, url });
+    },
   };
-  return { port, writes };
+  return { port, writes, cards };
 }
 
 function throwingLinkWriter(): NotionIssuePort {
@@ -42,8 +47,42 @@ function throwingLinkWriter(): NotionIssuePort {
     writeMeetingLink: async (): Promise<void> => {
       throw new Error('notion down');
     },
+    embedMeetingCard: async (): Promise<void> => undefined,
   };
 }
+
+describe('NotionMeetingProvisioningService 회의 카드', () => {
+  const makeService = (notionIssue: NotionIssuePort) =>
+    new NotionMeetingProvisioningService({
+      meetingCreation: fakeMeetingCreation('ABC123').port,
+      notionIssue,
+      meetingLinkBase: 'https://convene.example.com',
+      logger: silentLogger(),
+    });
+
+  it('이슈 페이지에 회의 링크와 같은 주소로 카드를 심는다', async () => {
+    const notionIssue = fakeNotionIssue([]);
+    await makeService(notionIssue.port).provisionForIssue('issue-1', '스프린트 회고');
+
+    expect(notionIssue.cards).toEqual([
+      { issueId: 'issue-1', url: 'https://convene.example.com/meetings/ABC123' },
+    ]);
+  });
+
+  it('카드 삽입이 실패해도 회의 발급은 성공으로 돌려준다(부가 표시)', async () => {
+    const notionIssue = fakeNotionIssue([]);
+    const failing: NotionIssuePort = {
+      ...notionIssue.port,
+      embedMeetingCard: async (): Promise<void> => {
+        throw new Error('notion down');
+      },
+    };
+
+    await expect(makeService(failing).provisionForIssue('issue-1', null)).resolves.toMatchObject({
+      code: 'ABC123',
+    });
+  });
+});
 
 describe('NotionMeetingProvisioningService.provisionForIssue', () => {
   it('notion-issue 회의를 예약 발급하고 링크를 조립·기입한다', async () => {
