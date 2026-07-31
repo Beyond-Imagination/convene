@@ -1,9 +1,11 @@
 'use client';
 
 import { ChatPanel } from '@/feature/meeting/components/ChatPanel';
+import { EmbedGate } from '@/feature/meeting/components/EmbedGate';
 import { MeetingScreen } from '@/feature/meeting/components/MeetingScreen';
 import { NicknameGate } from '@/feature/meeting/components/NicknameGate';
 import { useChatViewModel } from '@/feature/meeting/hooks/useChatViewModel';
+import { useEmbedGateViewModel } from '@/feature/meeting/hooks/useEmbedGateViewModel';
 import { useMediasoupViewModel } from '@/feature/meeting/hooks/useMediasoupViewModel';
 import { useMeetingLayoutViewModel } from '@/feature/meeting/hooks/useMeetingLayoutViewModel';
 import { useMeetingViewModel } from '@/feature/meeting/hooks/useMeetingViewModel';
@@ -11,15 +13,12 @@ import { useNicknameGateViewModel } from '@/feature/meeting/hooks/useNicknameGat
 import { useRouteSegment } from '@/shared/hooks/useRouteSegment';
 
 /**
- * `/meetings/[code]`의 client wrapper.
- *
- * URL에서 회의 코드를 읽고 세 ViewModel hook을 합성한다:
+ * 실제 회의 세션. 세 ViewModel hook을 합성한다:
  *   - `useMeetingViewModel`
  *   - `useMediasoupViewModel`
  *   - `useChatViewModel`
  */
-export function MeetingPageClient() {
-  const code = useRouteSegment('meetings', 'code');
+function MeetingSession({ code }: { readonly code: string }) {
   const meetingVm = useMeetingViewModel(code);
   // 예약 회의는 join이 처리되는 순간 방이 열린다. 입장이 확인되기 전에는 socket을 넘기지 않아
   // 미디어 협상이 방보다 먼저 도착하는 것을 막는다.
@@ -71,4 +70,27 @@ export function MeetingPageClient() {
       )}
     </div>
   );
+}
+
+/**
+ * `/meetings/[code]`의 client wrapper.
+ *
+ * URL에서 회의 코드를 읽고, 임베드 여부에 따라 회의 세션과 진입 안내를 가른다.
+ * 임베드 판정 전에 세션을 마운트하면 소켓·미디어가 붙었다가 곧바로 정리되므로
+ * 판정이 끝난 뒤에만 `MeetingSession`을 그린다.
+ */
+export function MeetingPageClient() {
+  const code = useRouteSegment('meetings', 'code');
+  const embed = useEmbedGateViewModel();
+
+  if (embed.status === 'checking') return null;
+  if (embed.status === 'embedded') {
+    return (
+      <EmbedGate
+        code={code}
+        pageUrl={embed.pageUrl}
+      />
+    );
+  }
+  return <MeetingSession code={code} />;
 }

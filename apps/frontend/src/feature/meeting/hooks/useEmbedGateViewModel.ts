@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+
 export type EmbedGateStatus = 'checking' | 'embedded' | 'standalone';
 
 export interface UseEmbedGateViewModel {
@@ -9,6 +11,17 @@ export interface UseEmbedGateViewModel {
   readonly pageUrl: string;
 }
 
+const CHECKING: UseEmbedGateViewModel = { status: 'checking', pageUrl: '' };
+
 export function useEmbedGateViewModel(): UseEmbedGateViewModel {
-  throw new Error('not implemented');
+  const [state, setState] = useState<UseEmbedGateViewModel>(CHECKING);
+
+  useEffect(() => {
+    setState({
+      status: window.self === window.top ? 'standalone' : 'embedded',
+      pageUrl: window.location.href,
+    });
+  }, []);
+
+  return state;
 }
