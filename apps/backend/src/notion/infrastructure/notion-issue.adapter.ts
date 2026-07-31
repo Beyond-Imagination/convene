@@ -1,21 +1,28 @@
 import { NotionIssuePort, PendingIssue } from '@/notion/domain/ports/notion-issue.port';
 import { NotionHttpClient } from '@/notion/infrastructure/notion-http.client';
 import {
+  MEETING_PENDING_STATUS,
   MEETING_TRIGGER_OPTION,
   NOTION_ISSUE_PROPERTIES,
 } from '@/notion/infrastructure/notion-issue.properties';
 import { LoggerPort } from '@/shared-kernel/domain/ports';
 
-/** 폴링 필터: `유형⊃회의 AND 링크 없음 AND (날짜 미설정 OR 날짜≤now)`. */
+// 시각이 아닌 날짜로 비교한다. 노션 `날짜`는 시간이 선택 사항이라 시각으로 자르면 시간 없는 값(자정 취급)과 이미 시작한 당일 회의가 통째로 필터에서 빠진다.
+function todayInUtc(now: Date): string {
+  return now.toISOString().slice(0, 10);
+}
+
+/** 폴링 필터: `유형⊃회의 AND 상태=시작 전 AND 링크 없음 AND (날짜 미설정 OR 날짜≥오늘)`. */
 export function buildPendingIssuesFilter(now: Date): Record<string, unknown> {
   return {
     and: [
       { property: NOTION_ISSUE_PROPERTIES.type, multi_select: { contains: MEETING_TRIGGER_OPTION } },
+      { property: NOTION_ISSUE_PROPERTIES.status, status: { equals: MEETING_PENDING_STATUS } },
       { property: NOTION_ISSUE_PROPERTIES.meetingLink, url: { is_empty: true } },
       {
         or: [
           { property: NOTION_ISSUE_PROPERTIES.meetingDate, date: { is_empty: true } },
-          { property: NOTION_ISSUE_PROPERTIES.meetingDate, date: { on_or_before: now.toISOString() } },
+          { property: NOTION_ISSUE_PROPERTIES.meetingDate, date: { on_or_after: todayInUtc(now) } },
         ],
       },
     ],
