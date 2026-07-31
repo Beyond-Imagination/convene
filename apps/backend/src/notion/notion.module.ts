@@ -63,6 +63,7 @@ export class NotionModule {
               client,
               databaseIds,
               new PinoLoggerAdapter(logger, NotionIssueAdapter.name),
+              meetingLinkBase,
             ),
             meetingLinkBase,
             logger: new PinoLoggerAdapter(logger, NotionMeetingProvisioningService.name),

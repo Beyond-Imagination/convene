@@ -53,6 +53,12 @@ export class NotionMeetingProvisioningService {
       if (!options?.bestEffortLink) throw error;
       this.deps.logger.error({ issueId, err: error }, 'notion 회의 링크 기입 실패(best-effort)');
     }
+    try {
+      await this.deps.notionIssue.embedMeetingCard(issueId, url);
+    } catch (error) {
+      // 카드는 링크를 보기 좋게 보여주는 부가 표시라, 실패해도 회의 발급은 유효하다.
+      this.deps.logger.error({ issueId, err: error }, 'notion 회의 카드 삽입 실패(best-effort)');
+    }
     return { issueId, code: meeting.code, url };
   }
 

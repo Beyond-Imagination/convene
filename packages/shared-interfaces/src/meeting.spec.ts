@@ -5,9 +5,12 @@ import {
   type CreateMeetingRequest,
   type CreateMeetingResponse,
   type ExternalReferencePayload,
+  MEETING_STATUSES,
   MEETING_TYPES,
   MEETING_WS_EVENTS,
+  type MeetingDetailResponse,
   type MeetingEndedBroadcast,
+  type MeetingStatus,
   type MeetingType,
   type MeetingWsEventName,
   type Source,
@@ -57,6 +60,39 @@ describe('meeting wire format', () => {
     };
     expect(r.code).toMatch(/^[a-z0-9]{8}$/);
     expect(r.hostToken).toBe('host-token-uuid');
+  });
+
+  it('MEETING_STATUSES는 scheduled/open/closed 세 가지다', () => {
+    expect(MEETING_STATUSES).toEqual(['scheduled', 'open', 'closed']);
+  });
+
+  it('MeetingStatus는 MEETING_STATUSES의 literal union이다 (컴파일 체크)', () => {
+    const s: MeetingStatus = 'scheduled';
+    expect(MEETING_STATUSES).toContain(s);
+  });
+
+  it('MeetingDetailResponse는 예약 회의를 startedAt=null로 표현한다', () => {
+    const r: MeetingDetailResponse = {
+      code: 'abc12xyz',
+      title: '스프린트 회고',
+      status: 'scheduled',
+      participantCount: 0,
+      startedAt: null,
+      endedAt: null,
+    };
+    expect(r.startedAt).toBeNull();
+  });
+
+  it('MeetingDetailResponse에는 hostToken이 없다 (조회 전용)', () => {
+    const r: MeetingDetailResponse = {
+      code: 'abc12xyz',
+      title: null,
+      status: 'closed',
+      participantCount: 0,
+      startedAt: '2026-07-31T10:00:00.000Z',
+      endedAt: '2026-07-31T11:00:00.000Z',
+    };
+    expect(Object.keys(r)).not.toContain('hostToken');
   });
 
   it('CloseMeetingResponse는 code / endedAt(ISO)을 가진다', () => {

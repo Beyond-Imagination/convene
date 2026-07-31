@@ -6,6 +6,7 @@ import {
 import { LoggerPort } from '@/shared-kernel/domain/ports';
 
 const NOW = new Date('2026-07-20T12:00:00.000Z');
+const LINK_BASE = 'https://convene.example.com';
 
 function silentLogger(): LoggerPort {
   const noop = (): void => undefined;
@@ -69,7 +70,12 @@ describe('NotionIssueAdapter.findPendingIssues', () => {
       },
     } as unknown as NotionHttpClient;
 
-    const adapter = new NotionIssueAdapter(client, ['team-db', 'proj-db'], silentLogger());
+    const adapter = new NotionIssueAdapter(
+      client,
+      ['team-db', 'proj-db'],
+      silentLogger(),
+      LINK_BASE,
+    );
     const result = await adapter.findPendingIssues(NOW);
 
     expect(result).toEqual([
@@ -94,7 +100,7 @@ describe('NotionIssueAdapter.findPendingIssues', () => {
       },
     } as unknown as NotionHttpClient;
 
-    await new NotionIssueAdapter(client, ['db'], silentLogger()).findPendingIssues(NOW);
+    await new NotionIssueAdapter(client, ['db'], silentLogger(), LINK_BASE).findPendingIssues(NOW);
 
     expect(queried).toEqual(['ds-1', 'ds-2']);
   });
@@ -112,6 +118,7 @@ describe('NotionIssueAdapter.findPendingIssues', () => {
       client,
       ['bad-db', 'good-db'],
       silentLogger(),
+      LINK_BASE,
     ).findPendingIssues(NOW);
 
     expect(result).toEqual([{ issueId: 'ok', title: 'OK' }]);
@@ -123,9 +130,75 @@ describe('NotionIssueAdapter.findPendingIssues', () => {
       queryDataSource: async (): Promise<NotionListPage> => page([{ id: 'no-title', properties: {} }]),
     } as unknown as NotionHttpClient;
 
-    const result = await new NotionIssueAdapter(client, ['db'], silentLogger()).findPendingIssues(NOW);
+    const result = await new NotionIssueAdapter(
+      client,
+      ['db'],
+      silentLogger(),
+      LINK_BASE,
+    ).findPendingIssues(NOW);
 
     expect(result).toEqual([{ issueId: 'no-title', title: null }]);
+  });
+});
+
+describe('NotionIssueAdapter.embedMeetingCard', () => {
+  const MEETING_URL = `${LINK_BASE}/meetings/abc12xyz`;
+
+  function embedClient(existing: ReadonlyArray<Record<string, unknown>>) {
+    const appended: { blockId: string; children: unknown; position: unknown }[] = [];
+    const deleted: string[] = [];
+    const client = {
+      getBlockChildren: async (): Promise<NotionListPage> => page(existing),
+      deleteBlock: async (blockId: string): Promise<Record<string, unknown>> => {
+        deleted.push(blockId);
+        return {};
+      },
+      appendBlockChildren: async (
+        blockId: string,
+        children: unknown,
+        position: unknown,
+      ): Promise<Record<string, unknown>> => {
+        appended.push({ blockId, children, position });
+        return {};
+      },
+    } as unknown as NotionHttpClient;
+    return { client, appended, deleted };
+  }
+
+  const adapterOf = (client: NotionHttpClient) =>
+    new NotionIssueAdapter(client, [], silentLogger(), LINK_BASE);
+
+  it('회의 카드를 embed 블록으로 페이지 맨 앞에 넣는다', async () => {
+    const { client, appended } = embedClient([]);
+    await adapterOf(client).embedMeetingCard('page-1', MEETING_URL);
+
+    expect(appended).toEqual([
+      {
+        blockId: 'page-1',
+        children: [{ type: 'embed', embed: { url: MEETING_URL } }],
+        position: { type: 'start' },
+      },
+    ]);
+  });
+
+  it('이전 회의 카드가 있으면 지우고 새로 넣는다(이슈당 하나)', async () => {
+    const { client, deleted, appended } = embedClient([
+      { id: 'old-card', type: 'embed', embed: { url: `${LINK_BASE}/meetings/old12345` } },
+    ]);
+    await adapterOf(client).embedMeetingCard('page-1', MEETING_URL);
+
+    expect(deleted).toEqual(['old-card']);
+    expect(appended).toHaveLength(1);
+  });
+
+  it('다른 서비스의 embed는 건드리지 않는다', async () => {
+    const { client, deleted } = embedClient([
+      { id: 'youtube', type: 'embed', embed: { url: 'https://youtube.com/watch?v=1' } },
+      { id: 'text', type: 'paragraph', paragraph: {} },
+    ]);
+    await adapterOf(client).embedMeetingCard('page-1', MEETING_URL);
+
+    expect(deleted).toEqual([]);
   });
 });
 
@@ -139,7 +212,7 @@ describe('NotionIssueAdapter.writeMeetingLink', () => {
       },
     } as unknown as NotionHttpClient;
 
-    await new NotionIssueAdapter(client, [], silentLogger()).writeMeetingLink(
+    await new NotionIssueAdapter(client, [], silentLogger(), LINK_BASE).writeMeetingLink(
       'page-1',
       'https://convene.example.com/meetings/ABC123',
     );

@@ -122,6 +122,11 @@ export class MeetingService {
     return meeting;
   }
 
+  /** 입장하지 않고 상태만 읽는다. 종료된 회의도 그대로 돌려준다(카드에 "종료됨"을 보여야 한다). */
+  async getMeeting(code: string): Promise<Meeting> {
+    return this.requireMeeting(code);
+  }
+
   async joinMeeting(command: JoinMeetingCommand): Promise<JoinMeetingResult> {
     const meeting = await this.requireMeeting(command.code);
     // 빈 방에 들어오는 사람이 방장이 된다. 노션이 만든 회의는 생성자(백엔드)가 접속하지 않아

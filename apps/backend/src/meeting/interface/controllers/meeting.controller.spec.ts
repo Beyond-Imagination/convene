@@ -80,6 +80,76 @@ describe('MeetingController.createMeeting', () => {
   });
 });
 
+describe('MeetingController.getMeeting', () => {
+  const makeScheduled = () =>
+    Meeting.createScheduled({
+      code: fakeCode,
+      source: 'notion-issue',
+      externalReference: externalReference({ issueId: 'NTN-1' }),
+      idleTimeout: IdleTimeout.default(),
+      createdAt: fakeStartedAt,
+      hostToken: 'host-token-1',
+      title: '스프린트 회고',
+    });
+
+  const makeController = (meeting: Meeting) => {
+    const service = { getMeeting: jest.fn(async () => meeting) };
+    return { controller: new MeetingController(service as any), service };
+  };
+
+  it('예약 회의는 아직 열리지 않았으므로 startedAt이 null이다', async () => {
+    const { controller } = makeController(makeScheduled());
+    await expect(controller.getMeeting('abc12xyz')).resolves.toEqual({
+      code: 'abc12xyz',
+      title: '스프린트 회고',
+      status: 'scheduled',
+      participantCount: 0,
+      startedAt: null,
+      endedAt: null,
+    });
+  });
+
+  it('첫 입장으로 열린 회의는 참가자 수와 열린 시각을 싣는다', async () => {
+    const opened = makeScheduled();
+    const joinedAt = new Date('2026-01-01T01:00:00.000Z');
+    opened.addParticipant('s1', 'alice', joinedAt);
+    const { controller } = makeController(opened);
+
+    const result = await controller.getMeeting('abc12xyz');
+    expect(result.status).toBe('open');
+    expect(result.participantCount).toBe(1);
+    expect(result.startedAt).toBe(joinedAt.toISOString());
+  });
+
+  it('종료된 회의는 status=closed와 endedAt을 싣는다', async () => {
+    const closed = makeScheduled();
+    closed.addParticipant('s1', 'alice', fakeStartedAt);
+    const endedAt = new Date('2026-01-01T02:00:00.000Z');
+    closed.close(endedAt);
+    const { controller } = makeController(closed);
+
+    const result = await controller.getMeeting('abc12xyz');
+    expect(result.status).toBe('closed');
+    expect(result.endedAt).toBe(endedAt.toISOString());
+  });
+
+  it('잘못된 code 형식은 BadRequestException으로 거부하고 service를 호출하지 않는다', async () => {
+    const { controller, service } = makeController(makeScheduled());
+    await expect(controller.getMeeting('BAD')).rejects.toBeInstanceOf(BadRequestException);
+    expect(service.getMeeting).not.toHaveBeenCalled();
+  });
+
+  it('service가 던진 MeetingNotFoundError를 그대로 전파한다', async () => {
+    const service = {
+      getMeeting: jest.fn(async () => {
+        throw new MeetingNotFoundError('abc12xyz');
+      }),
+    };
+    const controller = new MeetingController(service as any);
+    await expect(controller.getMeeting('abc12xyz')).rejects.toBeInstanceOf(MeetingNotFoundError);
+  });
+});
+
 describe('MeetingController.closeMeeting', () => {
   const endedAt = new Date('2026-01-01T00:30:00.000Z');
 

@@ -1,9 +1,14 @@
-import type { CloseMeetingResponse, CreateMeetingResponse } from '@convene/shared-interfaces';
+import type {
+  CloseMeetingResponse,
+  CreateMeetingResponse,
+  MeetingDetailResponse,
+} from '@convene/shared-interfaces';
 import {
   BadRequestException,
   Body,
   Controller,
   Delete,
+  Get,
   Headers,
   HttpCode,
   HttpStatus,
@@ -41,19 +46,28 @@ export class MeetingController {
     };
   }
 
+  @Get(':code')
+  async getMeeting(@Param('code') code: string): Promise<MeetingDetailResponse> {
+    this.assertCodeFormat(code);
+    const meeting = await this.service.getMeeting(code);
+    return {
+      code: meeting.code.value,
+      title: meeting.title,
+      status: meeting.status,
+      participantCount: meeting.activeParticipantCount,
+      // 예약 회의의 startedAt은 생성 시각이라 "방이 열린 시각"이 아니다.
+      startedAt: meeting.status === 'scheduled' ? null : meeting.startedAt.toISOString(),
+      endedAt: meeting.endedAt?.toISOString() ?? null,
+    };
+  }
+
   @Delete(':code')
   @HttpCode(HttpStatus.OK)
   async closeMeeting(
     @Param('code') code: string,
     @Headers('x-host-token') hostToken?: string,
   ): Promise<CloseMeetingResponse> {
-    // 형식 위반은 도메인 에러가 아니라 클라이언트 요청 오류이므로 BadRequestException으로 매핑.
-    // 도메인 에러(MeetingNotFound/NotHost)는 DomainExceptionFilter가 HTTP로 번역한다.
-    try {
-      MeetingCode.from(code);
-    } catch (e) {
-      throw new BadRequestException((e as Error).message);
-    }
+    this.assertCodeFormat(code);
     const meeting = await this.service.closeMeeting({
       code,
       reason: 'manual',
@@ -63,5 +77,15 @@ export class MeetingController {
       code: meeting.code.value,
       endedAt: meeting.endedAt!.toISOString(),
     };
+  }
+
+  // 형식 위반은 도메인 에러가 아니라 클라이언트 요청 오류이므로 BadRequestException으로 매핑.
+  // 도메인 에러(MeetingNotFound/NotHost)는 DomainExceptionFilter가 HTTP로 번역한다.
+  private assertCodeFormat(code: string): void {
+    try {
+      MeetingCode.from(code);
+    } catch (e) {
+      throw new BadRequestException((e as Error).message);
+    }
   }
 }

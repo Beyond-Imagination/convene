@@ -10,6 +10,10 @@ export type Source = (typeof SOURCES)[number];
 export const MEETING_TYPES = ['general', 'retrospective', 'weekly-sync'] as const;
 export type MeetingType = (typeof MEETING_TYPES)[number];
 
+/** 예약(코드만 발급) → 열림(첫 입장) → 종료. */
+export const MEETING_STATUSES = ['scheduled', 'open', 'closed'] as const;
+export type MeetingStatus = (typeof MEETING_STATUSES)[number];
+
 /**
  * 회의를 만들어낸 외부 시스템의 식별자.
  *   - v1.0.0: 항상 비어 있거나 미전송.
@@ -31,6 +35,20 @@ export interface CreateMeetingResponse {
   source: Source;
   startedAt: string;
   hostToken: string;
+}
+
+/**
+ * GET /meetings/:code 응답. 회의에 들어가지 않고 상태만 확인하는 용도(노션 임베드 카드 등)라
+ * hostToken 같은 민감 값은 싣지 않는다.
+ */
+export interface MeetingDetailResponse {
+  code: string;
+  title: string | null;
+  status: MeetingStatus;
+  participantCount: number;
+  /** 방이 열린 시각. 아직 열리지 않은 예약 회의는 null. */
+  startedAt: string | null;
+  endedAt: string | null;
 }
 
 /**
