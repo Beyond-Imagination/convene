@@ -7,8 +7,7 @@ import {
 } from '@/notion/infrastructure/notion-issue.properties';
 import { LoggerPort } from '@/shared-kernel/domain/ports';
 
-// 시각이 아닌 날짜로 비교한다. 노션 `날짜`는 시간이 선택 사항이라 시각으로 자르면
-// 시간 없는 값(자정 취급)과 이미 시작한 당일 회의가 통째로 필터에서 빠진다.
+// 시각이 아닌 날짜로 비교한다. 노션 `날짜`는 시간이 선택 사항이라 시각으로 자르면 시간 없는 값(자정 취급)과 이미 시작한 당일 회의가 통째로 필터에서 빠진다.
 function todayInUtc(now: Date): string {
   return now.toISOString().slice(0, 10);
 }
