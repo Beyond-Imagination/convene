@@ -24,19 +24,26 @@ function page(
 }
 
 describe('buildPendingIssuesFilter', () => {
-  it('유형⊃회의 AND 링크 없음 AND (날짜 미설정 OR 날짜≤now) 필터를 조립한다', () => {
+  it('유형⊃회의 AND 상태=시작 전 AND 링크 없음 AND (날짜 미설정 OR 날짜≥오늘) 필터를 조립한다', () => {
     expect(buildPendingIssuesFilter(NOW)).toEqual({
       and: [
         { property: '유형', multi_select: { contains: '회의' } },
+        { property: '상태', status: { equals: '시작 전' } },
         { property: '회의링크', url: { is_empty: true } },
         {
           or: [
             { property: '날짜', date: { is_empty: true } },
-            { property: '날짜', date: { on_or_before: '2026-07-20T12:00:00.000Z' } },
+            { property: '날짜', date: { on_or_after: '2026-07-20' } },
           ],
         },
       ],
     });
+  });
+
+  it('날짜 경계는 시각이 아닌 UTC 날짜 — 같은 날이면 몇 시에 폴링해도 같은 필터', () => {
+    expect(buildPendingIssuesFilter(new Date('2026-07-20T23:59:59.999Z'))).toEqual(
+      buildPendingIssuesFilter(new Date('2026-07-20T00:00:00.000Z')),
+    );
   });
 });
 
