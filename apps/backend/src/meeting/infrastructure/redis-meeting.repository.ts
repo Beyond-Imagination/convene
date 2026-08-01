@@ -74,6 +74,14 @@ export class RedisMeetingRepository implements MeetingRepository {
     return this.redis.smembers(OPEN_CODES_KEY);
   }
 
+  async isOpenIndexWarm(): Promise<boolean> {
+    throw new Error('not implemented');
+  }
+
+  async primeOpenIndex(_codes: string[]): Promise<void> {
+    throw new Error('not implemented');
+  }
+
   private key(code: string): string {
     return `${KEY_PREFIX}${code}`;
   }
