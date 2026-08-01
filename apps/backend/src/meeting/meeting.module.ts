@@ -5,6 +5,8 @@ import { MeetingService } from '@/meeting/application/meeting.service';
 import { MeetingCreationAdapter } from '@/meeting/application/meeting-creation.adapter';
 import { MeetingIdleScheduler } from '@/meeting/application/meeting-idle.scheduler';
 import { MeetingRecoveryService } from '@/meeting/application/meeting-recovery.service';
+import { CachedMeetingRepository } from '@/meeting/infrastructure/cached-meeting.repository';
+import { MongoMeetingRepository } from '@/meeting/infrastructure/mongo-meeting.repository';
 import { RandomHostTokenGenerator } from '@/meeting/infrastructure/random-host-token.generator';
 import { RandomMeetingCodeGenerator } from '@/meeting/infrastructure/random-meeting-code.generator';
 import { RedisChatRepository } from '@/meeting/infrastructure/redis-chat.repository';
@@ -28,6 +30,13 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
   controllers: [MeetingController],
   providers: [
     RedisMeetingRepository,
+    MongoMeetingRepository,
+    {
+      provide: CachedMeetingRepository,
+      useFactory: (cache: RedisMeetingRepository, origin: MongoMeetingRepository) =>
+        new CachedMeetingRepository(cache, origin),
+      inject: [RedisMeetingRepository, MongoMeetingRepository],
+    },
     RedisChatRepository,
     RandomMeetingCodeGenerator,
     RandomHostTokenGenerator,
@@ -35,7 +44,7 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
     {
       provide: MeetingService,
       useFactory: (
-        repository: RedisMeetingRepository,
+        repository: CachedMeetingRepository,
         chatRepository: RedisChatRepository,
         codeGenerator: RandomMeetingCodeGenerator,
         hostTokenGenerator: RandomHostTokenGenerator,
@@ -53,7 +62,7 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
           logger: new PinoLoggerAdapter(logger, MeetingService.name),
         }),
       inject: [
-        RedisMeetingRepository,
+        CachedMeetingRepository,
         RedisChatRepository,
         RandomMeetingCodeGenerator,
         RandomHostTokenGenerator,
@@ -65,7 +74,7 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
     {
       provide: MeetingRecoveryService,
       useFactory: (
-        repository: RedisMeetingRepository,
+        repository: CachedMeetingRepository,
         meetingService: MeetingService,
         clock: SystemClock,
         eventPublisher: NestEventBusDomainEventPublisher,
@@ -79,7 +88,7 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
           logger: new PinoLoggerAdapter(logger, MeetingRecoveryService.name),
         }),
       inject: [
-        RedisMeetingRepository,
+        CachedMeetingRepository,
         MeetingService,
         SystemClock,
         NestEventBusDomainEventPublisher,
