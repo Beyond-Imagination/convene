@@ -61,6 +61,14 @@ packages/shared-interfaces/src/   meeting.ts · mediasoup.ts · reports.ts · ev
 
 « `meeting:participantJoined`(전체) · `meeting:participants`(본인 = 기존 목록)
 
+### 2.2.1 재시작 복구 (부팅 시 1회)
+
+`meeting-recovery.service`(OnApplicationBootstrap) — 회의는 redis에 남지만 방·socket은 프로세스와 함께 사라진다.
+
+1. `repo.listOpenCodes()` → 회의마다 ⇢ `meeting.opened` (mediasoup 방 재생성)
+2. 남아 있는 참가자 = 유령(`participantId` = socket.id) → `meeting.service.leaveMeeting` ⇢ `meeting.participant.left`
+3. 유령이 있었던 회의만 `markActive(now)` — 재접속에 `idleTimeout` 유예. 비어 있던 회의는 다음 idle sweep이 정리
+
 ### 2.3 미디어 (Mediasoup SFU)
 
 1. **VM** `useMediasoupViewModel`
