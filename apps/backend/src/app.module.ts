@@ -46,7 +46,6 @@ import { SharedKernelModule } from '@/shared-kernel/shared-kernel.module';
       }),
     }),
     EventEmitterModule.forRoot({ wildcard: true, delimiter: '.' }),
-    // @Cron 스케줄러 인프라는 루트에서 한 번만 초기화. notion 폴링 등 각 모듈의 @Cron을 자동 감지한다.
     ScheduleModule.forRoot(),
     SharedKernelModule,
     RedisModule,

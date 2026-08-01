@@ -1,3 +1,5 @@
+# 진행 중인 회의 상태는 redis 에만 있다. `down -v` 는 redis-data 볼륨째 지워
+# 회의를 전멸시키니 쓰지 말 것(재기동은 `restart` 또는 `up -d`).
 services:
   redis:
     image: redis:7.2-alpine
@@ -9,10 +11,15 @@ services:
       --appendonly yes
       --appendfsync everysec
       --maxmemory 256mb
-      --maxmemory-policy volatile-lru
+      --maxmemory-policy noeviction
       --notify-keyspace-events Ex
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
     restart: unless-stopped
 
   # MongoDB 는 Atlas 무료 티어를 사용한다(PLAN.md §3). 운영/개발은 같은 클러스터를
@@ -50,8 +57,10 @@ services:
       dockerfile: apps/backend/Dockerfile
     container_name: convene-backend
     depends_on:
-      - redis
-      - ai-worker
+      redis:
+        condition: service_healthy
+      ai-worker:
+        condition: service_started
     env_file:
       - ./apps/backend/.env
     environment:

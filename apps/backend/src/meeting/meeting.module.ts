@@ -4,6 +4,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { MeetingService } from '@/meeting/application/meeting.service';
 import { MeetingCreationAdapter } from '@/meeting/application/meeting-creation.adapter';
 import { MeetingIdleScheduler } from '@/meeting/application/meeting-idle.scheduler';
+import { MeetingRecoveryService } from '@/meeting/application/meeting-recovery.service';
 import { RandomHostTokenGenerator } from '@/meeting/infrastructure/random-host-token.generator';
 import { RandomMeetingCodeGenerator } from '@/meeting/infrastructure/random-meeting-code.generator';
 import { RedisChatRepository } from '@/meeting/infrastructure/redis-chat.repository';
@@ -56,6 +57,30 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
         RedisChatRepository,
         RandomMeetingCodeGenerator,
         RandomHostTokenGenerator,
+        SystemClock,
+        NestEventBusDomainEventPublisher,
+        PinoLogger,
+      ],
+    },
+    {
+      provide: MeetingRecoveryService,
+      useFactory: (
+        repository: RedisMeetingRepository,
+        meetingService: MeetingService,
+        clock: SystemClock,
+        eventPublisher: NestEventBusDomainEventPublisher,
+        logger: PinoLogger,
+      ) =>
+        new MeetingRecoveryService({
+          repository,
+          meetingService,
+          clock,
+          eventPublisher,
+          logger: new PinoLoggerAdapter(logger, MeetingRecoveryService.name),
+        }),
+      inject: [
+        RedisMeetingRepository,
+        MeetingService,
         SystemClock,
         NestEventBusDomainEventPublisher,
         PinoLogger,

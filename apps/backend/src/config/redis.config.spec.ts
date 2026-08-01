@@ -1,6 +1,9 @@
 import {
   DEFAULT_REDIS_KEY_PREFIX,
   DEFAULT_REDIS_URL,
+  REDIS_MAX_RETRIES_PER_REQUEST,
+  REDIS_RECONNECT_MAX_DELAY_MS,
+  redisRetryStrategy,
   resolveRedisKeyPrefix,
   resolveRedisUrl,
 } from './redis.config';
@@ -43,5 +46,26 @@ describe('resolveRedisKeyPrefix', () => {
 
   it('명시된 prefix를 trim 해서 돌려준다', () => {
     expect(resolveRedisKeyPrefix({ REDIS_KEY_PREFIX: '  test:  ' })).toBe('test:');
+  });
+});
+
+describe('redisRetryStrategy', () => {
+  it('첫 재연결은 즉시에 가깝게 시도한다', () => {
+    expect(redisRetryStrategy(1)).toBeLessThanOrEqual(500);
+  });
+
+  it('재시도가 쌓일수록 간격을 늘린다', () => {
+    expect(redisRetryStrategy(2)).toBeGreaterThan(redisRetryStrategy(1));
+  });
+
+  it('간격은 상한을 넘지 않는다', () => {
+    expect(redisRetryStrategy(1_000)).toBe(REDIS_RECONNECT_MAX_DELAY_MS);
+  });
+
+  it('명령 재시도 한도가 redis 컨테이너 재기동(수 초)을 버틸 만큼 잡혀 있다', () => {
+    // 최악(상한 간격)으로 잡아도 10초 이상은 기다려 준다.
+    expect(REDIS_MAX_RETRIES_PER_REQUEST * REDIS_RECONNECT_MAX_DELAY_MS).toBeGreaterThanOrEqual(
+      10_000,
+    );
   });
 });

@@ -33,10 +33,15 @@ services:
       --appendonly yes
       --appendfsync everysec
       --maxmemory 256mb
-      --maxmemory-policy volatile-lru
+      --maxmemory-policy noeviction
       --notify-keyspace-events Ex
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
     # ports 발행 안 함 — 내부망 전용
 
   ai-worker:
@@ -53,8 +58,10 @@ services:
     container_name: convene-backend
     restart: unless-stopped
     depends_on:
-      - redis
-      - ai-worker
+      redis:
+        condition: service_healthy
+      ai-worker:
+        condition: service_started
     env_file:
       - ./.env
     environment:

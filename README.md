@@ -93,7 +93,8 @@ pip install -r requirements.txt
 uvicorn main:app --port 8000
 ```
 
-Redis는 로컬(6379)에 떠 있어야 한다(Docker 등).
+Redis는 로컬(6379)에 떠 있어야 한다 — `docker compose -f docker-compose.local.yml up -d redis`.
+진행 중인 회의 상태가 여기에만 있으므로 AOF 영속화가 걸린 이 컨테이너를 쓴다(`down -v` 금지).
 
 | 서비스           | 포트                    | 비고                                 |
 |---------------|-----------------------|------------------------------------|

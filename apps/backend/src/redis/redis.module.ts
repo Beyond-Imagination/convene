@@ -1,7 +1,25 @@
 import { Global, Inject, Module, OnApplicationShutdown } from '@nestjs/common';
 import Redis from 'ioredis';
+import { PinoLogger } from 'nestjs-pino';
 
-import { resolveRedisKeyPrefix, resolveRedisUrl } from '@/config/redis.config';
+import {
+  REDIS_MAX_RETRIES_PER_REQUEST,
+  redisRetryStrategy,
+  resolveRedisKeyPrefix,
+  resolveRedisUrl,
+} from '@/config/redis.config';
+import { LoggerPort } from '@/shared-kernel/domain/ports';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
+
+/**
+ * 연결 상태 전이를 구조화 로그로 남긴다.
+ * 리스너가 하나도 없으면 ioredis 가 연결 오류를 `console.error`로 흘려 pino 를 우회한다.
+ */
+function attachConnectionLogging(client: Redis, logger: LoggerPort): void {
+  client.on('error', (err: Error) => logger.error({ err }, 'redis 연결 오류'));
+  client.on('reconnecting', (delayMs: number) => logger.warn({ delayMs }, 'redis 재연결 시도'));
+  client.on('ready', () => logger.info({}, 'redis 연결 준비 완료'));
+}
 
 /**
  * 전역 Redis 클라이언트(`ioredis`) 인스턴스를 묶어주는 모듈.
@@ -16,14 +34,21 @@ import { resolveRedisKeyPrefix, resolveRedisUrl } from '@/config/redis.config';
   providers: [
     {
       provide: Redis,
-      useFactory: () =>
-        new Redis(resolveRedisUrl(), {
+      useFactory: (pino: PinoLogger) => {
+        const client = new Redis(resolveRedisUrl(), {
           keyPrefix: resolveRedisKeyPrefix(),
           // 부트 단계에 즉시 connect를 시도하지 않는다.
           // 실 redis가 없는 e2e 환경에서도 모듈이 부트되어야 하므로, 첫 명령 호출 시점까지 연결을 미룬다.
           lazyConnect: true,
-          maxRetriesPerRequest: 3,
-        }),
+          // redis 재기동(수 초) 동안 명령을 실패시키지 않고 버틴다.
+          // 기본 backoff(50ms 배수)에 재시도 3회면 0.3초 만에 포기해 컨테이너 재기동을 못 넘긴다.
+          retryStrategy: redisRetryStrategy,
+          maxRetriesPerRequest: REDIS_MAX_RETRIES_PER_REQUEST,
+        });
+        attachConnectionLogging(client, new PinoLoggerAdapter(pino, RedisModule.name));
+        return client;
+      },
+      inject: [PinoLogger],
     },
   ],
   exports: [Redis],
