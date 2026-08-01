@@ -46,17 +46,17 @@ packages/shared-interfaces/src/   meeting.ts · mediasoup.ts · reports.ts · ev
 4. **Ctrl** `meeting.controller.createMeeting`
 5. **Svc** `meeting.service.createMeeting`
    — Meeting.create · repo.save · ⇢ `meeting.created`
-6. **Repo** `cached-meeting.repository.save` — Mongo(원장) + redis(캐시)
+6. **Repo** `cached-meeting.repository.save` — Mongo(원본) + redis(캐시)
 
 « 응답 `{ code, source, startedAt, hostToken }` — hostToken 보유자 = host 권한
 
-**회의 저장소.** 원장은 `mongo-meeting.repository`(collection `meetings`, `_id` = code), 그 앞에
+**회의 저장소.** 원본은 `mongo-meeting.repository`(collection `meetings`, `_id` = code), 그 앞에
 `redis-meeting.repository`가 캐시로 붙는다. 조합은 `cached-meeting.repository`가 한다.
 
-- `save` — `lastActiveAt`만 바뀐 저장(=채팅 heartbeat)은 캐시까지만. 상태 전이만 원장에 내려간다
-- `findByCode` — 캐시 miss면 원장에서 읽어 캐시를 채운다
-- `listOpenCodes` — 캐시 색인이 cold면 원장 질의(`status: 'open'`)로 재구축. redis가 전손돼도 재시작 복구가 동작한다
-- 종료된 회의의 캐시 키에는 TTL 1h. 원장에 남아 있으므로 만료돼도 조회는 된다
+- `save` — `lastActiveAt`만 바뀐 저장(=채팅 heartbeat)은 캐시까지만. 상태 전이만 원본에 내려간다
+- `findByCode` — 캐시 miss면 원본에서 읽어 캐시를 채운다
+- `listOpenCodes` — 캐시 색인이 cold면 원본 질의(`status: 'open'`)로 재구축. redis가 전손돼도 재시작 복구가 동작한다
+- 종료된 회의의 캐시 키에는 TTL 1h. 원본에 남아 있으므로 만료돼도 조회는 된다
 
 ### 2.2 회의 입장 (닉네임 게이트)
 

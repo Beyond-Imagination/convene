@@ -24,7 +24,7 @@ const makeMeeting = (codeStr: string): Meeting =>
     title: null,
   });
 
-/** 호출을 세는 in-memory 원장. Mongo 어댑터 자리에 끼운다. */
+/** 호출을 세는 in-memory 원본. Mongo 어댑터 자리에 끼운다. */
 const makeOrigin = () => {
   const stored = new Map<string, MeetingSnapshot>();
   const calls = { findByCode: 0, save: 0, listOpenCodes: 0 };
@@ -67,13 +67,13 @@ describe('CachedMeetingRepository', () => {
   });
 
   describe('save', () => {
-    it('캐시에 없던 회의는 원장에 기록한다', async () => {
+    it('캐시에 없던 회의는 원본에 기록한다', async () => {
       await repo.save(makeMeeting('abc12xyz'));
 
       expect(origin.calls.save).toBe(1);
     });
 
-    it('lastActiveAt만 바뀐 저장은 원장을 건드리지 않는다', async () => {
+    it('lastActiveAt만 바뀐 저장은 원본을 건드리지 않는다', async () => {
       const meeting = makeMeeting('abc12xyz');
       await repo.save(meeting);
 
@@ -94,7 +94,7 @@ describe('CachedMeetingRepository', () => {
       expect(cached!.lastActiveAt).toEqual(t30s);
     });
 
-    it('참가자가 바뀌면 원장에 기록한다', async () => {
+    it('참가자가 바뀌면 원본에 기록한다', async () => {
       const meeting = makeMeeting('abc12xyz');
       await repo.save(meeting);
 
@@ -104,7 +104,7 @@ describe('CachedMeetingRepository', () => {
       expect(origin.calls.save).toBe(2);
     });
 
-    it('회의가 종료되면 원장에 기록한다', async () => {
+    it('회의가 종료되면 원본에 기록한다', async () => {
       const meeting = makeMeeting('abc12xyz');
       await repo.save(meeting);
 
@@ -116,7 +116,7 @@ describe('CachedMeetingRepository', () => {
   });
 
   describe('findByCode', () => {
-    it('캐시에 있으면 원장을 읽지 않는다', async () => {
+    it('캐시에 있으면 원본을 읽지 않는다', async () => {
       await repo.save(makeMeeting('abc12xyz'));
       origin.calls.findByCode = 0;
 
@@ -126,7 +126,7 @@ describe('CachedMeetingRepository', () => {
       expect(origin.calls.findByCode).toBe(0);
     });
 
-    it('캐시에 없으면 원장에서 읽어 온다', async () => {
+    it('캐시에 없으면 원본에서 읽어 온다', async () => {
       await origin.repository.save(makeMeeting('abc12xyz'));
 
       const found = await repo.findByCode('abc12xyz');
@@ -134,7 +134,7 @@ describe('CachedMeetingRepository', () => {
       expect(found!.code.value).toBe('abc12xyz');
     });
 
-    it('원장에서 읽어 온 회의는 캐시에 채워 둔다', async () => {
+    it('원본에서 읽어 온 회의는 캐시에 채워 둔다', async () => {
       await origin.repository.save(makeMeeting('abc12xyz'));
 
       await repo.findByCode('abc12xyz');
@@ -142,19 +142,19 @@ describe('CachedMeetingRepository', () => {
       expect(await cache.findByCode('abc12xyz')).not.toBeNull();
     });
 
-    it('원장에도 없으면 null을 돌려준다', async () => {
+    it('원본에도 없으면 null을 돌려준다', async () => {
       await expect(repo.findByCode('missing0')).resolves.toBeNull();
     });
   });
 
   describe('listOpenCodes', () => {
-    it('캐시 색인이 비어 있으면 원장 질의로 재구축한다', async () => {
+    it('캐시 색인이 비어 있으면 원본 질의로 재구축한다', async () => {
       await origin.repository.save(makeMeeting('abc12xyz'));
 
       await expect(repo.listOpenCodes()).resolves.toEqual(['abc12xyz']);
     });
 
-    it('재구축 이후에는 원장을 다시 질의하지 않는다', async () => {
+    it('재구축 이후에는 원본을 다시 질의하지 않는다', async () => {
       await origin.repository.save(makeMeeting('abc12xyz'));
       await repo.listOpenCodes();
       origin.calls.listOpenCodes = 0;

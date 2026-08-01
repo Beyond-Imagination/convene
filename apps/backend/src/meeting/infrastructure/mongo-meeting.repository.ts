@@ -28,7 +28,7 @@ interface MeetingDoc {
 }
 
 /**
- * MeetingRepository의 mongoose 구현체 — 회의의 진실 원장.
+ * MeetingRepository의 mongoose 구현체 — 회의의 원본.
  *
  * `save`는 `replaceOne(upsert)`으로 멱등 처리한다.
  * 종료된 회의도 그대로 남긴다(노션 카드가 "종료됨"을 표시하려면 조회돼야 한다).

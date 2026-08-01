@@ -11,7 +11,7 @@ const KEY_PREFIX = 'meeting:';
 const OPEN_CODES_KEY = 'meeting:open';
 /** 색인을 Mongo에서 한 번이라도 채웠는지 표시한다. 없으면 "열린 회의 0건"과 "캐시 유실"을 구분할 수 없다. */
 const OPEN_INDEX_WARM_KEY = 'meeting:open:warm';
-/** 종료된 회의는 원장(Mongo)에 남으므로 캐시에는 오래 들고 있을 이유가 없다. */
+/** 종료된 회의는 원본(Mongo)에 남으므로 캐시에는 오래 들고 있을 이유가 없다. */
 const CLOSED_CACHE_TTL_SECONDS = 60 * 60;
 
 /**
@@ -44,7 +44,7 @@ interface MeetingWire {
 }
 
 /**
- * MeetingRepository의 redis(ioredis) 구현체 — 원장은 Mongo고 이쪽은 캐시다(`CachedMeetingRepository`).
+ * MeetingRepository의 redis(ioredis) 구현체 — 원본은 Mongo고 이쪽은 캐시다(`CachedMeetingRepository`).
  *
  * 직렬화 정책:
  *   - `meeting:{code}` key에 Aggregate snapshot의 JSON 직렬화 본을 string으로 저장.

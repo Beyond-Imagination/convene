@@ -94,7 +94,7 @@ uvicorn main:app --port 8000
 ```
 
 Redis는 로컬(6379)에 떠 있어야 한다 — `docker compose -f docker-compose.local.yml up -d redis`.
-회의 원장은 MongoDB지만 진행 중인 회의의 채팅·오디오 버퍼는 redis에만 있으므로,
+회의 원본은 MongoDB지만 진행 중인 회의의 채팅·오디오 버퍼는 redis에만 있으므로,
 AOF 영속화가 걸린 이 컨테이너를 쓴다(`down -v` 금지).
 
 | 서비스           | 포트                    | 비고                                 |
@@ -102,7 +102,7 @@ AOF 영속화가 걸린 이 컨테이너를 쓴다(`down -v` 금지).
 | backend       | 5000                  | HTTP + WebSocket(Socket.IO)        |
 | frontend      | 3000                  | Next.js dev                        |
 | ai-worker     | 8000                  | FastAPI(STT)                       |
-| redis         | 6379                  | 회의 캐시·채팅·오디오 버퍼 (회의 원장은 MongoDB)     |
+| redis         | 6379                  | 회의 캐시·채팅·오디오 버퍼 (회의 원본은 MongoDB)     |
 | mediasoup RTC | 40000–49999 (UDP/TCP) | WebRTC 미디어. `RTC_MIN/MAX_PORT`로 조정 |
 
 ### 테스트 · 빌드 · 린트

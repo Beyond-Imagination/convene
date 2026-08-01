@@ -10,11 +10,11 @@ const fingerprint = (meeting: Meeting): string =>
   JSON.stringify({ ...meeting.snapshot(), lastActiveAt: null });
 
 /**
- * 회의 저장소. 원장은 Mongo, redis는 그 앞의 캐시다.
+ * 회의 저장소. 원본은 Mongo, redis는 그 앞의 캐시다.
  *
- * 쓰기는 상태 전이(생성·입장·퇴장·종료)에서만 원장까지 내려간다. 채팅은 메시지마다
+ * 쓰기는 상태 전이(생성·입장·퇴장·종료)에서만 원본까지 내려간다. 채팅은 메시지마다
  * `markActive` + `save`를 하는데(`meeting.service.postChat`) 이건 heartbeat일 뿐이라
- * 원장 쓰기를 유발하면 안 된다 — 낡은 `lastActiveAt`은 idle 판정을 캐시로 하는 한 무해하고,
+ * 원본 쓰기를 유발하면 안 된다 — 낡은 `lastActiveAt`은 idle 판정을 캐시로 하는 한 무해하고,
  * 캐시가 통째로 날아간 경우엔 재시작 복구가 `markActive(now)`로 다시 잡아 준다.
  */
 @Injectable()
@@ -34,7 +34,7 @@ export class CachedMeetingRepository implements MeetingRepository {
 
   async save(meeting: Meeting): Promise<void> {
     const previous = await this.cache.findByCode(meeting.code.value);
-    // 캐시에 직전 상태가 없으면 무엇이 바뀌었는지 판단할 수 없다 — 원장에 쓰는 쪽이 안전하다.
+    // 캐시에 직전 상태가 없으면 무엇이 바뀌었는지 판단할 수 없다 — 원본에 쓰는 쪽이 안전하다.
     if (previous === null || fingerprint(previous) !== fingerprint(meeting)) {
       await this.origin.save(meeting);
     }
