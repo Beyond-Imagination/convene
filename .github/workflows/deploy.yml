@@ -185,8 +185,6 @@ jobs:
           MONGO_URI: ${{ secrets.MONGO_URI }}
           ADMIN_API_TOKEN: ${{ secrets.ADMIN_API_TOKEN }}
           NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
-          # organization secret 에 NOTION_TOKEN 이 있어 저장소 값을 안 넣으면 그쪽이 흘러들어온다.
-          # 이 하나만 CONVENE_ 접두어로 분리한다(컨테이너 안 이름은 그대로).
           NOTION_TOKEN: ${{ secrets.CONVENE_NOTION_TOKEN }}
           NOTION_SIGNING_SECRET: ${{ secrets.NOTION_SIGNING_SECRET }}
           NOTION_DB_IDS: ${{ vars.NOTION_DB_IDS }}
