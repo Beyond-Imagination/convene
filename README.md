@@ -74,8 +74,12 @@ cp apps/frontend/.env.template apps/frontend/.env.local
 cp apps/ai-worker/.env.template apps/ai-worker/.env   # 선택 — 모두 기본값으로 동작
 ```
 
-- **backend** 핵심: `GEMINI_API_KEY`(LLM 요약), `MONGO_URI`·`MONGO_DB_NAME`(회의록 저장).
+- **backend** 핵심: `GEMINI_API_KEY`(LLM 요약), `MONGO_URI`·`MONGO_DB_NAME`(회의·회의록 저장).
   나머지(Redis·Mediasoup·CORS·포트 등)는 `.env.template` 주석 참조.
+  값은 `[운영필수]`·`[게이트]`·`[튜닝]` 셋으로 표기돼 있다. **운영필수**는 기본값이 로컬 전용이라
+  `NODE_ENV=production`이면 미설정 시 부팅이 실패하고(조용히 dev DB·localhost 로 붙는 것 방지),
+  **게이트**는 비우면 그 기능만 꺼진 채 뜬다 — 무엇이 꺼졌는지는 `backend listening` 로그의
+  `features` 필드로 확인한다.
 - **frontend**: `NEXT_PUBLIC_API_URL`(기본 `http://localhost:5000`)로 백엔드를 가리킨다.
   정적 export 라 빌드 타임에 인라인되므로 배포 빌드 시 운영 백엔드 URL을 넣어야 한다.
 

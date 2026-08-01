@@ -1,3 +1,6 @@
+import { requireInProduction } from './required-env';
+
+/** 로컬 개발 편의 디폴트. 운영에서는 `REDIS_URL` 미설정이 부팅 실패다. */
 export const DEFAULT_REDIS_URL = 'redis://localhost:6379';
 export const DEFAULT_REDIS_KEY_PREFIX = 'convene:';
 
@@ -11,13 +14,11 @@ export function redisRetryStrategy(attempt: number): number {
 }
 
 export function resolveRedisUrl(env: NodeJS.ProcessEnv = process.env): string {
-  const raw = env.REDIS_URL;
-  if (raw === undefined || raw.trim() === '') return DEFAULT_REDIS_URL;
-  const trimmed = raw.trim();
-  if (!/^rediss?:\/\//.test(trimmed)) {
-    throw new Error(`REDIS_URL must use the redis:// or rediss:// scheme: "${raw}"`);
+  const value = requireInProduction(env, 'REDIS_URL', DEFAULT_REDIS_URL);
+  if (!/^rediss?:\/\//.test(value)) {
+    throw new Error(`REDIS_URL must use the redis:// or rediss:// scheme: "${value}"`);
   }
-  return trimmed;
+  return value;
 }
 
 export function resolveRedisKeyPrefix(env: NodeJS.ProcessEnv = process.env): string {

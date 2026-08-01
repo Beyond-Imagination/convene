@@ -131,7 +131,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: GHCR_TOKEN,GHCR_USER,DOMAIN,ACME_EMAIL,CORS_ORIGIN,ANNOUNCED_IP,RTC_MIN_PORT,RTC_MAX_PORT,MEDIASOUP_WORKER_NUM,STT_MODEL_SIZE,MONGO_DB_NAME,IMAGE_TAG,GEMINI_API_KEY,GEMINI_MODEL,MONGO_URI,ADMIN_API_TOKEN,NEW_RELIC_LICENSE_KEY
+          envs: GHCR_TOKEN,GHCR_USER,DOMAIN,ACME_EMAIL,CORS_ORIGIN,ANNOUNCED_IP,RTC_MIN_PORT,RTC_MAX_PORT,MEDIASOUP_WORKER_NUM,STT_MODEL_SIZE,MONGO_DB_NAME,IMAGE_TAG,GEMINI_API_KEY,GEMINI_MODEL,MONGO_URI,ADMIN_API_TOKEN,NEW_RELIC_LICENSE_KEY,NOTION_TOKEN,NOTION_DB_IDS,NOTION_SIGNING_SECRET,NOTION_POLL_CRON
           script: |
             set -e
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
@@ -156,6 +156,10 @@ jobs:
               echo "MONGO_DB_NAME=${MONGO_DB_NAME:-convene-prod}"
               echo "ADMIN_API_TOKEN=$ADMIN_API_TOKEN"
               echo "NEW_RELIC_LICENSE_KEY=$NEW_RELIC_LICENSE_KEY"
+              echo "NOTION_TOKEN=$NOTION_TOKEN"
+              echo "NOTION_DB_IDS=$NOTION_DB_IDS"
+              echo "NOTION_SIGNING_SECRET=$NOTION_SIGNING_SECRET"
+              echo "NOTION_POLL_CRON=$NOTION_POLL_CRON"
             } > .env
 
             docker compose -f docker-compose.prod.yml pull
@@ -181,6 +185,10 @@ jobs:
           MONGO_URI: ${{ secrets.MONGO_URI }}
           ADMIN_API_TOKEN: ${{ secrets.ADMIN_API_TOKEN }}
           NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+          NOTION_TOKEN: ${{ secrets.CONVENE_NOTION_TOKEN }}
+          NOTION_SIGNING_SECRET: ${{ secrets.NOTION_SIGNING_SECRET }}
+          NOTION_DB_IDS: ${{ vars.NOTION_DB_IDS }}
+          NOTION_POLL_CRON: ${{ vars.NOTION_POLL_CRON }}
 
   # 5) 프론트 배포 (정적 export → S3 → CloudFront). FRONTEND_DEPLOY_ENABLED 게이트.
   deploy-frontend:

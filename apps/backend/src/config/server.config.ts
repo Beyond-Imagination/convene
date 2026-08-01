@@ -1,3 +1,5 @@
+import { requireInProduction } from './required-env';
+
 export const DEFAULT_PORT = 5000;
 
 /**
@@ -22,7 +24,7 @@ export function resolvePort(env: NodeJS.ProcessEnv = process.env): number {
  * 빈 문자열은 무시하며, 결과가 비면 디폴트 origin으로 fallback 한다.
  */
 export function resolveCorsOrigins(env: NodeJS.ProcessEnv = process.env): string[] {
-  const raw = env.CORS_ORIGIN ?? DEFAULT_CORS_ORIGIN;
+  const raw = requireInProduction(env, 'CORS_ORIGIN', DEFAULT_CORS_ORIGIN);
   const parsed = raw
     .split(',')
     .map((o) => o.trim())

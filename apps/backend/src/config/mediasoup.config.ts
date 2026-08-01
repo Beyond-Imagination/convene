@@ -1,6 +1,8 @@
 import { RtpCodecCapability, WorkerLogLevel, WorkerLogTag } from 'mediasoup/node/lib/types';
 import * as os from 'os';
 
+import { requireInProduction } from './required-env';
+
 /**
  * Mediasoup infrastructure 설정.
  *
@@ -96,7 +98,10 @@ export function resolveWebRtcTransportOptions(
   env: NodeJS.ProcessEnv = process.env,
 ): WebRtcTransportOptions {
   return {
-    listenIps: [{ ip: '0.0.0.0', announcedIp: env.ANNOUNCED_IP ?? DEFAULT_ANNOUNCED_IP }],
+    // 운영에서 127.0.0.1 로 폴백하면 시그널링은 성공하고 미디어만 조용히 안 붙는다.
+    listenIps: [
+      { ip: '0.0.0.0', announcedIp: requireInProduction(env, 'ANNOUNCED_IP', DEFAULT_ANNOUNCED_IP) },
+    ],
     enableUdp: parseBoolEnv(env, 'ENABLE_UDP', true),
     enableTcp: parseBoolEnv(env, 'ENABLE_TCP', true),
     preferUdp: parseBoolEnv(env, 'PREFER_UDP', true),
