@@ -9,6 +9,10 @@ import { ExternalReference, MeetingType, Source } from '@/shared-kernel/domain/v
 
 const KEY_PREFIX = 'meeting:';
 const OPEN_CODES_KEY = 'meeting:open';
+/** 색인을 Mongo에서 한 번이라도 채웠는지 표시한다. 없으면 "열린 회의 0건"과 "캐시 유실"을 구분할 수 없다. */
+const OPEN_INDEX_WARM_KEY = 'meeting:open:warm';
+/** 종료된 회의는 원장(Mongo)에 남으므로 캐시에는 오래 들고 있을 이유가 없다. */
+const CLOSED_CACHE_TTL_SECONDS = 60 * 60;
 
 /**
  * Redis에 저장하는 직렬화 형태. Date는 ISO string으로, 나머지는 snapshot과 동일.
@@ -40,7 +44,7 @@ interface MeetingWire {
 }
 
 /**
- * MeetingRepository의 redis(ioredis) 구현체.
+ * MeetingRepository의 redis(ioredis) 구현체 — 원장은 Mongo고 이쪽은 캐시다(`CachedMeetingRepository`).
  *
  * 직렬화 정책:
  *   - `meeting:{code}` key에 Aggregate snapshot의 JSON 직렬화 본을 string으로 저장.
@@ -61,9 +65,13 @@ export class RedisMeetingRepository implements MeetingRepository {
   async save(meeting: Meeting): Promise<void> {
     const code = meeting.code.value;
     const payload = JSON.stringify(this.toWire(meeting.snapshot()));
+    const key = this.key(code);
     // 종료된 회의 key도 남기 때문에 SCAN으로는 열린 회의를 골라낼 수 없다.
     // 열린 회의 code만 별도 set으로 들고 있다가 종료 시 빼낸다.
-    const pipeline = this.redis.pipeline().set(this.key(code), payload);
+    const pipeline =
+      meeting.status === 'closed'
+        ? this.redis.pipeline().set(key, payload, 'EX', CLOSED_CACHE_TTL_SECONDS)
+        : this.redis.pipeline().set(key, payload);
     await (meeting.isOpen
       ? pipeline.sadd(OPEN_CODES_KEY, code)
       : pipeline.srem(OPEN_CODES_KEY, code)
@@ -75,11 +83,13 @@ export class RedisMeetingRepository implements MeetingRepository {
   }
 
   async isOpenIndexWarm(): Promise<boolean> {
-    throw new Error('not implemented');
+    return (await this.redis.exists(OPEN_INDEX_WARM_KEY)) === 1;
   }
 
-  async primeOpenIndex(_codes: string[]): Promise<void> {
-    throw new Error('not implemented');
+  async primeOpenIndex(codes: string[]): Promise<void> {
+    const pipeline = this.redis.pipeline().del(OPEN_CODES_KEY);
+    if (codes.length > 0) pipeline.sadd(OPEN_CODES_KEY, ...codes);
+    await pipeline.set(OPEN_INDEX_WARM_KEY, '1').exec();
   }
 
   private key(code: string): string {
