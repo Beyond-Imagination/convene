@@ -33,7 +33,7 @@ services:
       --appendonly yes
       --appendfsync everysec
       --maxmemory 256mb
-      --maxmemory-policy noeviction
+      --maxmemory-policy volatile-lru
       --notify-keyspace-events Ex
     volumes:
       - redis-data:/data

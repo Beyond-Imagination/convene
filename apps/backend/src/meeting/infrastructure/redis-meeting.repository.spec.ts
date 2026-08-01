@@ -138,4 +138,52 @@ describe('RedisMeetingRepository', () => {
     expect(found!.source).toBe('notion-issue');
     expect(found!.externalReference.issueId).toBe('NOTION-42');
   });
+
+  describe('캐시 수명', () => {
+    it('진행 중인 회의는 만료시키지 않는다', async () => {
+      const meeting = makeMeeting('abc12xyz');
+      await repo.save(meeting);
+
+      await expect(redis.ttl('meeting:abc12xyz')).resolves.toBe(-1);
+    });
+
+    it('종료된 회의는 만료 시각을 붙여 캐시가 무한히 자라지 않게 한다', async () => {
+      const meeting = makeMeeting('abc12xyz');
+      meeting.close(t1m);
+      await repo.save(meeting);
+
+      await expect(redis.ttl('meeting:abc12xyz')).resolves.toBeGreaterThan(0);
+    });
+  });
+
+  describe('열린 회의 색인 재구축', () => {
+    it('한 번도 채운 적 없는 색인은 cold 로 판정한다', async () => {
+      await expect(repo.isOpenIndexWarm()).resolves.toBe(false);
+    });
+
+    it('primeOpenIndex 이후에는 warm 으로 판정한다', async () => {
+      await repo.primeOpenIndex(['abc12xyz']);
+
+      await expect(repo.isOpenIndexWarm()).resolves.toBe(true);
+    });
+
+    it('primeOpenIndex는 기존 색인을 통째로 갈아끼운다', async () => {
+      const stale = makeMeeting('stale123');
+      await repo.save(stale);
+
+      await repo.primeOpenIndex(['abc12xyz', 'xyz99aaa']);
+
+      await expect(repo.listOpenCodes()).resolves.toEqual(
+        expect.arrayContaining(['abc12xyz', 'xyz99aaa']),
+      );
+      await expect(repo.listOpenCodes()).resolves.toHaveLength(2);
+    });
+
+    it('열린 회의가 하나도 없어도 warm 으로 남는다', async () => {
+      await repo.primeOpenIndex([]);
+
+      await expect(repo.isOpenIndexWarm()).resolves.toBe(true);
+      await expect(repo.listOpenCodes()).resolves.toEqual([]);
+    });
+  });
 });

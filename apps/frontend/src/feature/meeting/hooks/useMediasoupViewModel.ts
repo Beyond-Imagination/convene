@@ -277,14 +277,19 @@ export function useMediasoupViewModel(socket: Socket | null, code: string): UseM
     return () => {
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       audioStreamRef.current?.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current?.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
       audioStreamRef.current = null;
       audioProducerRef.current = null;
       videoProducerRef.current = null;
+      screenProducerRef.current = null;
+      screenStreamRef.current = null;
+      setScreenStream(null);
       setLocalStream(null);
       // 재연결/unmount 후엔 다시 기본 OFF로 시작한다(사용자가 재요청해야 켜짐).
       setIsAudioMuted(true);
       setIsVideoMuted(true);
+      setIsSharingScreen(false);
     };
   }, [status]);
 

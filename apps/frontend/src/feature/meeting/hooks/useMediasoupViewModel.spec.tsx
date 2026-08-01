@@ -758,6 +758,60 @@ describe('useMediasoupViewModel.screenShare', () => {
     });
     expect(getDisplayMediaMock).toHaveBeenCalledTimes(1);
   });
+
+  it('재연결 시 화면 공유 상태가 초기화되고 stale producer를 서버에 알리지 않는다', async () => {
+    // 재연결하면 participantId(socket.id)가 새로 발급된다. 재시작 전에 만든 producerId로
+    // CLOSE_PRODUCER를 보내면 서버가 새 참가자 기준으로 소유권을 검사해 거부한다.
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderHook(() => useMediasoupViewModel(socket as unknown as never, code));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => {
+      await result.current.startScreenShare();
+    });
+    const stream = result.current.screenStream as unknown as FakeMediaStream;
+    expect(result.current.isSharingScreen).toBe(true);
+
+    socket.emit.mockClear();
+    const onConnect = captureSocketListener(socket, 'connect');
+    await act(async () => {
+      onConnect();
+      onConnect();
+    });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    expect(result.current.isSharingScreen).toBe(false);
+    expect(result.current.screenStream).toBeNull();
+    for (const t of stream.getTracks()) expect(t.stop).toHaveBeenCalled();
+    expect(socket.emit).not.toHaveBeenCalledWith(
+      MEDIASOUP_WS_EVENTS.CLOSE_PRODUCER,
+      expect.anything(),
+    );
+  });
+
+  it('재연결 후 화면 공유를 다시 시작할 수 있다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderHook(() => useMediasoupViewModel(socket as unknown as never, code));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => {
+      await result.current.startScreenShare();
+    });
+
+    const onConnect = captureSocketListener(socket, 'connect');
+    await act(async () => {
+      onConnect();
+      onConnect();
+    });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    await act(async () => {
+      await result.current.startScreenShare();
+    });
+
+    expect(getDisplayMediaMock).toHaveBeenCalledTimes(2);
+    expect(result.current.isSharingScreen).toBe(true);
+  });
 });
 
 describe('useMediasoupViewModel.listProducers (기존 producer 합류)', () => {
