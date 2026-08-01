@@ -7,6 +7,7 @@ import pino from 'pino';
 
 import { AppModule } from './app.module';
 import { assertEnvIsValid } from './config/env-validation';
+import { resolveFeatureGates } from './config/feature-gates';
 import { resolveCorsOrigins, resolvePort } from './config/server.config';
 import { CorsIoAdapter } from './shared-kernel/infrastructure/cors-io.adapter';
 
@@ -35,7 +36,10 @@ async function bootstrap() {
   const port = resolvePort();
   await app.listen(port);
   const logger = await app.resolve(PinoLogger);
-  logger.info({ port, origins: corsOrigins }, 'backend listening');
+  logger.info(
+    { port, origins: corsOrigins, features: resolveFeatureGates() },
+    'backend listening',
+  );
 }
 
 bootstrap().catch((err) => {
