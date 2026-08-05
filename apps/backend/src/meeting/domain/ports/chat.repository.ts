@@ -1,4 +1,4 @@
-import { ChatEntry } from '@/shared-kernel/domain/value-objects';
+import { ChatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
 
 export const CHAT_REPOSITORY = Symbol('CHAT_REPOSITORY');
 

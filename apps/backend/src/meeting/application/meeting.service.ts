@@ -4,36 +4,20 @@ import { Inject, Injectable } from '@nestjs/common';
 import { MeetingNotFoundError, NotHostError } from '@/meeting/application/meeting.errors';
 import { Meeting } from '@/meeting/domain/meeting';
 import { Participant } from '@/meeting/domain/participant';
-import {
-  CHAT_REPOSITORY,
-  ChatRepository,
-  HOST_TOKEN_GENERATOR,
-  HostTokenGenerator,
-  MEETING_CODE_GENERATOR,
-  MEETING_REPOSITORY,
-  MeetingCodeGenerator,
-  MeetingRepository,
-} from '@/meeting/domain/ports';
-import { IdleTimeout } from '@/meeting/domain/value-objects';
-import { MeetingEndedPayload, MeetingEndedReason } from '@/shared-kernel/domain/events';
-import {
-  CLOCK,
-  Clock,
-  CreatedMeeting,
-  CreateMeetingInput,
-  DomainEventPublisher,
-  EVENT_PUBLISHER,
-  LOGGER,
-  LoggerPort,
-  MeetingCreationPort,
-} from '@/shared-kernel/domain/ports';
-import {
-  ChatEntry,
-  chatEntry,
-  ExternalReference,
-  MeetingType,
-  Source,
-} from '@/shared-kernel/domain/value-objects';
+import { CHAT_REPOSITORY, ChatRepository } from '@/meeting/domain/ports/chat.repository';
+import { HOST_TOKEN_GENERATOR, HostTokenGenerator } from '@/meeting/domain/ports/host-token.generator';
+import { MEETING_REPOSITORY, MeetingRepository } from '@/meeting/domain/ports/meeting.repository';
+import { IdleTimeout } from '@/meeting/domain/value-objects/idle-timeout';
+import { RandomMeetingCodeGenerator } from '@/meeting/infrastructure/random-meeting-code.generator';
+import { MeetingEndedPayload, MeetingEndedReason } from '@/shared-kernel/domain/events/meeting-ended.payload';
+import { DomainEventPublisher, EVENT_PUBLISHER } from '@/shared-kernel/domain/ports/event-publisher';
+import { LOGGER, LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { CreatedMeeting, CreateMeetingInput, MeetingCreationPort } from '@/shared-kernel/domain/ports/meeting-creation.port';
+import { ChatEntry, chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
+import { ExternalReference } from '@/shared-kernel/domain/value-objects/external-reference';
+import { MeetingType } from '@/shared-kernel/domain/value-objects/meeting-type';
+import { Source } from '@/shared-kernel/domain/value-objects/source';
+import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 
 interface CreateMeetingCommand {
   source: Source;
@@ -96,9 +80,9 @@ export class MeetingService implements MeetingCreationPort {
   constructor(
     @Inject(MEETING_REPOSITORY) private readonly repository: MeetingRepository,
     @Inject(CHAT_REPOSITORY) private readonly chatRepository: ChatRepository,
-    @Inject(MEETING_CODE_GENERATOR) private readonly codeGenerator: MeetingCodeGenerator,
+    private readonly codeGenerator: RandomMeetingCodeGenerator,
     @Inject(HOST_TOKEN_GENERATOR) private readonly hostTokenGenerator: HostTokenGenerator,
-    @Inject(CLOCK) private readonly clock: Clock,
+    private readonly clock: SystemClock,
     @Inject(EVENT_PUBLISHER) private readonly eventPublisher: DomainEventPublisher,
     @Inject(LOGGER) private readonly logger: LoggerPort,
   ) {}

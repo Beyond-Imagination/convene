@@ -1,13 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 
 import { NOTION_ISSUE, NotionIssuePort } from '@/notion/domain/ports/notion-issue.port';
-import {
-  LOGGER,
-  LoggerPort,
-  MEETING_CREATION_PORT,
-  MeetingCreationPort,
-} from '@/shared-kernel/domain/ports';
-import { externalReference } from '@/shared-kernel/domain/value-objects';
+import { LOGGER, LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { MEETING_CREATION_PORT, MeetingCreationPort } from '@/shared-kernel/domain/ports/meeting-creation.port';
+import { externalReference } from '@/shared-kernel/domain/value-objects/external-reference';
 
 export const MEETING_LINK_BASE = Symbol('MEETING_LINK_BASE');
 

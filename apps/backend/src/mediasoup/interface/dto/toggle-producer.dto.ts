@@ -1,7 +1,7 @@
 import type { ToggleProducerRequest } from '@convene/shared-interfaces';
 import { IsBoolean, IsString, Length, MaxLength } from 'class-validator';
 
-import { MeetingCode } from '@/meeting/domain/value-objects';
+import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
 
 const ID_MAX = 64;
 

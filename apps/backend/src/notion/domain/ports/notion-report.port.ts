@@ -1,4 +1,4 @@
-import { FinalizedReport } from '@/shared-kernel/domain/ports';
+import { FinalizedReport } from '@/shared-kernel/domain/ports/report-lookup.port';
 
 export const NOTION_REPORT = Symbol('NOTION_REPORT');
 

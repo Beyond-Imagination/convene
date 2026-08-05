@@ -2,7 +2,7 @@ import type { DomainEventName } from '@convene/shared-interfaces';
 import { Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import type { DomainEventPublisher } from '@/shared-kernel/domain/ports';
+import type { DomainEventPublisher } from '@/shared-kernel/domain/ports/event-publisher';
 
 /**
  * DomainEventPublisher 포트의 production 어댑터.

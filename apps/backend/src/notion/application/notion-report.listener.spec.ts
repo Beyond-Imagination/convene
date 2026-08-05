@@ -1,4 +1,4 @@
-import { ReportFinalizedPayload } from '@/shared-kernel/domain/events';
+import { ReportFinalizedPayload } from '@/shared-kernel/domain/events/report-finalized.payload';
 
 import { NotionReportListener } from './notion-report.listener';
 import { NotionReportPushService } from './notion-report-push.service';

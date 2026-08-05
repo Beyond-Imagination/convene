@@ -10,19 +10,17 @@ import {
 } from '@/config/mediasoup.config';
 import { MediasoupMeetingLifecycleListener } from '@/mediasoup/application/mediasoup-meeting-lifecycle.listener';
 import { MediasoupSignalingService } from '@/mediasoup/application/mediasoup-signaling.service';
-import {
-  AUDIO_CAPTURE,
-  MEDIA_ROUTER,
-  MEDIA_TRANSPORT,
-  PARTICIPANT_MEDIA_REPOSITORY,
-} from '@/mediasoup/domain/ports';
+import { AUDIO_CAPTURE } from '@/mediasoup/domain/ports/audio-capture.port';
+import { MEDIA_ROUTER } from '@/mediasoup/domain/ports/media-router.port';
+import { MEDIA_TRANSPORT } from '@/mediasoup/domain/ports/media-transport.port';
+import { PARTICIPANT_MEDIA_REPOSITORY } from '@/mediasoup/domain/ports/participant-media.repository';
 import { FfmpegAudioCaptureAdapter } from '@/mediasoup/infrastructure/ffmpeg-audio-capture.adapter';
 import { MediasoupRouterAdapter } from '@/mediasoup/infrastructure/mediasoup-router.adapter';
 import { MediasoupTransportAdapter } from '@/mediasoup/infrastructure/mediasoup-transport.adapter';
 import { MediasoupWorkerPool } from '@/mediasoup/infrastructure/mediasoup-worker.pool';
 import { RedisParticipantMediaRepository } from '@/mediasoup/infrastructure/redis-participant-media.repository';
 import { MediasoupGateway } from '@/mediasoup/interface/gateways/mediasoup.gateway';
-import { AUDIO_BUFFER_REPOSITORY, AudioBufferRepository } from '@/recording/domain/ports';
+import { AUDIO_BUFFER_REPOSITORY, AudioBufferRepository } from '@/recording/domain/ports/audio-buffer.repository';
 import { RecordingModule } from '@/recording/recording.module';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 

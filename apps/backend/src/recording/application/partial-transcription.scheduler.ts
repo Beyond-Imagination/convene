@@ -1,15 +1,9 @@
 import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 
-import {
-  AbsoluteTranscriptSegment,
-  AUDIO_BUFFER_REPOSITORY,
-  AudioBufferRepository,
-  PARTIAL_TRANSCRIPT_STORE,
-  PartialTranscriptStore,
-  TRANSCRIBER,
-  TranscriberPort,
-} from '@/recording/domain/ports';
-import { LOGGER, LoggerPort } from '@/shared-kernel/domain/ports';
+import { AUDIO_BUFFER_REPOSITORY, AudioBufferRepository } from '@/recording/domain/ports/audio-buffer.repository';
+import { AbsoluteTranscriptSegment, PARTIAL_TRANSCRIPT_STORE, PartialTranscriptStore } from '@/recording/domain/ports/partial-transcript.store';
+import { TRANSCRIBER, TranscriberPort } from '@/recording/domain/ports/transcriber.port';
+import { LOGGER, LoggerPort } from '@/shared-kernel/domain/ports/logger';
 
 import {
   dropOverlapHeadSegments,

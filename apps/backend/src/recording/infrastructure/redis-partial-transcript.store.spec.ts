@@ -1,7 +1,7 @@
 import type Redis from 'ioredis';
 import RedisMock from 'ioredis-mock';
 
-import { AbsoluteTranscriptSegment } from '@/recording/domain/ports';
+import { AbsoluteTranscriptSegment } from '@/recording/domain/ports/partial-transcript.store';
 
 import { RedisPartialTranscriptStore } from './redis-partial-transcript.store';
 

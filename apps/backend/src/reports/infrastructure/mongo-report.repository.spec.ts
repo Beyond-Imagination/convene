@@ -1,14 +1,12 @@
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { Connection, createConnection } from 'mongoose';
 
-import { participantEntry, transcriptSegment } from '@/reports/domain/entries';
+import { participantEntry } from '@/reports/domain/entries/participant-entry';
+import { transcriptSegment } from '@/reports/domain/entries/transcript-segment';
 import { MeetingReport } from '@/reports/domain/meeting-report';
-import { notionPushResult } from '@/reports/domain/value-objects';
-import {
-  externalReference,
-  NO_EXTERNAL_REFERENCE,
-  reportSummary,
-} from '@/shared-kernel/domain/value-objects';
+import { notionPushResult } from '@/reports/domain/value-objects/notion-push-result';
+import { externalReference, NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects/external-reference';
+import { reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
 
 import { MongoReportRepository } from './mongo-report.repository';
 

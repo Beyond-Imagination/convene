@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import { SummarizerInput, SummarizerPort } from '@/reports/domain/ports';
-import { ReportSummary, reportSummary } from '@/shared-kernel/domain/value-objects';
+import { SummarizerInput, SummarizerPort } from '@/reports/domain/ports/summarizer.port';
+import { ReportSummary, reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
 
 /**
  * SummarizerPort의 부트스트랩 fallback 구현체.

@@ -1,6 +1,6 @@
-import { ChatEntry, ReportSummary } from '@/shared-kernel/domain/value-objects';
-
-import { TranscriptSegment } from '../entries';
+import { TranscriptSegment } from '@/reports/domain/entries/transcript-segment';
+import { ChatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
+import { ReportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
 
 export const SUMMARIZER = Symbol('SUMMARIZER');
 

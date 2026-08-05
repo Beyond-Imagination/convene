@@ -1,7 +1,7 @@
 import { Producer, Router, RtpCodecCapability } from 'mediasoup/node/lib/types';
 
-import { MediaRouterPort } from '@/mediasoup/domain/ports';
-import { LoggerPort } from '@/shared-kernel/domain/ports';
+import { MediaRouterPort } from '@/mediasoup/domain/ports/media-router.port';
+import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
 
 import { MediasoupWorkerPool } from './mediasoup-worker.pool';
 

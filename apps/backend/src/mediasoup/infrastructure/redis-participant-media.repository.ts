@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import Redis from 'ioredis';
 
 import { ParticipantMedia, ParticipantMediaSnapshot } from '@/mediasoup/domain/participant-media';
-import { ParticipantMediaRepository } from '@/mediasoup/domain/ports';
+import { ParticipantMediaRepository } from '@/mediasoup/domain/ports/participant-media.repository';
 
 const PARTICIPANT_KEY_PREFIX = 'participant-media:';
 const MEETING_INDEX_KEY_PREFIX = 'participant-media:meeting:';

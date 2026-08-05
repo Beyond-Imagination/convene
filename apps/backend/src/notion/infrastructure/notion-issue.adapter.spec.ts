@@ -3,7 +3,7 @@ import {
   buildPendingIssuesFilter,
   NotionIssueAdapter,
 } from '@/notion/infrastructure/notion-issue.adapter';
-import { LoggerPort } from '@/shared-kernel/domain/ports';
+import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
 
 const NOW = new Date('2026-07-20T12:00:00.000Z');
 const LINK_BASE = 'https://convene.example.com';

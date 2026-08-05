@@ -1,12 +1,13 @@
 import { Global, Module } from '@nestjs/common';
 
-import { CLOCK, EVENT_PUBLISHER, LOGGER } from '@/shared-kernel/domain/ports';
+import { EVENT_PUBLISHER } from '@/shared-kernel/domain/ports/event-publisher';
+import { LOGGER } from '@/shared-kernel/domain/ports/logger';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 
-const PROVIDERS = [
-  { provide: CLOCK, useClass: SystemClock },
+// 구현이 하나뿐이고 주입 상태도 없는 SystemClock은 포트 없이 클래스 자체를 토큰으로 쓴다.
+const TOKEN_PROVIDERS = [
   { provide: EVENT_PUBLISHER, useClass: NestEventBusDomainEventPublisher },
   { provide: LOGGER, useClass: PinoLoggerAdapter },
 ];
@@ -17,7 +18,7 @@ const PROVIDERS = [
  */
 @Global()
 @Module({
-  providers: PROVIDERS,
-  exports: PROVIDERS.map(({ provide }) => provide),
+  providers: [SystemClock, ...TOKEN_PROVIDERS],
+  exports: [SystemClock, ...TOKEN_PROVIDERS.map(({ provide }) => provide)],
 })
 export class SharedKernelModule {}

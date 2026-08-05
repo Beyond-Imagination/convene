@@ -9,13 +9,15 @@ import { ReportFinalizationService } from '@/reports/application/report-finaliza
 import { ReportLookupAdapter } from '@/reports/application/report-lookup.adapter';
 import { ReportMeetingLifecycleListener } from '@/reports/application/report-meeting-lifecycle.listener';
 import { ReportPipelineListener } from '@/reports/application/report-pipeline.listener';
-import { REPORT_ID_GENERATOR, REPORT_REPOSITORY, SUMMARIZER } from '@/reports/domain/ports';
+import { REPORT_REPOSITORY } from '@/reports/domain/ports/report.repository';
+import { REPORT_ID_GENERATOR } from '@/reports/domain/ports/report-id.generator';
+import { SUMMARIZER } from '@/reports/domain/ports/summarizer.port';
 import { GeminiSummarizer } from '@/reports/infrastructure/gemini.summarizer';
 import { MongoReportRepository } from '@/reports/infrastructure/mongo-report.repository';
 import { NoopSummarizer } from '@/reports/infrastructure/noop.summarizer';
 import { ReportsController } from '@/reports/interface/controllers/reports.controller';
 import { ADMIN_API_TOKEN, AdminGuard } from '@/reports/interface/guards/admin.guard';
-import { REPORT_LOOKUP_PORT } from '@/shared-kernel/domain/ports';
+import { REPORT_LOOKUP_PORT } from '@/shared-kernel/domain/ports/report-lookup.port';
 
 /**
  * Reports 기능을 구성하는 NestJS 모듈.

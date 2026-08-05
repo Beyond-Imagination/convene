@@ -1,10 +1,12 @@
 import { MEETING_EVENTS } from '@convene/shared-interfaces';
 
 import { Meeting } from '@/meeting/domain/meeting';
-import { MeetingRepository } from '@/meeting/domain/ports';
-import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';
-import { LoggerPort } from '@/shared-kernel/domain/ports';
-import { ChatEntry, externalReference } from '@/shared-kernel/domain/value-objects';
+import { MeetingRepository } from '@/meeting/domain/ports/meeting.repository';
+import { IdleTimeout } from '@/meeting/domain/value-objects/idle-timeout';
+import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
+import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { ChatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
+import { externalReference } from '@/shared-kernel/domain/value-objects/external-reference';
 
 import { MeetingService } from './meeting.service';
 import { MeetingRecoveryService } from './meeting-recovery.service';

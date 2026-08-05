@@ -1,7 +1,7 @@
 import { NotionMeetingProvisioningService } from '@/notion/application/notion-meeting-provisioning.service';
 import { NotionIssuePort, PendingIssue } from '@/notion/domain/ports/notion-issue.port';
-import { CreatedMeeting, CreateMeetingInput, MeetingCreationPort } from '@/shared-kernel/domain/ports';
-import { LoggerPort } from '@/shared-kernel/domain/ports';
+import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { CreatedMeeting, CreateMeetingInput, MeetingCreationPort } from '@/shared-kernel/domain/ports/meeting-creation.port';
 
 function silentLogger(): LoggerPort {
   const noop = (): void => undefined;

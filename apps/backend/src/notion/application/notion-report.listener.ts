@@ -2,7 +2,7 @@ import { REPORT_EVENTS } from '@convene/shared-interfaces';
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 
-import { ReportFinalizedPayload } from '@/shared-kernel/domain/events';
+import { ReportFinalizedPayload } from '@/shared-kernel/domain/events/report-finalized.payload';
 
 import { NotionReportPushService } from './notion-report-push.service';
 

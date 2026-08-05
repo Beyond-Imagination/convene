@@ -1,14 +1,11 @@
 import { REPORT_EVENTS } from '@convene/shared-interfaces';
 
-import { participantEntry, transcriptSegment } from '@/reports/domain/entries';
-import { LoggerPort } from '@/shared-kernel/domain/ports';
-import {
-  chatEntry,
-  externalReference,
-  NO_EXTERNAL_REFERENCE,
-  ReportSummary,
-  reportSummary,
-} from '@/shared-kernel/domain/value-objects';
+import { participantEntry } from '@/reports/domain/entries/participant-entry';
+import { transcriptSegment } from '@/reports/domain/entries/transcript-segment';
+import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
+import { externalReference, NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects/external-reference';
+import { ReportSummary, reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
 
 import { MeetingReport } from '../domain/meeting-report';
 import { ReportNotFoundError, ReportNotResummarizableError } from './report.errors';

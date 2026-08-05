@@ -1,4 +1,6 @@
-import { ExternalReference, MeetingType, Source } from '@/shared-kernel/domain/value-objects';
+import { ExternalReference } from '@/shared-kernel/domain/value-objects/external-reference';
+import { MeetingType } from '@/shared-kernel/domain/value-objects/meeting-type';
+import { Source } from '@/shared-kernel/domain/value-objects/source';
 
 // 다른 BC가 meeting 내부를 import하지 않고 회의 생성을 호출하는 Port(hard rule 7).
 // shared-kernel에 추상만 두고 meeting BC가 구현한다.

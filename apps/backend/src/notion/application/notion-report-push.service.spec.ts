@@ -1,6 +1,7 @@
 import { NotionReportPort } from '@/notion/domain/ports/notion-report.port';
-import { FinalizedReport, LoggerPort, ReportLookupPort } from '@/shared-kernel/domain/ports';
-import { reportSummary } from '@/shared-kernel/domain/value-objects';
+import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { FinalizedReport, ReportLookupPort } from '@/shared-kernel/domain/ports/report-lookup.port';
+import { reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
 
 import { NotionReportPushService } from './notion-report-push.service';
 

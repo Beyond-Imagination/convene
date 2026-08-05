@@ -1,12 +1,11 @@
-import {
-  DEFAULT_MEETING_TYPE,
-  ExternalReference,
-  MeetingType,
-  Source,
-} from '@/shared-kernel/domain/value-objects';
+import { IdleTimeout } from '@/meeting/domain/value-objects/idle-timeout';
+import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
+import { MeetingStatus } from '@/meeting/domain/value-objects/meeting-status';
+import { ExternalReference } from '@/shared-kernel/domain/value-objects/external-reference';
+import { DEFAULT_MEETING_TYPE, MeetingType } from '@/shared-kernel/domain/value-objects/meeting-type';
+import { Source } from '@/shared-kernel/domain/value-objects/source';
 
 import { Participant, ParticipantSnapshot } from './participant';
-import { IdleTimeout, MeetingCode, MeetingStatus } from './value-objects';
 
 export interface MeetingSnapshot {
   readonly code: string;

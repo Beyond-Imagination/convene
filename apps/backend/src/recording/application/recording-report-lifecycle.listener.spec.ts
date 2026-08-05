@@ -1,4 +1,4 @@
-import { ReportTranscriptionRequestedPayload } from '@/shared-kernel/domain/events';
+import { ReportTranscriptionRequestedPayload } from '@/shared-kernel/domain/events/report-transcription.payload';
 
 import { RecordingService, RequestTranscriptionCommand } from './recording.service';
 import { RecordingReportLifecycleListener } from './recording-report-lifecycle.listener';

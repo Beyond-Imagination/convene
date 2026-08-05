@@ -1,7 +1,4 @@
-import {
-  ReportTranscriptionCompletedPayload,
-  ReportTranscriptionFailedPayload,
-} from '@/shared-kernel/domain/events';
+import { ReportTranscriptionCompletedPayload, ReportTranscriptionFailedPayload } from '@/shared-kernel/domain/events/report-transcription.payload';
 
 import {
   CompleteTranscriptionCommand,

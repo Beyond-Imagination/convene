@@ -8,7 +8,7 @@ import {
   resolveRedisKeyPrefix,
   resolveRedisUrl,
 } from '@/config/redis.config';
-import { LoggerPort } from '@/shared-kernel/domain/ports';
+import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 /**

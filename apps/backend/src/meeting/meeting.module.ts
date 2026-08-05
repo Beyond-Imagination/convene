@@ -5,12 +5,9 @@ import { Module } from '@nestjs/common';
 import { MeetingService } from '@/meeting/application/meeting.service';
 import { MeetingIdleScheduler } from '@/meeting/application/meeting-idle.scheduler';
 import { MeetingRecoveryService } from '@/meeting/application/meeting-recovery.service';
-import {
-  CHAT_REPOSITORY,
-  HOST_TOKEN_GENERATOR,
-  MEETING_CODE_GENERATOR,
-  MEETING_REPOSITORY,
-} from '@/meeting/domain/ports';
+import { CHAT_REPOSITORY } from '@/meeting/domain/ports/chat.repository';
+import { HOST_TOKEN_GENERATOR } from '@/meeting/domain/ports/host-token.generator';
+import { MEETING_REPOSITORY } from '@/meeting/domain/ports/meeting.repository';
 import { CachedMeetingRepository } from '@/meeting/infrastructure/cached-meeting.repository';
 import { MongoMeetingRepository } from '@/meeting/infrastructure/mongo-meeting.repository';
 import { RandomMeetingCodeGenerator } from '@/meeting/infrastructure/random-meeting-code.generator';
@@ -18,7 +15,7 @@ import { RedisChatRepository } from '@/meeting/infrastructure/redis-chat.reposit
 import { RedisMeetingRepository } from '@/meeting/infrastructure/redis-meeting.repository';
 import { MeetingController } from '@/meeting/interface/controllers/meeting.controller';
 import { MeetingGateway } from '@/meeting/interface/gateways/meeting.gateway';
-import { MEETING_CREATION_PORT } from '@/shared-kernel/domain/ports';
+import { MEETING_CREATION_PORT } from '@/shared-kernel/domain/ports/meeting-creation.port';
 
 /**
  * Meeting 기능을 구성하는 NestJS 모듈.
@@ -39,9 +36,8 @@ import { MEETING_CREATION_PORT } from '@/shared-kernel/domain/ports';
     CachedMeetingRepository,
     { provide: MEETING_REPOSITORY, useExisting: CachedMeetingRepository },
     { provide: CHAT_REPOSITORY, useClass: RedisChatRepository },
-    { provide: MEETING_CODE_GENERATOR, useClass: RandomMeetingCodeGenerator },
+    RandomMeetingCodeGenerator,
     { provide: HOST_TOKEN_GENERATOR, useValue: { next: () => randomUUID() } },
-    // notion 등 다른 BC가 회의를 생성하는 진입점. MeetingService가 직접 구현한다.
     { provide: MEETING_CREATION_PORT, useExisting: MeetingService },
   ],
   exports: [MEETING_CREATION_PORT],

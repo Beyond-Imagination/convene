@@ -1,7 +1,7 @@
 import { NotionHttpClient, NotionListPage } from '@/notion/infrastructure/notion-http.client';
 import { NotionReportAdapter } from '@/notion/infrastructure/notion-report.adapter';
-import { FinalizedReport } from '@/shared-kernel/domain/ports';
-import { reportSummary } from '@/shared-kernel/domain/value-objects';
+import { FinalizedReport } from '@/shared-kernel/domain/ports/report-lookup.port';
+import { reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
 
 const REPORT_ID = 'rep_001';
 const ISSUE_ID = 'issue_1';

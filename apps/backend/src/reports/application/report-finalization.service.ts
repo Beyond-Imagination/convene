@@ -1,30 +1,19 @@
 import { REPORT_EVENTS } from '@convene/shared-interfaces';
 import { Inject, Injectable } from '@nestjs/common';
 
-import { ParticipantEntry, TranscriptSegment } from '@/reports/domain/entries';
+import { ParticipantEntry } from '@/reports/domain/entries/participant-entry';
+import { TranscriptSegment } from '@/reports/domain/entries/transcript-segment';
 import { MeetingReport } from '@/reports/domain/meeting-report';
-import {
-  REPORT_ID_GENERATOR,
-  REPORT_REPOSITORY,
-  ReportIdGenerator,
-  ReportRepository,
-  SUMMARIZER,
-  SummarizerPort,
-} from '@/reports/domain/ports';
-import {
-  CLOCK,
-  Clock,
-  DomainEventPublisher,
-  EVENT_PUBLISHER,
-  LOGGER,
-  LoggerPort,
-} from '@/shared-kernel/domain/ports';
-import {
-  ChatEntry,
-  ExternalReference,
-  MeetingType,
-  Source,
-} from '@/shared-kernel/domain/value-objects';
+import { REPORT_REPOSITORY, ReportRepository } from '@/reports/domain/ports/report.repository';
+import { REPORT_ID_GENERATOR, ReportIdGenerator } from '@/reports/domain/ports/report-id.generator';
+import { SUMMARIZER, SummarizerPort } from '@/reports/domain/ports/summarizer.port';
+import { DomainEventPublisher, EVENT_PUBLISHER } from '@/shared-kernel/domain/ports/event-publisher';
+import { LOGGER, LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { ChatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
+import { ExternalReference } from '@/shared-kernel/domain/value-objects/external-reference';
+import { MeetingType } from '@/shared-kernel/domain/value-objects/meeting-type';
+import { Source } from '@/shared-kernel/domain/value-objects/source';
+import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 
 import { ReportNotFoundError, ReportNotResummarizableError } from './report.errors';
 
@@ -64,7 +53,7 @@ export class ReportFinalizationService {
     @Inject(REPORT_REPOSITORY) private readonly repository: ReportRepository,
     @Inject(SUMMARIZER) private readonly summarizer: SummarizerPort,
     @Inject(REPORT_ID_GENERATOR) private readonly idGenerator: ReportIdGenerator,
-    @Inject(CLOCK) private readonly clock: Clock,
+    private readonly clock: SystemClock,
     @Inject(EVENT_PUBLISHER) private readonly eventPublisher: DomainEventPublisher,
     @Inject(LOGGER) private readonly logger: LoggerPort,
   ) {}

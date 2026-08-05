@@ -18,9 +18,9 @@ import { io, type Socket } from 'socket.io-client';
 import request from 'supertest';
 
 import { AppModule } from '@/app.module';
-import { AUDIO_CAPTURE } from '@/mediasoup/domain/ports';
-import { TRANSCRIBER } from '@/recording/domain/ports';
-import { SUMMARIZER } from '@/reports/domain/ports';
+import { AUDIO_CAPTURE } from '@/mediasoup/domain/ports/audio-capture.port';
+import { TRANSCRIBER } from '@/recording/domain/ports/transcriber.port';
+import { SUMMARIZER } from '@/reports/domain/ports/summarizer.port';
 import { NoopSummarizer } from '@/reports/infrastructure/noop.summarizer';
 
 import { NoopTranscriber } from './support/noop.transcriber';

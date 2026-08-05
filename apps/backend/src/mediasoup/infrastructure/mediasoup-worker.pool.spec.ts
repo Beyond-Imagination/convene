@@ -1,6 +1,6 @@
 import { WorkerLogLevel, WorkerLogTag } from 'mediasoup/node/lib/types';
 
-import { LoggerPort } from '@/shared-kernel/domain/ports';
+import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
 
 import { MediasoupWorkerPool } from './mediasoup-worker.pool';
 

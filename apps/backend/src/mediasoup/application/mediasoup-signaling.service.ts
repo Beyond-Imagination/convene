@@ -9,17 +9,11 @@ import {
 import { Inject, Injectable } from '@nestjs/common';
 
 import { ParticipantMedia } from '@/mediasoup/domain/participant-media';
-import {
-  AUDIO_CAPTURE,
-  AudioCapturePort,
-  MEDIA_ROUTER,
-  MEDIA_TRANSPORT,
-  MediaRouterPort,
-  MediaTransportPort,
-  PARTICIPANT_MEDIA_REPOSITORY,
-  ParticipantMediaRepository,
-} from '@/mediasoup/domain/ports';
-import { DomainEventPublisher, EVENT_PUBLISHER } from '@/shared-kernel/domain/ports';
+import { AUDIO_CAPTURE, AudioCapturePort } from '@/mediasoup/domain/ports/audio-capture.port';
+import { MEDIA_ROUTER, MediaRouterPort } from '@/mediasoup/domain/ports/media-router.port';
+import { MEDIA_TRANSPORT, MediaTransportPort } from '@/mediasoup/domain/ports/media-transport.port';
+import { PARTICIPANT_MEDIA_REPOSITORY, ParticipantMediaRepository } from '@/mediasoup/domain/ports/participant-media.repository';
+import { DomainEventPublisher, EVENT_PUBLISHER } from '@/shared-kernel/domain/ports/event-publisher';
 
 import { ParticipantMediaNotFoundError, ScreenShareConflictError } from './mediasoup.errors';
 

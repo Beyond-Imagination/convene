@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
-import { LOGGER, LoggerPort } from '@/shared-kernel/domain/ports';
+import { LOGGER, LoggerPort } from '@/shared-kernel/domain/ports/logger';
 
 // idle 임계(1분)보다 촘촘히 돌아 종료 지연이 주기 이상 벌어지지 않게 한다.
 export const IDLE_SWEEP_INTERVAL_MS = 30_000;

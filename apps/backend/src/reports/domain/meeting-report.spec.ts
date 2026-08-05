@@ -1,12 +1,11 @@
-import {
-  chatEntry,
-  externalReference,
-  reportSummary,
-} from '@/shared-kernel/domain/value-objects';
+import { participantEntry } from '@/reports/domain/entries/participant-entry';
+import { transcriptSegment } from '@/reports/domain/entries/transcript-segment';
+import { notionPushResult } from '@/reports/domain/value-objects/notion-push-result';
+import { chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
+import { externalReference } from '@/shared-kernel/domain/value-objects/external-reference';
+import { reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
 
-import { participantEntry, transcriptSegment } from './entries';
 import { MeetingReport } from './meeting-report';
-import { notionPushResult } from './value-objects';
 
 describe('MeetingReport (Aggregate Root)', () => {
   const startedAt = new Date('2026-01-01T00:00:00Z');

@@ -2,7 +2,7 @@ import { OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import * as mediasoup from 'mediasoup';
 import { Worker, WorkerLogLevel, WorkerLogTag } from 'mediasoup/node/lib/types';
 
-import { LoggerPort } from '@/shared-kernel/domain/ports';
+import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
 
 export interface MediasoupWorkerPoolOptions {
   numWorkers: number;

@@ -1,5 +1,5 @@
-import { transcriptSegment } from '@/reports/domain/entries';
-import { chatEntry } from '@/shared-kernel/domain/value-objects';
+import { transcriptSegment } from '@/reports/domain/entries/transcript-segment';
+import { chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
 
 import { GeminiSummarizer, GeminiSummarizerOptions } from './gemini.summarizer';
 

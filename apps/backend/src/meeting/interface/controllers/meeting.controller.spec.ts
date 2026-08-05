@@ -2,10 +2,11 @@ import { BadRequestException } from '@nestjs/common';
 
 import { MeetingNotFoundError, NotHostError } from '@/meeting/application/meeting.errors';
 import { Meeting } from '@/meeting/domain/meeting';
-import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';
+import { IdleTimeout } from '@/meeting/domain/value-objects/idle-timeout';
+import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
 import { CreateMeetingDto } from '@/meeting/interface/dto/create-meeting.dto';
 import { ExternalReferenceDto } from '@/meeting/interface/dto/external-reference.dto';
-import { externalReference } from '@/shared-kernel/domain/value-objects';
+import { externalReference } from '@/shared-kernel/domain/value-objects/external-reference';
 
 import { MeetingController } from './meeting.controller';
 

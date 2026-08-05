@@ -1,14 +1,11 @@
 import { MEETING_EVENTS } from '@convene/shared-interfaces';
 
 import { Meeting } from '@/meeting/domain/meeting';
-import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';
-import { LoggerPort } from '@/shared-kernel/domain/ports';
-import {
-  ChatEntry,
-  chatEntry,
-  externalReference,
-  NO_EXTERNAL_REFERENCE,
-} from '@/shared-kernel/domain/value-objects';
+import { IdleTimeout } from '@/meeting/domain/value-objects/idle-timeout';
+import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
+import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { ChatEntry, chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
+import { externalReference, NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects/external-reference';
 
 import { MeetingNotFoundError, NotHostError } from './meeting.errors';
 import { MeetingService } from './meeting.service';

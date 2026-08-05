@@ -3,9 +3,11 @@ import { Connection, Model } from 'mongoose';
 
 import { Meeting, MeetingSnapshot } from '@/meeting/domain/meeting';
 import { ParticipantSnapshot } from '@/meeting/domain/participant';
-import { MeetingRepository } from '@/meeting/domain/ports';
-import { asMeetingStatus, MeetingStatus } from '@/meeting/domain/value-objects';
-import { ExternalReference, MeetingType, Source } from '@/shared-kernel/domain/value-objects';
+import { MeetingRepository } from '@/meeting/domain/ports/meeting.repository';
+import { asMeetingStatus, MeetingStatus } from '@/meeting/domain/value-objects/meeting-status';
+import { ExternalReference } from '@/shared-kernel/domain/value-objects/external-reference';
+import { MeetingType } from '@/shared-kernel/domain/value-objects/meeting-type';
+import { Source } from '@/shared-kernel/domain/value-objects/source';
 
 import { MEETING_COLLECTION, meetingSchema } from './meeting.schema';
 

@@ -1,4 +1,5 @@
-import { MeetingType, ReportSummary } from '@/shared-kernel/domain/value-objects';
+import { MeetingType } from '@/shared-kernel/domain/value-objects/meeting-type';
+import { ReportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
 
 // 다른 BC가 reports 내부를 import하지 않고 확정된 회의록을 읽는 Port(하드룰 7).
 // shared-kernel에 추상만 두고 reports BC가 구현한다.

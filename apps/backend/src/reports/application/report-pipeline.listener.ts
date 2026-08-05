@@ -2,11 +2,8 @@ import { REPORT_EVENTS } from '@convene/shared-interfaces';
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 
-import { transcriptSegment } from '@/reports/domain/entries';
-import {
-  ReportTranscriptionCompletedPayload,
-  ReportTranscriptionFailedPayload,
-} from '@/shared-kernel/domain/events';
+import { transcriptSegment } from '@/reports/domain/entries/transcript-segment';
+import { ReportTranscriptionCompletedPayload, ReportTranscriptionFailedPayload } from '@/shared-kernel/domain/events/report-transcription.payload';
 
 import { ReportFinalizationService } from './report-finalization.service';
 

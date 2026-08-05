@@ -2,7 +2,7 @@ import { Inject, Injectable, Scope } from '@nestjs/common';
 import { INQUIRER } from '@nestjs/core';
 import { PinoLogger } from 'nestjs-pino';
 
-import type { LogContext, LoggerPort } from '@/shared-kernel/domain/ports';
+import type { LogContext, LoggerPort } from '@/shared-kernel/domain/ports/logger';
 
 /**
  * LoggerPort의 production 어댑터.

@@ -1,4 +1,7 @@
-import { ChatEntry, ExternalReference, MeetingType, Source } from '../value-objects';
+import { ChatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
+import { ExternalReference } from '@/shared-kernel/domain/value-objects/external-reference';
+import { MeetingType } from '@/shared-kernel/domain/value-objects/meeting-type';
+import { Source } from '@/shared-kernel/domain/value-objects/source';
 
 export type MeetingEndedReason = 'manual' | 'idle';
 

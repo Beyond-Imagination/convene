@@ -1,10 +1,7 @@
 import { MeetingReport } from '@/reports/domain/meeting-report';
-import { ReportRepository } from '@/reports/domain/ports';
-import {
-  externalReference,
-  NO_EXTERNAL_REFERENCE,
-  reportSummary,
-} from '@/shared-kernel/domain/value-objects';
+import { ReportRepository } from '@/reports/domain/ports/report.repository';
+import { externalReference, NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects/external-reference';
+import { reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
 
 import { ReportLookupAdapter } from './report-lookup.adapter';
 

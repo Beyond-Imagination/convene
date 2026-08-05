@@ -1,5 +1,5 @@
 import { IdleSweepOutcome, MeetingService } from '@/meeting/application/meeting.service';
-import { LoggerPort } from '@/shared-kernel/domain/ports';
+import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
 
 import { MeetingIdleScheduler } from './meeting-idle.scheduler';
 

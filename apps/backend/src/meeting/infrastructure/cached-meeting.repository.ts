@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 
 import { Meeting } from '@/meeting/domain/meeting';
-import { MeetingRepository } from '@/meeting/domain/ports';
+import { MeetingRepository } from '@/meeting/domain/ports/meeting.repository';
 
 import { MongoMeetingRepository } from './mongo-meeting.repository';
 import { RedisMeetingRepository } from './redis-meeting.repository';

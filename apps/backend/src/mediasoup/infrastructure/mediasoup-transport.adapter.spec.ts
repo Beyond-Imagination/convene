@@ -1,6 +1,6 @@
 import { RtpCodecCapability, WorkerLogLevel, WorkerLogTag } from 'mediasoup/node/lib/types';
 
-import { LoggerPort } from '@/shared-kernel/domain/ports';
+import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
 
 import { MediasoupRouterAdapter } from './mediasoup-router.adapter';
 import { MediasoupTransportAdapter } from './mediasoup-transport.adapter';

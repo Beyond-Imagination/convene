@@ -173,9 +173,19 @@ export interface ChatRepository { ... }
 - 로거는 `@Inject(LOGGER) logger: LoggerPort`만 쓴다. context는 `PinoLoggerAdapter`가 `INQUIRER`로
   주입 지점 클래스명을 읽어 채운다. **단 `useFactory`로 만든 인스턴스는 INQUIRER를 못 쓰므로**
   `new PinoLoggerAdapter(logger, X.name)`처럼 context를 명시한다.
-- 구현체가 1개여도 인프라(mongo/redis/http/mediasoup/LLM)를 감싸면 Port를 유지한다. 스펙이 객체 리터럴로
-  대역을 넘기는 구조적 타이핑이 여기 의존한다 — 구체 클래스를 직접 주입하면 private 필드 때문에 컴파일이 깨진다.
-  반대로 순수 함수 래퍼(uuid, now)는 Port만 남기고 클래스를 지운 뒤 `useValue`로 바인딩한다.
+**Port를 둘지 판단하는 기준은 "구현체가 몇 개냐"가 아니라 "구현체에 주입 상태가 있느냐"다.**
+스펙은 대역을 객체 리터럴로 넘기는데(`{ now: () => 고정시각 }`), TypeScript는 private 멤버가 있는 클래스를
+구조적이 아니라 **명목적으로** 취급해 리터럴을 거부하기 때문이다.
+
+| 구현체 | 예 | 배선 |
+|---|---|---|
+| 생성자 주입 상태 있음(private 필드) | `RedisChatRepository(redis)`, `MongoReportRepository`, `HttpTranscriber` | Port 인터페이스 + Symbol 유지 |
+| 주입 상태 없음 | `SystemClock`, `RandomMeetingCodeGenerator` | **Port 없이 클래스 자체가 토큰.** `providers: [SystemClock]` 한 줄 |
+| 함수 한 줄 | uuid 발급 | 클래스 없이 Port + `useValue: { next: () => randomUUID() }` |
+| 구현체가 진짜 여럿 | `SummarizerPort`(Gemini↔Noop), `MeetingRepository`(Redis/Mongo/Cached) | Port 유지 |
+
+Port를 지우고 구체 클래스를 주입하려다 스펙이 컴파일에서 깨지면, 그 구현체는 첫 줄에 해당한다는 뜻이다.
+`domain/`엔 배럴(`index.ts`)을 두지 않는다 — 정의로 한 번에 점프하도록 실제 모듈을 직접 import 한다.
 
 > 토큰명을 바꾸면 e2e의 `.overrideProvider()`가 **조용히 무력화**된다(외부 API 실호출로 이어질 수 있음).
 > 토큰을 바꿀 땐 `apps/backend/test/*.e2e-spec.ts`의 override를 함께 옮긴다.

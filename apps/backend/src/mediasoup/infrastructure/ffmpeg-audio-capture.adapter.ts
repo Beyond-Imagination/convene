@@ -4,9 +4,9 @@ import { AddressInfo, createServer } from 'node:net';
 import { Injectable } from '@nestjs/common';
 import { Consumer, PlainTransport } from 'mediasoup/node/lib/types';
 
-import { AudioCapturePort, AudioCaptureStartInput } from '@/mediasoup/domain/ports';
-import { AudioBufferRepository } from '@/recording/domain/ports';
-import { LoggerPort } from '@/shared-kernel/domain/ports';
+import { AudioCapturePort, AudioCaptureStartInput } from '@/mediasoup/domain/ports/audio-capture.port';
+import { AudioBufferRepository } from '@/recording/domain/ports/audio-buffer.repository';
+import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
 
 import { MediasoupRouterAdapter } from './mediasoup-router.adapter';
 

@@ -1,5 +1,5 @@
-import { MeetingEndedPayload } from '@/shared-kernel/domain/events';
-import { NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects';
+import { MeetingEndedPayload } from '@/shared-kernel/domain/events/meeting-ended.payload';
+import { NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects/external-reference';
 
 import { CreateDraftCommand, ReportFinalizationService } from './report-finalization.service';
 import { ReportMeetingLifecycleListener } from './report-meeting-lifecycle.listener';

@@ -2,15 +2,10 @@ import { MEETING_EVENTS } from '@convene/shared-interfaces';
 import { Inject, Injectable, OnApplicationBootstrap } from '@nestjs/common';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
-import { MEETING_REPOSITORY, MeetingRepository } from '@/meeting/domain/ports';
-import {
-  CLOCK,
-  Clock,
-  DomainEventPublisher,
-  EVENT_PUBLISHER,
-  LOGGER,
-  LoggerPort,
-} from '@/shared-kernel/domain/ports';
+import { MEETING_REPOSITORY, MeetingRepository } from '@/meeting/domain/ports/meeting.repository';
+import { DomainEventPublisher, EVENT_PUBLISHER } from '@/shared-kernel/domain/ports/event-publisher';
+import { LOGGER, LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 
 export interface MeetingRecoveryOutcome {
   /** 훑은 열린 회의 수. */
@@ -34,7 +29,7 @@ export class MeetingRecoveryService implements OnApplicationBootstrap {
   constructor(
     @Inject(MEETING_REPOSITORY) private readonly repository: MeetingRepository,
     private readonly meetingService: MeetingService,
-    @Inject(CLOCK) private readonly clock: Clock,
+    private readonly clock: SystemClock,
     @Inject(EVENT_PUBLISHER) private readonly eventPublisher: DomainEventPublisher,
     @Inject(LOGGER) private readonly logger: LoggerPort,
   ) {}

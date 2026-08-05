@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 
-import { REPORT_REPOSITORY, ReportRepository } from '@/reports/domain/ports';
-import { FinalizedReport, ReportLookupPort } from '@/shared-kernel/domain/ports';
+import { REPORT_REPOSITORY, ReportRepository } from '@/reports/domain/ports/report.repository';
+import { FinalizedReport, ReportLookupPort } from '@/shared-kernel/domain/ports/report-lookup.port';
 
 @Injectable()
 export class ReportLookupAdapter implements ReportLookupPort {

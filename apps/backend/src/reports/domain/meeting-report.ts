@@ -1,13 +1,12 @@
-import {
-  ChatEntry,
-  ExternalReference,
-  MeetingType,
-  ReportSummary,
-  Source,
-} from '@/shared-kernel/domain/value-objects';
-
-import { ParticipantEntry, TranscriptSegment } from './entries';
-import { NotionPushResult, PipelineState } from './value-objects';
+import { ParticipantEntry } from '@/reports/domain/entries/participant-entry';
+import { TranscriptSegment } from '@/reports/domain/entries/transcript-segment';
+import { NotionPushResult } from '@/reports/domain/value-objects/notion-push-result';
+import { PipelineState } from '@/reports/domain/value-objects/pipeline-state';
+import { ChatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
+import { ExternalReference } from '@/shared-kernel/domain/value-objects/external-reference';
+import { MeetingType } from '@/shared-kernel/domain/value-objects/meeting-type';
+import { ReportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
+import { Source } from '@/shared-kernel/domain/value-objects/source';
 
 export interface CreateMeetingReportInput {
   id: string;

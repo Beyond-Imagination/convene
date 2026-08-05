@@ -7,16 +7,10 @@ import {
 } from '@convene/shared-interfaces';
 
 import { ParticipantMedia } from '@/mediasoup/domain/participant-media';
-import {
-  AudioCapturePort,
-  AudioCaptureStartInput,
-  ConsumeInput,
-  CreateWebRtcTransportInput,
-  MediaRouterPort,
-  MediaTransportPort,
-  ParticipantMediaRepository,
-  ProduceInput,
-} from '@/mediasoup/domain/ports';
+import { AudioCapturePort, AudioCaptureStartInput } from '@/mediasoup/domain/ports/audio-capture.port';
+import { MediaRouterPort } from '@/mediasoup/domain/ports/media-router.port';
+import { ConsumeInput, CreateWebRtcTransportInput, MediaTransportPort, ProduceInput } from '@/mediasoup/domain/ports/media-transport.port';
+import { ParticipantMediaRepository } from '@/mediasoup/domain/ports/participant-media.repository';
 
 import { ParticipantMediaNotFoundError, ScreenShareConflictError } from './mediasoup.errors';
 import { MediasoupSignalingService } from './mediasoup-signaling.service';
