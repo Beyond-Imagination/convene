@@ -2,6 +2,7 @@ import { CreatedMeeting, CreateMeetingInput, MeetingService } from '@/meeting/ap
 import { NotionMeetingProvisioningService } from '@/notion/application/notion-meeting-provisioning.service';
 import { NotionIssuePort, PendingIssue } from '@/notion/domain/ports/notion-issue.port';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
+import { stub } from '@/shared-kernel/testing/stub';
 
 /**
  * private 필드를 가진 구체 서비스의 테스트 대역.
@@ -10,8 +11,7 @@ import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.ad
 const stubService = <T,>(impl: Partial<T>): T => impl as T;
 
 function silentLogger(): PinoLoggerAdapter {
-  const noop = (): void => undefined;
-  return { debug: noop, info: noop, warn: noop, error: noop } as unknown as PinoLoggerAdapter;
+  return stub<PinoLoggerAdapter>({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() });
 }
 
 function fakeMeetingCreation(code: string): {

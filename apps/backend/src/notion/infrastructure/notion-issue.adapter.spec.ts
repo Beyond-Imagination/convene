@@ -4,13 +4,13 @@ import {
   NotionIssueAdapter,
 } from '@/notion/infrastructure/notion-issue.adapter';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
+import { stub } from '@/shared-kernel/testing/stub';
 
 const NOW = new Date('2026-07-20T12:00:00.000Z');
 const LINK_BASE = 'https://convene.example.com';
 
 function silentLogger(): PinoLoggerAdapter {
-  const noop = (): void => undefined;
-  return { debug: noop, info: noop, warn: noop, error: noop } as unknown as PinoLoggerAdapter;
+  return stub<PinoLoggerAdapter>({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() });
 }
 
 function titleIssue(id: string, title: string): Record<string, unknown> {

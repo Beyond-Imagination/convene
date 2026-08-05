@@ -12,6 +12,7 @@ import { externalReference, NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain
 import { ReportSummary, reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
+import { stub } from '@/shared-kernel/testing/stub';
 
 import { MeetingReport } from '../domain/meeting-report';
 import { ReportNotFoundError, ReportNotResummarizableError } from './report.errors';
@@ -30,7 +31,7 @@ const makeEventPublisher = () => {
       publish: async (name: string, payload: unknown): Promise<void> => {
         events.push({ name, payload });
       },
-    } as unknown as NestEventBusDomainEventPublisher,
+    } satisfies Pick<NestEventBusDomainEventPublisher, 'publish'> as NestEventBusDomainEventPublisher,
   };
 };
 
@@ -38,12 +39,12 @@ const noopSummarizer = () => ({
   summarize: jest.fn(),
 });
 
-const noopLogger = (): PinoLoggerAdapter => ({
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-} as unknown as PinoLoggerAdapter);
+const noopLogger = (): PinoLoggerAdapter => stub<PinoLoggerAdapter>({
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+});
 
 describe('ReportFinalizationService.createDraft', () => {
   const startedAt = new Date('2026-01-01T00:00:00Z');

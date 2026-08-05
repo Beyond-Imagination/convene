@@ -1,11 +1,11 @@
 import { IdleSweepOutcome, MeetingService } from '@/meeting/application/meeting.service';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
+import { stub } from '@/shared-kernel/testing/stub';
 
 import { MeetingIdleScheduler } from './meeting-idle.scheduler';
 
 function silentLogger(): PinoLoggerAdapter {
-  const noop = (): void => undefined;
-  return { debug: noop, info: noop, warn: noop, error: noop } as unknown as PinoLoggerAdapter;
+  return stub<PinoLoggerAdapter>({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() });
 }
 
 const NOTHING_CLOSED: IdleSweepOutcome = { scanned: 0, closed: 0 };

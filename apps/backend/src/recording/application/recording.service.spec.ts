@@ -3,6 +3,7 @@ import { REPORT_EVENTS } from '@convene/shared-interfaces';
 import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events/report-transcription.payload';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
+import { stub } from '@/shared-kernel/testing/stub';
 
 import {
   PCM_BYTES_PER_SECOND,
@@ -24,16 +25,16 @@ const makeEventPublisher = () => {
       publish: async (name: string, payload: unknown): Promise<void> => {
         events.push({ name, payload });
       },
-    } as unknown as NestEventBusDomainEventPublisher,
+    } satisfies Pick<NestEventBusDomainEventPublisher, 'publish'> as NestEventBusDomainEventPublisher,
   };
 };
 
-const noopLogger = (): PinoLoggerAdapter => ({
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-} as unknown as PinoLoggerAdapter);
+const noopLogger = (): PinoLoggerAdapter => stub<PinoLoggerAdapter>({
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+});
 
 /** transcribe input.audio가 wav(RIFF)인지 가정하고, PCM body의 text 식별값을 돌려준다. */
 const wavBodyText = (audio: Buffer): string => audio.subarray(WAV_HEADER_BYTES).toString();

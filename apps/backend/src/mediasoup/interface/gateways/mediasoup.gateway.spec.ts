@@ -10,6 +10,7 @@ import { GetRtpCapabilitiesDto } from '@/mediasoup/interface/dto/get-rtp-capabil
 import { ProduceDto } from '@/mediasoup/interface/dto/produce.dto';
 import { ResumeConsumerDto } from '@/mediasoup/interface/dto/resume-consumer.dto';
 import { ToggleProducerDto } from '@/mediasoup/interface/dto/toggle-producer.dto';
+import { stub } from '@/shared-kernel/testing/stub';
 
 import { MediasoupGateway } from './mediasoup.gateway';
 
@@ -73,7 +74,7 @@ const makeService = () => {
       calls.push({ name: 'closeProducer', args: [cmd] });
     },
   };
-  return { calls, service: service as unknown as MediasoupSignalingService };
+  return { calls, service: stub<MediasoupSignalingService>(service) };
 };
 
 const makeClient = (id: string): Socket => ({ id }) as unknown as Socket;

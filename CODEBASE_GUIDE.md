@@ -184,12 +184,19 @@ export interface ChatRepository { ... }
 | 유틸·순수 함수 | `SystemClock`, `RandomMeetingCodeGenerator`, id 발급(`randomUUID()` 직접 호출) | 클래스가 곧 토큰이거나, 추상화 없음 |
 
 인터페이스가 없는 구체 서비스를 스펙에서 대역으로 쓸 땐 private 필드 때문에 객체 리터럴이 그대로는 안 들어간다.
-이건 구조를 되돌릴 이유가 아니라 **대역 작성 방식의 문제**이므로, 그 테스트가 실제로 쓰는 메서드만 구현해 캐스팅한다:
+`as unknown as T`로 뚫지 말 것 — 타입 검사를 통째로 버려서 대역이 실제 시그니처와 어긋나도 조용히 통과한다.
+`shared-kernel/testing/stub.ts`를 쓰면 캐스팅이 헬퍼 안에 갇히고 호출부는 `Partial<T>`로 검사받는다:
 
 ```ts
-const stubService = <T,>(impl: Partial<T>): T => impl as T;
-const meetings = stubService<MeetingService>({ create: async () => ({ code: 'x', ... }) });
+import { stub } from '@/shared-kernel/testing/stub';
+
+const logger = stub<PinoLoggerAdapter>({ info: jest.fn(), error: jest.fn() });
+const meetings = stub<MeetingService>({ create: jest.fn(async () => ({ code: 'x', ... })) });
 ```
+
+메서드명 오타·시그니처 불일치·인자 개수 오류가 전부 컴파일 에러가 된다. `stub`이 거부하면 대역이 실제
+계약을 안 지키고 있다는 뜻이니, 감추지 말고 대역을 고치거나 왜 예외인지 남길 것.
+(`Socket`·`Redis` 등 서드파티 타입과 `jest.mock`의 `typeof` 캐스팅은 본 헬퍼 대상이 아니다.)
 
 `domain/`엔 배럴(`index.ts`)을 두지 않는다 — 정의로 한 번에 점프하도록 실제 모듈을 직접 import 한다.
 
