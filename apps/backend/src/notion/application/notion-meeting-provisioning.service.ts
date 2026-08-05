@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 
+import { MeetingService } from '@/meeting/application/meeting.service';
 import { NOTION_ISSUE, NotionIssuePort } from '@/notion/domain/ports/notion-issue.port';
 import { LOGGER, LoggerPort } from '@/shared-kernel/domain/ports/logger';
-import { MEETING_CREATION_PORT, MeetingCreationPort } from '@/shared-kernel/domain/ports/meeting-creation.port';
 import { externalReference } from '@/shared-kernel/domain/value-objects/external-reference';
 
 export const MEETING_LINK_BASE = Symbol('MEETING_LINK_BASE');
@@ -28,7 +28,7 @@ export interface PollOutcome {
 @Injectable()
 export class NotionMeetingProvisioningService {
   constructor(
-    @Inject(MEETING_CREATION_PORT) private readonly meetingCreation: MeetingCreationPort,
+    private readonly meetingCreation: MeetingService,
     @Inject(NOTION_ISSUE) private readonly notionIssue: NotionIssuePort,
     @Inject(MEETING_LINK_BASE) private readonly meetingLinkBase: string,
     @Inject(LOGGER) private readonly logger: LoggerPort,

@@ -1,4 +1,4 @@
-import { FinalizedReport } from '@/shared-kernel/domain/ports/report-lookup.port';
+import { FinalizedReport } from '@/reports/application/report-lookup.service';
 import { reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
 
 import { toReportBlocks } from './report-blocks.mapper';

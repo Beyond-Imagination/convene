@@ -12,12 +12,27 @@ import { RandomMeetingCodeGenerator } from '@/meeting/infrastructure/random-meet
 import { MeetingEndedPayload, MeetingEndedReason } from '@/shared-kernel/domain/events/meeting-ended.payload';
 import { DomainEventPublisher, EVENT_PUBLISHER } from '@/shared-kernel/domain/ports/event-publisher';
 import { LOGGER, LoggerPort } from '@/shared-kernel/domain/ports/logger';
-import { CreatedMeeting, CreateMeetingInput, MeetingCreationPort } from '@/shared-kernel/domain/ports/meeting-creation.port';
 import { ChatEntry, chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
 import { ExternalReference } from '@/shared-kernel/domain/value-objects/external-reference';
 import { MeetingType } from '@/shared-kernel/domain/value-objects/meeting-type';
 import { Source } from '@/shared-kernel/domain/value-objects/source';
 import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
+
+/** 다른 BC가 회의를 생성할 때 쓰는 입력. Meeting Aggregate를 노출하지 않는다. */
+export interface CreateMeetingInput {
+  readonly source: Source;
+  readonly meetingType?: MeetingType;
+  readonly externalReference: ExternalReference;
+  readonly title?: string | null;
+  /** true면 코드·링크만 발급하고 방은 첫 참가자가 들어올 때 열린다. */
+  readonly scheduled?: boolean;
+}
+
+export interface CreatedMeeting {
+  readonly code: string;
+  readonly hostToken: string;
+  readonly startedAt: Date;
+}
 
 interface CreateMeetingCommand {
   source: Source;
@@ -76,7 +91,7 @@ export interface IdleSweepOutcome {
 }
 
 @Injectable()
-export class MeetingService implements MeetingCreationPort {
+export class MeetingService {
   constructor(
     @Inject(MEETING_REPOSITORY) private readonly repository: MeetingRepository,
     @Inject(CHAT_REPOSITORY) private readonly chatRepository: ChatRepository,
@@ -87,7 +102,7 @@ export class MeetingService implements MeetingCreationPort {
     @Inject(LOGGER) private readonly logger: LoggerPort,
   ) {}
 
-  /** 다른 BC(notion 등)가 회의를 생성하는 진입점. Meeting Aggregate를 노출하지 않는다. */
+  /** 다른 BC(notion 등)가 회의를 생성하는 진입점. */
   async create(input: CreateMeetingInput): Promise<CreatedMeeting> {
     const meeting = await this.createMeeting({
       source: input.source,

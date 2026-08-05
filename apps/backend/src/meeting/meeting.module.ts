@@ -15,7 +15,6 @@ import { RedisChatRepository } from '@/meeting/infrastructure/redis-chat.reposit
 import { RedisMeetingRepository } from '@/meeting/infrastructure/redis-meeting.repository';
 import { MeetingController } from '@/meeting/interface/controllers/meeting.controller';
 import { MeetingGateway } from '@/meeting/interface/gateways/meeting.gateway';
-import { MEETING_CREATION_PORT } from '@/shared-kernel/domain/ports/meeting-creation.port';
 
 /**
  * Meeting 기능을 구성하는 NestJS 모듈.
@@ -38,8 +37,8 @@ import { MEETING_CREATION_PORT } from '@/shared-kernel/domain/ports/meeting-crea
     { provide: CHAT_REPOSITORY, useClass: RedisChatRepository },
     RandomMeetingCodeGenerator,
     { provide: HOST_TOKEN_GENERATOR, useValue: { next: () => randomUUID() } },
-    { provide: MEETING_CREATION_PORT, useExisting: MeetingService },
   ],
-  exports: [MEETING_CREATION_PORT],
+  // notion BC가 회의 생성을 호출한다.
+  exports: [MeetingService],
 })
 export class MeetingModule {}

@@ -173,18 +173,23 @@ export interface ChatRepository { ... }
 - 로거는 `@Inject(LOGGER) logger: LoggerPort`만 쓴다. context는 `PinoLoggerAdapter`가 `INQUIRER`로
   주입 지점 클래스명을 읽어 채운다. **단 `useFactory`로 만든 인스턴스는 INQUIRER를 못 쓰므로**
   `new PinoLoggerAdapter(logger, X.name)`처럼 context를 명시한다.
-**Port를 둘지 판단하는 기준은 "구현체가 몇 개냐"가 아니라 "구현체에 주입 상태가 있느냐"다.**
-스펙은 대역을 객체 리터럴로 넘기는데(`{ now: () => 고정시각 }`), TypeScript는 private 멤버가 있는 클래스를
-구조적이 아니라 **명목적으로** 취급해 리터럴을 거부하기 때문이다.
+**Port는 outbound에만 둔다. 기준은 "교체·변경 가능성"이다.**
 
-| 구현체 | 예 | 배선 |
+| 방향 | 예 | 배선 |
 |---|---|---|
-| 생성자 주입 상태 있음(private 필드) | `RedisChatRepository(redis)`, `MongoReportRepository`, `HttpTranscriber` | Port 인터페이스 + Symbol 유지 |
-| 주입 상태 없음 | `SystemClock`, `RandomMeetingCodeGenerator` | **Port 없이 클래스 자체가 토큰.** `providers: [SystemClock]` 한 줄 |
-| 함수 한 줄 | uuid 발급 | 클래스 없이 Port + `useValue: { next: () => randomUUID() }` |
-| 구현체가 진짜 여럿 | `SummarizerPort`(Gemini↔Noop), `MeetingRepository`(Redis/Mongo/Cached) | Port 유지 |
+| **Outbound** — DB, 외부 API, 서드파티 라이브러리, 메일 | `MeetingRepository`, `TranscriberPort`, `SummarizerPort`, `NotionIssuePort`, `MediaRouterPort`, `LoggerPort` | **Port 인터페이스 + Symbol** |
+| **Inbound** — Controller/Gateway → UseCase | `MeetingController` → `MeetingService` | 구체 서비스 주입. 인터페이스 없음 |
+| **BC → BC** — 같은 프로세스 안이라 교체 대상이 아님 | `notion` → `MeetingService`, `ReportLookupService` | 구체 서비스 주입. 소유 모듈이 `exports` |
+| 주입 상태 없는 유틸 | `SystemClock`, `RandomMeetingCodeGenerator` | Port 없이 클래스가 곧 토큰 |
 
-Port를 지우고 구체 클래스를 주입하려다 스펙이 컴파일에서 깨지면, 그 구현체는 첫 줄에 해당한다는 뜻이다.
+인터페이스가 없는 구체 서비스를 스펙에서 대역으로 쓸 땐 private 필드 때문에 객체 리터럴이 그대로는 안 들어간다.
+이건 구조를 되돌릴 이유가 아니라 **대역 작성 방식의 문제**이므로, 그 테스트가 실제로 쓰는 메서드만 구현해 캐스팅한다:
+
+```ts
+const stubService = <T,>(impl: Partial<T>): T => impl as T;
+const meetings = stubService<MeetingService>({ create: async () => ({ code: 'x', ... }) });
+```
+
 `domain/`엔 배럴(`index.ts`)을 두지 않는다 — 정의로 한 번에 점프하도록 실제 모듈을 직접 import 한다.
 
 > 토큰명을 바꾸면 e2e의 `.overrideProvider()`가 **조용히 무력화**된다(외부 API 실호출로 이어질 수 있음).

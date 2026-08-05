@@ -1,7 +1,13 @@
+import { CreatedMeeting, CreateMeetingInput, MeetingService } from '@/meeting/application/meeting.service';
 import { NotionMeetingProvisioningService } from '@/notion/application/notion-meeting-provisioning.service';
 import { NotionIssuePort, PendingIssue } from '@/notion/domain/ports/notion-issue.port';
 import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
-import { CreatedMeeting, CreateMeetingInput, MeetingCreationPort } from '@/shared-kernel/domain/ports/meeting-creation.port';
+
+/**
+ * private 필드를 가진 구체 서비스의 테스트 대역.
+ * 인터페이스가 아니라 클래스를 주입받으므로, 이 테스트가 실제로 쓰는 메서드만 구현해 넘긴다.
+ */
+const stubService = <T,>(impl: Partial<T>): T => impl as T;
 
 function silentLogger(): LoggerPort {
   const noop = (): void => undefined;
@@ -9,16 +15,16 @@ function silentLogger(): LoggerPort {
 }
 
 function fakeMeetingCreation(code: string): {
-  port: MeetingCreationPort;
+  port: MeetingService;
   inputs: CreateMeetingInput[];
 } {
   const inputs: CreateMeetingInput[] = [];
-  const port: MeetingCreationPort = {
+  const port = stubService<MeetingService>({
     create: async (input: CreateMeetingInput): Promise<CreatedMeeting> => {
       inputs.push(input);
       return { code, hostToken: 'host-tok', startedAt: new Date('2026-07-20T00:00:00.000Z') };
     },
-  };
+  });
   return { port, inputs };
 }
 
@@ -167,13 +173,13 @@ describe('NotionMeetingProvisioningService.pollPendingIssues', () => {
       { issueId: 'ok', title: null },
     ]);
     let attempt = 0;
-    const meetingCreation: MeetingCreationPort = {
+    const meetingCreation = stubService<MeetingService>({
       create: async (): Promise<CreatedMeeting> => {
         attempt += 1;
         if (attempt === 1) throw new Error('notion down');
         return { code: 'OK', hostToken: 'h', startedAt: new Date() };
       },
-    };
+    });
     const service = new NotionMeetingProvisioningService(
       meetingCreation,
       notionIssue.port,

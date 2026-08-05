@@ -6,7 +6,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { resolveAdminConfig } from '@/config/admin.config';
 import { resolveGeminiConfig } from '@/config/gemini.config';
 import { ReportFinalizationService } from '@/reports/application/report-finalization.service';
-import { ReportLookupAdapter } from '@/reports/application/report-lookup.adapter';
+import { ReportLookupService } from '@/reports/application/report-lookup.service';
 import { ReportMeetingLifecycleListener } from '@/reports/application/report-meeting-lifecycle.listener';
 import { ReportPipelineListener } from '@/reports/application/report-pipeline.listener';
 import { REPORT_REPOSITORY } from '@/reports/domain/ports/report.repository';
@@ -17,7 +17,6 @@ import { MongoReportRepository } from '@/reports/infrastructure/mongo-report.rep
 import { NoopSummarizer } from '@/reports/infrastructure/noop.summarizer';
 import { ReportsController } from '@/reports/interface/controllers/reports.controller';
 import { ADMIN_API_TOKEN, AdminGuard } from '@/reports/interface/guards/admin.guard';
-import { REPORT_LOOKUP_PORT } from '@/shared-kernel/domain/ports/report-lookup.port';
 
 /**
  * Reports 기능을 구성하는 NestJS 모듈.
@@ -26,7 +25,7 @@ import { REPORT_LOOKUP_PORT } from '@/shared-kernel/domain/ports/report-lookup.p
  * - 회의록 영속화는 mongoose 기반 `MongoReportRepository`가 책임진다.
  * - SummarizerPort default는 `GeminiSummarizer`. `GEMINI_API_KEY` 미설정 시 `NoopSummarizer`로 fallback.
  * - 회의록의 노션 push는 `notion` BC가 `report.finalized`를 구독해 수행한다(본 모듈 밖).
- *   그 BC가 회의록 본문을 읽도록 `REPORT_LOOKUP_PORT`를 export한다.
+ *   그 BC가 회의록 본문을 읽도록 `ReportLookupService`를 export한다.
  */
 @Module({
   controllers: [ReportsController],
@@ -36,7 +35,7 @@ import { REPORT_LOOKUP_PORT } from '@/shared-kernel/domain/ports/report-lookup.p
     ReportPipelineListener,
     AdminGuard,
     { provide: REPORT_REPOSITORY, useClass: MongoReportRepository },
-    { provide: REPORT_LOOKUP_PORT, useClass: ReportLookupAdapter },
+    ReportLookupService,
     { provide: REPORT_ID_GENERATOR, useValue: { next: () => randomUUID() } },
     { provide: ADMIN_API_TOKEN, useFactory: () => resolveAdminConfig()?.token ?? null },
     {
@@ -55,6 +54,6 @@ import { REPORT_LOOKUP_PORT } from '@/shared-kernel/domain/ports/report-lookup.p
       inject: [PinoLogger],
     },
   ],
-  exports: [REPORT_LOOKUP_PORT],
+  exports: [ReportLookupService],
 })
 export class ReportsModule {}

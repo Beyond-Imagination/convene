@@ -1,6 +1,6 @@
 import { NotionReportPort } from '@/notion/domain/ports/notion-report.port';
+import { FinalizedReport, ReportLookupService } from '@/reports/application/report-lookup.service';
 import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
-import { FinalizedReport, ReportLookupPort } from '@/shared-kernel/domain/ports/report-lookup.port';
 import { reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
 
 import { NotionReportPushService } from './notion-report-push.service';
@@ -32,12 +32,12 @@ const makeService = (options: {
   pushError?: Error;
 }) => {
   const pushed: { issueId: string; report: FinalizedReport }[] = [];
-  const reportLookup: ReportLookupPort = {
+  const reportLookup = {
     findFinalizedReport: jest.fn(async () => {
       if (options.lookupError !== undefined) throw options.lookupError;
       return options.found ?? null;
     }),
-  };
+  } as unknown as ReportLookupService;
   const notionReport: NotionReportPort = {
     pushReport: jest.fn(async (issueId: string, report: FinalizedReport) => {
       if (options.pushError !== undefined) throw options.pushError;

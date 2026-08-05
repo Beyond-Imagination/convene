@@ -1,13 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 
 import { NOTION_REPORT, NotionReportPort } from '@/notion/domain/ports/notion-report.port';
+import { ReportLookupService } from '@/reports/application/report-lookup.service';
 import { LOGGER, LoggerPort } from '@/shared-kernel/domain/ports/logger';
-import { REPORT_LOOKUP_PORT, ReportLookupPort } from '@/shared-kernel/domain/ports/report-lookup.port';
 
 @Injectable()
 export class NotionReportPushService {
   constructor(
-    @Inject(REPORT_LOOKUP_PORT) private readonly reportLookup: ReportLookupPort,
+    private readonly reportLookup: ReportLookupService,
     @Inject(NOTION_REPORT) private readonly notionReport: NotionReportPort,
     @Inject(LOGGER) private readonly logger: LoggerPort,
   ) {}

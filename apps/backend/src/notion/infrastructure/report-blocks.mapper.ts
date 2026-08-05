@@ -1,4 +1,4 @@
-import { FinalizedReport } from '@/shared-kernel/domain/ports/report-lookup.port';
+import { FinalizedReport } from '@/reports/application/report-lookup.service';
 import { ActionItem } from '@/shared-kernel/domain/value-objects/action-item';
 import { KeyTopic } from '@/shared-kernel/domain/value-objects/key-topic';
 import { ReportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
