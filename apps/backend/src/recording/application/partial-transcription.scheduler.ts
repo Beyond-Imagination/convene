@@ -3,7 +3,7 @@ import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { AUDIO_BUFFER_REPOSITORY, AudioBufferRepository } from '@/recording/domain/ports/audio-buffer.repository';
 import { AbsoluteTranscriptSegment, PARTIAL_TRANSCRIPT_STORE, PartialTranscriptStore } from '@/recording/domain/ports/partial-transcript.store';
 import { TRANSCRIBER, TranscriberPort } from '@/recording/domain/ports/transcriber.port';
-import { LOGGER, LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 import {
   dropOverlapHeadSegments,
@@ -38,7 +38,7 @@ export class PartialTranscriptionScheduler implements OnModuleInit, OnModuleDest
     @Inject(AUDIO_BUFFER_REPOSITORY) private readonly audioBufferRepository: AudioBufferRepository,
     @Inject(TRANSCRIBER) private readonly transcriber: TranscriberPort,
     @Inject(PARTIAL_TRANSCRIPT_STORE) private readonly partialTranscriptStore: PartialTranscriptStore,
-    @Inject(LOGGER) private readonly logger: LoggerPort,
+    private readonly logger: PinoLoggerAdapter,
   ) {}
 
   onModuleInit(): void {

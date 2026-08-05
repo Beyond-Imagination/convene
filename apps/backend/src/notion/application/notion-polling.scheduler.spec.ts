@@ -3,12 +3,12 @@ import {
   PollOutcome,
 } from '@/notion/application/notion-meeting-provisioning.service';
 import { NotionPollingScheduler } from '@/notion/application/notion-polling.scheduler';
-import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 
-function silentLogger(): LoggerPort {
+function silentLogger(): PinoLoggerAdapter {
   const noop = (): void => undefined;
-  return { debug: noop, info: noop, warn: noop, error: noop } as unknown as LoggerPort;
+  return { debug: noop, info: noop, warn: noop, error: noop } as unknown as PinoLoggerAdapter;
 }
 
 function fixedClock(now: Date): SystemClock {

@@ -1,12 +1,9 @@
-import { randomUUID } from 'node:crypto';
-
 import { Module } from '@nestjs/common';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
 import { MeetingIdleScheduler } from '@/meeting/application/meeting-idle.scheduler';
 import { MeetingRecoveryService } from '@/meeting/application/meeting-recovery.service';
 import { CHAT_REPOSITORY } from '@/meeting/domain/ports/chat.repository';
-import { HOST_TOKEN_GENERATOR } from '@/meeting/domain/ports/host-token.generator';
 import { MEETING_REPOSITORY } from '@/meeting/domain/ports/meeting.repository';
 import { CachedMeetingRepository } from '@/meeting/infrastructure/cached-meeting.repository';
 import { MongoMeetingRepository } from '@/meeting/infrastructure/mongo-meeting.repository';
@@ -36,7 +33,6 @@ import { MeetingGateway } from '@/meeting/interface/gateways/meeting.gateway';
     { provide: MEETING_REPOSITORY, useExisting: CachedMeetingRepository },
     { provide: CHAT_REPOSITORY, useClass: RedisChatRepository },
     RandomMeetingCodeGenerator,
-    { provide: HOST_TOKEN_GENERATOR, useValue: { next: () => randomUUID() } },
   ],
   // notion BC가 회의 생성을 호출한다.
   exports: [MeetingService],

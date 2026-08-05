@@ -1,7 +1,7 @@
 import { NotionReportPort } from '@/notion/domain/ports/notion-report.port';
 import { FinalizedReport, ReportLookupService } from '@/reports/application/report-lookup.service';
-import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
 import { reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 import { NotionReportPushService } from './notion-report-push.service';
 
@@ -21,9 +21,9 @@ const finalizedReport = (issueId: string | null): FinalizedReport => ({
   }),
 });
 
-function silentLogger(): LoggerPort {
+function silentLogger(): PinoLoggerAdapter {
   const noop = (): void => undefined;
-  return { debug: noop, info: noop, warn: noop, error: noop };
+  return { debug: noop, info: noop, warn: noop, error: noop } as unknown as PinoLoggerAdapter;
 }
 
 const makeService = (options: {

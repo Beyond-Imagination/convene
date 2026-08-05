@@ -8,14 +8,13 @@ import {
   resolveRedisKeyPrefix,
   resolveRedisUrl,
 } from '@/config/redis.config';
-import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 /**
  * 연결 상태 전이를 구조화 로그로 남긴다.
  * 리스너가 하나도 없으면 ioredis 가 연결 오류를 `console.error`로 흘려 pino 를 우회한다.
  */
-function attachConnectionLogging(client: Redis, logger: LoggerPort): void {
+function attachConnectionLogging(client: Redis, logger: PinoLoggerAdapter): void {
   client.on('error', (err: Error) => logger.error({ err }, 'redis 연결 오류'));
   client.on('reconnecting', (delayMs: number) => logger.warn({ delayMs }, 'redis 재연결 시도'));
   client.on('ready', () => logger.info({}, 'redis 연결 준비 완료'));

@@ -1,7 +1,7 @@
 import { Producer, Router, RtpCodecCapability } from 'mediasoup/node/lib/types';
 
 import { MediaRouterPort } from '@/mediasoup/domain/ports/media-router.port';
-import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 import { MediasoupWorkerPool } from './mediasoup-worker.pool';
 
@@ -47,7 +47,7 @@ export class MediasoupRouterAdapter implements MediaRouterPort {
   constructor(
     private readonly workerPool: MediasoupWorkerPool,
     private readonly options: MediasoupRouterAdapterOptions,
-    private readonly logger: LoggerPort,
+    private readonly logger: PinoLoggerAdapter,
   ) {}
 
   async createRoom(meetingCode: string): Promise<void> {

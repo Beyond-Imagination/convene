@@ -1,12 +1,12 @@
 import { RtpCodecCapability, WorkerLogLevel, WorkerLogTag } from 'mediasoup/node/lib/types';
 
-import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 import { MediasoupRouterAdapter } from './mediasoup-router.adapter';
 import { MediasoupTransportAdapter } from './mediasoup-transport.adapter';
 import { MediasoupWorkerPool } from './mediasoup-worker.pool';
 
-const noopLogger: LoggerPort = { debug() {}, info() {}, warn() {}, error() {} };
+const noopLogger = { debug() {}, info() {}, warn() {}, error() {} } as unknown as PinoLoggerAdapter;
 
 const mediaCodecs = [
   { kind: 'audio', mimeType: 'audio/opus', clockRate: 48000, channels: 2 },

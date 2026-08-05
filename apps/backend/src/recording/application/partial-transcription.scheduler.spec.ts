@@ -2,7 +2,7 @@ import { AudioBufferRepository } from '@/recording/domain/ports/audio-buffer.rep
 import { AbsoluteTranscriptSegment, PartialTranscriptStore } from '@/recording/domain/ports/partial-transcript.store';
 import { TranscriberPort } from '@/recording/domain/ports/transcriber.port';
 import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events/report-transcription.payload';
-import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 import { WAV_HEADER_BYTES } from '../infrastructure/audio-chunker';
 import { KEEP_LAST_BYTES, PartialTranscriptionScheduler } from './partial-transcription.scheduler';
@@ -50,12 +50,12 @@ const makeStore = (): PartialTranscriptStore & {
   };
 };
 
-const noopLogger = (): LoggerPort => ({
+const noopLogger = (): PinoLoggerAdapter => ({
   debug: () => {},
   info: () => {},
   warn: () => {},
   error: () => {},
-});
+} as unknown as PinoLoggerAdapter);
 
 describe('PartialTranscriptionScheduler.tick', () => {
   it('active 회의가 없으면 transcribe 호출 없음', async () => {

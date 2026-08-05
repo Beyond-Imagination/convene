@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { MEETING_EVENTS } from '@convene/shared-interfaces';
 import { Inject, Injectable } from '@nestjs/common';
 
@@ -5,17 +7,16 @@ import { MeetingNotFoundError, NotHostError } from '@/meeting/application/meetin
 import { Meeting } from '@/meeting/domain/meeting';
 import { Participant } from '@/meeting/domain/participant';
 import { CHAT_REPOSITORY, ChatRepository } from '@/meeting/domain/ports/chat.repository';
-import { HOST_TOKEN_GENERATOR, HostTokenGenerator } from '@/meeting/domain/ports/host-token.generator';
 import { MEETING_REPOSITORY, MeetingRepository } from '@/meeting/domain/ports/meeting.repository';
 import { IdleTimeout } from '@/meeting/domain/value-objects/idle-timeout';
 import { RandomMeetingCodeGenerator } from '@/meeting/infrastructure/random-meeting-code.generator';
 import { MeetingEndedPayload, MeetingEndedReason } from '@/shared-kernel/domain/events/meeting-ended.payload';
-import { DomainEventPublisher, EVENT_PUBLISHER } from '@/shared-kernel/domain/ports/event-publisher';
-import { LOGGER, LoggerPort } from '@/shared-kernel/domain/ports/logger';
 import { ChatEntry, chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
 import { ExternalReference } from '@/shared-kernel/domain/value-objects/external-reference';
 import { MeetingType } from '@/shared-kernel/domain/value-objects/meeting-type';
 import { Source } from '@/shared-kernel/domain/value-objects/source';
+import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 
 /** 다른 BC가 회의를 생성할 때 쓰는 입력. Meeting Aggregate를 노출하지 않는다. */
@@ -96,10 +97,9 @@ export class MeetingService {
     @Inject(MEETING_REPOSITORY) private readonly repository: MeetingRepository,
     @Inject(CHAT_REPOSITORY) private readonly chatRepository: ChatRepository,
     private readonly codeGenerator: RandomMeetingCodeGenerator,
-    @Inject(HOST_TOKEN_GENERATOR) private readonly hostTokenGenerator: HostTokenGenerator,
     private readonly clock: SystemClock,
-    @Inject(EVENT_PUBLISHER) private readonly eventPublisher: DomainEventPublisher,
-    @Inject(LOGGER) private readonly logger: LoggerPort,
+    private readonly eventPublisher: NestEventBusDomainEventPublisher,
+    private readonly logger: PinoLoggerAdapter,
   ) {}
 
   /** 다른 BC(notion 등)가 회의를 생성하는 진입점. */
@@ -127,7 +127,7 @@ export class MeetingService {
       meetingType: command.meetingType,
       externalReference: command.externalReference,
       idleTimeout: IdleTimeout.default(),
-      hostToken: this.hostTokenGenerator.next(),
+      hostToken: randomUUID(),
       title: command.title ?? null,
     };
     // 예약 회의는 코드만 발급하고 방은 첫 참가자가 열게 둔다. 아무도 오지 않는 동안

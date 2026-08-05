@@ -3,8 +3,8 @@ import { Inject, Injectable, OnApplicationBootstrap } from '@nestjs/common';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
 import { MEETING_REPOSITORY, MeetingRepository } from '@/meeting/domain/ports/meeting.repository';
-import { DomainEventPublisher, EVENT_PUBLISHER } from '@/shared-kernel/domain/ports/event-publisher';
-import { LOGGER, LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 
 export interface MeetingRecoveryOutcome {
@@ -30,8 +30,8 @@ export class MeetingRecoveryService implements OnApplicationBootstrap {
     @Inject(MEETING_REPOSITORY) private readonly repository: MeetingRepository,
     private readonly meetingService: MeetingService,
     private readonly clock: SystemClock,
-    @Inject(EVENT_PUBLISHER) private readonly eventPublisher: DomainEventPublisher,
-    @Inject(LOGGER) private readonly logger: LoggerPort,
+    private readonly eventPublisher: NestEventBusDomainEventPublisher,
+    private readonly logger: PinoLoggerAdapter,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {

@@ -32,7 +32,7 @@ This file (CLAUDE.md) is the English index for fast context recovery.
 - Module / folder / REST path: `reports/`, `/reports`.
 - Domain event prefix: `report.*` (singular). Meeting events: `meeting.*`. Examples: `report.transcription.completed`, `report.summary.completed`, `report.finalized`, `meeting.created`, `meeting.participant.joined`, `meeting.chat.posted`, `meeting.idle.detected`, `meeting.ended`.
 - VOs: `ReportSummary`, `IdleTimeout`, `ExternalReference`, `NotionPushResult`, `MeetingCode`, `Source`.
-- Ports (**outbound only** — DB, external API, third-party lib): `TranscriberPort`, `SummarizerPort`, `MeetingRepository`, `ReportRepository`; `notion/` owns `NotionIssuePort`, `NotionReportPort`. Inbound calls (Controller → UseCase, and BC → BC) inject the concrete service; no interface.
+- Ports (**outbound and genuinely swappable only** — DB, external API, third-party lib): `TranscriberPort`, `SummarizerPort`, `MeetingRepository`, `ReportRepository`; `notion/` owns `NotionIssuePort`, `NotionReportPort`. Everything else injects the concrete class: inbound calls (Controller → UseCase, BC → BC), framework-bound infra (`PinoLoggerAdapter`, `NestEventBusDomainEventPublisher`, `SystemClock`), and pure functions (`randomUUID()` called inline).
 - Frontend hooks: `useMeetingViewModel`, `useChatViewModel`, `useMeetingReportViewModel`.
 
 ## Bounded contexts

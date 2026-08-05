@@ -5,8 +5,8 @@ import { AUDIO_BUFFER_REPOSITORY, AudioBufferRepository } from '@/recording/doma
 import { AbsoluteTranscriptSegment, PARTIAL_TRANSCRIPT_STORE, PartialTranscriptStore } from '@/recording/domain/ports/partial-transcript.store';
 import { TRANSCRIBER, TranscriberPort } from '@/recording/domain/ports/transcriber.port';
 import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events/report-transcription.payload';
-import { DomainEventPublisher, EVENT_PUBLISHER } from '@/shared-kernel/domain/ports/event-publisher';
-import { LOGGER, LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 import { dropOverlapHeadSegments, splitPcmIntoWavChunks } from '../infrastructure/audio-chunker';
 
@@ -44,8 +44,8 @@ export class RecordingService {
     @Inject(AUDIO_BUFFER_REPOSITORY) private readonly audioBufferRepository: AudioBufferRepository,
     @Inject(PARTIAL_TRANSCRIPT_STORE) private readonly partialTranscriptStore: PartialTranscriptStore,
     @Inject(TRANSCRIBER) private readonly transcriber: TranscriberPort,
-    @Inject(EVENT_PUBLISHER) private readonly eventPublisher: DomainEventPublisher,
-    @Inject(LOGGER) private readonly logger: LoggerPort,
+    private readonly eventPublisher: NestEventBusDomainEventPublisher,
+    private readonly logger: PinoLoggerAdapter,
   ) {}
 
   async requestTranscription(command: RequestTranscriptionCommand): Promise<void> {

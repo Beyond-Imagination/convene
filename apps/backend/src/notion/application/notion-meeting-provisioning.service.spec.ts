@@ -1,7 +1,7 @@
 import { CreatedMeeting, CreateMeetingInput, MeetingService } from '@/meeting/application/meeting.service';
 import { NotionMeetingProvisioningService } from '@/notion/application/notion-meeting-provisioning.service';
 import { NotionIssuePort, PendingIssue } from '@/notion/domain/ports/notion-issue.port';
-import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 /**
  * private 필드를 가진 구체 서비스의 테스트 대역.
@@ -9,9 +9,9 @@ import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
  */
 const stubService = <T,>(impl: Partial<T>): T => impl as T;
 
-function silentLogger(): LoggerPort {
+function silentLogger(): PinoLoggerAdapter {
   const noop = (): void => undefined;
-  return { debug: noop, info: noop, warn: noop, error: noop } as unknown as LoggerPort;
+  return { debug: noop, info: noop, warn: noop, error: noop } as unknown as PinoLoggerAdapter;
 }
 
 function fakeMeetingCreation(code: string): {

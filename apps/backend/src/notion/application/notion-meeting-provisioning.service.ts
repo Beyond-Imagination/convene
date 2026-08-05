@@ -2,8 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
 import { NOTION_ISSUE, NotionIssuePort } from '@/notion/domain/ports/notion-issue.port';
-import { LOGGER, LoggerPort } from '@/shared-kernel/domain/ports/logger';
 import { externalReference } from '@/shared-kernel/domain/value-objects/external-reference';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 export const MEETING_LINK_BASE = Symbol('MEETING_LINK_BASE');
 
@@ -31,7 +31,7 @@ export class NotionMeetingProvisioningService {
     private readonly meetingCreation: MeetingService,
     @Inject(NOTION_ISSUE) private readonly notionIssue: NotionIssuePort,
     @Inject(MEETING_LINK_BASE) private readonly meetingLinkBase: string,
-    @Inject(LOGGER) private readonly logger: LoggerPort,
+    private readonly logger: PinoLoggerAdapter,
   ) {}
 
   async provisionForIssue(

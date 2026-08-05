@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto';
-
 import { Module } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
 
@@ -10,7 +8,6 @@ import { ReportLookupService } from '@/reports/application/report-lookup.service
 import { ReportMeetingLifecycleListener } from '@/reports/application/report-meeting-lifecycle.listener';
 import { ReportPipelineListener } from '@/reports/application/report-pipeline.listener';
 import { REPORT_REPOSITORY } from '@/reports/domain/ports/report.repository';
-import { REPORT_ID_GENERATOR } from '@/reports/domain/ports/report-id.generator';
 import { SUMMARIZER } from '@/reports/domain/ports/summarizer.port';
 import { GeminiSummarizer } from '@/reports/infrastructure/gemini.summarizer';
 import { MongoReportRepository } from '@/reports/infrastructure/mongo-report.repository';
@@ -36,7 +33,6 @@ import { ADMIN_API_TOKEN, AdminGuard } from '@/reports/interface/guards/admin.gu
     AdminGuard,
     { provide: REPORT_REPOSITORY, useClass: MongoReportRepository },
     ReportLookupService,
-    { provide: REPORT_ID_GENERATOR, useValue: { next: () => randomUUID() } },
     { provide: ADMIN_API_TOKEN, useFactory: () => resolveAdminConfig()?.token ?? null },
     {
       provide: SUMMARIZER,

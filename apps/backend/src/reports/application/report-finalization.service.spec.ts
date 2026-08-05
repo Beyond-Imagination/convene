@@ -1,11 +1,17 @@
+jest.mock('node:crypto', () => ({
+  ...jest.requireActual<typeof import('node:crypto')>('node:crypto'),
+  randomUUID: () => 'rep_0001',
+}));
+
 import { REPORT_EVENTS } from '@convene/shared-interfaces';
 
 import { participantEntry } from '@/reports/domain/entries/participant-entry';
 import { transcriptSegment } from '@/reports/domain/entries/transcript-segment';
-import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
 import { chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
 import { externalReference, NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects/external-reference';
 import { ReportSummary, reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
+import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 import { MeetingReport } from '../domain/meeting-report';
 import { ReportNotFoundError, ReportNotResummarizableError } from './report.errors';
@@ -24,7 +30,7 @@ const makeEventPublisher = () => {
       publish: async (name: string, payload: unknown): Promise<void> => {
         events.push({ name, payload });
       },
-    },
+    } as unknown as NestEventBusDomainEventPublisher,
   };
 };
 
@@ -32,12 +38,12 @@ const noopSummarizer = () => ({
   summarize: jest.fn(),
 });
 
-const noopLogger = (): LoggerPort => ({
+const noopLogger = (): PinoLoggerAdapter => ({
   debug: () => {},
   info: () => {},
   warn: () => {},
   error: () => {},
-});
+} as unknown as PinoLoggerAdapter);
 
 describe('ReportFinalizationService.createDraft', () => {
   const startedAt = new Date('2026-01-01T00:00:00Z');
@@ -58,7 +64,6 @@ describe('ReportFinalizationService.createDraft', () => {
         listRecent: async () => [],
       },
       summarizer,
-      { next: () => generatedId },
       { now: () => endedAt },
       publisher,
       noopLogger(),
@@ -85,7 +90,7 @@ describe('ReportFinalizationService.createDraft', () => {
     chat: [chatEntry({ nickname: '준', text: '안녕', sentAt: startedAt })],
   });
 
-  it('ReportIdGenerator로 받은 id로 MeetingReport draft를 생성한다', async () => {
+  it('새로 발급한 id로 MeetingReport draft를 생성한다', async () => {
     const { service } = makeService();
     const report = await service.createDraft(validCommand());
     expect(report.id).toBe(generatedId);
@@ -209,7 +214,6 @@ describe('ReportFinalizationService.completeTranscription', () => {
         listRecent: async () => [],
       },
       summarizer,
-      { next: () => 'unused' },
       { now: () => failedAt },
       publisher,
       noopLogger(),
@@ -347,7 +351,6 @@ describe('ReportFinalizationService.resummarize', () => {
         listRecent: async () => [],
       },
       summarizer,
-      { next: () => 'unused' },
       { now: () => now },
       publisher,
       noopLogger(),
@@ -488,7 +491,6 @@ describe('ReportFinalizationService.listRecent', () => {
         listRecent: repoListMock,
       },
       noopSummarizer(),
-      { next: () => 'unused' },
       { now: () => startedAt },
       publisher,
       noopLogger(),
@@ -541,7 +543,6 @@ describe('ReportFinalizationService.getById', () => {
         listRecent: async () => [],
       },
       noopSummarizer(),
-      { next: () => 'unused' },
       { now: () => endedAt },
       publisher,
       noopLogger(),
@@ -596,7 +597,6 @@ describe('ReportFinalizationService.failTranscription', () => {
         listRecent: async () => [],
       },
       summarizer,
-      { next: () => 'unused' },
       { now: () => failedAt },
       publisher,
       noopLogger(),

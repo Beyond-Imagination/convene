@@ -2,14 +2,14 @@ import { Inject, Injectable } from '@nestjs/common';
 
 import { NOTION_REPORT, NotionReportPort } from '@/notion/domain/ports/notion-report.port';
 import { ReportLookupService } from '@/reports/application/report-lookup.service';
-import { LOGGER, LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 @Injectable()
 export class NotionReportPushService {
   constructor(
     private readonly reportLookup: ReportLookupService,
     @Inject(NOTION_REPORT) private readonly notionReport: NotionReportPort,
-    @Inject(LOGGER) private readonly logger: LoggerPort,
+    private readonly logger: PinoLoggerAdapter,
   ) {}
 
   /**

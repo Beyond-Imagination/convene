@@ -1,11 +1,17 @@
+jest.mock('node:crypto', () => ({
+  ...jest.requireActual<typeof import('node:crypto')>('node:crypto'),
+  randomUUID: () => 'host-token-generated',
+}));
+
 import { MEETING_EVENTS } from '@convene/shared-interfaces';
 
 import { Meeting } from '@/meeting/domain/meeting';
 import { IdleTimeout } from '@/meeting/domain/value-objects/idle-timeout';
 import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
-import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
 import { ChatEntry, chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
 import { externalReference, NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects/external-reference';
+import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 import { MeetingNotFoundError, NotHostError } from './meeting.errors';
 import { MeetingService } from './meeting.service';
@@ -23,16 +29,16 @@ const makeEventPublisher = () => {
       publish: async (name: string, payload: unknown): Promise<void> => {
         events.push({ name, payload });
       },
-    },
+    } as unknown as NestEventBusDomainEventPublisher,
   };
 };
 
-const noopLogger = (): LoggerPort => ({
+const noopLogger = (): PinoLoggerAdapter => ({
   debug: () => {},
   info: () => {},
   warn: () => {},
   error: () => {},
-});
+} as unknown as PinoLoggerAdapter);
 
 const code = MeetingCode.from('abc12xyz');
 
@@ -68,7 +74,6 @@ describe('MeetingService.createMeeting', () => {
       },
       noopChatRepository(),
       { next: () => code },
-      { next: () => 'host-token-generated' },
       { now: () => fakeNow },
       publisher,
       noopLogger(),
@@ -142,7 +147,7 @@ describe('MeetingService.createMeeting', () => {
     expect(events.map((e) => e.name)).toEqual([MEETING_EVENTS.CREATED]);
   });
 
-  it('HostTokenGenerator가 발급한 hostToken을 Meeting에 부여한다', async () => {
+  it('추측 불가능한 hostToken을 발급해 Meeting에 부여한다', async () => {
     const { service } = makeService();
     const result = await service.createMeeting({
       source: 'web',
@@ -181,7 +186,6 @@ describe('MeetingService.joinMeeting', () => {
       },
       noopChatRepository(),
       { next: () => code },
-      { next: () => 'host-token-generated' },
       { now: () => t1 },
       publisher,
       noopLogger(),
@@ -301,7 +305,6 @@ describe('MeetingService.leaveMeeting', () => {
       },
       noopChatRepository(),
       { next: () => code },
-      { next: () => 'host-token-generated' },
       { now: () => t2 },
       publisher,
       noopLogger(),
@@ -379,7 +382,6 @@ describe('MeetingService.postChat', () => {
         listByCode: async () => appended.map((a) => a.entry),
       },
       { next: () => code },
-      { next: () => 'host-token-generated' },
       { now: () => t2 },
       publisher,
       noopLogger(),
@@ -458,7 +460,6 @@ describe('MeetingService.closeMeeting', () => {
       },
       noopChatRepository(),
       { next: () => code },
-      { next: () => 'host-token-generated' },
       { now: () => tClose },
       publisher,
       noopLogger(),
@@ -517,7 +518,6 @@ describe('MeetingService.closeMeeting', () => {
         listByCode: async () => accumulated,
       },
       { next: () => code },
-      { next: () => 'host-token-generated' },
       { now: () => tClose },
       publisher,
       noopLogger(),
@@ -578,7 +578,6 @@ describe('MeetingService.detectIdleAndClose', () => {
       },
       noopChatRepository(),
       { next: () => code },
-      { next: () => 'host-token-generated' },
       { now: () => now },
       publisher,
       noopLogger(),
@@ -699,7 +698,6 @@ describe('MeetingService.sweepIdleMeetings', () => {
       },
       noopChatRepository(),
       { next: () => code },
-      { next: () => 'host-token-generated' },
       { now: () => tIdleElapsed },
       publisher,
       noopLogger(),

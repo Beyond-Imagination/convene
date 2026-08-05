@@ -1,9 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 
 import { resolveNotionPollCron } from '@/config/notion.config';
 import { NotionMeetingProvisioningService } from '@/notion/application/notion-meeting-provisioning.service';
-import { LOGGER, LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 
 // DB id가 있을 때만 모듈에 등록된다.
@@ -14,7 +14,7 @@ export class NotionPollingScheduler {
   constructor(
     private readonly provisioning: NotionMeetingProvisioningService,
     private readonly clock: SystemClock,
-    @Inject(LOGGER) private readonly logger: LoggerPort,
+    private readonly logger: PinoLoggerAdapter,
   ) {}
 
   @Cron(resolveNotionPollCron())

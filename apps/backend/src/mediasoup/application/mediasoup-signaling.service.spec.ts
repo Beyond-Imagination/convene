@@ -11,6 +11,7 @@ import { AudioCapturePort, AudioCaptureStartInput } from '@/mediasoup/domain/por
 import { MediaRouterPort } from '@/mediasoup/domain/ports/media-router.port';
 import { ConsumeInput, CreateWebRtcTransportInput, MediaTransportPort, ProduceInput } from '@/mediasoup/domain/ports/media-transport.port';
 import { ParticipantMediaRepository } from '@/mediasoup/domain/ports/participant-media.repository';
+import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 
 import { ParticipantMediaNotFoundError, ScreenShareConflictError } from './mediasoup.errors';
 import { MediasoupSignalingService } from './mediasoup-signaling.service';
@@ -32,7 +33,7 @@ const makeEventPublisher = () => {
       publish: async (name: string, payload: unknown): Promise<void> => {
         events.push({ name, payload });
       },
-    },
+    } as unknown as NestEventBusDomainEventPublisher,
   };
 };
 

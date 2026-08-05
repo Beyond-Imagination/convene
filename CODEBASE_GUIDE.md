@@ -177,10 +177,11 @@ export interface ChatRepository { ... }
 
 | 방향 | 예 | 배선 |
 |---|---|---|
-| **Outbound** — DB, 외부 API, 서드파티 라이브러리, 메일 | `MeetingRepository`, `TranscriberPort`, `SummarizerPort`, `NotionIssuePort`, `MediaRouterPort`, `LoggerPort` | **Port 인터페이스 + Symbol** |
-| **Inbound** — Controller/Gateway → UseCase | `MeetingController` → `MeetingService` | 구체 서비스 주입. 인터페이스 없음 |
-| **BC → BC** — 같은 프로세스 안이라 교체 대상이 아님 | `notion` → `MeetingService`, `ReportLookupService` | 구체 서비스 주입. 소유 모듈이 `exports` |
-| 주입 상태 없는 유틸 | `SystemClock`, `RandomMeetingCodeGenerator` | Port 없이 클래스가 곧 토큰 |
+| **Outbound + 교체 가능성 있음** — DB, 외부 API, 서드파티 | `MeetingRepository`, `TranscriberPort`, `SummarizerPort`, `NotionIssuePort`, `MediaRouterPort` | **Port 인터페이스 + Symbol** |
+| **Outbound지만 교체할 일 없음** — 프레임워크에 묶여 있음 | `PinoLoggerAdapter`(pino), `NestEventBusDomainEventPublisher`(Nest 이벤트 버스) | 구체 클래스 주입 |
+| **Inbound** — Controller/Gateway → UseCase | `MeetingController` → `MeetingService` | 구체 서비스 주입 |
+| **BC → BC** — 같은 프로세스 안이라 교체 대상 아님 | `notion` → `MeetingService`, `ReportLookupService` | 구체 서비스 주입. 소유 모듈이 `exports` |
+| 유틸·순수 함수 | `SystemClock`, `RandomMeetingCodeGenerator`, id 발급(`randomUUID()` 직접 호출) | 클래스가 곧 토큰이거나, 추상화 없음 |
 
 인터페이스가 없는 구체 서비스를 스펙에서 대역으로 쓸 땐 private 필드 때문에 객체 리터럴이 그대로는 안 들어간다.
 이건 구조를 되돌릴 이유가 아니라 **대역 작성 방식의 문제**이므로, 그 테스트가 실제로 쓰는 메서드만 구현해 캐스팅한다:

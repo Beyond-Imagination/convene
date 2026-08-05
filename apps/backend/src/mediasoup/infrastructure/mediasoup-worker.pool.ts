@@ -2,7 +2,7 @@ import { OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import * as mediasoup from 'mediasoup';
 import { Worker, WorkerLogLevel, WorkerLogTag } from 'mediasoup/node/lib/types';
 
-import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 export interface MediasoupWorkerPoolOptions {
   numWorkers: number;
@@ -25,7 +25,7 @@ export class MediasoupWorkerPool implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly options: MediasoupWorkerPoolOptions,
-    private readonly logger: LoggerPort,
+    private readonly logger: PinoLoggerAdapter,
   ) {}
 
   async onModuleInit(): Promise<void> {

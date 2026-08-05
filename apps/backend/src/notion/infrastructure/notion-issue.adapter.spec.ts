@@ -3,14 +3,14 @@ import {
   buildPendingIssuesFilter,
   NotionIssueAdapter,
 } from '@/notion/infrastructure/notion-issue.adapter';
-import { LoggerPort } from '@/shared-kernel/domain/ports/logger';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 const NOW = new Date('2026-07-20T12:00:00.000Z');
 const LINK_BASE = 'https://convene.example.com';
 
-function silentLogger(): LoggerPort {
+function silentLogger(): PinoLoggerAdapter {
   const noop = (): void => undefined;
-  return { debug: noop, info: noop, warn: noop, error: noop } as unknown as LoggerPort;
+  return { debug: noop, info: noop, warn: noop, error: noop } as unknown as PinoLoggerAdapter;
 }
 
 function titleIssue(id: string, title: string): Record<string, unknown> {

@@ -13,7 +13,7 @@ import { AUDIO_CAPTURE, AudioCapturePort } from '@/mediasoup/domain/ports/audio-
 import { MEDIA_ROUTER, MediaRouterPort } from '@/mediasoup/domain/ports/media-router.port';
 import { MEDIA_TRANSPORT, MediaTransportPort } from '@/mediasoup/domain/ports/media-transport.port';
 import { PARTICIPANT_MEDIA_REPOSITORY, ParticipantMediaRepository } from '@/mediasoup/domain/ports/participant-media.repository';
-import { DomainEventPublisher, EVENT_PUBLISHER } from '@/shared-kernel/domain/ports/event-publisher';
+import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 
 import { ParticipantMediaNotFoundError, ScreenShareConflictError } from './mediasoup.errors';
 
@@ -75,7 +75,7 @@ export class MediasoupSignalingService {
     @Inject(PARTICIPANT_MEDIA_REPOSITORY)
     private readonly participantMediaRepository: ParticipantMediaRepository,
     @Inject(AUDIO_CAPTURE) private readonly audioCapture: AudioCapturePort,
-    @Inject(EVENT_PUBLISHER) private readonly eventPublisher: DomainEventPublisher,
+    private readonly eventPublisher: NestEventBusDomainEventPublisher,
   ) {}
 
   // ---------- room lifecycle ----------

@@ -2,15 +2,13 @@ import type { DomainEventName } from '@convene/shared-interfaces';
 import { Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import type { DomainEventPublisher } from '@/shared-kernel/domain/ports/event-publisher';
-
 /**
- * DomainEventPublisher 포트의 production 어댑터.
+ * 도메인 이벤트 발행기. `@nestjs/event-emitter`의 EventEmitter2에 위임한다.
  *
- * `@nestjs/event-emitter`의 EventEmitter2에 위임한다.
+ * `payload` 타입은 컨텍스트별로 자유롭게 정의되도록 `unknown`으로 둔다.
  */
 @Injectable()
-export class NestEventBusDomainEventPublisher implements DomainEventPublisher {
+export class NestEventBusDomainEventPublisher {
   constructor(private readonly emitter: EventEmitter2) {}
 
   async publish(name: DomainEventName, payload: unknown): Promise<void> {
