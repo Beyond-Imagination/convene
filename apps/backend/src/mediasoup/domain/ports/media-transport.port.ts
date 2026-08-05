@@ -48,10 +48,8 @@ export interface MediaTransportPort {
 
   resumeConsumer(consumerId: string): Promise<void>;
 
-  /** 자기 producer 일시정지(mute). mediasoup `producer.pause()`. */
   pauseProducer(producerId: string): Promise<void>;
 
-  /** 자기 producer 재개(unmute). mediasoup `producer.resume()`. */
   resumeProducer(producerId: string): Promise<void>;
 
   closeProducer(producerId: string): Promise<void>;

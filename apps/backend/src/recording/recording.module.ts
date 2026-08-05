@@ -11,13 +11,7 @@ import { HttpTranscriber } from '@/recording/infrastructure/http.transcriber';
 import { RedisAudioBufferRepository } from '@/recording/infrastructure/redis-audio-buffer.repository';
 import { RedisPartialTranscriptStore } from '@/recording/infrastructure/redis-partial-transcript.store';
 
-/**
- * Recording 기능을 구성하는 NestJS 모듈.
- *
- * - `RecordingReportLifecycleListener`는 Reports BC가 발행한 이벤트를 구독해 STT 호출을 트리거한다.
- * - 오디오 버퍼는 redis LIST로 누적하고 consume 시점에 즉시 폐기한다.
- * - transcriber는 ai-worker HTTP 어댑터 `HttpTranscriber`를 default provider로 둔다.
- */
+/** Reports BC가 발행한 `report.transcription.requested`를 구독해 STT를 트리거한다. */
 @Module({
   providers: [
     RecordingService,

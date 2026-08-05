@@ -18,11 +18,8 @@ import { ADMIN_API_TOKEN, AdminGuard } from '@/reports/interface/guards/admin.gu
 /**
  * Reports 기능을 구성하는 NestJS 모듈.
  *
- * - `ReportMeetingLifecycleListener`는 Meeting BC의 도메인 이벤트를 구독한다.
- * - 회의록 영속화는 mongoose 기반 `MongoReportRepository`가 책임진다.
- * - SummarizerPort default는 `GeminiSummarizer`. `GEMINI_API_KEY` 미설정 시 `NoopSummarizer`로 fallback.
- * - 회의록의 노션 push는 `notion` BC가 `report.finalized`를 구독해 수행한다(본 모듈 밖).
- *   그 BC가 회의록 본문을 읽도록 `ReportLookupService`를 export한다.
+ * 회의록의 노션 push는 `notion` BC가 `report.finalized`를 구독해 수행한다(본 모듈 밖).
+ * 그 BC가 회의록 본문을 읽도록 `ReportLookupService`를 export한다.
  */
 @Module({
   controllers: [ReportsController],

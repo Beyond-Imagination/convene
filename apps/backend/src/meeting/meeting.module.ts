@@ -13,13 +13,7 @@ import { RedisMeetingRepository } from '@/meeting/infrastructure/redis-meeting.r
 import { MeetingController } from '@/meeting/interface/controllers/meeting.controller';
 import { MeetingGateway } from '@/meeting/interface/gateways/meeting.gateway';
 
-/**
- * Meeting 기능을 구성하는 NestJS 모듈.
- *
- * 회의 원본은 MongoDB, redis는 캐시다. `CachedMeetingRepository`가 둘을 묶어 MEETING_REPOSITORY로 노출된다.
- * RedisModule(@Global)이 ioredis 클라이언트를 한 번 만들어 두고, 본 모듈의 Repository가 같은 인스턴스를 inject 한다.
- * CLOCK / EVENT_PUBLISHER / LOGGER는 @Global()인 SharedKernelModule을 통해 주입된다.
- */
+/** 회의 원본은 MongoDB, redis는 캐시다. `CachedMeetingRepository`가 둘을 묶어 노출한다. */
 @Module({
   controllers: [MeetingController],
   providers: [
