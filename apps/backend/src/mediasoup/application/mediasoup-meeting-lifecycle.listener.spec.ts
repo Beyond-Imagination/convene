@@ -1,3 +1,6 @@
+import { ParticipantMedia } from '@/mediasoup/domain/participant-media';
+import { stub } from '@/shared-kernel/testing/stub';
+
 import { MediasoupMeetingLifecycleListener } from './mediasoup-meeting-lifecycle.listener';
 import { MediasoupSignalingService } from './mediasoup-signaling.service';
 
@@ -8,24 +11,26 @@ interface CapturedCall {
 
 const makeListener = () => {
   const calls: CapturedCall[] = [];
-  const service = {
-    openRoom: async (cmd: unknown) => {
+  const service = stub<MediasoupSignalingService>({
+    openRoom: async (cmd) => {
       calls.push({ name: 'openRoom', args: [cmd] });
     },
-    closeRoom: async (cmd: unknown) => {
+    closeRoom: async (cmd) => {
       calls.push({ name: 'closeRoom', args: [cmd] });
     },
-    admitParticipant: async (cmd: unknown) => {
+    admitParticipant: async (cmd) => {
       calls.push({ name: 'admitParticipant', args: [cmd] });
-      return undefined;
+      return ParticipantMedia.spawn({
+        participantId: cmd.participantId,
+        meetingCode: cmd.meetingCode,
+        routerIndex: 0,
+      });
     },
-    dismissParticipant: async (cmd: unknown) => {
+    dismissParticipant: async (cmd) => {
       calls.push({ name: 'dismissParticipant', args: [cmd] });
     },
-  };
-  const listener = new MediasoupMeetingLifecycleListener(
-    service as unknown as MediasoupSignalingService,
-  );
+  });
+  const listener = new MediasoupMeetingLifecycleListener(service);
   return { listener, calls };
 };
 

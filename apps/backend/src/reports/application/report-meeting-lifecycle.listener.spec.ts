@@ -1,5 +1,7 @@
+import { MeetingReport } from '@/reports/domain/meeting-report';
 import { MeetingEndedPayload } from '@/shared-kernel/domain/events/meeting-ended.payload';
 import { NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects/external-reference';
+import { stub } from '@/shared-kernel/testing/stub';
 
 import { CreateDraftCommand, ReportFinalizationService } from './report-finalization.service';
 import { ReportMeetingLifecycleListener } from './report-meeting-lifecycle.listener';
@@ -23,15 +25,14 @@ const payload: MeetingEndedPayload = {
 
 const makeListener = () => {
   const calls: CreateDraftCommand[] = [];
-  const service = {
+  const service = stub<ReportFinalizationService>({
     createDraft: jest.fn(async (cmd: CreateDraftCommand) => {
       calls.push(cmd);
-      return undefined as unknown;
+      // id는 실제 서비스가 발급한다. 대역은 리스너가 반환값을 쓰지 않더라도 계약은 지킨다.
+      return MeetingReport.fromEndedMeeting({ ...cmd, id: 'rep_stub', title: cmd.title ?? null });
     }),
-  };
-  const listener = new ReportMeetingLifecycleListener(
-    service as unknown as ReportFinalizationService,
-  );
+  });
+  const listener = new ReportMeetingLifecycleListener(service);
   return { listener, calls, service };
 };
 
