@@ -53,12 +53,12 @@ function throwingLinkWriter(): NotionIssuePort {
 
 describe('NotionMeetingProvisioningService 회의 카드', () => {
   const makeService = (notionIssue: NotionIssuePort) =>
-    new NotionMeetingProvisioningService({
-      meetingCreation: fakeMeetingCreation('ABC123').port,
+    new NotionMeetingProvisioningService(
+      fakeMeetingCreation('ABC123').port,
       notionIssue,
-      meetingLinkBase: 'https://convene.example.com',
-      logger: silentLogger(),
-    });
+      'https://convene.example.com',
+      silentLogger(),
+    );
 
   it('이슈 페이지에 회의 링크와 같은 주소로 카드를 심는다', async () => {
     const notionIssue = fakeNotionIssue([]);
@@ -88,12 +88,12 @@ describe('NotionMeetingProvisioningService.provisionForIssue', () => {
   it('notion-issue 회의를 예약 발급하고 링크를 조립·기입한다', async () => {
     const meetingCreation = fakeMeetingCreation('ABC123');
     const notionIssue = fakeNotionIssue([]);
-    const service = new NotionMeetingProvisioningService({
-      meetingCreation: meetingCreation.port,
-      notionIssue: notionIssue.port,
-      meetingLinkBase: 'https://convene.example.com',
-      logger: silentLogger(),
-    });
+    const service = new NotionMeetingProvisioningService(
+      meetingCreation.port,
+      notionIssue.port,
+      'https://convene.example.com',
+      silentLogger(),
+    );
 
     const result = await service.provisionForIssue('issue-1', '스프린트 회고');
 
@@ -117,23 +117,23 @@ describe('NotionMeetingProvisioningService.provisionForIssue', () => {
   });
 
   it('링크 기입이 실패하면 기본은 예외를 전파한다(폴링 멱등 유지)', async () => {
-    const service = new NotionMeetingProvisioningService({
-      meetingCreation: fakeMeetingCreation('ABC').port,
-      notionIssue: throwingLinkWriter(),
-      meetingLinkBase: 'https://x',
-      logger: silentLogger(),
-    });
+    const service = new NotionMeetingProvisioningService(
+      fakeMeetingCreation('ABC').port,
+      throwingLinkWriter(),
+      'https://x',
+      silentLogger(),
+    );
 
     await expect(service.provisionForIssue('issue-1', null)).rejects.toThrow();
   });
 
   it('bestEffortLink면 링크 기입이 실패해도 회의 결과를 반환한다(즉시 경로)', async () => {
-    const service = new NotionMeetingProvisioningService({
-      meetingCreation: fakeMeetingCreation('ABC').port,
-      notionIssue: throwingLinkWriter(),
-      meetingLinkBase: 'https://x',
-      logger: silentLogger(),
-    });
+    const service = new NotionMeetingProvisioningService(
+      fakeMeetingCreation('ABC').port,
+      throwingLinkWriter(),
+      'https://x',
+      silentLogger(),
+    );
 
     const result = await service.provisionForIssue('issue-1', null, { bestEffortLink: true });
 
@@ -148,12 +148,12 @@ describe('NotionMeetingProvisioningService.pollPendingIssues', () => {
       { issueId: 'a', title: 'A' },
       { issueId: 'b', title: null },
     ]);
-    const service = new NotionMeetingProvisioningService({
-      meetingCreation: meetingCreation.port,
-      notionIssue: notionIssue.port,
-      meetingLinkBase: 'https://x',
-      logger: silentLogger(),
-    });
+    const service = new NotionMeetingProvisioningService(
+      meetingCreation.port,
+      notionIssue.port,
+      'https://x',
+      silentLogger(),
+    );
 
     const outcome = await service.pollPendingIssues(new Date());
 
@@ -174,12 +174,12 @@ describe('NotionMeetingProvisioningService.pollPendingIssues', () => {
         return { code: 'OK', hostToken: 'h', startedAt: new Date() };
       },
     };
-    const service = new NotionMeetingProvisioningService({
+    const service = new NotionMeetingProvisioningService(
       meetingCreation,
-      notionIssue: notionIssue.port,
-      meetingLinkBase: 'https://x',
-      logger: silentLogger(),
-    });
+      notionIssue.port,
+      'https://x',
+      silentLogger(),
+    );
 
     const outcome = await service.pollPendingIssues(new Date());
 

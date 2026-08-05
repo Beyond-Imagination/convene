@@ -51,8 +51,8 @@ describe('ReportFinalizationService.createDraft', () => {
     const saved: MeetingReport[] = [];
     const { events, publisher } = makeEventPublisher();
     const summarizer = noopSummarizer();
-    const service = new ReportFinalizationService({
-      repository: {
+    const service = new ReportFinalizationService(
+      {
         save: async (r) => {
           saved.push(r);
         },
@@ -61,11 +61,11 @@ describe('ReportFinalizationService.createDraft', () => {
         listRecent: async () => [],
       },
       summarizer,
-      idGenerator: { next: () => generatedId },
-      clock: { now: () => endedAt },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      { next: () => generatedId },
+      { now: () => endedAt },
+      publisher,
+      noopLogger(),
+    );
     return { service, saved, events, summarizer };
   };
 
@@ -201,8 +201,8 @@ describe('ReportFinalizationService.completeTranscription', () => {
         return opts.summarizerResult ?? summaryResult;
       }),
     };
-    const service = new ReportFinalizationService({
-      repository: {
+    const service = new ReportFinalizationService(
+      {
         save: async (r) => {
           store.set(r.id, r);
           saves.push(r.id);
@@ -212,11 +212,11 @@ describe('ReportFinalizationService.completeTranscription', () => {
         listRecent: async () => [],
       },
       summarizer,
-      idGenerator: { next: () => 'unused' },
-      clock: { now: () => failedAt },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      { next: () => 'unused' },
+      { now: () => failedAt },
+      publisher,
+      noopLogger(),
+    );
     return { service, store, saves, events, summarizer };
   };
 
@@ -339,8 +339,8 @@ describe('ReportFinalizationService.resummarize', () => {
         return opts.summarizerResult ?? newSummary;
       }),
     };
-    const service = new ReportFinalizationService({
-      repository: {
+    const service = new ReportFinalizationService(
+      {
         save: async (r) => {
           store.set(r.id, r);
           saves.push(r.id);
@@ -350,11 +350,11 @@ describe('ReportFinalizationService.resummarize', () => {
         listRecent: async () => [],
       },
       summarizer,
-      idGenerator: { next: () => 'unused' },
-      clock: { now: () => now },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      { next: () => 'unused' },
+      { now: () => now },
+      publisher,
+      noopLogger(),
+    );
     return { service, store, saves, events, summarizer };
   };
 
@@ -483,19 +483,19 @@ describe('ReportFinalizationService.listRecent', () => {
   const makeService = () => {
     const repoListMock = jest.fn<Promise<MeetingReport[]>, [number]>(async () => []);
     const { publisher } = makeEventPublisher();
-    const service = new ReportFinalizationService({
-      repository: {
+    const service = new ReportFinalizationService(
+      {
         save: async () => {},
         findById: async () => null,
         findByMeetingId: async () => null,
         listRecent: repoListMock,
       },
-      summarizer: noopSummarizer(),
-      idGenerator: { next: () => 'unused' },
-      clock: { now: () => startedAt },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      noopSummarizer(),
+      { next: () => 'unused' },
+      { now: () => startedAt },
+      publisher,
+      noopLogger(),
+    );
     return { service, repoListMock };
   };
 
@@ -536,19 +536,19 @@ describe('ReportFinalizationService.getById', () => {
 
   const makeService = (stored: MeetingReport | null) => {
     const { publisher } = makeEventPublisher();
-    const service = new ReportFinalizationService({
-      repository: {
+    const service = new ReportFinalizationService(
+      {
         save: async () => {},
         findById: async (id) => (stored && stored.id === id ? stored : null),
         findByMeetingId: async () => null,
         listRecent: async () => [],
       },
-      summarizer: noopSummarizer(),
-      idGenerator: { next: () => 'unused' },
-      clock: { now: () => endedAt },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      noopSummarizer(),
+      { next: () => 'unused' },
+      { now: () => endedAt },
+      publisher,
+      noopLogger(),
+    );
     return { service };
   };
 
@@ -589,8 +589,8 @@ describe('ReportFinalizationService.failTranscription', () => {
     store.set(reportId, makeDraft());
     const { events, publisher } = makeEventPublisher();
     const summarizer = noopSummarizer();
-    const service = new ReportFinalizationService({
-      repository: {
+    const service = new ReportFinalizationService(
+      {
         save: async (r) => {
           store.set(r.id, r);
         },
@@ -599,11 +599,11 @@ describe('ReportFinalizationService.failTranscription', () => {
         listRecent: async () => [],
       },
       summarizer,
-      idGenerator: { next: () => 'unused' },
-      clock: { now: () => failedAt },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      { next: () => 'unused' },
+      { now: () => failedAt },
+      publisher,
+      noopLogger(),
+    );
     return { service, store, events, summarizer };
   };
 

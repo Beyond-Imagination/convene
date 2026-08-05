@@ -1,5 +1,7 @@
 import type { DomainEventName } from '@convene/shared-interfaces';
 
+export const EVENT_PUBLISHER = Symbol('EVENT_PUBLISHER');
+
 /**
  * 도메인 이벤트 발행 포트.
  *

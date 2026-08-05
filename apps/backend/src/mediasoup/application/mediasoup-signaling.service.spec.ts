@@ -185,13 +185,13 @@ const makeService = () => {
   const repo = makeRepository();
   const audioCapture = makeAudioCapture();
   const { events, publisher } = makeEventPublisher();
-  const service = new MediasoupSignalingService({
-    routerPort: router.port,
-    transportPort: transport.port,
-    participantMediaRepository: repo.repository,
-    audioCapture: audioCapture.port,
-    eventPublisher: publisher,
-  });
+  const service = new MediasoupSignalingService(
+      router.port,
+      transport.port,
+      repo.repository,
+      audioCapture.port,
+      publisher,
+    );
   return { service, router, transport, repo, audioCapture, events };
 };
 

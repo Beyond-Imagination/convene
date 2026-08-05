@@ -1,5 +1,7 @@
 import { Meeting } from '@/meeting/domain/meeting';
 
+export const MEETING_REPOSITORY = Symbol('MEETING_REPOSITORY');
+
 /**
  * Meeting Aggregate의 영속 경계.
  * `code` 유일성 보장은 본 Repository의 책임

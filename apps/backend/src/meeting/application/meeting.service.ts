@@ -1,17 +1,32 @@
 import { MEETING_EVENTS } from '@convene/shared-interfaces';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { MeetingNotFoundError, NotHostError } from '@/meeting/application/meeting.errors';
 import { Meeting } from '@/meeting/domain/meeting';
 import { Participant } from '@/meeting/domain/participant';
 import {
+  CHAT_REPOSITORY,
   ChatRepository,
+  HOST_TOKEN_GENERATOR,
   HostTokenGenerator,
+  MEETING_CODE_GENERATOR,
+  MEETING_REPOSITORY,
   MeetingCodeGenerator,
   MeetingRepository,
 } from '@/meeting/domain/ports';
 import { IdleTimeout } from '@/meeting/domain/value-objects';
 import { MeetingEndedPayload, MeetingEndedReason } from '@/shared-kernel/domain/events';
-import { Clock, DomainEventPublisher, LoggerPort } from '@/shared-kernel/domain/ports';
+import {
+  CLOCK,
+  Clock,
+  CreatedMeeting,
+  CreateMeetingInput,
+  DomainEventPublisher,
+  EVENT_PUBLISHER,
+  LOGGER,
+  LoggerPort,
+  MeetingCreationPort,
+} from '@/shared-kernel/domain/ports';
 import {
   ChatEntry,
   chatEntry,
@@ -19,16 +34,6 @@ import {
   MeetingType,
   Source,
 } from '@/shared-kernel/domain/value-objects';
-
-interface MeetingServiceDeps {
-  repository: MeetingRepository;
-  chatRepository: ChatRepository;
-  codeGenerator: MeetingCodeGenerator;
-  hostTokenGenerator: HostTokenGenerator;
-  clock: Clock;
-  eventPublisher: DomainEventPublisher;
-  logger: LoggerPort;
-}
 
 interface CreateMeetingCommand {
   source: Source;
@@ -86,19 +91,44 @@ export interface IdleSweepOutcome {
   readonly closed: number;
 }
 
-export class MeetingService {
-  constructor(private readonly deps: MeetingServiceDeps) {}
+@Injectable()
+export class MeetingService implements MeetingCreationPort {
+  constructor(
+    @Inject(MEETING_REPOSITORY) private readonly repository: MeetingRepository,
+    @Inject(CHAT_REPOSITORY) private readonly chatRepository: ChatRepository,
+    @Inject(MEETING_CODE_GENERATOR) private readonly codeGenerator: MeetingCodeGenerator,
+    @Inject(HOST_TOKEN_GENERATOR) private readonly hostTokenGenerator: HostTokenGenerator,
+    @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(EVENT_PUBLISHER) private readonly eventPublisher: DomainEventPublisher,
+    @Inject(LOGGER) private readonly logger: LoggerPort,
+  ) {}
+
+  /** 다른 BC(notion 등)가 회의를 생성하는 진입점. Meeting Aggregate를 노출하지 않는다. */
+  async create(input: CreateMeetingInput): Promise<CreatedMeeting> {
+    const meeting = await this.createMeeting({
+      source: input.source,
+      meetingType: input.meetingType,
+      externalReference: input.externalReference,
+      title: input.title ?? null,
+      scheduled: input.scheduled,
+    });
+    return {
+      code: meeting.code.value,
+      hostToken: meeting.hostToken,
+      startedAt: meeting.startedAt,
+    };
+  }
 
   async createMeeting(command: CreateMeetingCommand): Promise<Meeting> {
-    const code = this.deps.codeGenerator.next();
-    const now = this.deps.clock.now();
+    const code = this.codeGenerator.next();
+    const now = this.clock.now();
     const input = {
       code,
       source: command.source,
       meetingType: command.meetingType,
       externalReference: command.externalReference,
       idleTimeout: IdleTimeout.default(),
-      hostToken: this.deps.hostTokenGenerator.next(),
+      hostToken: this.hostTokenGenerator.next(),
       title: command.title ?? null,
     };
     // 예약 회의는 코드만 발급하고 방은 첫 참가자가 열게 둔다. 아무도 오지 않는 동안
@@ -106,16 +136,16 @@ export class MeetingService {
     const meeting = command.scheduled
       ? Meeting.createScheduled({ ...input, createdAt: now })
       : Meeting.create({ ...input, startedAt: now });
-    await this.deps.repository.save(meeting);
-    await this.deps.eventPublisher.publish(MEETING_EVENTS.CREATED, {
+    await this.repository.save(meeting);
+    await this.eventPublisher.publish(MEETING_EVENTS.CREATED, {
       code: code.value,
       source: command.source,
       startedAt: now,
     });
     if (meeting.isOpen) {
-      await this.deps.eventPublisher.publish(MEETING_EVENTS.OPENED, { code: code.value });
+      await this.eventPublisher.publish(MEETING_EVENTS.OPENED, { code: code.value });
     }
-    this.deps.logger.info(
+    this.logger.info(
       { meetingCode: code.value, source: command.source, status: meeting.status },
       'meeting created',
     );
@@ -136,20 +166,20 @@ export class MeetingService {
     const participant = meeting.addParticipant(
       command.participantId,
       command.nickname,
-      this.deps.clock.now(),
+      this.clock.now(),
     );
-    await this.deps.repository.save(meeting);
+    await this.repository.save(meeting);
     // 참가자 입장을 알리기 전에 방부터 연다(미디어 리소스가 먼저 준비돼야 한다).
     if (wasScheduled) {
-      await this.deps.eventPublisher.publish(MEETING_EVENTS.OPENED, { code: command.code });
+      await this.eventPublisher.publish(MEETING_EVENTS.OPENED, { code: command.code });
     }
-    await this.deps.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_JOINED, {
+    await this.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_JOINED, {
       code: command.code,
       participantId: participant.id,
       nickname: participant.nickname,
       joinedAt: participant.joinedAt,
     });
-    this.deps.logger.info(
+    this.logger.info(
       { meetingCode: command.code, participantId: participant.id },
       'participant joined',
     );
@@ -158,14 +188,14 @@ export class MeetingService {
 
   async leaveMeeting(command: LeaveMeetingCommand): Promise<LeaveMeetingResult> {
     const meeting = await this.requireMeeting(command.code);
-    const participant = meeting.removeParticipant(command.participantId, this.deps.clock.now());
-    await this.deps.repository.save(meeting);
-    await this.deps.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_LEFT, {
+    const participant = meeting.removeParticipant(command.participantId, this.clock.now());
+    await this.repository.save(meeting);
+    await this.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_LEFT, {
       code: command.code,
       participantId: participant.id,
       leftAt: participant.leftAt,
     });
-    this.deps.logger.info(
+    this.logger.info(
       { meetingCode: command.code, participantId: participant.id },
       'participant left',
     );
@@ -180,12 +210,12 @@ export class MeetingService {
         `Participant "${command.participantId}" not found in meeting "${command.code}"`,
       );
     }
-    const now = this.deps.clock.now();
+    const now = this.clock.now();
     const entry = chatEntry({ nickname: participant.nickname, text: command.text, sentAt: now });
     meeting.markActive(now);
-    await this.deps.chatRepository.append(command.code, entry);
-    await this.deps.repository.save(meeting);
-    this.deps.logger.debug(
+    await this.chatRepository.append(command.code, entry);
+    await this.repository.save(meeting);
+    this.logger.debug(
       { meetingCode: command.code, participantId: command.participantId },
       'chat posted',
     );
@@ -198,12 +228,12 @@ export class MeetingService {
     if (!meeting.isHost(command.hostToken)) {
       throw new NotHostError(command.code);
     }
-    const endedAt = this.deps.clock.now();
+    const endedAt = this.clock.now();
     meeting.close(endedAt);
-    await this.deps.repository.save(meeting);
+    await this.repository.save(meeting);
     const payload = await this.buildEndedPayload(meeting, command.code, endedAt, command.reason);
-    await this.deps.eventPublisher.publish(MEETING_EVENTS.ENDED, payload);
-    this.deps.logger.info({ meetingCode: command.code, reason: command.reason }, 'meeting closed');
+    await this.eventPublisher.publish(MEETING_EVENTS.ENDED, payload);
+    this.logger.info({ meetingCode: command.code, reason: command.reason }, 'meeting closed');
     return meeting;
   }
 
@@ -212,13 +242,13 @@ export class MeetingService {
    * 한 회의의 실패가 나머지 순회를 막지 않는다.
    */
   async sweepIdleMeetings(): Promise<IdleSweepOutcome> {
-    const codes = await this.deps.repository.listOpenCodes();
+    const codes = await this.repository.listOpenCodes();
     let closed = 0;
     for (const code of codes) {
       try {
         if (await this.detectIdleAndClose({ code })) closed += 1;
       } catch (error) {
-        this.deps.logger.error({ meetingCode: code, err: error }, 'idle 판정 실패');
+        this.logger.error({ meetingCode: code, err: error }, 'idle 판정 실패');
       }
     }
     return { scanned: codes.length, closed };
@@ -231,17 +261,17 @@ export class MeetingService {
   async detectIdleAndClose(command: DetectIdleAndCloseCommand): Promise<boolean> {
     const meeting = await this.requireMeeting(command.code);
     if (!meeting.isOpen) return false;
-    const now = this.deps.clock.now();
+    const now = this.clock.now();
     if (!meeting.isIdleSince(now)) return false;
     meeting.close(now);
-    await this.deps.repository.save(meeting);
-    await this.deps.eventPublisher.publish(MEETING_EVENTS.IDLE_DETECTED, {
+    await this.repository.save(meeting);
+    await this.eventPublisher.publish(MEETING_EVENTS.IDLE_DETECTED, {
       code: command.code,
       detectedAt: now,
     });
     const payload = await this.buildEndedPayload(meeting, command.code, now, 'idle');
-    await this.deps.eventPublisher.publish(MEETING_EVENTS.ENDED, payload);
-    this.deps.logger.info({ meetingCode: command.code }, 'meeting closed by idle timeout');
+    await this.eventPublisher.publish(MEETING_EVENTS.ENDED, payload);
+    this.logger.info({ meetingCode: command.code }, 'meeting closed by idle timeout');
     return true;
   }
 
@@ -252,7 +282,7 @@ export class MeetingService {
     reason: MeetingEndedReason,
   ): Promise<MeetingEndedPayload> {
     const snapshot = meeting.snapshot();
-    const chat = await this.deps.chatRepository.listByCode(code);
+    const chat = await this.chatRepository.listByCode(code);
     return {
       code,
       source: snapshot.source,
@@ -268,7 +298,7 @@ export class MeetingService {
   }
 
   private async requireMeeting(code: string): Promise<Meeting> {
-    const meeting = await this.deps.repository.findByCode(code);
+    const meeting = await this.repository.findByCode(code);
     if (!meeting) {
       throw new MeetingNotFoundError(code);
     }

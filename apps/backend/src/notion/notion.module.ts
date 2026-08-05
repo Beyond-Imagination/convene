@@ -4,24 +4,22 @@ import { PinoLogger } from 'nestjs-pino';
 import { resolveNotionConfig } from '@/config/notion.config';
 import { resolveCorsOrigins } from '@/config/server.config';
 import { MeetingModule } from '@/meeting/meeting.module';
-import { NotionMeetingProvisioningService } from '@/notion/application/notion-meeting-provisioning.service';
+import {
+  MEETING_LINK_BASE,
+  NotionMeetingProvisioningService,
+} from '@/notion/application/notion-meeting-provisioning.service';
 import { NotionPollingScheduler } from '@/notion/application/notion-polling.scheduler';
 import { NotionReportListener } from '@/notion/application/notion-report.listener';
 import { NotionReportPushService } from '@/notion/application/notion-report-push.service';
+import { NOTION_ISSUE } from '@/notion/domain/ports/notion-issue.port';
+import { NOTION_REPORT } from '@/notion/domain/ports/notion-report.port';
 import { NotionHttpClient } from '@/notion/infrastructure/notion-http.client';
 import { NotionIssueAdapter } from '@/notion/infrastructure/notion-issue.adapter';
 import { NotionReportAdapter } from '@/notion/infrastructure/notion-report.adapter';
 import { NotionMeetingsController } from '@/notion/interface/notion-meetings.controller';
 import { NotionSignatureVerifier } from '@/notion/interface/notion-signature';
 import { ReportsModule } from '@/reports/reports.module';
-import {
-  MEETING_CREATION_PORT,
-  MeetingCreationPort,
-  REPORT_LOOKUP_PORT,
-  ReportLookupPort,
-} from '@/shared-kernel/domain/ports';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
-import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 
 export const NOTION_CLIENT = Symbol('NOTION_CLIENT');
 
@@ -50,41 +48,27 @@ export class NotionModule {
     const meetingLinkBase = resolveCorsOrigins()[0];
     const providers: Provider[] = [
       clientProvider,
-      {
-        provide: NotionMeetingProvisioningService,
-        useFactory: (
-          client: NotionHttpClient,
-          meetingCreation: MeetingCreationPort,
-          logger: PinoLogger,
-        ) =>
-          new NotionMeetingProvisioningService({
-            meetingCreation,
-            notionIssue: new NotionIssueAdapter(
-              client,
-              databaseIds,
-              new PinoLoggerAdapter(logger, NotionIssueAdapter.name),
-              meetingLinkBase,
-            ),
-            meetingLinkBase,
-            logger: new PinoLoggerAdapter(logger, NotionMeetingProvisioningService.name),
-          }),
-        inject: [NOTION_CLIENT, MEETING_CREATION_PORT, PinoLogger],
-      },
-      {
-        provide: NotionReportPushService,
-        useFactory: (
-          client: NotionHttpClient,
-          reportLookup: ReportLookupPort,
-          logger: PinoLogger,
-        ) =>
-          new NotionReportPushService({
-            reportLookup,
-            notionReport: new NotionReportAdapter(client),
-            logger: new PinoLoggerAdapter(logger, NotionReportPushService.name),
-          }),
-        inject: [NOTION_CLIENT, REPORT_LOOKUP_PORT, PinoLogger],
-      },
+      NotionMeetingProvisioningService,
+      NotionReportPushService,
       NotionReportListener,
+      { provide: MEETING_LINK_BASE, useValue: meetingLinkBase },
+      {
+        // databaseIds가 register() 시점 env에서 오므로 동적 생성이 필요하다.
+        provide: NOTION_ISSUE,
+        useFactory: (client: NotionHttpClient, logger: PinoLogger) =>
+          new NotionIssueAdapter(
+            client,
+            databaseIds,
+            new PinoLoggerAdapter(logger, NotionIssueAdapter.name),
+            meetingLinkBase,
+          ),
+        inject: [NOTION_CLIENT, PinoLogger],
+      },
+      {
+        provide: NOTION_REPORT,
+        useFactory: (client: NotionHttpClient) => new NotionReportAdapter(client),
+        inject: [NOTION_CLIENT],
+      },
     ];
     const controllers: Type<unknown>[] = [];
     const imports: DynamicModule['imports'] = [MeetingModule, ReportsModule];
@@ -100,20 +84,7 @@ export class NotionModule {
     if (databaseIds.length > 0) {
       // ScheduleModule.forRoot()는 AppModule 루트에 있다. 여기선 스케줄러 provider만 등록하면
       // 루트의 SchedulerExplorer가 @Cron을 감지해 스케줄한다.
-      providers.push({
-        provide: NotionPollingScheduler,
-        useFactory: (
-          provisioning: NotionMeetingProvisioningService,
-          clock: SystemClock,
-          logger: PinoLogger,
-        ) =>
-          new NotionPollingScheduler(
-            provisioning,
-            clock,
-            new PinoLoggerAdapter(logger, NotionPollingScheduler.name),
-          ),
-        inject: [NotionMeetingProvisioningService, SystemClock, PinoLogger],
-      });
+      providers.push(NotionPollingScheduler);
     }
 
     return { module: NotionModule, imports, controllers, providers, exports: [NOTION_CLIENT] };

@@ -43,11 +43,11 @@ const makeService = (options: {
       pushed.push({ issueId, report });
     }),
   };
-  const service = new NotionReportPushService({
-    reportLookup,
-    notionReport,
-    logger: silentLogger(),
-  });
+  const service = new NotionReportPushService(
+      reportLookup,
+      notionReport,
+      silentLogger(),
+    );
   return { service, pushed, reportLookup, notionReport };
 };
 

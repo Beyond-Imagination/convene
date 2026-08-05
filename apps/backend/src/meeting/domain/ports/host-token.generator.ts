@@ -1,3 +1,5 @@
+export const HOST_TOKEN_GENERATOR = Symbol('HOST_TOKEN_GENERATOR');
+
 /**
  * 회의 종료 권한자(host) 식별용 비밀 토큰 발급 추상화.
  *

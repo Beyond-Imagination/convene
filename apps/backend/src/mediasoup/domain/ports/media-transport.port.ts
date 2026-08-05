@@ -5,6 +5,8 @@ import {
   TransportDirection,
 } from '@convene/shared-interfaces';
 
+export const MEDIA_TRANSPORT = Symbol('MEDIA_TRANSPORT');
+
 /**
  * WebRTC Transport/Producer/Consumer의 lifecycle
  *

@@ -1,8 +1,11 @@
-import { ReportRepository } from '@/reports/domain/ports';
+import { Inject, Injectable } from '@nestjs/common';
+
+import { REPORT_REPOSITORY, ReportRepository } from '@/reports/domain/ports';
 import { FinalizedReport, ReportLookupPort } from '@/shared-kernel/domain/ports';
 
+@Injectable()
 export class ReportLookupAdapter implements ReportLookupPort {
-  constructor(private readonly repository: ReportRepository) {}
+  constructor(@Inject(REPORT_REPOSITORY) private readonly repository: ReportRepository) {}
 
   async findFinalizedReport(reportId: string): Promise<FinalizedReport | null> {
     const report = await this.repository.findById(reportId);

@@ -1,3 +1,5 @@
+export const AUDIO_CAPTURE = Symbol('AUDIO_CAPTURE');
+
 /**
  * mediasoup audio producer의 RTP stream을 PlainTransport + ffmpeg으로 잡아 recording BC의 `AudioBufferRepository`로 보냄
  *

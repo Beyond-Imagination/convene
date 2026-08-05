@@ -65,12 +65,12 @@ describe('PartialTranscriptionScheduler.tick', () => {
     const repo = makeRepo({ activeMeetings: [] });
     const transcriber = makeTranscriber();
     const store = makeStore();
-    const scheduler = new PartialTranscriptionScheduler({
-      audioBufferRepository: repo,
+    const scheduler = new PartialTranscriptionScheduler(
+      repo,
       transcriber,
-      partialTranscriptStore: store,
-      logger: noopLogger(),
-    });
+      store,
+      noopLogger(),
+    );
     await scheduler.tick();
     expect(transcriber.transcribe).not.toHaveBeenCalled();
     expect(store.appended).toEqual([]);
@@ -84,12 +84,12 @@ describe('PartialTranscriptionScheduler.tick', () => {
     });
     const transcriber = makeTranscriber();
     const store = makeStore();
-    const scheduler = new PartialTranscriptionScheduler({
-      audioBufferRepository: repo,
+    const scheduler = new PartialTranscriptionScheduler(
+      repo,
       transcriber,
-      partialTranscriptStore: store,
-      logger: noopLogger(),
-    });
+      store,
+      noopLogger(),
+    );
     await scheduler.tick();
     expect(transcriber.transcribe).not.toHaveBeenCalled();
     expect(store.appended).toEqual([]);
@@ -104,12 +104,12 @@ describe('PartialTranscriptionScheduler.tick', () => {
     });
     const transcriber = makeTranscriber();
     const store = makeStore();
-    const scheduler = new PartialTranscriptionScheduler({
-      audioBufferRepository: repo,
+    const scheduler = new PartialTranscriptionScheduler(
+      repo,
       transcriber,
-      partialTranscriptStore: store,
-      logger: noopLogger(),
-    });
+      store,
+      noopLogger(),
+    );
     await scheduler.tick();
     expect(transcriber.transcribe).toHaveBeenCalledTimes(1);
     const passed = (transcriber.transcribe as jest.Mock).mock.calls[0][0].audio as Buffer;
@@ -135,12 +135,12 @@ describe('PartialTranscriptionScheduler.tick', () => {
       { text: 'bye', startMs: 4000, endMs: 4500 },
     ]);
     const store = makeStore();
-    const scheduler = new PartialTranscriptionScheduler({
-      audioBufferRepository: repo,
+    const scheduler = new PartialTranscriptionScheduler(
+      repo,
       transcriber,
-      partialTranscriptStore: store,
-      logger: noopLogger(),
-    });
+      store,
+      noopLogger(),
+    );
     await scheduler.tick();
     expect(store.appended).toEqual([
       {
@@ -175,12 +175,12 @@ describe('PartialTranscriptionScheduler.tick', () => {
     });
     const transcriber = makeTranscriber(() => [{ text: 'x', startMs: 0, endMs: 100 }]);
     const store = makeStore();
-    const scheduler = new PartialTranscriptionScheduler({
-      audioBufferRepository: repo,
+    const scheduler = new PartialTranscriptionScheduler(
+      repo,
       transcriber,
-      partialTranscriptStore: store,
-      logger: noopLogger(),
-    });
+      store,
+      noopLogger(),
+    );
     await scheduler.tick();
     expect(store.appended.map((a) => `${a.code}/${a.segments[0].speaker}`)).toEqual([
       'aaa11aaa/s1',
@@ -208,12 +208,12 @@ describe('PartialTranscriptionScheduler.tick', () => {
         .mockImplementationOnce(async () => [{ text: 'x', startMs: 0, endMs: 100 }]),
     };
     const store = makeStore();
-    const scheduler = new PartialTranscriptionScheduler({
-      audioBufferRepository: repo,
+    const scheduler = new PartialTranscriptionScheduler(
+      repo,
       transcriber,
-      partialTranscriptStore: store,
-      logger: noopLogger(),
-    });
+      store,
+      noopLogger(),
+    );
     await expect(scheduler.tick()).resolves.toBeUndefined();
     expect(store.appended).toHaveLength(1);
     expect(store.appended[0].segments[0].speaker).toBe('s2');
@@ -236,12 +236,12 @@ describe('PartialTranscriptionScheduler.tick', () => {
       { text: 'keep2', startMs: 5_000, endMs: 6_000 },
     ]);
     const store = makeStore();
-    const scheduler = new PartialTranscriptionScheduler({
-      audioBufferRepository: repo,
+    const scheduler = new PartialTranscriptionScheduler(
+      repo,
       transcriber,
-      partialTranscriptStore: store,
-      logger: noopLogger(),
-    });
+      store,
+      noopLogger(),
+    );
     await scheduler.tick();
     expect(store.appended[0].segments.map((s) => s.text)).toEqual(['keep', 'keep2']);
   });
@@ -259,12 +259,12 @@ describe('PartialTranscriptionScheduler.tick', () => {
       { text: 'third', startMs: 2_000, endMs: 3_000 },
     ]);
     const store = makeStore();
-    const scheduler = new PartialTranscriptionScheduler({
-      audioBufferRepository: repo,
+    const scheduler = new PartialTranscriptionScheduler(
+      repo,
       transcriber,
-      partialTranscriptStore: store,
-      logger: noopLogger(),
-    });
+      store,
+      noopLogger(),
+    );
     await scheduler.tick();
     expect(store.appended[0].segments.map((s) => s.text)).toEqual(['first', 'second', 'third']);
   });
@@ -278,12 +278,12 @@ describe('PartialTranscriptionScheduler.tick', () => {
     // chunk.startMs=5000 → 첫 partial 아님 → dedup. startMs >= 2000만 keep.
     const transcriber = makeTranscriber(() => [{ text: 'x', startMs: 2_500, endMs: 3_000 }]);
     const store = makeStore();
-    const scheduler = new PartialTranscriptionScheduler({
-      audioBufferRepository: repo,
+    const scheduler = new PartialTranscriptionScheduler(
+      repo,
       transcriber,
-      partialTranscriptStore: store,
-      logger: noopLogger(),
-    });
+      store,
+      noopLogger(),
+    );
     await scheduler.tick();
     expect(store.appended[0].segments[0]).toEqual({
       speaker: 's1',
@@ -300,12 +300,12 @@ describe('PartialTranscriptionScheduler lifecycle', () => {
     const repo = makeRepo();
     const transcriber = makeTranscriber();
     const store = makeStore();
-    const scheduler = new PartialTranscriptionScheduler({
-      audioBufferRepository: repo,
+    const scheduler = new PartialTranscriptionScheduler(
+      repo,
       transcriber,
-      partialTranscriptStore: store,
-      logger: noopLogger(),
-    });
+      store,
+      noopLogger(),
+    );
     scheduler.onModuleInit();
     expect(jest.getTimerCount()).toBe(1);
     scheduler.onModuleDestroy();

@@ -1,5 +1,7 @@
 import { ChatEntry } from '@/shared-kernel/domain/value-objects';
 
+export const CHAT_REPOSITORY = Symbol('CHAT_REPOSITORY');
+
 /**
  * 회의 중 흐르는 채팅 보관소.
  *

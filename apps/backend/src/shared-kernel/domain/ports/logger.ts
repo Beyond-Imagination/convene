@@ -1,3 +1,5 @@
+export const LOGGER = Symbol('LOGGER');
+
 export type LogContext = Record<string, unknown>;
 
 /**

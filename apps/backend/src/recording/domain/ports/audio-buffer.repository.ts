@@ -1,3 +1,5 @@
+export const AUDIO_BUFFER_REPOSITORY = Symbol('AUDIO_BUFFER_REPOSITORY');
+
 /**
  * 회의별·참가자별 임시 오디오 버퍼의 영속/조회 경계.
  *

@@ -1,5 +1,7 @@
 import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events';
 
+export const TRANSCRIBER = Symbol('TRANSCRIBER');
+
 /**
  * STT(Speech-to-Text) 어댑터의 도메인 포트.
  *

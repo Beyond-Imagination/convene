@@ -1,12 +1,15 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 
 import {
   AbsoluteTranscriptSegment,
+  AUDIO_BUFFER_REPOSITORY,
   AudioBufferRepository,
+  PARTIAL_TRANSCRIPT_STORE,
   PartialTranscriptStore,
+  TRANSCRIBER,
   TranscriberPort,
 } from '@/recording/domain/ports';
-import { LoggerPort } from '@/shared-kernel/domain/ports';
+import { LOGGER, LoggerPort } from '@/shared-kernel/domain/ports';
 
 import {
   dropOverlapHeadSegments,
@@ -17,13 +20,6 @@ import {
 /** chunk 경계 단어 잘림 보호를 위한 overlap(byte). 16kHz pcm_s16le 2초 분량. */
 export const KEEP_LAST_BYTES = PCM_BYTES_PER_SECOND * 2;
 const PARTIAL_INTERVAL_MS = 30_000;
-
-interface PartialTranscriptionSchedulerDeps {
-  audioBufferRepository: AudioBufferRepository;
-  transcriber: TranscriberPort;
-  partialTranscriptStore: PartialTranscriptStore;
-  logger: LoggerPort;
-}
 
 /**
  * 회의 진행 중 매 N초 마다 누적된 audio chunk를 잘라 ai-worker로 보내고, 결과 segments를 회의 단위 partial transcript에 누적한다.
@@ -44,11 +40,16 @@ interface PartialTranscriptionSchedulerDeps {
 export class PartialTranscriptionScheduler implements OnModuleInit, OnModuleDestroy {
   private timer?: NodeJS.Timeout;
 
-  constructor(private readonly deps: PartialTranscriptionSchedulerDeps) {}
+  constructor(
+    @Inject(AUDIO_BUFFER_REPOSITORY) private readonly audioBufferRepository: AudioBufferRepository,
+    @Inject(TRANSCRIBER) private readonly transcriber: TranscriberPort,
+    @Inject(PARTIAL_TRANSCRIPT_STORE) private readonly partialTranscriptStore: PartialTranscriptStore,
+    @Inject(LOGGER) private readonly logger: LoggerPort,
+  ) {}
 
   onModuleInit(): void {
     this.timer = setInterval(() => {
-      this.tick().catch((err) => this.deps.logger.error({ err }, 'partial tick failed'));
+      this.tick().catch((err) => this.logger.error({ err }, 'partial tick failed'));
     }, PARTIAL_INTERVAL_MS);
     // Node.js가 본 timer 때문에 프로세스 종료를 막지 않도록 unref.
     this.timer.unref?.();
@@ -62,9 +63,9 @@ export class PartialTranscriptionScheduler implements OnModuleInit, OnModuleDest
   }
 
   async tick(): Promise<void> {
-    const meetings = await this.deps.audioBufferRepository.listActiveMeetings();
+    const meetings = await this.audioBufferRepository.listActiveMeetings();
     for (const code of meetings) {
-      const pids = await this.deps.audioBufferRepository.listActiveParticipants(code);
+      const pids = await this.audioBufferRepository.listActiveParticipants(code);
       for (const pid of pids) {
         await this.processParticipant(code, pid);
       }
@@ -73,7 +74,7 @@ export class PartialTranscriptionScheduler implements OnModuleInit, OnModuleDest
 
   private async processParticipant(meetingCode: string, participantId: string): Promise<void> {
     try {
-      const { pcm, startMs, startedAtMs } = await this.deps.audioBufferRepository.drainAvailable(
+      const { pcm, startMs, startedAtMs } = await this.audioBufferRepository.drainAvailable(
         meetingCode,
         participantId,
         KEEP_LAST_BYTES,
@@ -83,7 +84,7 @@ export class PartialTranscriptionScheduler implements OnModuleInit, OnModuleDest
       // drain 한 PCM은 redis에 다시 못 넣으니 origin을 0(=epoch)으로 두고 일단 진행한다.
       const originMs = startedAtMs ?? 0;
       const wav = wrapPcmAsWav(pcm);
-      const rawSegments = await this.deps.transcriber.transcribe({
+      const rawSegments = await this.transcriber.transcribe({
         meetingCode,
         audio: wav,
       });
@@ -96,9 +97,9 @@ export class PartialTranscriptionScheduler implements OnModuleInit, OnModuleDest
         absoluteStartMs: originMs + startMs + s.startMs,
         absoluteEndMs: originMs + startMs + s.endMs,
       }));
-      await this.deps.partialTranscriptStore.append(meetingCode, absolute);
+      await this.partialTranscriptStore.append(meetingCode, absolute);
     } catch (err) {
-      this.deps.logger.error(
+      this.logger.error(
         { meetingCode, participantId, err },
         'partial transcribe failed',
       );

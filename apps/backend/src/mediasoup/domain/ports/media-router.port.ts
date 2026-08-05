@@ -1,3 +1,5 @@
+export const MEDIA_ROUTER = Symbol('MEDIA_ROUTER');
+
 /**
  * Multi-Router 풀의 생성·정리·할당
  *

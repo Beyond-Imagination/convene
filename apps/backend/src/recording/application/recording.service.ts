@@ -1,13 +1,22 @@
 import { REPORT_EVENTS } from '@convene/shared-interfaces';
+import { Inject, Injectable } from '@nestjs/common';
 
 import {
   AbsoluteTranscriptSegment,
+  AUDIO_BUFFER_REPOSITORY,
   AudioBufferRepository,
+  PARTIAL_TRANSCRIPT_STORE,
   PartialTranscriptStore,
+  TRANSCRIBER,
   TranscriberPort,
 } from '@/recording/domain/ports';
 import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events';
-import { DomainEventPublisher, LoggerPort } from '@/shared-kernel/domain/ports';
+import {
+  DomainEventPublisher,
+  EVENT_PUBLISHER,
+  LOGGER,
+  LoggerPort,
+} from '@/shared-kernel/domain/ports';
 
 import { dropOverlapHeadSegments, splitPcmIntoWavChunks } from '../infrastructure/audio-chunker';
 
@@ -28,14 +37,6 @@ export interface RequestTranscriptionCommand {
   participantNames?: Readonly<Record<string, string>>;
 }
 
-export interface RecordingServiceDeps {
-  audioBufferRepository: AudioBufferRepository;
-  partialTranscriptStore: PartialTranscriptStore;
-  transcriber: TranscriberPort;
-  eventPublisher: DomainEventPublisher;
-  logger: LoggerPort;
-}
-
 /**
  * 회의 오디오를 STT로 전사하는 서비스.
  *
@@ -47,22 +48,29 @@ export interface RecordingServiceDeps {
  *
  * 본 서비스는 throw 하지 않는다. STT 실패는 정상 흐름의 일부이며, 모든 실패를 `failed` 이벤트로 표현해 Reports BC가 처리하게 한다.
  */
+@Injectable()
 export class RecordingService {
-  constructor(private readonly deps: RecordingServiceDeps) {}
+  constructor(
+    @Inject(AUDIO_BUFFER_REPOSITORY) private readonly audioBufferRepository: AudioBufferRepository,
+    @Inject(PARTIAL_TRANSCRIPT_STORE) private readonly partialTranscriptStore: PartialTranscriptStore,
+    @Inject(TRANSCRIBER) private readonly transcriber: TranscriberPort,
+    @Inject(EVENT_PUBLISHER) private readonly eventPublisher: DomainEventPublisher,
+    @Inject(LOGGER) private readonly logger: LoggerPort,
+  ) {}
 
   async requestTranscription(command: RequestTranscriptionCommand): Promise<void> {
     try {
       // 1) partial scheduler가 누적해 둔 segments를 가져온다(절대 epoch ms).
-      const partial = await this.deps.partialTranscriptStore.consume(command.meetingCode);
+      const partial = await this.partialTranscriptStore.consume(command.meetingCode);
       // 2) 회의 종료 시점의 잔여 audio를 consume. scheduler가 사전 drain 한 만큼은 `startMs`(시간축 위치)로 표현된다.
-      const audios = await this.deps.audioBufferRepository.consume(command.meetingCode);
+      const audios = await this.audioBufferRepository.consume(command.meetingCode);
 
       if (partial.length === 0 && audios.length === 0) {
-        await this.deps.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_COMPLETED, {
+        await this.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_COMPLETED, {
           reportId: command.reportId,
           transcript: [],
         });
-        this.deps.logger.info(
+        this.logger.info(
           { reportId: command.reportId, meetingCode: command.meetingCode, segments: 0 },
           'transcription completed',
         );
@@ -87,7 +95,7 @@ export class RecordingService {
         const hadPriorPartial = baseAudioMs > 0;
         for (let i = 0; i < chunks.length; i++) {
           const chunk = chunks[i];
-          const rawSegments = await this.deps.transcriber.transcribe({
+          const rawSegments = await this.transcriber.transcribe({
             meetingCode: command.meetingCode,
             audio: chunk.wav,
           });
@@ -118,21 +126,21 @@ export class RecordingService {
         }))
         .sort((a, b) => a.startMs - b.startMs);
 
-      await this.deps.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_COMPLETED, {
+      await this.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_COMPLETED, {
         reportId: command.reportId,
         transcript: merged,
       });
-      this.deps.logger.info(
+      this.logger.info(
         { reportId: command.reportId, meetingCode: command.meetingCode, segments: merged.length },
         'transcription completed',
       );
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
-      this.deps.logger.error(
+      this.logger.error(
         { reportId: command.reportId, meetingCode: command.meetingCode, err },
         'transcription failed',
       );
-      await this.deps.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_FAILED, {
+      await this.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_FAILED, {
         reportId: command.reportId,
         error,
       });

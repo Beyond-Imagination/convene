@@ -22,7 +22,7 @@ This file (CLAUDE.md) is the English index for fast context recovery.
 
 ## Patterns
 
-- **Backend**: Layered MVC + DDD 4-layer. Dependency direction: Interface → Application → Domain ← Infrastructure. Domain layer has **zero framework imports**. Application talks to Infrastructure only through Ports.
+- **Backend**: Layered MVC + DDD 4-layer. Dependency direction: Interface → Application → Domain ← Infrastructure. Domain layer has **zero framework imports**. Application talks to Infrastructure only through Ports, and is wired by Nest DI (`@Injectable` + `@Inject(TOKEN)`) — see `CODEBASE_GUIDE.md` §3.4.
 - **Frontend**: MVVM. View = `'use client'` component, props only. ViewModel = `useXxxViewModel` hook. Model = zustand store + api service + socket client. **View components do not call `fetch`, `useEffect`, `useState`, socket APIs, or zustand setters directly.**
 - **File member order** (deps-first, bottom-up): imports → module constants → supporting types/interfaces/helpers → the file's main class/aggregate/function **last**. Class-internal order (`field → constructor → method`) is enforced by `@typescript-eslint/member-ordering`. Multi-export files with no single namesake (e.g. sibling `*.errors.ts`, wire-type modules) are exempt.
 
@@ -46,7 +46,7 @@ This file (CLAUDE.md) is the English index for fast context recovery.
 3. **View components are dumb.** All fetch/socket/state composition goes into a `useXxxViewModel` hook. The View receives data and callbacks via props or hook return values.
 4. **Static export constraints.** No `app/**/route.ts`, no server actions, no middleware, no `getServerSideProps`-equivalents. All data comes from `fetch(NEXT_PUBLIC_API_URL/...)` in client components.
 5. **Audio is ephemeral.** Buffered on backend disk → sent to ai-worker → **deleted immediately**. No S3. No long-term audio storage.
-6. **Domain is framework-free.** No `@nestjs/...`, `mongoose`, `ioredis` imports inside `domain/`. Ports are TS interfaces.
+6. **Domain is framework-free.** No `@nestjs/...`, `mongoose`, `ioredis` imports inside `domain/`. Ports are TS interfaces, each paired with a plain `Symbol` DI token in the same file (a Symbol is not a framework import).
 7. **Cross-context coupling only via Domain Events (`@nestjs/event-emitter`) or Ports.** No direct imports of Aggregates / Application Services / Repositories across bounded contexts. Read-only Value Objects shared by multiple contexts live in `apps/backend/src/shared-kernel/domain/` — this is the DDD **Shared Kernel** pattern. Changes to the shared kernel require alignment from every consumer.
 8. **Validation pipe is global** with `whitelist: true, forbidNonWhitelisted: true, transform: true`. Every inbound HTTP/WS payload must be a DTO class.
 

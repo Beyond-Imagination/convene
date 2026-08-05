@@ -65,22 +65,22 @@ const makeRecovery = (meetings: Meeting[]) => {
   };
   const { repository, stored } = makeRepository(meetings);
   const clock = { now: (): Date => BOOTED_AT };
-  const meetingService = new MeetingService({
-    repository,
-    chatRepository: { append: async () => {}, listByCode: async (): Promise<ChatEntry[]> => [] },
-    codeGenerator: { next: () => MeetingCode.from('unused123') },
-    hostTokenGenerator: { next: () => 'unused' },
-    clock,
-    eventPublisher,
-    logger: noopLogger(),
-  });
-  const service = new MeetingRecoveryService({
-    repository,
-    meetingService,
-    clock,
-    eventPublisher,
-    logger: noopLogger(),
-  });
+  const meetingService = new MeetingService(
+      repository,
+      { append: async () => {}, listByCode: async (): Promise<ChatEntry[]> => [] },
+      { next: () => MeetingCode.from('unused123') },
+      { next: () => 'unused' },
+      clock,
+      eventPublisher,
+      noopLogger(),
+    );
+  const service = new MeetingRecoveryService(
+      repository,
+      meetingService,
+      clock,
+      eventPublisher,
+      noopLogger(),
+    );
   return { service, events, stored, repository };
 };
 
