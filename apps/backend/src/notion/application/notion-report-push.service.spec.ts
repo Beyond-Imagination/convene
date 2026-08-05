@@ -32,12 +32,12 @@ const makeService = (options: {
   pushError?: Error;
 }) => {
   const pushed: { issueId: string; report: FinalizedReport }[] = [];
-  const reportLookup = {
+  const reportLookup = stub<ReportLookupService>({
     findFinalizedReport: jest.fn(async () => {
       if (options.lookupError !== undefined) throw options.lookupError;
       return options.found ?? null;
     }),
-  } as unknown as ReportLookupService;
+  });
   const notionReport: NotionReportPort = {
     pushReport: jest.fn(async (issueId: string, report: FinalizedReport) => {
       if (options.pushError !== undefined) throw options.pushError;

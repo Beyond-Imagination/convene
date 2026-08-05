@@ -4,6 +4,7 @@ import { NotionMeetingProvisioningService, ProvisionResult } from '@/notion/appl
 import { NotionMeetingParamsDto } from '@/notion/interface/dto/notion-meeting-params.dto';
 import { NotionMeetingsController } from '@/notion/interface/notion-meetings.controller';
 import { NotionSignatureVerifier, signIssue } from '@/notion/interface/notion-signature';
+import { stub } from '@/shared-kernel/testing/stub';
 
 const SECRET = 's3cr3t';
 
@@ -12,7 +13,7 @@ function fakeProvisioning(url: string): {
   calls: { issueId: string; title: string | null; options: unknown }[];
 } {
   const calls: { issueId: string; title: string | null; options: unknown }[] = [];
-  const service = {
+  const service = stub<NotionMeetingProvisioningService>({
     provisionForIssue: async (
       issueId: string,
       title: string | null,
@@ -21,7 +22,7 @@ function fakeProvisioning(url: string): {
       calls.push({ issueId, title, options });
       return { issueId, code: 'ABC', url };
     },
-  } as unknown as NotionMeetingProvisioningService;
+  });
   return { service, calls };
 }
 

@@ -2,6 +2,7 @@ import { NotionHttpClient, NotionListPage } from '@/notion/infrastructure/notion
 import { NotionReportAdapter } from '@/notion/infrastructure/notion-report.adapter';
 import { FinalizedReport } from '@/reports/application/report-lookup.service';
 import { reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
+import { stub } from '@/shared-kernel/testing/stub';
 
 const REPORT_ID = 'rep_001';
 const ISSUE_ID = 'issue_1';
@@ -50,7 +51,7 @@ function makeClient(pages: ReadonlyArray<NotionListPage> = [page([])]): {
 } {
   const calls: ClientCalls = { appended: [], deleted: [], childrenQueries: [] };
   let queried = 0;
-  const client = {
+  const client = stub<NotionHttpClient>({
     getBlockChildren: async (blockId: string, cursor?: string): Promise<NotionListPage> => {
       calls.childrenQueries.push(cursor === undefined ? { blockId } : { blockId, cursor });
       return pages[queried++] ?? page([]);
@@ -66,7 +67,7 @@ function makeClient(pages: ReadonlyArray<NotionListPage> = [page([])]): {
       calls.deleted.push(blockId);
       return {};
     },
-  } as unknown as NotionHttpClient;
+  });
   return { client, calls };
 }
 
@@ -139,11 +140,11 @@ describe('NotionReportAdapter.pushReport', () => {
   });
 
   it('toggle append 응답에 블록 id가 없으면 실패한다', async () => {
-    const client = {
+    const client = stub<NotionHttpClient>({
       getBlockChildren: async (): Promise<NotionListPage> => page([]),
       appendBlockChildren: async (): Promise<Record<string, unknown>> => ({ results: [] }),
       deleteBlock: async (): Promise<Record<string, unknown>> => ({}),
-    } as unknown as NotionHttpClient;
+    });
 
     await expect(new NotionReportAdapter(client).pushReport(ISSUE_ID, report())).rejects.toThrow();
   });
