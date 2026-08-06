@@ -1,5 +1,5 @@
 # 재사용 가능한 검증 워크플로 — lint/build/test.
-# ci.yml(PR) 과 deploy-backend.yml(배포 전 게이트) 가 `uses:` 로 호출한다(중복 정의 방지).
+# ci.yml(PR) 과 deploy.yml(배포 전 게이트) 가 `uses:` 로 호출한다(중복 정의 방지).
 name: Verify
 
 on:
