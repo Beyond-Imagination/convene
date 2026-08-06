@@ -1,6 +1,7 @@
-import { chatEntry, NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects';
+import { transcriptSegment } from '@/reports/domain/entries/transcript-segment';
+import { chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
+import { NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects/external-reference';
 
-import { transcriptSegment } from '../domain/entries';
 import { NoopSummarizer } from './noop.summarizer';
 
 describe('NoopSummarizer', () => {

@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { Meeting } from '@/meeting/domain/meeting';
-import { MeetingRepository } from '@/meeting/domain/ports';
+import { MeetingRepository } from '@/meeting/domain/ports/meeting.repository';
 
+import { MongoMeetingRepository } from './mongo-meeting.repository';
 import { RedisMeetingRepository } from './redis-meeting.repository';
 
 /** `lastActiveAt`을 뺀 나머지 상태. 두 스냅숏의 이 값이 같으면 실질 변화는 heartbeat뿐이다. */
@@ -21,7 +22,8 @@ const fingerprint = (meeting: Meeting): string =>
 export class CachedMeetingRepository implements MeetingRepository {
   constructor(
     private readonly cache: RedisMeetingRepository,
-    private readonly origin: MeetingRepository,
+    // 인터페이스 타입은 리플렉션으로 못 찾으므로 원본 구현 클래스를 토큰으로 지정한다.
+    @Inject(MongoMeetingRepository) private readonly origin: MeetingRepository,
   ) {}
 
   async findByCode(code: string): Promise<Meeting | null> {

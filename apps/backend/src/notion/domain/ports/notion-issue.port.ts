@@ -1,3 +1,5 @@
+export const NOTION_ISSUE = Symbol('NOTION_ISSUE');
+
 export interface PendingIssue {
   readonly issueId: string;
   readonly title: string | null;

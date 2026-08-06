@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
-import { LoggerPort } from '@/shared-kernel/domain/ports';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 // idle 임계(1분)보다 촘촘히 돌아 종료 지연이 주기 이상 벌어지지 않게 한다.
 export const IDLE_SWEEP_INTERVAL_MS = 30_000;
@@ -13,7 +13,7 @@ export class MeetingIdleScheduler {
 
   constructor(
     private readonly service: MeetingService,
-    private readonly logger: LoggerPort,
+    private readonly logger: PinoLoggerAdapter,
   ) {}
 
   @Interval(IDLE_SWEEP_INTERVAL_MS)

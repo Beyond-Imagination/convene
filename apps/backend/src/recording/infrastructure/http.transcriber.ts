@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
-import { TranscriberInput, TranscriberPort } from '@/recording/domain/ports';
-import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events';
+import { TranscriberInput, TranscriberPort } from '@/recording/domain/ports/transcriber.port';
+import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events/report-transcription.payload';
 
 /**
  * ai-worker(FastAPI + faster-whisper) HTTP 어댑터.

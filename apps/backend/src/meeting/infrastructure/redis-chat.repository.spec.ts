@@ -1,7 +1,7 @@
 import type Redis from 'ioredis';
 import RedisMock from 'ioredis-mock';
 
-import { chatEntry } from '@/shared-kernel/domain/value-objects';
+import { chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
 
 import { RedisChatRepository } from './redis-chat.repository';
 

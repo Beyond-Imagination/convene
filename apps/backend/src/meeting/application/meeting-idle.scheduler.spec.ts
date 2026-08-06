@@ -1,20 +1,20 @@
 import { IdleSweepOutcome, MeetingService } from '@/meeting/application/meeting.service';
-import { LoggerPort } from '@/shared-kernel/domain/ports';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
+import { stub } from '@/shared-kernel/testing/stub';
 
 import { MeetingIdleScheduler } from './meeting-idle.scheduler';
 
-function silentLogger(): LoggerPort {
-  const noop = (): void => undefined;
-  return { debug: noop, info: noop, warn: noop, error: noop };
+function silentLogger(): PinoLoggerAdapter {
+  return stub<PinoLoggerAdapter>({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() });
 }
 
 const NOTHING_CLOSED: IdleSweepOutcome = { scanned: 0, closed: 0 };
 
 describe('MeetingIdleScheduler.sweep', () => {
   it('회의 sweep 유스케이스를 호출한다', async () => {
-    const service = {
+    const service = stub<MeetingService>({
       sweepIdleMeetings: jest.fn(async () => NOTHING_CLOSED),
-    } as unknown as MeetingService;
+    });
 
     await new MeetingIdleScheduler(service, silentLogger()).sweep();
 
@@ -27,13 +27,13 @@ describe('MeetingIdleScheduler.sweep', () => {
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const service = {
+    const service = stub<MeetingService>({
       sweepIdleMeetings: async (): Promise<IdleSweepOutcome> => {
         calls += 1;
         await gate;
         return NOTHING_CLOSED;
       },
-    } as unknown as MeetingService;
+    });
     const scheduler = new MeetingIdleScheduler(service, silentLogger());
 
     const first = scheduler.sweep();
@@ -46,12 +46,12 @@ describe('MeetingIdleScheduler.sweep', () => {
 
   it('sweep이 throw해도 삼키고 다음 주기를 허용한다', async () => {
     let calls = 0;
-    const service = {
+    const service = stub<MeetingService>({
       sweepIdleMeetings: async (): Promise<IdleSweepOutcome> => {
         calls += 1;
         throw new Error('redis down');
       },
-    } as unknown as MeetingService;
+    });
     const scheduler = new MeetingIdleScheduler(service, silentLogger());
 
     await expect(scheduler.sweep()).resolves.toBeUndefined();

@@ -1,7 +1,5 @@
-import {
-  ReportTranscriptionCompletedPayload,
-  ReportTranscriptionFailedPayload,
-} from '@/shared-kernel/domain/events';
+import { ReportTranscriptionCompletedPayload, ReportTranscriptionFailedPayload } from '@/shared-kernel/domain/events/report-transcription.payload';
+import { stub } from '@/shared-kernel/testing/stub';
 
 import {
   CompleteTranscriptionCommand,
@@ -21,7 +19,7 @@ const makeListener = () => {
       failed.push(cmd);
     }),
   };
-  const listener = new ReportPipelineListener(service as unknown as ReportFinalizationService);
+  const listener = new ReportPipelineListener(stub<ReportFinalizationService>(service));
   return { listener, completed, failed, service };
 };
 

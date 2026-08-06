@@ -1,4 +1,4 @@
-import { MeetingCode } from '@/meeting/domain/value-objects';
+import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
 
 import { RandomMeetingCodeGenerator } from './random-meeting-code.generator';
 

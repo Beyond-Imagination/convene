@@ -1,14 +1,18 @@
+jest.mock('node:crypto', () => ({
+  ...jest.requireActual<typeof import('node:crypto')>('node:crypto'),
+  randomUUID: () => 'host-token-generated',
+}));
+
 import { MEETING_EVENTS } from '@convene/shared-interfaces';
 
 import { Meeting } from '@/meeting/domain/meeting';
-import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';
-import { LoggerPort } from '@/shared-kernel/domain/ports';
-import {
-  ChatEntry,
-  chatEntry,
-  externalReference,
-  NO_EXTERNAL_REFERENCE,
-} from '@/shared-kernel/domain/value-objects';
+import { IdleTimeout } from '@/meeting/domain/value-objects/idle-timeout';
+import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
+import { ChatEntry, chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
+import { externalReference, NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects/external-reference';
+import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
+import { stub } from '@/shared-kernel/testing/stub';
 
 import { MeetingNotFoundError, NotHostError } from './meeting.errors';
 import { MeetingService } from './meeting.service';
@@ -26,15 +30,15 @@ const makeEventPublisher = () => {
       publish: async (name: string, payload: unknown): Promise<void> => {
         events.push({ name, payload });
       },
-    },
+    } satisfies Pick<NestEventBusDomainEventPublisher, 'publish'> as NestEventBusDomainEventPublisher,
   };
 };
 
-const noopLogger = (): LoggerPort => ({
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {},
+const noopLogger = (): PinoLoggerAdapter => stub<PinoLoggerAdapter>({
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
 });
 
 const code = MeetingCode.from('abc12xyz');
@@ -61,21 +65,20 @@ describe('MeetingService.createMeeting', () => {
   const makeService = () => {
     const saved: Meeting[] = [];
     const { events, publisher } = makeEventPublisher();
-    const service = new MeetingService({
-      repository: {
+    const service = new MeetingService(
+      {
         save: async (m) => {
           saved.push(m);
         },
         findByCode: async () => null,
         listOpenCodes: async () => [],
       },
-      chatRepository: noopChatRepository(),
-      codeGenerator: { next: () => code },
-      hostTokenGenerator: { next: () => 'host-token-generated' },
-      clock: { now: () => fakeNow },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      noopChatRepository(),
+      { next: () => code },
+      { now: () => fakeNow },
+      publisher,
+      noopLogger(),
+    );
     return { service, saved, events };
   };
 
@@ -145,7 +148,7 @@ describe('MeetingService.createMeeting', () => {
     expect(events.map((e) => e.name)).toEqual([MEETING_EVENTS.CREATED]);
   });
 
-  it('HostTokenGenerator가 발급한 hostToken을 Meeting에 부여한다', async () => {
+  it('추측 불가능한 hostToken을 발급해 Meeting에 부여한다', async () => {
     const { service } = makeService();
     const result = await service.createMeeting({
       source: 'web',
@@ -174,21 +177,20 @@ describe('MeetingService.joinMeeting', () => {
   const makeService = (meeting: Meeting | null) => {
     const saved: Meeting[] = [];
     const { events, publisher } = makeEventPublisher();
-    const service = new MeetingService({
-      repository: {
+    const service = new MeetingService(
+      {
         findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
         listOpenCodes: async () => [],
         save: async (m) => {
           saved.push(m);
         },
       },
-      chatRepository: noopChatRepository(),
-      codeGenerator: { next: () => code },
-      hostTokenGenerator: { next: () => 'host-token-generated' },
-      clock: { now: () => t1 },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      noopChatRepository(),
+      { next: () => code },
+      { now: () => t1 },
+      publisher,
+      noopLogger(),
+    );
     return { service, saved, events };
   };
 
@@ -294,21 +296,20 @@ describe('MeetingService.leaveMeeting', () => {
   const makeService = (meeting: Meeting | null) => {
     const saved: Meeting[] = [];
     const { events, publisher } = makeEventPublisher();
-    const service = new MeetingService({
-      repository: {
+    const service = new MeetingService(
+      {
         findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
         listOpenCodes: async () => [],
         save: async (m) => {
           saved.push(m);
         },
       },
-      chatRepository: noopChatRepository(),
-      codeGenerator: { next: () => code },
-      hostTokenGenerator: { next: () => 'host-token-generated' },
-      clock: { now: () => t2 },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      noopChatRepository(),
+      { next: () => code },
+      { now: () => t2 },
+      publisher,
+      noopLogger(),
+    );
     return { service, saved, events };
   };
 
@@ -367,26 +368,25 @@ describe('MeetingService.postChat', () => {
     const saved: Meeting[] = [];
     const appended: { code: string; entry: ChatEntry }[] = [];
     const { publisher } = makeEventPublisher();
-    const service = new MeetingService({
-      repository: {
+    const service = new MeetingService(
+      {
         findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
         listOpenCodes: async () => [],
         save: async (m) => {
           saved.push(m);
         },
       },
-      chatRepository: {
+      {
         append: async (c, entry) => {
           appended.push({ code: c, entry });
         },
         listByCode: async () => appended.map((a) => a.entry),
       },
-      codeGenerator: { next: () => code },
-      hostTokenGenerator: { next: () => 'host-token-generated' },
-      clock: { now: () => t2 },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      { next: () => code },
+      { now: () => t2 },
+      publisher,
+      noopLogger(),
+    );
     return { service, saved, appended };
   };
 
@@ -451,21 +451,20 @@ describe('MeetingService.closeMeeting', () => {
   const makeService = (meeting: Meeting | null) => {
     const saved: Meeting[] = [];
     const { publisher, events } = makeEventPublisher();
-    const service = new MeetingService({
-      repository: {
+    const service = new MeetingService(
+      {
         findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
         listOpenCodes: async () => [],
         save: async (m) => {
           saved.push(m);
         },
       },
-      chatRepository: noopChatRepository(),
-      codeGenerator: { next: () => code },
-      hostTokenGenerator: { next: () => 'host-token-generated' },
-      clock: { now: () => tClose },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      noopChatRepository(),
+      { next: () => code },
+      { now: () => tClose },
+      publisher,
+      noopLogger(),
+    );
     return { service, saved, events };
   };
 
@@ -507,24 +506,23 @@ describe('MeetingService.closeMeeting', () => {
     const accumulated: ChatEntry[] = [chatEntry({ nickname: 'alice', text: '안녕', sentAt: t1 })];
     const saved: Meeting[] = [];
     const { publisher, events } = makeEventPublisher();
-    const service = new MeetingService({
-      repository: {
+    const service = new MeetingService(
+      {
         findByCode: async (c) => (c === 'abc12xyz' ? meeting : null),
         listOpenCodes: async () => [],
         save: async (m) => {
           saved.push(m);
         },
       },
-      chatRepository: {
+      {
         append: async () => {},
         listByCode: async () => accumulated,
       },
-      codeGenerator: { next: () => code },
-      hostTokenGenerator: { next: () => 'host-token-generated' },
-      clock: { now: () => tClose },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      { next: () => code },
+      { now: () => tClose },
+      publisher,
+      noopLogger(),
+    );
     await service.closeMeeting({ code: 'abc12xyz', reason: 'manual', hostToken: 'host-token-1' });
     const endedEvent = events.find((e) => e.name === MEETING_EVENTS.ENDED);
     expect(endedEvent?.payload).toMatchObject({ chat: accumulated });
@@ -571,21 +569,20 @@ describe('MeetingService.detectIdleAndClose', () => {
   const makeService = (meeting: Meeting | null, now: Date) => {
     const saved: Meeting[] = [];
     const { publisher, events } = makeEventPublisher();
-    const service = new MeetingService({
-      repository: {
+    const service = new MeetingService(
+      {
         findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
         listOpenCodes: async () => [],
         save: async (m) => {
           saved.push(m);
         },
       },
-      chatRepository: noopChatRepository(),
-      codeGenerator: { next: () => code },
-      hostTokenGenerator: { next: () => 'host-token-generated' },
-      clock: { now: () => now },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      noopChatRepository(),
+      { next: () => code },
+      { now: () => now },
+      publisher,
+      noopLogger(),
+    );
     return { service, saved, events };
   };
 
@@ -691,8 +688,8 @@ describe('MeetingService.sweepIdleMeetings', () => {
   const makeService = (meetings: Meeting[], brokenCode?: string) => {
     const byCode = new Map(meetings.map((m) => [m.code.value, m]));
     const { publisher, events } = makeEventPublisher();
-    const service = new MeetingService({
-      repository: {
+    const service = new MeetingService(
+      {
         findByCode: async (c) => {
           if (c === brokenCode) throw new Error('redis down');
           return byCode.get(c) ?? null;
@@ -700,13 +697,12 @@ describe('MeetingService.sweepIdleMeetings', () => {
         listOpenCodes: async () => [...byCode.keys(), ...(brokenCode ? [brokenCode] : [])],
         save: async () => {},
       },
-      chatRepository: noopChatRepository(),
-      codeGenerator: { next: () => code },
-      hostTokenGenerator: { next: () => 'host-token-generated' },
-      clock: { now: () => tIdleElapsed },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      noopChatRepository(),
+      { next: () => code },
+      { now: () => tIdleElapsed },
+      publisher,
+      noopLogger(),
+    );
     return { service, events };
   };
 

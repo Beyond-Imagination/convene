@@ -1,17 +1,11 @@
 import { MEETING_EVENTS } from '@convene/shared-interfaces';
-import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
+import { Inject, Injectable, OnApplicationBootstrap } from '@nestjs/common';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
-import { MeetingRepository } from '@/meeting/domain/ports';
-import { Clock, DomainEventPublisher, LoggerPort } from '@/shared-kernel/domain/ports';
-
-interface MeetingRecoveryServiceDeps {
-  repository: MeetingRepository;
-  meetingService: MeetingService;
-  clock: Clock;
-  eventPublisher: DomainEventPublisher;
-  logger: LoggerPort;
-}
+import { MEETING_REPOSITORY, MeetingRepository } from '@/meeting/domain/ports/meeting.repository';
+import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
+import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 
 export interface MeetingRecoveryOutcome {
   /** 훑은 열린 회의 수. */
@@ -32,7 +26,13 @@ const NOTHING_RECOVERED: MeetingRecoveryOutcome = {
  */
 @Injectable()
 export class MeetingRecoveryService implements OnApplicationBootstrap {
-  constructor(private readonly deps: MeetingRecoveryServiceDeps) {}
+  constructor(
+    @Inject(MEETING_REPOSITORY) private readonly repository: MeetingRepository,
+    private readonly meetingService: MeetingService,
+    private readonly clock: SystemClock,
+    private readonly eventPublisher: NestEventBusDomainEventPublisher,
+    private readonly logger: PinoLoggerAdapter,
+  ) {}
 
   async onApplicationBootstrap(): Promise<void> {
     await this.recover();
@@ -41,9 +41,9 @@ export class MeetingRecoveryService implements OnApplicationBootstrap {
   async recover(): Promise<MeetingRecoveryOutcome> {
     let codes: string[];
     try {
-      codes = await this.deps.repository.listOpenCodes();
+      codes = await this.repository.listOpenCodes();
     } catch (error) {
-      this.deps.logger.error({ err: error }, '회의 복구를 위한 열린 회의 조회 실패');
+      this.logger.error({ err: error }, '회의 복구를 위한 열린 회의 조회 실패');
       return NOTHING_RECOVERED;
     }
 
@@ -56,12 +56,12 @@ export class MeetingRecoveryService implements OnApplicationBootstrap {
         reopened += 1;
         detachedParticipants += detached;
       } catch (error) {
-        this.deps.logger.error({ meetingCode: code, err: error }, '회의 복구 실패');
+        this.logger.error({ meetingCode: code, err: error }, '회의 복구 실패');
       }
     }
 
     if (reopened > 0) {
-      this.deps.logger.info(
+      this.logger.info(
         { scanned: codes.length, reopened, detachedParticipants },
         '재시작 후 회의 복구',
       );
@@ -71,17 +71,17 @@ export class MeetingRecoveryService implements OnApplicationBootstrap {
 
   /** 복구 대상이 아니면 null, 맞으면 떼어낸 유령 참가자 수. */
   private async recoverOne(code: string): Promise<number | null> {
-    const meeting = await this.deps.repository.findByCode(code);
+    const meeting = await this.repository.findByCode(code);
     if (meeting === null || !meeting.isOpen) return null;
 
-    await this.deps.eventPublisher.publish(MEETING_EVENTS.OPENED, { code });
+    await this.eventPublisher.publish(MEETING_EVENTS.OPENED, { code });
 
     const ghosts = meeting
       .snapshot()
       .participants.filter((p) => p.leftAt === null)
       .map((p) => p.id);
     for (const participantId of ghosts) {
-      await this.deps.meetingService.leaveMeeting({ code, participantId });
+      await this.meetingService.leaveMeeting({ code, participantId });
     }
     // 유령이 있었다 = 재시작 직전까지 사람이 있었다. 재접속에 idleTimeout 만큼의 유예를 준다.
     // 이미 비어 있던 회의는 그대로 둬 다음 idle sweep에 정리되게 한다.
@@ -93,9 +93,9 @@ export class MeetingRecoveryService implements OnApplicationBootstrap {
 
   private async extendIdleWindow(code: string): Promise<void> {
     // leave 유스케이스가 저장한 최신 상태를 다시 읽는다.
-    const meeting = await this.deps.repository.findByCode(code);
+    const meeting = await this.repository.findByCode(code);
     if (meeting === null || !meeting.isOpen) return;
-    meeting.markActive(this.deps.clock.now());
-    await this.deps.repository.save(meeting);
+    meeting.markActive(this.clock.now());
+    await this.repository.save(meeting);
   }
 }

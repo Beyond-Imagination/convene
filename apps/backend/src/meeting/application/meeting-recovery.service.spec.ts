@@ -1,10 +1,14 @@
 import { MEETING_EVENTS } from '@convene/shared-interfaces';
 
 import { Meeting } from '@/meeting/domain/meeting';
-import { MeetingRepository } from '@/meeting/domain/ports';
-import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';
-import { LoggerPort } from '@/shared-kernel/domain/ports';
-import { ChatEntry, externalReference } from '@/shared-kernel/domain/value-objects';
+import { MeetingRepository } from '@/meeting/domain/ports/meeting.repository';
+import { IdleTimeout } from '@/meeting/domain/value-objects/idle-timeout';
+import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
+import { ChatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
+import { externalReference } from '@/shared-kernel/domain/value-objects/external-reference';
+import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
+import { stub } from '@/shared-kernel/testing/stub';
 
 import { MeetingService } from './meeting.service';
 import { MeetingRecoveryService } from './meeting-recovery.service';
@@ -14,11 +18,11 @@ interface CapturedEvent {
   payload: unknown;
 }
 
-const noopLogger = (): LoggerPort => ({
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {},
+const noopLogger = (): PinoLoggerAdapter => stub<PinoLoggerAdapter>({
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
 });
 
 const CRASHED_AT = new Date('2026-01-01T00:00:00Z');
@@ -62,25 +66,24 @@ const makeRecovery = (meetings: Meeting[]) => {
     publish: async (name: string, payload: unknown): Promise<void> => {
       events.push({ name, payload });
     },
-  };
+  } satisfies Pick<NestEventBusDomainEventPublisher, 'publish'> as NestEventBusDomainEventPublisher;
   const { repository, stored } = makeRepository(meetings);
   const clock = { now: (): Date => BOOTED_AT };
-  const meetingService = new MeetingService({
-    repository,
-    chatRepository: { append: async () => {}, listByCode: async (): Promise<ChatEntry[]> => [] },
-    codeGenerator: { next: () => MeetingCode.from('unused123') },
-    hostTokenGenerator: { next: () => 'unused' },
-    clock,
-    eventPublisher,
-    logger: noopLogger(),
-  });
-  const service = new MeetingRecoveryService({
-    repository,
-    meetingService,
-    clock,
-    eventPublisher,
-    logger: noopLogger(),
-  });
+  const meetingService = new MeetingService(
+      repository,
+      { append: async () => {}, listByCode: async (): Promise<ChatEntry[]> => [] },
+      { next: () => MeetingCode.from('unused123') },
+      clock,
+      eventPublisher,
+      noopLogger(),
+    );
+  const service = new MeetingRecoveryService(
+      repository,
+      meetingService,
+      clock,
+      eventPublisher,
+      noopLogger(),
+    );
   return { service, events, stored, repository };
 };
 

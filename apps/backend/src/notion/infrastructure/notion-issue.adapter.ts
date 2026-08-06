@@ -5,7 +5,7 @@ import {
   MEETING_TRIGGER_OPTION,
   NOTION_ISSUE_PROPERTIES,
 } from '@/notion/infrastructure/notion-issue.properties';
-import { LoggerPort } from '@/shared-kernel/domain/ports';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 // 시각이 아닌 날짜로 비교한다. 노션 `날짜`는 시간이 선택 사항이라 시각으로 자르면 시간 없는 값(자정 취급)과 이미 시작한 당일 회의가 통째로 필터에서 빠진다.
 function todayInUtc(now: Date): string {
@@ -47,7 +47,7 @@ export class NotionIssueAdapter implements NotionIssuePort {
   constructor(
     private readonly client: NotionHttpClient,
     private readonly databaseIds: ReadonlyArray<string>,
-    private readonly logger: LoggerPort,
+    private readonly logger: PinoLoggerAdapter,
     /** 이전 회의 카드를 식별하는 기준. 이 주소로 시작하는 embed만 우리 것으로 본다. */
     private readonly meetingLinkBase: string,
   ) {}

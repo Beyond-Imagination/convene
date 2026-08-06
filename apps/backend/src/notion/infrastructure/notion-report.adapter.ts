@@ -1,7 +1,7 @@
 import { NotionReportPort } from '@/notion/domain/ports/notion-report.port';
 import { NotionHttpClient } from '@/notion/infrastructure/notion-http.client';
 import { toReportBlocks } from '@/notion/infrastructure/report-blocks.mapper';
-import { FinalizedReport } from '@/shared-kernel/domain/ports';
+import { FinalizedReport } from '@/reports/application/report-lookup.service';
 
 // 노션 append는 요청당 100 블록까지 받는다.
 const MAX_BLOCKS_PER_REQUEST = 100;

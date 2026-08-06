@@ -5,6 +5,8 @@ export interface AbsoluteTranscriptSegment {
   readonly absoluteEndMs: number;
 }
 
+export const PARTIAL_TRANSCRIPT_STORE = Symbol('PARTIAL_TRANSCRIPT_STORE');
+
 /**
  * 실시간 partial 전사의 누적 결과 저장소.
  *

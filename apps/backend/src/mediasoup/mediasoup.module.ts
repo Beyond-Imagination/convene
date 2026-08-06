@@ -10,70 +10,64 @@ import {
 } from '@/config/mediasoup.config';
 import { MediasoupMeetingLifecycleListener } from '@/mediasoup/application/mediasoup-meeting-lifecycle.listener';
 import { MediasoupSignalingService } from '@/mediasoup/application/mediasoup-signaling.service';
+import { AUDIO_CAPTURE } from '@/mediasoup/domain/ports/audio-capture.port';
+import { MEDIA_ROUTER } from '@/mediasoup/domain/ports/media-router.port';
+import { MEDIA_TRANSPORT } from '@/mediasoup/domain/ports/media-transport.port';
+import { PARTICIPANT_MEDIA_REPOSITORY } from '@/mediasoup/domain/ports/participant-media.repository';
 import { FfmpegAudioCaptureAdapter } from '@/mediasoup/infrastructure/ffmpeg-audio-capture.adapter';
 import { MediasoupRouterAdapter } from '@/mediasoup/infrastructure/mediasoup-router.adapter';
 import { MediasoupTransportAdapter } from '@/mediasoup/infrastructure/mediasoup-transport.adapter';
 import { MediasoupWorkerPool } from '@/mediasoup/infrastructure/mediasoup-worker.pool';
 import { RedisParticipantMediaRepository } from '@/mediasoup/infrastructure/redis-participant-media.repository';
 import { MediasoupGateway } from '@/mediasoup/interface/gateways/mediasoup.gateway';
-import { RedisAudioBufferRepository } from '@/recording/infrastructure/redis-audio-buffer.repository';
+import { AUDIO_BUFFER_REPOSITORY, AudioBufferRepository } from '@/recording/domain/ports/audio-buffer.repository';
 import { RecordingModule } from '@/recording/recording.module';
-import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 /**
  * Mediasoup 기능을 구성하는 NestJS 모듈.
  *
- * - WorkerPool / RouterAdapter / TransportAdapter / SignalingService는 비-Nest 클래스라 useFactory로 묶는다.
- * - Gateway / LifecycleListener / RedisParticipantMediaRepository는 클래스 토큰만 등록한다.
- * - Redis 클라이언트는 RedisModule(@Global)이 제공하므로 imports 추가 없이 inject 가능.
- * - SharedKernelModule의 NestEventBusDomainEventPublisher가 도메인 이벤트 publish 채널.
- * - cross-BC 결합은 Port 인터페이스 한정.
+ * 인프라 어댑터는 `resolve*`가 읽는 런타임 env에 의존하므로 `useFactory`로 만든다.
+ * 팩토리 호출 시점은 NestFactory.create가 ConfigModule.forRoot()의 .env 로딩을 끝낸 뒤라 정확한 값을 읽는다.
+ * 팩토리로 만드는 인스턴스는 INQUIRER를 못 쓰므로 로그 context를 명시적으로 넘긴다.
  */
 @Module({
   imports: [forwardRef(() => RecordingModule)],
   providers: [
     MediasoupGateway,
     MediasoupMeetingLifecycleListener,
-    RedisParticipantMediaRepository,
+    MediasoupSignalingService,
+    { provide: PARTICIPANT_MEDIA_REPOSITORY, useClass: RedisParticipantMediaRepository },
     {
       provide: MediasoupWorkerPool,
       useFactory: (logger: PinoLogger) =>
-        // useFactory 호출 시점은 NestFactory.create가 ConfigModule.forRoot()의 .env 로딩을 끝낸 뒤
-        // 그때 resolve* 가 정확한 env를 읽는다.
         new MediasoupWorkerPool(
-          {
-            numWorkers: resolveNumWorkers(),
-            worker: resolveWorkerOptions(),
-          },
+          { numWorkers: resolveNumWorkers(), worker: resolveWorkerOptions() },
           new PinoLoggerAdapter(logger, MediasoupWorkerPool.name),
         ),
       inject: [PinoLogger],
     },
     {
-      provide: MediasoupRouterAdapter,
+      provide: MEDIA_ROUTER,
       useFactory: (workerPool: MediasoupWorkerPool, logger: PinoLogger) =>
         new MediasoupRouterAdapter(
           workerPool,
-          {
-            participantsPerRouter: resolveParticipantsPerRouter(),
-            mediaCodecs: MEDIA_CODECS,
-          },
+          { participantsPerRouter: resolveParticipantsPerRouter(), mediaCodecs: MEDIA_CODECS },
           new PinoLoggerAdapter(logger, MediasoupRouterAdapter.name),
         ),
       inject: [MediasoupWorkerPool, PinoLogger],
     },
     {
-      provide: MediasoupTransportAdapter,
+      provide: MEDIA_TRANSPORT,
       useFactory: (routerAdapter: MediasoupRouterAdapter) =>
         new MediasoupTransportAdapter(routerAdapter, resolveWebRtcTransportOptions()),
-      inject: [MediasoupRouterAdapter],
+      inject: [MEDIA_ROUTER],
     },
     {
-      provide: FfmpegAudioCaptureAdapter,
+      provide: AUDIO_CAPTURE,
       useFactory: (
         routerAdapter: MediasoupRouterAdapter,
-        audioBufferRepository: RedisAudioBufferRepository,
+        audioBufferRepository: AudioBufferRepository,
         logger: PinoLogger,
       ) =>
         new FfmpegAudioCaptureAdapter(
@@ -81,31 +75,7 @@ import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.ad
           audioBufferRepository,
           new PinoLoggerAdapter(logger, FfmpegAudioCaptureAdapter.name),
         ),
-      inject: [MediasoupRouterAdapter, RedisAudioBufferRepository, PinoLogger],
-    },
-    {
-      provide: MediasoupSignalingService,
-      useFactory: (
-        routerPort: MediasoupRouterAdapter,
-        transportPort: MediasoupTransportAdapter,
-        participantMediaRepository: RedisParticipantMediaRepository,
-        audioCapture: FfmpegAudioCaptureAdapter,
-        eventPublisher: NestEventBusDomainEventPublisher,
-      ) =>
-        new MediasoupSignalingService({
-          routerPort,
-          transportPort,
-          participantMediaRepository,
-          audioCapture,
-          eventPublisher,
-        }),
-      inject: [
-        MediasoupRouterAdapter,
-        MediasoupTransportAdapter,
-        RedisParticipantMediaRepository,
-        FfmpegAudioCaptureAdapter,
-        NestEventBusDomainEventPublisher,
-      ],
+      inject: [MEDIA_ROUTER, AUDIO_BUFFER_REPOSITORY, PinoLogger],
     },
   ],
 })

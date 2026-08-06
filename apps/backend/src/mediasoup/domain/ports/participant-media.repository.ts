@@ -1,5 +1,7 @@
 import { ParticipantMedia } from '@/mediasoup/domain/participant-media';
 
+export const PARTICIPANT_MEDIA_REPOSITORY = Symbol('PARTICIPANT_MEDIA_REPOSITORY');
+
 /**
  * ParticipantMedia Aggregate의 영속/조회 경계. 구현체는 infrastructure의 in-memory 스토리지 제공
  *

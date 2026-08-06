@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import Redis from 'ioredis';
 
-import { ChatRepository } from '@/meeting/domain/ports';
-import { ChatEntry } from '@/shared-kernel/domain/value-objects';
+import { ChatRepository } from '@/meeting/domain/ports/chat.repository';
+import { ChatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
 
 const KEY_PREFIX = 'chat:';
 

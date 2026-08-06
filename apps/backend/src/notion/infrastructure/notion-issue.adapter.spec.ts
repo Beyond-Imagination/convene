@@ -3,14 +3,14 @@ import {
   buildPendingIssuesFilter,
   NotionIssueAdapter,
 } from '@/notion/infrastructure/notion-issue.adapter';
-import { LoggerPort } from '@/shared-kernel/domain/ports';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
+import { stub } from '@/shared-kernel/testing/stub';
 
 const NOW = new Date('2026-07-20T12:00:00.000Z');
 const LINK_BASE = 'https://convene.example.com';
 
-function silentLogger(): LoggerPort {
-  const noop = (): void => undefined;
-  return { debug: noop, info: noop, warn: noop, error: noop } as unknown as LoggerPort;
+function silentLogger(): PinoLoggerAdapter {
+  return stub<PinoLoggerAdapter>({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() });
 }
 
 function titleIssue(id: string, title: string): Record<string, unknown> {
@@ -51,7 +51,7 @@ describe('buildPendingIssuesFilter', () => {
 describe('NotionIssueAdapter.findPendingIssues', () => {
   it('DB의 data source를 조회해 필터로 순회하고 페이지네이션을 따라 결과를 합친다', async () => {
     const calls: { dsId: string; body: { filter?: unknown; start_cursor?: string } }[] = [];
-    const client = {
+    const client = stub<NotionHttpClient>({
       retrieveDatabase: async (dbId: string): Promise<Record<string, unknown>> => ({
         data_sources: [{ id: `${dbId}-ds` }],
       }),
@@ -68,7 +68,7 @@ describe('NotionIssueAdapter.findPendingIssues', () => {
         }
         return page([titleIssue('C', 'C제목')]);
       },
-    } as unknown as NotionHttpClient;
+    });
 
     const adapter = new NotionIssueAdapter(
       client,
@@ -90,7 +90,7 @@ describe('NotionIssueAdapter.findPendingIssues', () => {
 
   it('한 DB에 data source가 여럿이면 모두 순회한다', async () => {
     const queried: string[] = [];
-    const client = {
+    const client = stub<NotionHttpClient>({
       retrieveDatabase: async (): Promise<Record<string, unknown>> => ({
         data_sources: [{ id: 'ds-1' }, { id: 'ds-2' }],
       }),
@@ -98,7 +98,7 @@ describe('NotionIssueAdapter.findPendingIssues', () => {
         queried.push(dsId);
         return page([titleIssue(dsId, dsId)]);
       },
-    } as unknown as NotionHttpClient;
+    });
 
     await new NotionIssueAdapter(client, ['db'], silentLogger(), LINK_BASE).findPendingIssues(NOW);
 
@@ -106,13 +106,13 @@ describe('NotionIssueAdapter.findPendingIssues', () => {
   });
 
   it('한 DB 조회가 실패해도 나머지 DB는 계속 폴링한다(예외 격리)', async () => {
-    const client = {
+    const client = stub<NotionHttpClient>({
       retrieveDatabase: async (dbId: string): Promise<Record<string, unknown>> => {
         if (dbId === 'bad-db') throw new Error('object_not_found');
         return { data_sources: [{ id: 'good-ds' }] };
       },
       queryDataSource: async (): Promise<NotionListPage> => page([titleIssue('ok', 'OK')]),
-    } as unknown as NotionHttpClient;
+    });
 
     const result = await new NotionIssueAdapter(
       client,
@@ -125,10 +125,10 @@ describe('NotionIssueAdapter.findPendingIssues', () => {
   });
 
   it('title 타입 속성이 없으면 title은 null', async () => {
-    const client = {
+    const client = stub<NotionHttpClient>({
       retrieveDatabase: async (): Promise<Record<string, unknown>> => ({ data_sources: [{ id: 'ds' }] }),
       queryDataSource: async (): Promise<NotionListPage> => page([{ id: 'no-title', properties: {} }]),
-    } as unknown as NotionHttpClient;
+    });
 
     const result = await new NotionIssueAdapter(
       client,
@@ -147,7 +147,7 @@ describe('NotionIssueAdapter.embedMeetingCard', () => {
   function embedClient(existing: ReadonlyArray<Record<string, unknown>>) {
     const appended: { blockId: string; children: unknown; position: unknown }[] = [];
     const deleted: string[] = [];
-    const client = {
+    const client = stub<NotionHttpClient>({
       getBlockChildren: async (): Promise<NotionListPage> => page(existing),
       deleteBlock: async (blockId: string): Promise<Record<string, unknown>> => {
         deleted.push(blockId);
@@ -161,7 +161,7 @@ describe('NotionIssueAdapter.embedMeetingCard', () => {
         appended.push({ blockId, children, position });
         return {};
       },
-    } as unknown as NotionHttpClient;
+    });
     return { client, appended, deleted };
   }
 
@@ -205,12 +205,12 @@ describe('NotionIssueAdapter.embedMeetingCard', () => {
 describe('NotionIssueAdapter.writeMeetingLink', () => {
   it('회의링크 url 속성을 patch 한다', async () => {
     const calls: { pageId: string; properties: unknown }[] = [];
-    const client = {
+    const client = stub<NotionHttpClient>({
       updatePageProperties: async (pageId: string, properties: Record<string, unknown>) => {
         calls.push({ pageId, properties });
         return {};
       },
-    } as unknown as NotionHttpClient;
+    });
 
     await new NotionIssueAdapter(client, [], silentLogger(), LINK_BASE).writeMeetingLink(
       'page-1',

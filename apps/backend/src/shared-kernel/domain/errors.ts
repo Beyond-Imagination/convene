@@ -14,12 +14,10 @@ export abstract class DomainError extends Error {
   }
 }
 
-/** 대상 리소스를 찾지 못함. */
 export class NotFoundError extends DomainError {
   readonly httpStatus = 404;
 }
 
-/** 권한 없음. */
 export class ForbiddenError extends DomainError {
   readonly httpStatus = 403;
 }

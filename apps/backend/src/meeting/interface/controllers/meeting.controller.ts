@@ -17,9 +17,9 @@ import {
 } from '@nestjs/common';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
-import { MeetingCode } from '@/meeting/domain/value-objects';
+import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
 import { CreateMeetingDto } from '@/meeting/interface/dto/create-meeting.dto';
-import { externalReference } from '@/shared-kernel/domain/value-objects';
+import { externalReference } from '@/shared-kernel/domain/value-objects/external-reference';
 
 /**
  * 책임: payload 검증(DTO + ValidationPipe), 도메인 VO 변환, MeetingService 호출, wire format으로 응답 직렬화.

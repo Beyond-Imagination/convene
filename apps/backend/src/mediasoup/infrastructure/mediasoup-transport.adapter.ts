@@ -8,12 +8,7 @@ import {
   WebRtcTransport,
 } from 'mediasoup/node/lib/types';
 
-import {
-  ConsumeInput,
-  CreateWebRtcTransportInput,
-  MediaTransportPort,
-  ProduceInput,
-} from '@/mediasoup/domain/ports';
+import { ConsumeInput, CreateWebRtcTransportInput, MediaTransportPort, ProduceInput } from '@/mediasoup/domain/ports/media-transport.port';
 
 import { MediasoupRouterAdapter } from './mediasoup-router.adapter';
 

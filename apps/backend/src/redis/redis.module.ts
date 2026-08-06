@@ -8,14 +8,13 @@ import {
   resolveRedisKeyPrefix,
   resolveRedisUrl,
 } from '@/config/redis.config';
-import { LoggerPort } from '@/shared-kernel/domain/ports';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 /**
  * 연결 상태 전이를 구조화 로그로 남긴다.
  * 리스너가 하나도 없으면 ioredis 가 연결 오류를 `console.error`로 흘려 pino 를 우회한다.
  */
-function attachConnectionLogging(client: Redis, logger: LoggerPort): void {
+function attachConnectionLogging(client: Redis, logger: PinoLoggerAdapter): void {
   client.on('error', (err: Error) => logger.error({ err }, 'redis 연결 오류'));
   client.on('reconnecting', (delayMs: number) => logger.warn({ delayMs }, 'redis 재연결 시도'));
   client.on('ready', () => logger.info({}, 'redis 연결 준비 완료'));
@@ -25,9 +24,7 @@ function attachConnectionLogging(client: Redis, logger: LoggerPort): void {
  * 전역 Redis 클라이언트(`ioredis`) 인스턴스를 묶어주는 모듈.
  *
  * `ioredis`의 default export인 `Redis` 클래스 자체를 DI 토큰으로 사용한다.
- * 각 RedisXRepository는 `@Inject(Redis)` 또는 useFactory inject로 같은 인스턴스를 공유한다.
- *
- * `onApplicationShutdown`에서 `quit()`으로 graceful close — Nest의 `enableShutdownHooks()`가 main.ts에서 활성화된다(이미 활성).
+ * graceful close는 main.ts의 `enableShutdownHooks()`에 의존한다.
  */
 @Global()
 @Module({

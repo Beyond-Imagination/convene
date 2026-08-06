@@ -3,14 +3,15 @@ import {
   PollOutcome,
 } from '@/notion/application/notion-meeting-provisioning.service';
 import { NotionPollingScheduler } from '@/notion/application/notion-polling.scheduler';
-import { Clock, LoggerPort } from '@/shared-kernel/domain/ports';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
+import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
+import { stub } from '@/shared-kernel/testing/stub';
 
-function silentLogger(): LoggerPort {
-  const noop = (): void => undefined;
-  return { debug: noop, info: noop, warn: noop, error: noop } as unknown as LoggerPort;
+function silentLogger(): PinoLoggerAdapter {
+  return stub<PinoLoggerAdapter>({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() });
 }
 
-function fixedClock(now: Date): Clock {
+function fixedClock(now: Date): SystemClock {
   return { now: () => now };
 }
 
@@ -20,12 +21,12 @@ describe('NotionPollingScheduler.poll', () => {
   it('clock 시각으로 provisioning.pollPendingIssues를 호출한다', async () => {
     const now = new Date('2026-07-20T00:00:00.000Z');
     const times: Date[] = [];
-    const provisioning = {
+    const provisioning = stub<NotionMeetingProvisioningService>({
       pollPendingIssues: async (t: Date): Promise<PollOutcome> => {
         times.push(t);
         return NOTHING_FOUND;
       },
-    } as unknown as NotionMeetingProvisioningService;
+    });
 
     await new NotionPollingScheduler(provisioning, fixedClock(now), silentLogger()).poll();
 
@@ -38,13 +39,13 @@ describe('NotionPollingScheduler.poll', () => {
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const provisioning = {
+    const provisioning = stub<NotionMeetingProvisioningService>({
       pollPendingIssues: async (): Promise<PollOutcome> => {
         calls += 1;
         await gate;
         return NOTHING_FOUND;
       },
-    } as unknown as NotionMeetingProvisioningService;
+    });
     const scheduler = new NotionPollingScheduler(provisioning, fixedClock(new Date()), silentLogger());
 
     const first = scheduler.poll();
@@ -57,12 +58,12 @@ describe('NotionPollingScheduler.poll', () => {
 
   it('폴링 전체가 throw해도 삼키고 running을 해제해 다음 폴링을 허용한다', async () => {
     let calls = 0;
-    const provisioning = {
+    const provisioning = stub<NotionMeetingProvisioningService>({
       pollPendingIssues: async (): Promise<PollOutcome> => {
         calls += 1;
         throw new Error('notion down');
       },
-    } as unknown as NotionMeetingProvisioningService;
+    });
     const scheduler = new NotionPollingScheduler(provisioning, fixedClock(new Date()), silentLogger());
 
     await expect(scheduler.poll()).resolves.toBeUndefined();

@@ -5,7 +5,7 @@ import {
 } from '@convene/shared-interfaces';
 import { IsIn, IsString, Length } from 'class-validator';
 
-import { MeetingCode } from '@/meeting/domain/value-objects';
+import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
 
 export class CreateTransportDto implements CreateTransportRequest {
   @IsString()

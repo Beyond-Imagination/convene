@@ -1,4 +1,6 @@
-import { FinalizedReport } from '@/shared-kernel/domain/ports';
+import { FinalizedReport } from '@/reports/application/report-lookup.service';
+
+export const NOTION_REPORT = Symbol('NOTION_REPORT');
 
 export interface NotionReportPort {
   /** 이슈 페이지의 회의록 앵커에 회의록을 멱등하게 써 넣는다. */

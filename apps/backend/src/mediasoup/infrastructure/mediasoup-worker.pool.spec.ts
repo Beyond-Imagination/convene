@@ -1,10 +1,11 @@
 import { WorkerLogLevel, WorkerLogTag } from 'mediasoup/node/lib/types';
 
-import { LoggerPort } from '@/shared-kernel/domain/ports';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
+import { stub } from '@/shared-kernel/testing/stub';
 
 import { MediasoupWorkerPool } from './mediasoup-worker.pool';
 
-const noopLogger: LoggerPort = { debug() {}, info() {}, warn() {}, error() {} };
+const noopLogger = stub<PinoLoggerAdapter>({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() });
 
 const baseOptions = (numWorkers: number) => ({
   numWorkers,

@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import Redis from 'ioredis';
 
-import { AudioBufferRepository } from '@/recording/domain/ports';
+import { AudioBufferRepository } from '@/recording/domain/ports/audio-buffer.repository';
 
 import { PCM_BYTES_PER_SECOND } from './audio-chunker';
 

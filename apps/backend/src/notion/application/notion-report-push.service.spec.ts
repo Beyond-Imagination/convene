@@ -1,6 +1,8 @@
 import { NotionReportPort } from '@/notion/domain/ports/notion-report.port';
-import { FinalizedReport, LoggerPort, ReportLookupPort } from '@/shared-kernel/domain/ports';
-import { reportSummary } from '@/shared-kernel/domain/value-objects';
+import { FinalizedReport, ReportLookupService } from '@/reports/application/report-lookup.service';
+import { reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
+import { stub } from '@/shared-kernel/testing/stub';
 
 import { NotionReportPushService } from './notion-report-push.service';
 
@@ -20,9 +22,8 @@ const finalizedReport = (issueId: string | null): FinalizedReport => ({
   }),
 });
 
-function silentLogger(): LoggerPort {
-  const noop = (): void => undefined;
-  return { debug: noop, info: noop, warn: noop, error: noop };
+function silentLogger(): PinoLoggerAdapter {
+  return stub<PinoLoggerAdapter>({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() });
 }
 
 const makeService = (options: {
@@ -31,23 +32,23 @@ const makeService = (options: {
   pushError?: Error;
 }) => {
   const pushed: { issueId: string; report: FinalizedReport }[] = [];
-  const reportLookup: ReportLookupPort = {
+  const reportLookup = stub<ReportLookupService>({
     findFinalizedReport: jest.fn(async () => {
       if (options.lookupError !== undefined) throw options.lookupError;
       return options.found ?? null;
     }),
-  };
+  });
   const notionReport: NotionReportPort = {
     pushReport: jest.fn(async (issueId: string, report: FinalizedReport) => {
       if (options.pushError !== undefined) throw options.pushError;
       pushed.push({ issueId, report });
     }),
   };
-  const service = new NotionReportPushService({
-    reportLookup,
-    notionReport,
-    logger: silentLogger(),
-  });
+  const service = new NotionReportPushService(
+      reportLookup,
+      notionReport,
+      silentLogger(),
+    );
   return { service, pushed, reportLookup, notionReport };
 };
 

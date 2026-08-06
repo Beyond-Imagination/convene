@@ -4,9 +4,9 @@ import { AddressInfo, createServer } from 'node:net';
 import { Injectable } from '@nestjs/common';
 import { Consumer, PlainTransport } from 'mediasoup/node/lib/types';
 
-import { AudioCapturePort, AudioCaptureStartInput } from '@/mediasoup/domain/ports';
-import { AudioBufferRepository } from '@/recording/domain/ports';
-import { LoggerPort } from '@/shared-kernel/domain/ports';
+import { AudioCapturePort, AudioCaptureStartInput } from '@/mediasoup/domain/ports/audio-capture.port';
+import { AudioBufferRepository } from '@/recording/domain/ports/audio-buffer.repository';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 import { MediasoupRouterAdapter } from './mediasoup-router.adapter';
 
@@ -42,7 +42,7 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
   constructor(
     private readonly routerAdapter: MediasoupRouterAdapter,
     private readonly audioBufferRepository: AudioBufferRepository,
-    private readonly logger: LoggerPort,
+    private readonly logger: PinoLoggerAdapter,
   ) {}
 
   async start(input: AudioCaptureStartInput): Promise<void> {

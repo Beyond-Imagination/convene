@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import { AudioCapturePort, AudioCaptureStartInput } from '@/mediasoup/domain/ports';
+import { AudioCapturePort, AudioCaptureStartInput } from '@/mediasoup/domain/ports/audio-capture.port';
 
 @Injectable()
 export class NoopAudioCapture implements AudioCapturePort {

@@ -2,9 +2,10 @@ import type Redis from 'ioredis';
 import RedisMock from 'ioredis-mock';
 
 import { Meeting, MeetingSnapshot } from '@/meeting/domain/meeting';
-import { MeetingRepository } from '@/meeting/domain/ports';
-import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';
-import { externalReference } from '@/shared-kernel/domain/value-objects';
+import { MeetingRepository } from '@/meeting/domain/ports/meeting.repository';
+import { IdleTimeout } from '@/meeting/domain/value-objects/idle-timeout';
+import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
+import { externalReference } from '@/shared-kernel/domain/value-objects/external-reference';
 
 import { CachedMeetingRepository } from './cached-meeting.repository';
 import { RedisMeetingRepository } from './redis-meeting.repository';

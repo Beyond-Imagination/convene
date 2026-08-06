@@ -7,16 +7,11 @@ import {
 } from '@convene/shared-interfaces';
 
 import { ParticipantMedia } from '@/mediasoup/domain/participant-media';
-import {
-  AudioCapturePort,
-  AudioCaptureStartInput,
-  ConsumeInput,
-  CreateWebRtcTransportInput,
-  MediaRouterPort,
-  MediaTransportPort,
-  ParticipantMediaRepository,
-  ProduceInput,
-} from '@/mediasoup/domain/ports';
+import { AudioCapturePort, AudioCaptureStartInput } from '@/mediasoup/domain/ports/audio-capture.port';
+import { MediaRouterPort } from '@/mediasoup/domain/ports/media-router.port';
+import { ConsumeInput, CreateWebRtcTransportInput, MediaTransportPort, ProduceInput } from '@/mediasoup/domain/ports/media-transport.port';
+import { ParticipantMediaRepository } from '@/mediasoup/domain/ports/participant-media.repository';
+import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 
 import { ParticipantMediaNotFoundError, ScreenShareConflictError } from './mediasoup.errors';
 import { MediasoupSignalingService } from './mediasoup-signaling.service';
@@ -38,7 +33,7 @@ const makeEventPublisher = () => {
       publish: async (name: string, payload: unknown): Promise<void> => {
         events.push({ name, payload });
       },
-    },
+    } satisfies Pick<NestEventBusDomainEventPublisher, 'publish'> as NestEventBusDomainEventPublisher,
   };
 };
 
@@ -185,13 +180,13 @@ const makeService = () => {
   const repo = makeRepository();
   const audioCapture = makeAudioCapture();
   const { events, publisher } = makeEventPublisher();
-  const service = new MediasoupSignalingService({
-    routerPort: router.port,
-    transportPort: transport.port,
-    participantMediaRepository: repo.repository,
-    audioCapture: audioCapture.port,
-    eventPublisher: publisher,
-  });
+  const service = new MediasoupSignalingService(
+      router.port,
+      transport.port,
+      repo.repository,
+      audioCapture.port,
+      publisher,
+    );
   return { service, router, transport, repo, audioCapture, events };
 };
 

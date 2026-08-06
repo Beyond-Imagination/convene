@@ -1,26 +1,22 @@
-import { REPORT_EVENTS } from '@convene/shared-interfaces';
+import { randomUUID } from 'node:crypto';
 
-import { ParticipantEntry, TranscriptSegment } from '@/reports/domain/entries';
+import { REPORT_EVENTS } from '@convene/shared-interfaces';
+import { Inject, Injectable } from '@nestjs/common';
+
+import { ParticipantEntry } from '@/reports/domain/entries/participant-entry';
+import { TranscriptSegment } from '@/reports/domain/entries/transcript-segment';
 import { MeetingReport } from '@/reports/domain/meeting-report';
-import { ReportIdGenerator, ReportRepository, SummarizerPort } from '@/reports/domain/ports';
-import { Clock, DomainEventPublisher, LoggerPort } from '@/shared-kernel/domain/ports';
-import {
-  ChatEntry,
-  ExternalReference,
-  MeetingType,
-  Source,
-} from '@/shared-kernel/domain/value-objects';
+import { REPORT_REPOSITORY, ReportRepository } from '@/reports/domain/ports/report.repository';
+import { SUMMARIZER, SummarizerPort } from '@/reports/domain/ports/summarizer.port';
+import { ChatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
+import { ExternalReference } from '@/shared-kernel/domain/value-objects/external-reference';
+import { MeetingType } from '@/shared-kernel/domain/value-objects/meeting-type';
+import { Source } from '@/shared-kernel/domain/value-objects/source';
+import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
+import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 
 import { ReportNotFoundError, ReportNotResummarizableError } from './report.errors';
-
-interface ReportFinalizationServiceDeps {
-  repository: ReportRepository;
-  summarizer: SummarizerPort;
-  idGenerator: ReportIdGenerator;
-  clock: Clock;
-  eventPublisher: DomainEventPublisher;
-  logger: LoggerPort;
-}
 
 export interface CreateDraftCommand {
   meetingId: string;
@@ -52,12 +48,19 @@ export interface FailTranscriptionCommand {
  * `meeting.ended` 이벤트를 받아 회의록 draft를 생성한 뒤 STT/Summary 파이프라인을 따라 `MeetingReport`를 진행시키고,
  * 그 결과를 도메인 이벤트로 발행한다.
  */
+@Injectable()
 export class ReportFinalizationService {
-  constructor(private readonly deps: ReportFinalizationServiceDeps) {}
+  constructor(
+    @Inject(REPORT_REPOSITORY) private readonly repository: ReportRepository,
+    @Inject(SUMMARIZER) private readonly summarizer: SummarizerPort,
+    private readonly clock: SystemClock,
+    private readonly eventPublisher: NestEventBusDomainEventPublisher,
+    private readonly logger: PinoLoggerAdapter,
+  ) {}
 
   async createDraft(command: CreateDraftCommand): Promise<MeetingReport> {
     const report = MeetingReport.fromEndedMeeting({
-      id: this.deps.idGenerator.next(),
+      id: randomUUID(),
       meetingId: command.meetingId,
       code: command.code,
       source: command.source,
@@ -69,20 +72,20 @@ export class ReportFinalizationService {
       chat: command.chat,
       title: command.title ?? null,
     });
-    await this.deps.repository.save(report);
+    await this.repository.save(report);
     // STT가 speaker를 nickname으로 채울 수 있도록 participantId→nickname 매핑을 함께 발행한다.
     const participantNames: Record<string, string> = {};
     for (const p of report.participants) {
       participantNames[p.id] = p.nickname;
     }
-    await this.deps.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_REQUESTED, {
+    await this.eventPublisher.publish(REPORT_EVENTS.TRANSCRIPTION_REQUESTED, {
       reportId: report.id,
       meetingId: report.meetingId,
       code: report.code,
       meetingStartedAtMs: report.startedAt.getTime(),
       participantNames,
     });
-    this.deps.logger.info(
+    this.logger.info(
       { reportId: report.id, meetingCode: report.code },
       'report draft created',
     );
@@ -92,10 +95,10 @@ export class ReportFinalizationService {
   async completeTranscription(command: CompleteTranscriptionCommand): Promise<void> {
     const report = await this.requireReport(command.reportId);
     report.applyTranscript(command.transcript);
-    await this.deps.repository.save(report);
+    await this.repository.save(report);
 
     try {
-      const summary = await this.deps.summarizer.summarize({
+      const summary = await this.summarizer.summarize({
         transcript: command.transcript,
         chat: report.chat,
         meta: {
@@ -106,23 +109,23 @@ export class ReportFinalizationService {
         },
       });
       report.applySummary(summary);
-      await this.deps.repository.save(report);
-      await this.deps.eventPublisher.publish(REPORT_EVENTS.SUMMARY_COMPLETED, {
+      await this.repository.save(report);
+      await this.eventPublisher.publish(REPORT_EVENTS.SUMMARY_COMPLETED, {
         reportId: report.id,
       });
-      this.deps.logger.info({ reportId: report.id }, 'report summary completed');
+      this.logger.info({ reportId: report.id }, 'report summary completed');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      report.markSummaryFailed(message, this.deps.clock.now());
-      await this.deps.repository.save(report);
-      this.deps.logger.error({ reportId: report.id, err }, 'report summary failed');
+      report.markSummaryFailed(message, this.clock.now());
+      await this.repository.save(report);
+      this.logger.error({ reportId: report.id, err }, 'report summary failed');
     }
 
     if (report.isFinalized) {
-      await this.deps.eventPublisher.publish(REPORT_EVENTS.FINALIZED, {
+      await this.eventPublisher.publish(REPORT_EVENTS.FINALIZED, {
         reportId: report.id,
       });
-      this.deps.logger.info({ reportId: report.id }, 'report finalized');
+      this.logger.info({ reportId: report.id }, 'report finalized');
     }
   }
 
@@ -153,7 +156,7 @@ export class ReportFinalizationService {
 
     // summarize 실패는 catch 하지 않고 전파한다.
     // 이 시점 이전에는 어떤 상태 변경/저장도 하지 않았으므로 기존 회의록 상태(done/failed)는 그대로 보존된다.
-    const summary = await this.deps.summarizer.summarize({
+    const summary = await this.summarizer.summarize({
       transcript: report.transcript,
       chat: report.chat,
       meta: {
@@ -164,21 +167,21 @@ export class ReportFinalizationService {
       },
     });
     report.replaceSummary(summary);
-    await this.deps.repository.save(report);
-    await this.deps.eventPublisher.publish(REPORT_EVENTS.SUMMARY_COMPLETED, {
+    await this.repository.save(report);
+    await this.eventPublisher.publish(REPORT_EVENTS.SUMMARY_COMPLETED, {
       reportId: report.id,
     });
     // 재요약 대상은 이미 STT가 끝난 회의록이므로 pipeline은 항상 final 상태다.
     // 1차 파이프라인과 동일하게 finalized 이벤트를 발행한다.
-    await this.deps.eventPublisher.publish(REPORT_EVENTS.FINALIZED, {
+    await this.eventPublisher.publish(REPORT_EVENTS.FINALIZED, {
       reportId: report.id,
     });
-    this.deps.logger.info({ reportId }, 'report resummarized');
+    this.logger.info({ reportId }, 'report resummarized');
     return report;
   }
 
   async listRecent(limit: number): Promise<MeetingReport[]> {
-    return this.deps.repository.listRecent(limit);
+    return this.repository.listRecent(limit);
   }
 
   async getById(reportId: string): Promise<MeetingReport> {
@@ -187,26 +190,26 @@ export class ReportFinalizationService {
 
   async failTranscription(command: FailTranscriptionCommand): Promise<void> {
     const report = await this.requireReport(command.reportId);
-    const at = this.deps.clock.now();
+    const at = this.clock.now();
     report.markTranscriptionFailed(command.error, at);
     // STT가 실패하면 summary 입력이 없으므로 cascade로 종료 처리(재시도 없음).
     report.markSummaryFailed(`Skipped due to transcription failure: ${command.error}`, at);
-    await this.deps.repository.save(report);
-    this.deps.logger.warn(
+    await this.repository.save(report);
+    this.logger.warn(
       { reportId: command.reportId, error: command.error },
       'report transcription failed',
     );
 
     if (report.isFinalized) {
-      await this.deps.eventPublisher.publish(REPORT_EVENTS.FINALIZED, {
+      await this.eventPublisher.publish(REPORT_EVENTS.FINALIZED, {
         reportId: report.id,
       });
-      this.deps.logger.info({ reportId: report.id }, 'report finalized');
+      this.logger.info({ reportId: report.id }, 'report finalized');
     }
   }
 
   private async requireReport(reportId: string): Promise<MeetingReport> {
-    const report = await this.deps.repository.findById(reportId);
+    const report = await this.repository.findById(reportId);
     if (!report) {
       throw new ReportNotFoundError(reportId);
     }

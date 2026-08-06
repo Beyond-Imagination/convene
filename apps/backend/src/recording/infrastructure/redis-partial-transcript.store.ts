@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import Redis from 'ioredis';
 
-import { AbsoluteTranscriptSegment, PartialTranscriptStore } from '@/recording/domain/ports';
+import { AbsoluteTranscriptSegment, PartialTranscriptStore } from '@/recording/domain/ports/partial-transcript.store';
 
 const PARTIAL_TRANSCRIPT_KEY_PREFIX = 'transcript-partial:';
 

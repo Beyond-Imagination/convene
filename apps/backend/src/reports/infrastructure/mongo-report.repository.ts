@@ -2,8 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Connection, Model } from 'mongoose';
 
 import { MeetingReport, MeetingReportSnapshot } from '@/reports/domain/meeting-report';
-import { ReportRepository } from '@/reports/domain/ports';
-import { PipelineState } from '@/reports/domain/value-objects';
+import { ReportRepository } from '@/reports/domain/ports/report.repository';
+import { PipelineState } from '@/reports/domain/value-objects/pipeline-state';
 
 import { MEETING_REPORT_COLLECTION, meetingReportSchema } from './meeting-report.schema';
 

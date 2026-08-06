@@ -18,9 +18,9 @@ import { io, type Socket } from 'socket.io-client';
 import request from 'supertest';
 
 import { AppModule } from '@/app.module';
-import { FfmpegAudioCaptureAdapter } from '@/mediasoup/infrastructure/ffmpeg-audio-capture.adapter';
-import { HttpTranscriber } from '@/recording/infrastructure/http.transcriber';
-import { GeminiSummarizer } from '@/reports/infrastructure/gemini.summarizer';
+import { AUDIO_CAPTURE } from '@/mediasoup/domain/ports/audio-capture.port';
+import { TRANSCRIBER } from '@/recording/domain/ports/transcriber.port';
+import { SUMMARIZER } from '@/reports/domain/ports/summarizer.port';
 import { NoopSummarizer } from '@/reports/infrastructure/noop.summarizer';
 
 import { NoopTranscriber } from './support/noop.transcriber';
@@ -56,11 +56,11 @@ describe('Meeting e2e', () => {
     })
       // e2e 환경엔 ai-worker 컨테이너/ffmpeg 바이너리/Gemini API 키가 없으므로
       // 외부 의존 어댑터를 모두 Noop으로 갈아끼운다.
-      .overrideProvider(HttpTranscriber)
+      .overrideProvider(TRANSCRIBER)
       .useValue(new NoopTranscriber())
-      .overrideProvider(FfmpegAudioCaptureAdapter)
+      .overrideProvider(AUDIO_CAPTURE)
       .useValue(new NoopAudioCapture())
-      .overrideProvider(GeminiSummarizer)
+      .overrideProvider(SUMMARIZER)
       .useValue(new NoopSummarizer())
       .compile();
 

@@ -140,7 +140,7 @@ packages/shared-interfaces/src/   meeting.ts · mediasoup.ts · reports.ts · ev
 - `apps/backend/src/<context>/{interface,application,domain,infrastructure}` + `<context>.module.ts` 생성 →
   `app.module.ts` imports 등록.
 - 다른 BC와는 **도메인 이벤트(`shared-kernel` payload) 또는 Port** 로만 결합. 직접 import 금지.
-- 비-Nest application service는 모듈의 `useFactory`로 Port 구현을 주입한다.
+- DI 배선은 3.4의 규약을 따른다.
 
 ### 3.3 테스트
 
@@ -149,6 +149,59 @@ packages/shared-interfaces/src/   meeting.ts · mediasoup.ts · reports.ts · ev
 - **frontend** = vitest. ViewModel은 `renderHook`/Harness 폼, View는 props 렌더. e2e는 Playwright(`apps/frontend/test/`).
   vitest는 타입체크를 안 하므로 타입 안전성은 `pnpm build`로 확인한다.
 - 공유 타입 수정 후에는 반드시 `pnpm build:shared`(안 하면 backend/frontend가 옛 타입을 본다).
+
+### 3.4 DI 배선 규약 (CNV-43)
+
+Port는 인터페이스 옆에 같은 이름의 `Symbol` 토큰을 함께 둔다. TS 인터페이스는 컴파일 시 지워져 Nest가
+런타임에 참조할 수 없기 때문이다(NestJS 공식 권장).
+
+```ts
+// domain/ports/chat.repository.ts
+export const CHAT_REPOSITORY = Symbol('CHAT_REPOSITORY');
+export interface ChatRepository { ... }
+
+// application/meeting.service.ts — @Injectable + 생성자 파라미터 주입
+@Inject(CHAT_REPOSITORY) private readonly chatRepository: ChatRepository,
+
+// meeting.module.ts — 한 줄
+{ provide: CHAT_REPOSITORY, useClass: RedisChatRepository },
+```
+
+- `useFactory`는 **런타임 값이 필요할 때만** 쓴다(env 기반 설정, 조건부 fallback). 정적 배선에는 쓰지 않는다.
+  현재 정당한 사례: mediasoup 어댑터(`resolve*`), `TRANSCRIBER`(ai-worker URL), `SUMMARIZER`(Gemini↔Noop), notion(`register()` 시점 env).
+- 같은 인스턴스를 다른 토큰으로도 노출할 땐 `useExisting`(예: `MEETING_CREATION_PORT` → `MeetingService`).
+- 로거는 `@Inject(LOGGER) logger: LoggerPort`만 쓴다. context는 `PinoLoggerAdapter`가 `INQUIRER`로
+  주입 지점 클래스명을 읽어 채운다. **단 `useFactory`로 만든 인스턴스는 INQUIRER를 못 쓰므로**
+  `new PinoLoggerAdapter(logger, X.name)`처럼 context를 명시한다.
+**Port는 outbound에만 둔다. 기준은 "교체·변경 가능성"이다.**
+
+| 방향 | 예 | 배선 |
+|---|---|---|
+| **Outbound + 교체 가능성 있음** — DB, 외부 API, 서드파티 | `MeetingRepository`, `TranscriberPort`, `SummarizerPort`, `NotionIssuePort`, `MediaRouterPort` | **Port 인터페이스 + Symbol** |
+| **Outbound지만 교체할 일 없음** — 프레임워크에 묶여 있음 | `PinoLoggerAdapter`(pino), `NestEventBusDomainEventPublisher`(Nest 이벤트 버스) | 구체 클래스 주입 |
+| **Inbound** — Controller/Gateway → UseCase | `MeetingController` → `MeetingService` | 구체 서비스 주입 |
+| **BC → BC** — 같은 프로세스 안이라 교체 대상 아님 | `notion` → `MeetingService`, `ReportLookupService` | 구체 서비스 주입. 소유 모듈이 `exports` |
+| 유틸·순수 함수 | `SystemClock`, `RandomMeetingCodeGenerator`, id 발급(`randomUUID()` 직접 호출) | 클래스가 곧 토큰이거나, 추상화 없음 |
+
+인터페이스가 없는 구체 서비스를 스펙에서 대역으로 쓸 땐 private 필드 때문에 객체 리터럴이 그대로는 안 들어간다.
+`as unknown as T`로 뚫지 말 것 — 타입 검사를 통째로 버려서 대역이 실제 시그니처와 어긋나도 조용히 통과한다.
+`shared-kernel/testing/stub.ts`를 쓰면 캐스팅이 헬퍼 안에 갇히고 호출부는 `Partial<T>`로 검사받는다:
+
+```ts
+import { stub } from '@/shared-kernel/testing/stub';
+
+const logger = stub<PinoLoggerAdapter>({ info: jest.fn(), error: jest.fn() });
+const meetings = stub<MeetingService>({ create: jest.fn(async () => ({ code: 'x', ... })) });
+```
+
+메서드명 오타·시그니처 불일치·인자 개수 오류가 전부 컴파일 에러가 된다. `stub`이 거부하면 대역이 실제
+계약을 안 지키고 있다는 뜻이니, 감추지 말고 대역을 고치거나 왜 예외인지 남길 것.
+(`Socket`·`Redis` 등 서드파티 타입과 `jest.mock`의 `typeof` 캐스팅은 본 헬퍼 대상이 아니다.)
+
+`domain/`엔 배럴(`index.ts`)을 두지 않는다 — 정의로 한 번에 점프하도록 실제 모듈을 직접 import 한다.
+
+> 토큰명을 바꾸면 e2e의 `.overrideProvider()`가 **조용히 무력화**된다(외부 API 실호출로 이어질 수 있음).
+> 토큰을 바꿀 땐 `apps/backend/test/*.e2e-spec.ts`의 override를 함께 옮긴다.
 
 ## 4. 자주 보는 파일 · 트러블슈팅
 

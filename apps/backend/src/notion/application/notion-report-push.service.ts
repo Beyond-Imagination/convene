@@ -1,14 +1,16 @@
-import { NotionReportPort } from '@/notion/domain/ports/notion-report.port';
-import { LoggerPort, ReportLookupPort } from '@/shared-kernel/domain/ports';
+import { Inject, Injectable } from '@nestjs/common';
 
-interface NotionReportPushDeps {
-  reportLookup: ReportLookupPort;
-  notionReport: NotionReportPort;
-  logger: LoggerPort;
-}
+import { NOTION_REPORT, NotionReportPort } from '@/notion/domain/ports/notion-report.port';
+import { ReportLookupService } from '@/reports/application/report-lookup.service';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
+@Injectable()
 export class NotionReportPushService {
-  constructor(private readonly deps: NotionReportPushDeps) {}
+  constructor(
+    private readonly reportLookup: ReportLookupService,
+    @Inject(NOTION_REPORT) private readonly notionReport: NotionReportPort,
+    private readonly logger: PinoLoggerAdapter,
+  ) {}
 
   /**
    * 확정된 회의록을 그 회의를 만들어낸 노션 이슈에 옮긴다.
@@ -16,13 +18,13 @@ export class NotionReportPushService {
    */
   async pushFinalizedReport(reportId: string): Promise<void> {
     try {
-      const report = await this.deps.reportLookup.findFinalizedReport(reportId);
+      const report = await this.reportLookup.findFinalizedReport(reportId);
       if (report === null || report.issueId === null) return;
 
-      await this.deps.notionReport.pushReport(report.issueId, report);
-      this.deps.logger.info({ reportId, issueId: report.issueId }, '회의록 노션 삽입 완료');
+      await this.notionReport.pushReport(report.issueId, report);
+      this.logger.info({ reportId, issueId: report.issueId }, '회의록 노션 삽입 완료');
     } catch (error) {
-      this.deps.logger.error({ reportId, err: error }, '회의록 노션 삽입 실패');
+      this.logger.error({ reportId, err: error }, '회의록 노션 삽입 실패');
     }
   }
 }

@@ -2,11 +2,13 @@ import { MEETING_WS_EVENTS } from '@convene/shared-interfaces';
 import type { Socket } from 'socket.io';
 
 import { Meeting } from '@/meeting/domain/meeting';
-import { IdleTimeout, MeetingCode } from '@/meeting/domain/value-objects';
+import { IdleTimeout } from '@/meeting/domain/value-objects/idle-timeout';
+import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
 import { ChatDto } from '@/meeting/interface/dto/chat.dto';
 import { JoinMeetingDto } from '@/meeting/interface/dto/join-meeting.dto';
 import { LeaveMeetingDto } from '@/meeting/interface/dto/leave-meeting.dto';
-import { chatEntry, externalReference } from '@/shared-kernel/domain/value-objects';
+import { chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
+import { externalReference } from '@/shared-kernel/domain/value-objects/external-reference';
 
 import { MeetingGateway } from './meeting.gateway';
 

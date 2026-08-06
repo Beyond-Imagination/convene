@@ -1,7 +1,9 @@
 import { REPORT_EVENTS } from '@convene/shared-interfaces';
 
-import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events';
-import { LoggerPort } from '@/shared-kernel/domain/ports';
+import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events/report-transcription.payload';
+import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
+import { stub } from '@/shared-kernel/testing/stub';
 
 import {
   PCM_BYTES_PER_SECOND,
@@ -23,15 +25,15 @@ const makeEventPublisher = () => {
       publish: async (name: string, payload: unknown): Promise<void> => {
         events.push({ name, payload });
       },
-    },
+    } satisfies Pick<NestEventBusDomainEventPublisher, 'publish'> as NestEventBusDomainEventPublisher,
   };
 };
 
-const noopLogger = (): LoggerPort => ({
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {},
+const noopLogger = (): PinoLoggerAdapter => stub<PinoLoggerAdapter>({
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
 });
 
 /** transcribe input.audio가 wav(RIFF)인지 가정하고, PCM body의 text 식별값을 돌려준다. */
@@ -61,8 +63,8 @@ describe('RecordingService.requestTranscription', () => {
     const consumeMock = jest.fn(async () => opts.audios ?? []);
     const transcribeMock = jest.fn(opts.transcribeImpl ?? (async () => []));
     const { events, publisher } = makeEventPublisher();
-    const service = new RecordingService({
-      audioBufferRepository: {
+    const service = new RecordingService(
+      {
         append: async () => {},
         markStarted: async () => {},
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
@@ -70,14 +72,14 @@ describe('RecordingService.requestTranscription', () => {
         listActiveParticipants: async () => [],
         consume: consumeMock,
       },
-      partialTranscriptStore: {
+      {
         append: async () => {},
         consume: async () => [],
       },
-      transcriber: { transcribe: transcribeMock },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      { transcribe: transcribeMock },
+      publisher,
+      noopLogger(),
+    );
     return { service, consumeMock, transcribeMock, events };
   };
 
@@ -171,8 +173,8 @@ describe('RecordingService.requestTranscription', () => {
   it('partial store의 segment speaker도 participantNames로 nickname 변환된다', async () => {
     const meetingStartedAtMs = 1_000_000_000_000;
     const { events, publisher } = makeEventPublisher();
-    const service = new RecordingService({
-      audioBufferRepository: {
+    const service = new RecordingService(
+      {
         append: async () => {},
         markStarted: async () => {},
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
@@ -180,7 +182,7 @@ describe('RecordingService.requestTranscription', () => {
         listActiveParticipants: async () => [],
         consume: async () => [],
       },
-      partialTranscriptStore: {
+      {
         append: async () => {},
         consume: async () => [
           {
@@ -191,10 +193,10 @@ describe('RecordingService.requestTranscription', () => {
           },
         ],
       },
-      transcriber: { transcribe: async () => [] },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      { transcribe: async () => [] },
+      publisher,
+      noopLogger(),
+    );
     await service.requestTranscription({
       reportId,
       meetingCode,
@@ -228,8 +230,8 @@ describe('RecordingService.requestTranscription', () => {
       return [];
     });
     const { events, publisher } = makeEventPublisher();
-    const service = new RecordingService({
-      audioBufferRepository: {
+    const service = new RecordingService(
+      {
         append: async () => {},
         markStarted: async () => {},
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
@@ -240,11 +242,11 @@ describe('RecordingService.requestTranscription', () => {
           { participantId: 's2', audio: pcmB },
         ],
       },
-      partialTranscriptStore: { append: async () => {}, consume: async () => [] },
-      transcriber: { transcribe: transcribeMock },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      { append: async () => {}, consume: async () => [] },
+      { transcribe: transcribeMock },
+      publisher,
+      noopLogger(),
+    );
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
     expect(payload.transcript).toEqual([
@@ -267,8 +269,8 @@ describe('RecordingService.requestTranscription', () => {
       return [];
     });
     const { events, publisher } = makeEventPublisher();
-    const service = new RecordingService({
-      audioBufferRepository: {
+    const service = new RecordingService(
+      {
         append: async () => {},
         markStarted: async () => {},
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
@@ -279,11 +281,11 @@ describe('RecordingService.requestTranscription', () => {
           { participantId: 's2', audio: pcmB, startedAtMs: s2StartedAtMs },
         ],
       },
-      partialTranscriptStore: { append: async () => {}, consume: async () => [] },
-      transcriber: { transcribe: transcribeMock },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      { append: async () => {}, consume: async () => [] },
+      { transcribe: transcribeMock },
+      publisher,
+      noopLogger(),
+    );
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
     expect(payload.transcript).toEqual([
@@ -304,8 +306,8 @@ describe('RecordingService.requestTranscription', () => {
       return [];
     });
     const { events, publisher } = makeEventPublisher();
-    const service = new RecordingService({
-      audioBufferRepository: {
+    const service = new RecordingService(
+      {
         append: async () => {},
         markStarted: async () => {},
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
@@ -313,11 +315,11 @@ describe('RecordingService.requestTranscription', () => {
         listActiveParticipants: async () => [],
         consume: async () => [{ participantId: 's1', audio: pcm }],
       },
-      partialTranscriptStore: { append: async () => {}, consume: async () => [] },
-      transcriber: { transcribe: transcribeMock },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      { append: async () => {}, consume: async () => [] },
+      { transcribe: transcribeMock },
+      publisher,
+      noopLogger(),
+    );
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
     expect(transcribeMock).toHaveBeenCalledTimes(2);
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
@@ -349,8 +351,8 @@ describe('RecordingService.requestTranscription', () => {
       return [];
     });
     const { events, publisher } = makeEventPublisher();
-    const service = new RecordingService({
-      audioBufferRepository: {
+    const service = new RecordingService(
+      {
         append: async () => {},
         markStarted: async () => {},
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
@@ -358,11 +360,11 @@ describe('RecordingService.requestTranscription', () => {
         listActiveParticipants: async () => [],
         consume: async () => [{ participantId: 's1', audio: pcm }],
       },
-      partialTranscriptStore: { append: async () => {}, consume: async () => [] },
-      transcriber: { transcribe: transcribeMock },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      { append: async () => {}, consume: async () => [] },
+      { transcribe: transcribeMock },
+      publisher,
+      noopLogger(),
+    );
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
     expect(payload.transcript).toEqual([
@@ -380,8 +382,8 @@ describe('RecordingService.requestTranscription', () => {
       { text: 'b', startMs: 1_500, endMs: 1_900 },
     ]);
     const { events, publisher } = makeEventPublisher();
-    const service = new RecordingService({
-      audioBufferRepository: {
+    const service = new RecordingService(
+      {
         append: async () => {},
         markStarted: async () => {},
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
@@ -389,11 +391,11 @@ describe('RecordingService.requestTranscription', () => {
         listActiveParticipants: async () => [],
         consume: async () => [{ participantId: 's1', audio: pcm }], // startMs 누락 = 0
       },
-      partialTranscriptStore: { append: async () => {}, consume: async () => [] },
-      transcriber: { transcribe: transcribeMock },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      { append: async () => {}, consume: async () => [] },
+      { transcribe: transcribeMock },
+      publisher,
+      noopLogger(),
+    );
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
     expect(payload.transcript).toEqual([
@@ -411,8 +413,8 @@ describe('RecordingService.requestTranscription', () => {
       { text: 'keep', startMs: 2_500, endMs: 3_500 },
     ]);
     const { events, publisher } = makeEventPublisher();
-    const service = new RecordingService({
-      audioBufferRepository: {
+    const service = new RecordingService(
+      {
         append: async () => {},
         markStarted: async () => {},
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
@@ -422,11 +424,11 @@ describe('RecordingService.requestTranscription', () => {
           { participantId: 's1', audio: pcm, startMs: 28_000 }, // scheduler가 처리 후 잔여
         ],
       },
-      partialTranscriptStore: { append: async () => {}, consume: async () => [] },
-      transcriber: { transcribe: transcribeMock },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      { append: async () => {}, consume: async () => [] },
+      { transcribe: transcribeMock },
+      publisher,
+      noopLogger(),
+    );
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs: 0 });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
     // dup은 28000+500=28500 위치인데 dedup. keep은 28000+2500=30500.
@@ -448,8 +450,8 @@ describe('RecordingService.requestTranscription', () => {
       return [];
     });
     const { events, publisher } = makeEventPublisher();
-    const service = new RecordingService({
-      audioBufferRepository: {
+    const service = new RecordingService(
+      {
         append: async () => {},
         markStarted: async () => {},
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
@@ -457,11 +459,11 @@ describe('RecordingService.requestTranscription', () => {
         listActiveParticipants: async () => [],
         consume: async () => [{ participantId: 's1', audio: pcm, startedAtMs: s1StartedAtMs }],
       },
-      partialTranscriptStore: { append: async () => {}, consume: async () => [] },
-      transcriber: { transcribe: transcribeMock },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      { append: async () => {}, consume: async () => [] },
+      { transcribe: transcribeMock },
+      publisher,
+      noopLogger(),
+    );
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
     // chunk0 startMs=0 + participant offset 10_000 → 10000
@@ -475,8 +477,8 @@ describe('RecordingService.requestTranscription', () => {
   it('participant의 startedAtMs가 누락되면 보정 없이 0 offset으로 취급한다(레거시 호환)', async () => {
     const meetingStartedAtMs = 1_000_000_000_000;
     const { events, publisher } = makeEventPublisher();
-    const service = new RecordingService({
-      audioBufferRepository: {
+    const service = new RecordingService(
+      {
         append: async () => {},
         markStarted: async () => {},
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
@@ -486,13 +488,13 @@ describe('RecordingService.requestTranscription', () => {
           { participantId: 's1', audio: pcmOfSeconds(1) }, // startedAtMs 누락
         ],
       },
-      partialTranscriptStore: { append: async () => {}, consume: async () => [] },
-      transcriber: {
+      { append: async () => {}, consume: async () => [] },
+      {
         transcribe: async () => [{ text: 'a0', startMs: 100, endMs: 400 }],
       },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      publisher,
+      noopLogger(),
+    );
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
     expect(payload.transcript).toEqual([{ speaker: 's1', text: 'a0', startMs: 100, endMs: 400 }]);
@@ -502,8 +504,8 @@ describe('RecordingService.requestTranscription', () => {
     const meetingStartedAtMs = 1_000_000_000_000;
     const beforeMeetingMs = meetingStartedAtMs - 5_000;
     const { events, publisher } = makeEventPublisher();
-    const service = new RecordingService({
-      audioBufferRepository: {
+    const service = new RecordingService(
+      {
         append: async () => {},
         markStarted: async () => {},
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
@@ -513,13 +515,13 @@ describe('RecordingService.requestTranscription', () => {
           { participantId: 's1', audio: pcmOfSeconds(1), startedAtMs: beforeMeetingMs },
         ],
       },
-      partialTranscriptStore: { append: async () => {}, consume: async () => [] },
-      transcriber: {
+      { append: async () => {}, consume: async () => [] },
+      {
         transcribe: async () => [{ text: 'a0', startMs: 0, endMs: 500 }],
       },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      publisher,
+      noopLogger(),
+    );
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
     expect(payload.transcript).toEqual([{ speaker: 's1', text: 'a0', startMs: 0, endMs: 500 }]);
@@ -528,8 +530,8 @@ describe('RecordingService.requestTranscription', () => {
   it('PartialTranscriptStore의 누적 segments가 (absolute - meetingStartedAtMs)로 정규화되어 결과에 포함된다', async () => {
     const meetingStartedAtMs = 1_000_000_000_000;
     const { events, publisher } = makeEventPublisher();
-    const service = new RecordingService({
-      audioBufferRepository: {
+    const service = new RecordingService(
+      {
         append: async () => {},
         markStarted: async () => {},
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
@@ -537,7 +539,7 @@ describe('RecordingService.requestTranscription', () => {
         listActiveParticipants: async () => [],
         consume: async () => [],
       },
-      partialTranscriptStore: {
+      {
         append: async () => {},
         consume: async () => [
           {
@@ -554,10 +556,10 @@ describe('RecordingService.requestTranscription', () => {
           },
         ],
       },
-      transcriber: { transcribe: async () => [] },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      { transcribe: async () => [] },
+      publisher,
+      noopLogger(),
+    );
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
     expect(payload.transcript).toEqual([
@@ -576,8 +578,8 @@ describe('RecordingService.requestTranscription', () => {
       absoluteEndMs: meetingStartedAtMs + 10_500,
     };
     const { events, publisher } = makeEventPublisher();
-    const service = new RecordingService({
-      audioBufferRepository: {
+    const service = new RecordingService(
+      {
         append: async () => {},
         markStarted: async () => {},
         drainAvailable: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
@@ -593,18 +595,18 @@ describe('RecordingService.requestTranscription', () => {
           },
         ],
       },
-      partialTranscriptStore: {
+      {
         append: async () => {},
         consume: async () => [partialSeg],
       },
-      transcriber: {
+      {
         // 잔여 chunk의 STT 결과. partial scheduler가 사전 drain 했으므로 첫 chunk
         // 라도 chunk-local startMs<2000 segment는 dedup. tail은 2000 이상이라 keep.
         transcribe: async () => [{ text: 'tail', startMs: 2500, endMs: 3000 }],
       },
-      eventPublisher: publisher,
-      logger: noopLogger(),
-    });
+      publisher,
+      noopLogger(),
+    );
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
     expect(payload.transcript).toEqual([

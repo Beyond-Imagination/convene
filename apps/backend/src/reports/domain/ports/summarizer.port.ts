@@ -1,6 +1,8 @@
-import { ChatEntry, ReportSummary } from '@/shared-kernel/domain/value-objects';
+import { TranscriptSegment } from '@/reports/domain/entries/transcript-segment';
+import { ChatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
+import { ReportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
 
-import { TranscriptSegment } from '../entries';
+export const SUMMARIZER = Symbol('SUMMARIZER');
 
 /**
  * LLM 기반 회의록 요약 어댑터의 도메인 포트.

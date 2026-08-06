@@ -1,4 +1,5 @@
-import { ReportTranscriptionRequestedPayload } from '@/shared-kernel/domain/events';
+import { ReportTranscriptionRequestedPayload } from '@/shared-kernel/domain/events/report-transcription.payload';
+import { stub } from '@/shared-kernel/testing/stub';
 
 import { RecordingService, RequestTranscriptionCommand } from './recording.service';
 import { RecordingReportLifecycleListener } from './recording-report-lifecycle.listener';
@@ -10,7 +11,7 @@ const makeListener = () => {
       calls.push(cmd);
     }),
   };
-  const listener = new RecordingReportLifecycleListener(service as unknown as RecordingService);
+  const listener = new RecordingReportLifecycleListener(stub<RecordingService>(service));
   return { listener, calls, service };
 };
 

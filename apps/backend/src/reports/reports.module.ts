@@ -4,51 +4,36 @@ import { PinoLogger } from 'nestjs-pino';
 import { resolveAdminConfig } from '@/config/admin.config';
 import { resolveGeminiConfig } from '@/config/gemini.config';
 import { ReportFinalizationService } from '@/reports/application/report-finalization.service';
-import { ReportLookupAdapter } from '@/reports/application/report-lookup.adapter';
+import { ReportLookupService } from '@/reports/application/report-lookup.service';
 import { ReportMeetingLifecycleListener } from '@/reports/application/report-meeting-lifecycle.listener';
 import { ReportPipelineListener } from '@/reports/application/report-pipeline.listener';
-import { SummarizerPort } from '@/reports/domain/ports';
+import { REPORT_REPOSITORY } from '@/reports/domain/ports/report.repository';
+import { SUMMARIZER } from '@/reports/domain/ports/summarizer.port';
 import { GeminiSummarizer } from '@/reports/infrastructure/gemini.summarizer';
 import { MongoReportRepository } from '@/reports/infrastructure/mongo-report.repository';
 import { NoopSummarizer } from '@/reports/infrastructure/noop.summarizer';
-import { UuidReportIdGenerator } from '@/reports/infrastructure/uuid-report-id.generator';
 import { ReportsController } from '@/reports/interface/controllers/reports.controller';
 import { ADMIN_API_TOKEN, AdminGuard } from '@/reports/interface/guards/admin.guard';
-import { REPORT_LOOKUP_PORT } from '@/shared-kernel/domain/ports';
-import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
-import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
-import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
 
 /**
  * Reports 기능을 구성하는 NestJS 모듈.
  *
- * - `ReportFinalizationService`는 비-Nest class라 `useFactory`로 묶는다.
- * - `ReportMeetingLifecycleListener`는 Meeting BC의 도메인 이벤트를 구독한다.
- * - 회의록 영속화는 mongoose 기반 `MongoReportRepository`가 책임진다.
- * - SummarizerPort default는 `GeminiSummarizer`. `GEMINI_API_KEY` 미설정 시 `NoopSummarizer`로 fallback.
- * - 회의록의 노션 push는 `notion` BC가 `report.finalized`를 구독해 수행한다(본 모듈 밖).
- *   그 BC가 회의록 본문을 읽도록 `REPORT_LOOKUP_PORT`를 export한다.
+ * 회의록의 노션 push는 `notion` BC가 `report.finalized`를 구독해 수행한다(본 모듈 밖).
+ * 그 BC가 회의록 본문을 읽도록 `ReportLookupService`를 export한다.
  */
 @Module({
   controllers: [ReportsController],
   providers: [
-    MongoReportRepository,
-    UuidReportIdGenerator,
+    ReportFinalizationService,
     ReportMeetingLifecycleListener,
     ReportPipelineListener,
     AdminGuard,
+    { provide: REPORT_REPOSITORY, useClass: MongoReportRepository },
+    ReportLookupService,
+    { provide: ADMIN_API_TOKEN, useFactory: () => resolveAdminConfig()?.token ?? null },
     {
-      provide: ADMIN_API_TOKEN,
-      useFactory: (): string | null => resolveAdminConfig()?.token ?? null,
-    },
-    {
-      provide: REPORT_LOOKUP_PORT,
-      useFactory: (repository: MongoReportRepository) => new ReportLookupAdapter(repository),
-      inject: [MongoReportRepository],
-    },
-    {
-      provide: GeminiSummarizer,
-      useFactory: (logger: PinoLogger): SummarizerPort => {
+      provide: SUMMARIZER,
+      useFactory: (logger: PinoLogger) => {
         const config = resolveGeminiConfig();
         if (config === null) {
           logger.warn(
@@ -61,34 +46,7 @@ import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
       },
       inject: [PinoLogger],
     },
-    {
-      provide: ReportFinalizationService,
-      useFactory: (
-        repository: MongoReportRepository,
-        summarizer: GeminiSummarizer,
-        idGenerator: UuidReportIdGenerator,
-        clock: SystemClock,
-        eventPublisher: NestEventBusDomainEventPublisher,
-        logger: PinoLogger,
-      ) =>
-        new ReportFinalizationService({
-          repository,
-          summarizer,
-          idGenerator,
-          clock,
-          eventPublisher,
-          logger: new PinoLoggerAdapter(logger, ReportFinalizationService.name),
-        }),
-      inject: [
-        MongoReportRepository,
-        GeminiSummarizer,
-        UuidReportIdGenerator,
-        SystemClock,
-        NestEventBusDomainEventPublisher,
-        PinoLogger,
-      ],
-    },
   ],
-  exports: [REPORT_LOOKUP_PORT],
+  exports: [ReportLookupService],
 })
 export class ReportsModule {}

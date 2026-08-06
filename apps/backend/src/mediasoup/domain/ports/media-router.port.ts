@@ -1,3 +1,5 @@
+export const MEDIA_ROUTER = Symbol('MEDIA_ROUTER');
+
 /**
  * Multi-Router 풀의 생성·정리·할당
  *
@@ -14,7 +16,6 @@ export interface MediaRouterPort {
   /** mediasoup-client `Device.load({ routerRtpCapabilities })` 입력. */
   getRtpCapabilities(meetingCode: string): Promise<unknown>;
 
-  /** 참가자에게 router를 할당하고 그 인덱스를 반환한다. */
   assignParticipant(meetingCode: string, participantId: string): Promise<number>;
 
   releaseParticipant(meetingCode: string, participantId: string): Promise<void>;

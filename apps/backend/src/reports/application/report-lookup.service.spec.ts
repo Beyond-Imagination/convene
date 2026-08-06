@@ -1,12 +1,9 @@
 import { MeetingReport } from '@/reports/domain/meeting-report';
-import { ReportRepository } from '@/reports/domain/ports';
-import {
-  externalReference,
-  NO_EXTERNAL_REFERENCE,
-  reportSummary,
-} from '@/shared-kernel/domain/value-objects';
+import { ReportRepository } from '@/reports/domain/ports/report.repository';
+import { externalReference, NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects/external-reference';
+import { reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
 
-import { ReportLookupAdapter } from './report-lookup.adapter';
+import { ReportLookupService } from './report-lookup.service';
 
 const startedAt = new Date('2026-01-01T00:00:00Z');
 const endedAt = new Date('2026-01-01T00:30:00Z');
@@ -50,10 +47,10 @@ const makeAdapter = (report: MeetingReport | null) => {
     findByMeetingId: async () => null,
     listRecent: async () => [],
   };
-  return new ReportLookupAdapter(repository);
+  return new ReportLookupService(repository);
 };
 
-describe('ReportLookupAdapter', () => {
+describe('ReportLookupService', () => {
   it('확정된 회의록을 외부 push용 읽기 뷰로 돌려준다', async () => {
     const adapter = makeAdapter(finalize(makeReport({ issueId: 'issue_1', title: '주간 회의' })));
 

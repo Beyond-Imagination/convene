@@ -1,5 +1,7 @@
 import { MeetingReport } from '../meeting-report';
 
+export const REPORT_REPOSITORY = Symbol('REPORT_REPOSITORY');
+
 /**
  * MeetingReport Aggregate의 영속/조회 경계.
  * 도메인 객체를 그대로 주고받으며, 직렬화/역직렬화는 구현체 책임이다.

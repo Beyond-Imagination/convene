@@ -6,25 +6,16 @@ import {
   MediaType,
   TransportDirection,
 } from '@convene/shared-interfaces';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { ParticipantMedia } from '@/mediasoup/domain/participant-media';
-import {
-  AudioCapturePort,
-  MediaRouterPort,
-  MediaTransportPort,
-  ParticipantMediaRepository,
-} from '@/mediasoup/domain/ports';
-import { DomainEventPublisher } from '@/shared-kernel/domain/ports';
+import { AUDIO_CAPTURE, AudioCapturePort } from '@/mediasoup/domain/ports/audio-capture.port';
+import { MEDIA_ROUTER, MediaRouterPort } from '@/mediasoup/domain/ports/media-router.port';
+import { MEDIA_TRANSPORT, MediaTransportPort } from '@/mediasoup/domain/ports/media-transport.port';
+import { PARTICIPANT_MEDIA_REPOSITORY, ParticipantMediaRepository } from '@/mediasoup/domain/ports/participant-media.repository';
+import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 
 import { ParticipantMediaNotFoundError, ScreenShareConflictError } from './mediasoup.errors';
-
-interface MediasoupSignalingServiceDeps {
-  routerPort: MediaRouterPort;
-  transportPort: MediaTransportPort;
-  participantMediaRepository: ParticipantMediaRepository;
-  audioCapture: AudioCapturePort;
-  eventPublisher: DomainEventPublisher;
-}
 
 interface RoomCommand {
   meetingCode: string;
@@ -76,27 +67,35 @@ interface CloseProducerCommand extends ParticipantCommand {
  * Meeting BC의 도메인 이벤트에 반응해 회의 단위 라우터 풀과 참가자 단위 ParticipantMedia를 관리하고,
  * WebSocket 시그널링 RPC 진입점에서 호출되어 transport/producer/consumer lifecycle을 진행시키며 도메인 이벤트를 발행한다.
  */
+@Injectable()
 export class MediasoupSignalingService {
-  constructor(private readonly deps: MediasoupSignalingServiceDeps) {}
+  constructor(
+    @Inject(MEDIA_ROUTER) private readonly routerPort: MediaRouterPort,
+    @Inject(MEDIA_TRANSPORT) private readonly transportPort: MediaTransportPort,
+    @Inject(PARTICIPANT_MEDIA_REPOSITORY)
+    private readonly participantMediaRepository: ParticipantMediaRepository,
+    @Inject(AUDIO_CAPTURE) private readonly audioCapture: AudioCapturePort,
+    private readonly eventPublisher: NestEventBusDomainEventPublisher,
+  ) {}
 
   // ---------- room lifecycle ----------
 
   async openRoom(command: RoomCommand): Promise<void> {
-    await this.deps.routerPort.createRoom(command.meetingCode);
+    await this.routerPort.createRoom(command.meetingCode);
   }
 
   async closeRoom(command: RoomCommand): Promise<void> {
     // 회의 단위로 모든 audio capture 종료(stdin end → SIGTERM 대비).
     // 이후 router 정리 시 PlainTransport도 함께 close 되지만 stopAll이 명시적으로 ffmpeg subprocess까지 cleanup 한다.
-    await this.deps.audioCapture.stopAll(command.meetingCode);
-    await this.deps.participantMediaRepository.removeAllByMeetingCode(command.meetingCode);
-    await this.deps.routerPort.closeRoom(command.meetingCode);
+    await this.audioCapture.stopAll(command.meetingCode);
+    await this.participantMediaRepository.removeAllByMeetingCode(command.meetingCode);
+    await this.routerPort.closeRoom(command.meetingCode);
   }
 
   // ---------- participant lifecycle ----------
 
   async admitParticipant(command: ParticipantCommand): Promise<ParticipantMedia> {
-    const routerIndex = await this.deps.routerPort.assignParticipant(
+    const routerIndex = await this.routerPort.assignParticipant(
       command.meetingCode,
       command.participantId,
     );
@@ -105,43 +104,43 @@ export class MediasoupSignalingService {
       meetingCode: command.meetingCode,
       routerIndex,
     });
-    await this.deps.participantMediaRepository.save(media);
+    await this.participantMediaRepository.save(media);
     return media;
   }
 
   async dismissParticipant(command: ParticipantCommand): Promise<void> {
     // audio capture가 진행 중이라면 먼저 정리한다. capture context가 없으면 no-op.
-    await this.deps.audioCapture.stop(command.meetingCode, command.participantId);
-    const existing = await this.deps.participantMediaRepository.findByParticipantId(
+    await this.audioCapture.stop(command.meetingCode, command.participantId);
+    const existing = await this.participantMediaRepository.findByParticipantId(
       command.participantId,
     );
     if (existing) {
       if (!existing.isClosed) existing.close();
-      await this.deps.participantMediaRepository.removeByParticipantId(command.participantId);
+      await this.participantMediaRepository.removeByParticipantId(command.participantId);
     }
-    await this.deps.routerPort.releaseParticipant(command.meetingCode, command.participantId);
+    await this.routerPort.releaseParticipant(command.meetingCode, command.participantId);
   }
 
   // ---------- signaling RPC ----------
 
   async getRtpCapabilities(command: RoomCommand): Promise<unknown> {
-    return this.deps.routerPort.getRtpCapabilities(command.meetingCode);
+    return this.routerPort.getRtpCapabilities(command.meetingCode);
   }
 
   async createTransport(command: CreateTransportCommand): Promise<CreateTransportResponse> {
     const media = await this.requireParticipantMedia(command.participantId);
-    const res = await this.deps.transportPort.createWebRtcTransport({
+    const res = await this.transportPort.createWebRtcTransport({
       meetingCode: command.meetingCode,
       participantId: command.participantId,
       direction: command.direction,
     });
     media.attachTransport(command.direction, res.id);
-    await this.deps.participantMediaRepository.save(media);
+    await this.participantMediaRepository.save(media);
     return res;
   }
 
   async connectTransport(command: ConnectTransportCommand): Promise<void> {
-    await this.deps.transportPort.connectTransport(command.transportId, command.dtlsParameters);
+    await this.transportPort.connectTransport(command.transportId, command.dtlsParameters);
   }
 
   async produce(command: ProduceCommand): Promise<{ producerId: string }> {
@@ -150,7 +149,7 @@ export class MediasoupSignalingService {
     // 다른 참가자가 이미 screen producer를 갖고 있으면 거부한다(자기 자신 제외).
     // produce RPC는 순차 처리되고 frontend가 버튼을 disabled로 1차 차단한다.
     if (command.source === 'screen') {
-      const peers = await this.deps.participantMediaRepository.findByMeetingCode(
+      const peers = await this.participantMediaRepository.findByMeetingCode(
         command.meetingCode,
       );
       const otherSharing = peers.some(
@@ -162,7 +161,7 @@ export class MediasoupSignalingService {
         throw new ScreenShareConflictError(command.meetingCode);
       }
     }
-    const { producerId } = await this.deps.transportPort.produce({
+    const { producerId } = await this.transportPort.produce({
       meetingCode: command.meetingCode,
       participantId: command.participantId,
       transportId: command.transportId,
@@ -176,10 +175,10 @@ export class MediasoupSignalingService {
       source: command.source,
       paused: command.paused,
     });
-    await this.deps.participantMediaRepository.save(media);
+    await this.participantMediaRepository.save(media);
 
     // 다른 모든 router에 동일 producer가 보이도록 즉시 pipe. routersPerRoom <= 1이면 adapter가 no-op.
-    await this.deps.routerPort.pipeProducerToAllRouters(
+    await this.routerPort.pipeProducerToAllRouters(
       command.meetingCode,
       producerId,
       media.routerIndex,
@@ -188,14 +187,14 @@ export class MediasoupSignalingService {
     // audio producer만 STT 용으로 capture. video는 capture 대상이 아니다.
     // 같은 (meetingCode, participantId)에 대한 중복 호출은 어댑터가 dedup.
     if (command.kind === 'audio') {
-      await this.deps.audioCapture.start({
+      await this.audioCapture.start({
         meetingCode: command.meetingCode,
         participantId: command.participantId,
         producerId,
       });
     }
 
-    await this.deps.eventPublisher.publish(MEDIASOUP_EVENTS.PRODUCER_CREATED, {
+    await this.eventPublisher.publish(MEDIASOUP_EVENTS.PRODUCER_CREATED, {
       meetingCode: command.meetingCode,
       participantId: command.participantId,
       producerId,
@@ -214,7 +213,7 @@ export class MediasoupSignalingService {
         `Producer "${command.producerId}" not found in meeting "${command.meetingCode}"`,
       );
     }
-    const res = await this.deps.transportPort.consume({
+    const res = await this.transportPort.consume({
       meetingCode: command.meetingCode,
       participantId: command.participantId,
       transportId: command.transportId,
@@ -222,12 +221,12 @@ export class MediasoupSignalingService {
       rtpCapabilities: command.rtpCapabilities,
     });
     media.addConsumer(res.id, { producerId: command.producerId, kind: res.kind, source });
-    await this.deps.participantMediaRepository.save(media);
+    await this.participantMediaRepository.save(media);
     return res;
   }
 
   async resumeConsumer(command: ResumeConsumerCommand): Promise<void> {
-    await this.deps.transportPort.resumeConsumer(command.consumerId);
+    await this.transportPort.resumeConsumer(command.consumerId);
   }
 
   async toggleProducer(command: ToggleProducerCommand): Promise<void> {
@@ -239,13 +238,13 @@ export class MediasoupSignalingService {
       );
     }
     if (command.paused) {
-      await this.deps.transportPort.pauseProducer(command.producerId);
+      await this.transportPort.pauseProducer(command.producerId);
     } else {
-      await this.deps.transportPort.resumeProducer(command.producerId);
+      await this.transportPort.resumeProducer(command.producerId);
     }
     // 도메인에도 mute 상태를 반영·저장해, 늦게 입장한 참가자의 LIST_PRODUCERS 응답에 정확한 paused가 실리도록 한다(검은 화면 방지).
     media.setProducerPaused(command.producerId, command.paused);
-    await this.deps.participantMediaRepository.save(media);
+    await this.participantMediaRepository.save(media);
   }
 
   /**
@@ -260,14 +259,14 @@ export class MediasoupSignalingService {
         `Producer "${command.producerId}" is not owned by participant "${command.participantId}"`,
       );
     }
-    await this.deps.transportPort.closeProducer(command.producerId);
-    await this.deps.routerPort.cleanupPipeProducers(command.meetingCode, command.producerId);
+    await this.transportPort.closeProducer(command.producerId);
+    await this.routerPort.cleanupPipeProducers(command.meetingCode, command.producerId);
     media.removeProducer(command.producerId);
-    await this.deps.participantMediaRepository.save(media);
+    await this.participantMediaRepository.save(media);
   }
 
   async listProducers(command: ParticipantCommand): Promise<ListProducersResponse> {
-    const peers = await this.deps.participantMediaRepository.findByMeetingCode(command.meetingCode);
+    const peers = await this.participantMediaRepository.findByMeetingCode(command.meetingCode);
     const producers: ListProducersResponse['producers'] = [];
     for (const peer of peers) {
       if (peer.participantId === command.participantId) continue;
@@ -285,7 +284,7 @@ export class MediasoupSignalingService {
   }
 
   private async requireParticipantMedia(participantId: string): Promise<ParticipantMedia> {
-    const media = await this.deps.participantMediaRepository.findByParticipantId(participantId);
+    const media = await this.participantMediaRepository.findByParticipantId(participantId);
     if (!media) {
       throw new ParticipantMediaNotFoundError(participantId);
     }
@@ -296,7 +295,7 @@ export class MediasoupSignalingService {
     meetingCode: string,
     producerId: string,
   ): Promise<MediaType | null> {
-    const peers = await this.deps.participantMediaRepository.findByMeetingCode(meetingCode);
+    const peers = await this.participantMediaRepository.findByMeetingCode(meetingCode);
     for (const peer of peers) {
       const producer = peer.producers.find((p) => p.id === producerId);
       if (producer) return producer.source;

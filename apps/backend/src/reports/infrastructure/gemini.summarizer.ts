@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
-import { SummarizerInput, SummarizerPort } from '@/reports/domain/ports';
-import { ReportSummary, reportSummary } from '@/shared-kernel/domain/value-objects';
+import { SummarizerInput, SummarizerPort } from '@/reports/domain/ports/summarizer.port';
+import { ReportSummary, reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
 
 export interface GeminiSummarizerOptions {
   readonly apiKey: string;
@@ -62,20 +62,7 @@ const SUMMARY_RESPONSE_SCHEMA = {
 /**
  * Gemini `generateContent` REST API 기반 SummarizerPort 어댑터.
  *
- * POST {baseUrl}/v1beta/models/{model}:generateContent?key={apiKey}
- *   body: {
- *     contents: [{ role: 'user', parts: [{ text: <prompt> }] }],
- *     generationConfig: {
- *       responseMimeType: 'application/json',
- *       temperature: <낮은 값 — 일관성>,
- *       responseSchema: <5필드 구조 강제>
- *     }
- *   }
- *
- * 응답 candidates[0].content.parts[0].text를 JSON.parse → reportSummary VO factory로 정규화한다.
  * JSON 깨짐/필수 필드 누락은 throw 되어 Application Service의 try/catch가 `markSummaryFailed`로 전이한다.
- *
- * 타임아웃은 AbortController로 구현해 fetch 자체에 시간 한계를 둔다.
  */
 @Injectable()
 export class GeminiSummarizer implements SummarizerPort {
