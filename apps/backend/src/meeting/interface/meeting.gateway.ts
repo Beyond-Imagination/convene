@@ -8,7 +8,7 @@ import {
   type ParticipantJoinedBroadcast,
   type ParticipantLeftBroadcast,
 } from '@convene/shared-interfaces';
-import { UsePipes, ValidationPipe } from '@nestjs/common';
+import { UsePipes } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   ConnectedSocket,
@@ -17,7 +17,6 @@ import {
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
-  WsException,
 } from '@nestjs/websockets';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import type { Server, Socket } from 'socket.io';
@@ -25,6 +24,7 @@ import type { Server, Socket } from 'socket.io';
 import { MeetingService } from '@/meeting/application/meeting.service';
 import { ChatDto, JoinMeetingDto, LeaveMeetingDto } from '@/meeting/interface/meeting.dto';
 import { MeetingEndedPayload } from '@/shared-kernel/domain/domain-event.payloads';
+import { wsValidationPipe } from '@/shared-kernel/interface/ws-validation.pipe';
 
 const roomOf = (code: string): string => `meeting:${code}`;
 
@@ -33,25 +33,7 @@ const roomOf = (code: string): string => `meeting:${code}`;
  * 같은 room에 `meeting:*Broadcast` 이벤트를 emit한다.
  */
 @WebSocketGateway()
-@UsePipes(
-  new ValidationPipe({
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    transform: true,
-    // HTTP BadRequestException은 Nest 기본 WsExceptionFilter에 의해 'Internal server error'로 가려져 client에 검증 정보가 전달되지 않는다.
-    // WsException으로 명시 변환해 어떤 필드가 잘못됐는지 노출한다.
-    // 페이로드의 status: 'error'는 NestJS 기본 fallback 포맷과 동일한 컨벤션.
-    exceptionFactory: (errors) =>
-      new WsException({
-        status: 'error',
-        message: 'validation failed',
-        errors: errors.map((e) => ({
-          property: e.property,
-          constraints: e.constraints,
-        })),
-      }),
-  }),
-)
+@UsePipes(wsValidationPipe())
 export class MeetingGateway implements OnGatewayDisconnect {
   @WebSocketServer()
   server!: Server;

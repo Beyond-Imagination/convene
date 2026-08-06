@@ -12,7 +12,7 @@ import {
   type ProducerToggledBroadcast,
   type ToggleProducerResponse,
 } from '@convene/shared-interfaces';
-import { UsePipes, ValidationPipe } from '@nestjs/common';
+import { UsePipes } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   ConnectedSocket,
@@ -20,7 +20,6 @@ import {
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
-  WsException,
 } from '@nestjs/websockets';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import type { Server, Socket } from 'socket.io';
@@ -37,6 +36,7 @@ import {
   ResumeConsumerDto,
   ToggleProducerDto,
 } from '@/mediasoup/interface/mediasoup.dto';
+import { wsValidationPipe } from '@/shared-kernel/interface/ws-validation.pipe';
 
 const roomOf = (code: string): string => `meeting:${code}`;
 
@@ -56,22 +56,7 @@ interface ProducerCreatedPayload {
  * 회의 room 이름은 `roomOf(code)`로 양쪽이 일관되게 사용.
  */
 @WebSocketGateway()
-@UsePipes(
-  new ValidationPipe({
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    transform: true,
-    exceptionFactory: (errors) =>
-      new WsException({
-        status: 'error',
-        message: 'validation failed',
-        errors: errors.map((e) => ({
-          property: e.property,
-          constraints: e.constraints,
-        })),
-      }),
-  }),
-)
+@UsePipes(wsValidationPipe())
 export class MediasoupGateway {
   @WebSocketServer()
   server!: Server;

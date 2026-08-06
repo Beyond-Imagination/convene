@@ -100,7 +100,7 @@ Each bounded-context module follows:
 
 ```
 <context>/
-├── interface/        controllers, gateways, dto (class-validator)
+├── interface/        *.controller.ts, *.gateway.ts, <context>.dto.ts (class-validator; one DTO file per BC — no dto/ subfolder)
 ├── application/      use-case services, event handlers
 ├── domain/           aggregate, value objects, domain events, port interfaces
 └── infrastructure/   repository impls, mediasoup wiring, third-party adapters
@@ -111,10 +111,14 @@ Each bounded-context module follows:
 ```
 feature/<name>/
 ├── components/   View — props only
-├── hooks/        ViewModel — useXxxViewModel
-├── stores/       Model — zustand
-└── services/     Model — api fetch / socket handlers
+└── hooks/        ViewModel — useXxxViewModel
 ```
+
+Model (zustand stores, api fetch, socket clients) is shared across features and lives in
+`src/shared/{stores,api,socket}`, not per-feature.
+
+**File granularity**: split by "what you edit together", not by count — see `CODEBASE_GUIDE.md`
+섹션#1. Long files are fine; hopping between files is not. Subfolders only when they hold 2+ files.
 
 ## When you (Claude) come back to this repo cold
 
