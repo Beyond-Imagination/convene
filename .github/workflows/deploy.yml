@@ -1,10 +1,11 @@
 # 통합 배포 — main push(관련 경로) 또는 수동 시:
-#   verify(전체 lint/build/test, 1회) → changes(변경 타깃 판별)
+#   verify(수동 실행일 때만) → changes(변경 타깃 판별)
 #     ├─ build-push : 변경된 backend/ai-worker 이미지만 GHCR push
 #     ├─ deploy-backend : EC2 SSH (compose/Caddyfile 갱신 + 이미지 pull + 재기동)  [DEPLOY_ENABLED]
 #     └─ deploy-frontend : 정적 빌드 → S3 sync → CloudFront 무효화              [FRONTEND_DEPLOY_ENABLED]
 #
-# CI(verify) 통과해야 배포(needs). 모노레포라 verify 는 한 번만 돌고, 바뀐 타깃만 배포된다.
+# main push 는 PR CI(ci.yml) 를 통과한 커밋이므로 verify 를 다시 돌리지 않는다.
+# 임의 ref 에서 실행될 수 있는 수동 실행(workflow_dispatch) 만 verify 게이트를 거친다.
 name: Deploy
 
 on:
@@ -31,14 +32,16 @@ env:
   AIWORKER_IMAGE: ghcr.io/beyond-imagination/convene-ai-worker
 
 jobs:
-  # 1) CI 게이트 (전체 1회). backend 또는 frontend 배포가 켜져 있을 때만.
+  # 1) CI 게이트 — 수동 실행 전용(push 는 PR CI 로 이미 검증됨).
   verify:
-    if: ${{ vars.DEPLOY_ENABLED == 'true' || vars.FRONTEND_DEPLOY_ENABLED == 'true' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && (vars.DEPLOY_ENABLED == 'true' || vars.FRONTEND_DEPLOY_ENABLED == 'true') }}
     uses: ./.github/workflows/verify.yml
 
   # 2) 변경 타깃 판별 (push 일 때 diff; dispatch 는 아래 잡들이 강제 실행).
+  #    push 에선 verify 가 skip 이므로 always() 로 받고, 실패/취소만 차단한다.
   changes:
     needs: verify
+    if: ${{ always() && needs.verify.result != 'failure' && needs.verify.result != 'cancelled' && (vars.DEPLOY_ENABLED == 'true' || vars.FRONTEND_DEPLOY_ENABLED == 'true') }}
     runs-on: ubuntu-latest
     outputs:
       backend: ${{ steps.filter.outputs.backend }}

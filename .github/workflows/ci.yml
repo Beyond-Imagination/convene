@@ -1,10 +1,10 @@
-# PR 검증 — main 으로의 PR 에서 lint/build/test(verify.yml 재사용).
-# main push 시의 검증은 deploy-backend.yml 의 verify 잡이 담당(배포 전 게이트).
+# PR 검증 — main·develop 으로의 PR 에서 lint/build/test(verify.yml 재사용).
+# push(main·develop) 에서는 돌지 않는다 — 머지 대상 커밋은 여기서 이미 검증됐다.
 name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 concurrency:
   group: ci-${{ github.ref }}
