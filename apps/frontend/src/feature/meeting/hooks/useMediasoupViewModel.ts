@@ -34,8 +34,8 @@ export interface UseMediasoupViewModel {
  *   useRemoteMedia        : 다른 참가자 미디어 consume (recv 쪽)
  *   useLocalMedia         : 내 마이크/카메라/화면 공유 produce (send 쪽)
  *
- * transport가 만든 ref를 나머지 둘에게 넘기는 것이 유일한 결합점이라, 증상별로
- * (송출 이상 → useLocalMedia, 수신 이상 → useRemoteMedia) 한 파일만 열면 된다.
+ * transport가 만든 ref를 나머지 둘에게 넘기는 것이 유일한 결합점이라, 기능별로
+ * (송출 → useLocalMedia, 수신 → useRemoteMedia) 한 파일만 열면 된다.
  */
 export function useMediasoupViewModel(socket: Socket | null, code: string): UseMediasoupViewModel {
   const transport = useMediasoupTransport(socket, code);

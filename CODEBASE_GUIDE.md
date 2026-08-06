@@ -41,7 +41,7 @@ packages/shared-interfaces/src/   meeting.ts · mediasoup.ts · reports.ts · ev
 - **한 파일로 묶는다**: 한 gateway/controller가 쓰는 DTO 전부(`mediasoup.dto.ts`, `meeting.dto.ts`),
   합성 관계인 VO(`report-summary.ts`가 ActionItem·KeyTopic 포함), 도메인 이벤트 payload 전부,
   같은 마크업을 공유하는 View(`MeetingMedia.tsx`), 같은 저장소 종류(`meeting.storage.ts`).
-- **나눈다**: 증상이 달라 따로 열게 되는 것. `useMediasoupViewModel`(조립) ↔ transport/수신/송출,
+- **나눈다**: 기능이 달라 따로 열게 되는 것. `useMediasoupViewModel`(조립) ↔ transport/수신/송출,
   `gemini.summarizer`(HTTP) ↔ `summary-prompt`(프롬프트 튜닝),
   `ffmpeg-audio-capture.adapter`(캡처 lifecycle) ↔ `ffmpeg-process`(ffmpeg 인자·SDP).
 - **폴더는 파일이 2개 이상일 때만.** BC 4계층은 파일이 1개여도 유지하지만, 그 아래 `dto/`·`gateways/`
@@ -95,7 +95,7 @@ packages/shared-interfaces/src/   meeting.ts · mediasoup.ts · reports.ts · ev
 
 ### 2.3 미디어 (Mediasoup SFU)
 
-1. **VM** `useMediasoupViewModel` — 아래 셋을 조립만 한다(증상별로 한 파일만 열면 된다)
+1. **VM** `useMediasoupViewModel` — 아래 셋을 조립만 한다(기능별로 한 파일만 열면 된다)
    - `useMediasoupTransport` getRtpCapabilities → createTransport(send/recv), `status`/`errorMessage` 소유
    - `useRemoteMedia` 원격 consume + `mediasoup:*` broadcast 구독
    - `useLocalMedia` 마이크·카메라 토글 + 화면 공유 produce
