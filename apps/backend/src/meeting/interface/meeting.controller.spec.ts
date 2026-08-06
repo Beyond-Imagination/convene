@@ -4,8 +4,7 @@ import { MeetingNotFoundError, NotHostError } from '@/meeting/application/meetin
 import { Meeting } from '@/meeting/domain/meeting';
 import { IdleTimeout } from '@/meeting/domain/value-objects/idle-timeout';
 import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
-import { CreateMeetingDto } from '@/meeting/interface/dto/create-meeting.dto';
-import { ExternalReferenceDto } from '@/meeting/interface/dto/external-reference.dto';
+import { CreateMeetingDto, ExternalReferenceDto } from '@/meeting/interface/meeting.dto';
 import { externalReference } from '@/shared-kernel/domain/value-objects/external-reference';
 
 import { MeetingController } from './meeting.controller';

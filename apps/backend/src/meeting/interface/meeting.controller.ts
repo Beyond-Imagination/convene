@@ -18,7 +18,7 @@ import {
 
 import { MeetingService } from '@/meeting/application/meeting.service';
 import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
-import { CreateMeetingDto } from '@/meeting/interface/dto/create-meeting.dto';
+import { CreateMeetingDto } from '@/meeting/interface/meeting.dto';
 import { externalReference } from '@/shared-kernel/domain/value-objects/external-reference';
 
 /**

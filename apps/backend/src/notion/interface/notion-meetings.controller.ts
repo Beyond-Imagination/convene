@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 
 import { NotionMeetingProvisioningService } from '@/notion/application/notion-meeting-provisioning.service';
-import { NotionMeetingParamsDto } from '@/notion/interface/dto/notion-meeting-params.dto';
+import { NotionMeetingParamsDto } from '@/notion/interface/notion-meeting-params.dto';
 import { NotionSignatureVerifier } from '@/notion/interface/notion-signature';
 
 interface RedirectResponse {

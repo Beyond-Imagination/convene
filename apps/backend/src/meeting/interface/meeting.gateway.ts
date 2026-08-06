@@ -23,10 +23,8 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import type { Server, Socket } from 'socket.io';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
-import { ChatDto } from '@/meeting/interface/dto/chat.dto';
-import { JoinMeetingDto } from '@/meeting/interface/dto/join-meeting.dto';
-import { LeaveMeetingDto } from '@/meeting/interface/dto/leave-meeting.dto';
-import { MeetingEndedPayload } from '@/shared-kernel/domain/events/meeting-ended.payload';
+import { ChatDto, JoinMeetingDto, LeaveMeetingDto } from '@/meeting/interface/meeting.dto';
+import { MeetingEndedPayload } from '@/shared-kernel/domain/domain-event.payloads';
 
 const roomOf = (code: string): string => `meeting:${code}`;
 

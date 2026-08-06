@@ -19,7 +19,7 @@ import { MediasoupRouterAdapter } from '@/mediasoup/infrastructure/mediasoup-rou
 import { MediasoupTransportAdapter } from '@/mediasoup/infrastructure/mediasoup-transport.adapter';
 import { MediasoupWorkerPool } from '@/mediasoup/infrastructure/mediasoup-worker.pool';
 import { RedisParticipantMediaRepository } from '@/mediasoup/infrastructure/redis-participant-media.repository';
-import { MediasoupGateway } from '@/mediasoup/interface/gateways/mediasoup.gateway';
+import { MediasoupGateway } from '@/mediasoup/interface/mediasoup.gateway';
 import { AUDIO_BUFFER_REPOSITORY, AudioBufferRepository } from '@/recording/domain/ports/audio-buffer.repository';
 import { RecordingModule } from '@/recording/recording.module';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';

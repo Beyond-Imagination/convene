@@ -1,7 +1,7 @@
 import { AudioBufferRepository } from '@/recording/domain/ports/audio-buffer.repository';
 import { AbsoluteTranscriptSegment, PartialTranscriptStore } from '@/recording/domain/ports/partial-transcript.store';
 import { TranscriberPort } from '@/recording/domain/ports/transcriber.port';
-import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events/report-transcription.payload';
+import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/domain-event.payloads';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 import { stub } from '@/shared-kernel/testing/stub';
 

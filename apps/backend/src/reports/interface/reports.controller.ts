@@ -15,8 +15,8 @@ import {
 } from '@nestjs/common';
 
 import { ReportFinalizationService } from '@/reports/application/report-finalization.service';
-import { ListReportsQueryDto } from '@/reports/interface/dto/list-reports-query.dto';
-import { AdminGuard } from '@/reports/interface/guards/admin.guard';
+import { AdminGuard } from '@/reports/interface/admin.guard';
+import { ListReportsQueryDto } from '@/reports/interface/list-reports-query.dto';
 
 import { toReportDetailResponse, toReportListItem } from './report-serialize';
 

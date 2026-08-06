@@ -1,5 +1,5 @@
 import { MeetingReport } from '@/reports/domain/meeting-report';
-import { MeetingEndedPayload } from '@/shared-kernel/domain/events/meeting-ended.payload';
+import { MeetingEndedPayload } from '@/shared-kernel/domain/domain-event.payloads';
 import { NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects/external-reference';
 import { stub } from '@/shared-kernel/testing/stub';
 

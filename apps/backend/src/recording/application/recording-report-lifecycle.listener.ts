@@ -2,7 +2,7 @@ import { REPORT_EVENTS } from '@convene/shared-interfaces';
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 
-import { ReportTranscriptionRequestedPayload } from '@/shared-kernel/domain/events/report-transcription.payload';
+import { ReportTranscriptionRequestedPayload } from '@/shared-kernel/domain/domain-event.payloads';
 
 import { RecordingService } from './recording.service';
 

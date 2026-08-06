@@ -1,7 +1,7 @@
 import { UnauthorizedException } from '@nestjs/common';
 
 import { NotionMeetingProvisioningService, ProvisionResult } from '@/notion/application/notion-meeting-provisioning.service';
-import { NotionMeetingParamsDto } from '@/notion/interface/dto/notion-meeting-params.dto';
+import { NotionMeetingParamsDto } from '@/notion/interface/notion-meeting-params.dto';
 import { NotionMeetingsController } from '@/notion/interface/notion-meetings.controller';
 import { NotionSignatureVerifier, signIssue } from '@/notion/interface/notion-signature';
 import { stub } from '@/shared-kernel/testing/stub';

@@ -10,8 +10,8 @@ import { MongoMeetingRepository } from '@/meeting/infrastructure/mongo-meeting.r
 import { RandomMeetingCodeGenerator } from '@/meeting/infrastructure/random-meeting-code.generator';
 import { RedisChatRepository } from '@/meeting/infrastructure/redis-chat.repository';
 import { RedisMeetingRepository } from '@/meeting/infrastructure/redis-meeting.repository';
-import { MeetingController } from '@/meeting/interface/controllers/meeting.controller';
-import { MeetingGateway } from '@/meeting/interface/gateways/meeting.gateway';
+import { MeetingController } from '@/meeting/interface/meeting.controller';
+import { MeetingGateway } from '@/meeting/interface/meeting.gateway';
 
 /** 회의 원본은 MongoDB, redis는 캐시다. `CachedMeetingRepository`가 둘을 묶어 노출한다. */
 @Module({

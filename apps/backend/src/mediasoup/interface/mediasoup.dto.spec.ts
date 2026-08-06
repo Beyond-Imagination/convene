@@ -1,13 +1,15 @@
 import { ValidationPipe } from '@nestjs/common';
 
-import { CloseProducerDto } from './close-producer.dto';
-import { ConnectTransportDto } from './connect-transport.dto';
-import { ConsumeDto } from './consume.dto';
-import { CreateTransportDto } from './create-transport.dto';
-import { GetRtpCapabilitiesDto } from './get-rtp-capabilities.dto';
-import { ProduceDto } from './produce.dto';
-import { ResumeConsumerDto } from './resume-consumer.dto';
-import { ToggleProducerDto } from './toggle-producer.dto';
+import {
+  CloseProducerDto,
+  ConnectTransportDto,
+  ConsumeDto,
+  CreateTransportDto,
+  GetRtpCapabilitiesDto,
+  ProduceDto,
+  ResumeConsumerDto,
+  ToggleProducerDto,
+} from './mediasoup.dto';
 
 const makePipe = () =>
   new ValidationPipe({

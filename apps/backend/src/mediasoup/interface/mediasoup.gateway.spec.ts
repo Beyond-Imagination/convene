@@ -2,14 +2,16 @@ import { MEDIASOUP_WS_EVENTS } from '@convene/shared-interfaces';
 import type { Socket } from 'socket.io';
 
 import { MediasoupSignalingService } from '@/mediasoup/application/mediasoup-signaling.service';
-import { CloseProducerDto } from '@/mediasoup/interface/dto/close-producer.dto';
-import { ConnectTransportDto } from '@/mediasoup/interface/dto/connect-transport.dto';
-import { ConsumeDto } from '@/mediasoup/interface/dto/consume.dto';
-import { CreateTransportDto } from '@/mediasoup/interface/dto/create-transport.dto';
-import { GetRtpCapabilitiesDto } from '@/mediasoup/interface/dto/get-rtp-capabilities.dto';
-import { ProduceDto } from '@/mediasoup/interface/dto/produce.dto';
-import { ResumeConsumerDto } from '@/mediasoup/interface/dto/resume-consumer.dto';
-import { ToggleProducerDto } from '@/mediasoup/interface/dto/toggle-producer.dto';
+import {
+  CloseProducerDto,
+  ConnectTransportDto,
+  ConsumeDto,
+  CreateTransportDto,
+  GetRtpCapabilitiesDto,
+  ProduceDto,
+  ResumeConsumerDto,
+  ToggleProducerDto,
+} from '@/mediasoup/interface/mediasoup.dto';
 import { stub } from '@/shared-kernel/testing/stub';
 
 import { MediasoupGateway } from './mediasoup.gateway';

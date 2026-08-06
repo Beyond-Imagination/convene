@@ -1,6 +1,6 @@
 import { FinalizedReport } from '@/reports/application/report-lookup.service';
-import { ActionItem } from '@/shared-kernel/domain/value-objects/action-item';
-import { KeyTopic } from '@/shared-kernel/domain/value-objects/key-topic';
+import { ActionItem } from '@/shared-kernel/domain/value-objects/report-summary';
+import { KeyTopic } from '@/shared-kernel/domain/value-objects/report-summary';
 import { ReportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
 
 export const REPORT_ANCHOR_LABEL = 'Convene 회의록';
