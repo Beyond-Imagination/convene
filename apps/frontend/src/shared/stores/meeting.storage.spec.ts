@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { getHostToken, saveHostToken } from './host-token.storage';
+import { getHostToken, saveHostToken } from './meeting.storage';
 
-describe('host-token storage', () => {
+describe('meeting.storage — hostToken', () => {
   beforeEach(() => {
     window.sessionStorage.clear();
   });

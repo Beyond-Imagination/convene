@@ -2,7 +2,7 @@ import { render } from '@testing-library/react';
 
 import type { RemoteMediaEntry } from '@/feature/meeting/hooks/useMediasoupViewModel';
 
-import { RemoteAudioPlayer } from './RemoteAudioPlayer';
+import { RemoteAudioPlayer } from './MeetingMedia';
 
 const fakeAudioTrack = (id: string): MediaStreamTrack =>
   ({ kind: 'audio', id }) as unknown as MediaStreamTrack;

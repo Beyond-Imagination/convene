@@ -2,17 +2,58 @@
 
 import type { ReactNode } from 'react';
 
-import { LocalVideoTile } from '@/feature/meeting/components/LocalVideoTile';
-import {
-  gridDims,
-  pickAudioEntry,
-  pickScreenTrack,
-  pickVideoEntry,
-} from '@/feature/meeting/components/meeting-screen.helpers';
-import { RemoteVideoTile } from '@/feature/meeting/components/RemoteVideoTile';
-import { LocalScreenTile, RemoteScreenTile } from '@/feature/meeting/components/ScreenTile';
+import { ScreenTile, VideoTile } from '@/feature/meeting/components/MeetingMedia';
+import type { RemoteMediaEntry } from '@/feature/meeting/hooks/useMediasoupViewModel';
 import type { UseMediasoupViewModel } from '@/feature/meeting/hooks/useMediasoupViewModel';
 import type { RemoteParticipant } from '@/feature/meeting/hooks/useMeetingViewModel';
+
+/** 같은 참가자의 카메라(screen 제외) 비디오 entry를 찾는다. */
+const pickVideoEntry = (
+  remoteMedia: ReadonlyArray<RemoteMediaEntry>,
+  peerSocketId: string,
+): RemoteMediaEntry | null => {
+  for (const m of remoteMedia) {
+    if (m.peerSocketId === peerSocketId && m.kind === 'video' && m.source !== 'screen') {
+      return m;
+    }
+  }
+  return null;
+};
+
+/** 같은 참가자의 마이크(audio) entry를 찾는다. */
+const pickAudioEntry = (
+  remoteMedia: ReadonlyArray<RemoteMediaEntry>,
+  peerSocketId: string,
+): RemoteMediaEntry | null => {
+  for (const m of remoteMedia) {
+    if (m.peerSocketId === peerSocketId && m.kind === 'audio') return m;
+  }
+  return null;
+};
+
+const pickScreenTrack = (
+  remoteMedia: ReadonlyArray<RemoteMediaEntry>,
+  peerSocketId: string,
+): MediaStreamTrack | null => {
+  for (const m of remoteMedia) {
+    if (m.peerSocketId === peerSocketId && m.source === 'screen') return m.track;
+  }
+  return null;
+};
+
+/**
+ * 타일 수에 맞춰 빈칸 없이 영역을 채우는 열/행 수를 정한다(Zoom 갤러리 톤).
+ * 2명이면 2칸, 3명이면 3칸으로 가로로 꽉 채우고, 그 이상은 균형 잡힌 격자로.
+ */
+const gridDims = (count: number): { cols: number; rows: number } => {
+  if (count <= 1) return { cols: 1, rows: 1 };
+  if (count === 2) return { cols: 2, rows: 1 };
+  if (count === 3) return { cols: 3, rows: 1 };
+  if (count === 4) return { cols: 2, rows: 2 };
+  if (count <= 6) return { cols: 3, rows: 2 };
+  if (count <= 9) return { cols: 3, rows: 3 };
+  return { cols: 4, rows: Math.ceil(count / 4) };
+};
 
 export interface VideoStageProps {
   readonly nickname: string | null;
@@ -50,9 +91,10 @@ export function VideoStage({
 
   // self(첫 칸) + 원격 카메라 타일을 한 배열로 만든 뒤 페이지 단위로 자른다.
   const tiles: ReactNode[] = [
-    <LocalVideoTile
+    <VideoTile
       key="self"
-      nickname={nickname}
+      isSelf
+      label={nickname ?? '(미인증)'}
       stream={mediasoup.localStream}
       isVideoOff={mediasoup.isVideoMuted}
       isAudioOff={mediasoup.isAudioMuted}
@@ -61,10 +103,10 @@ export function VideoStage({
       const entry = pickVideoEntry(mediasoup.remoteMedia, p.socketId);
       const audioEntry = pickAudioEntry(mediasoup.remoteMedia, p.socketId);
       return (
-        <RemoteVideoTile
+        <VideoTile
           key={p.socketId}
-          participant={p}
-          videoTrack={entry?.track ?? null}
+          label={p.nickname}
+          track={entry?.track ?? null}
           isVideoOff={entry === null || entry.paused}
           isAudioOff={audioEntry === null || audioEntry.paused}
         />
@@ -85,13 +127,16 @@ export function VideoStage({
           {/* 화면 공유 stage */}
           <div className="flex min-h-0 flex-1 items-center justify-center">
             {mediasoup.isSharingScreen && mediasoup.screenStream !== null && (
-              <LocalScreenTile stream={mediasoup.screenStream} />
+              <ScreenTile
+                isSelf
+                stream={mediasoup.screenStream}
+              />
             )}
             {remoteParticipants.map((p) => {
               const track = pickScreenTrack(mediasoup.remoteMedia, p.socketId);
               if (track === null) return null;
               return (
-                <RemoteScreenTile
+                <ScreenTile
                   key={`screen-${p.socketId}`}
                   nickname={p.nickname}
                   track={track}

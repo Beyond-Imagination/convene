@@ -1,7 +1,7 @@
 'use client';
 
 import { MeetingControlBar } from '@/feature/meeting/components/MeetingControlBar';
-import { RemoteAudioPlayer } from '@/feature/meeting/components/RemoteAudioPlayer';
+import { RemoteAudioPlayer } from '@/feature/meeting/components/MeetingMedia';
 import { VideoStage } from '@/feature/meeting/components/VideoStage';
 import type { UseMediasoupViewModel } from '@/feature/meeting/hooks/useMediasoupViewModel';
 import type { UseMeetingViewModel } from '@/feature/meeting/hooks/useMeetingViewModel';
