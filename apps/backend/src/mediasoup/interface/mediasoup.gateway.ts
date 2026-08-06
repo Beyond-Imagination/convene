@@ -50,7 +50,7 @@ interface ProducerCreatedPayload {
 }
 
 /**
- * mediasoup:* RPC 6 개 핸들러 + `mediasoup.producer.created` 도메인 이벤트 구독.
+ * mediasoup:* RPC 핸들러 + `mediasoup.producer.created` 도메인 이벤트 구독.
  *
  * Meeting BC의 `MeetingGateway`와 동일한 socket.io 네임스페이스(/)를 공유한다.
  * 회의 room 이름은 `roomOf(code)`로 양쪽이 일관되게 사용.
