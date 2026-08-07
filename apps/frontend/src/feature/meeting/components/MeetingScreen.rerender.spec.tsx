@@ -1,6 +1,6 @@
 import { type ChatPostedBroadcast, MEETING_WS_EVENTS } from '@convene/shared-interfaces';
 import { act, render } from '@testing-library/react';
-import { memo, type ReactNode } from 'react';
+import { memo, type ReactNode, useEffect } from 'react';
 import type { Socket } from 'socket.io-client';
 
 import { MeetingPageClient } from '@/app/meetings/[code]/MeetingPageClient';
@@ -24,6 +24,24 @@ import type {
  * memo 가 무력화되어 둘 다 측정이 거짓이 된다.
  */
 const videoTileRenders = vi.fn();
+/**
+ * 미디어 요소 재바인딩(= `<video>` 의 srcObject 재설정) 횟수. 렌더 횟수보다 이쪽이 실제 부하다.
+ * 재바인딩이 일어나면 그 순간 영상이 끊긴다. 원본 훅과 같은 deps 를 걸어 같은 시점에 재실행된다.
+ */
+const mediaRebinds = vi.fn();
+vi.mock('@/feature/meeting/hooks/useMediaElementBinding', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/feature/meeting/hooks/useMediaElementBinding')>();
+  return {
+    useMediaElementBinding: (params: Parameters<typeof actual.useMediaElementBinding>[0]) => {
+      useEffect(() => {
+        if (params.stream !== null) mediaRebinds();
+      }, [params.ref, params.stream, params.enabled]);
+      return actual.useMediaElementBinding(params);
+    },
+  };
+});
+
 vi.mock('@/feature/meeting/components/MeetingMedia', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@/feature/meeting/components/MeetingMedia')>();
@@ -140,8 +158,20 @@ const typeInto = (input: HTMLInputElement, text: string): void => {
   }
 };
 
+const screenEntry: RemoteMediaEntry = {
+  consumerId: 'c-s1-screen',
+  peerSocketId: 's1',
+  producerId: 'p-s1-screen',
+  kind: 'video',
+  source: 'screen',
+  track: fakeTrack('video'),
+  paused: false,
+};
+const localStream = { id: 'local' } as unknown as MediaStream;
+
 beforeEach(() => {
   videoTileRenders.mockClear();
+  mediaRebinds.mockClear();
   socketHandlers.clear();
 });
 
@@ -230,5 +260,83 @@ describe('한 사람의 미디어 변화는 그 사람 타일만 다시 그린�
     );
 
     expect(videoTileRenders.mock.calls.map((c) => c[0])).toEqual(['지현']);
+  });
+});
+
+/**
+ * 화면 공유는 비디오 영역을 그리드 ↔ (공유 stage + 가로 strip) 으로 바꾼다.
+ * 이때 참가자 타일이 DOM 에서 언마운트/재마운트되면 `<video>` 가 새로 만들어지면서
+ * srcObject 가 다시 붙고, 그 순간 모든 참가자 영상이 끊긴다. 배치만 바뀌어야 한다.
+ */
+describe('화면 공유 전환이 참가자 영상을 끊지 않는다', () => {
+  const renderScreen = (mediasoup: UseMediasoupViewModel) =>
+    render(
+      <MeetingScreen
+        {...meetingVm}
+        mediasoup={mediasoup}
+      />,
+    );
+
+  it('원격 화면 공유가 시작돼도 참가자 타일은 다시 붙이지 않는다', () => {
+    const { rerender } = renderScreen(mediasoupVm({ localStream }));
+    videoTileRenders.mockClear();
+    mediaRebinds.mockClear();
+
+    rerender(
+      <MeetingScreen
+        {...meetingVm}
+        mediasoup={mediasoupVm({
+          localStream,
+          remoteMedia: [...remoteMedia, screenEntry],
+          isRemoteSharingScreen: true,
+        })}
+      />,
+    );
+
+    // 새로 생긴 공유 화면 하나만 붙는다.
+    expect(mediaRebinds).toHaveBeenCalledTimes(1);
+    expect(videoTileRenders).not.toHaveBeenCalled();
+  });
+
+  it('원격 화면 공유가 끝나도 참가자 타일은 다시 붙이지 않는다', () => {
+    const { rerender } = renderScreen(
+      mediasoupVm({
+        localStream,
+        remoteMedia: [...remoteMedia, screenEntry],
+        isRemoteSharingScreen: true,
+      }),
+    );
+    videoTileRenders.mockClear();
+    mediaRebinds.mockClear();
+
+    rerender(
+      <MeetingScreen
+        {...meetingVm}
+        mediasoup={mediasoupVm({ localStream })}
+      />,
+    );
+
+    expect(mediaRebinds).not.toHaveBeenCalled();
+    expect(videoTileRenders).not.toHaveBeenCalled();
+  });
+
+  it('내가 화면 공유를 시작해도 참가자 타일은 다시 붙이지 않는다', () => {
+    const { rerender } = renderScreen(mediasoupVm({ localStream }));
+    videoTileRenders.mockClear();
+    mediaRebinds.mockClear();
+
+    rerender(
+      <MeetingScreen
+        {...meetingVm}
+        mediasoup={mediasoupVm({
+          localStream,
+          isSharingScreen: true,
+          screenStream: { id: 'screen' } as unknown as MediaStream,
+        })}
+      />,
+    );
+
+    expect(mediaRebinds).toHaveBeenCalledTimes(1);
+    expect(videoTileRenders).not.toHaveBeenCalled();
   });
 });
