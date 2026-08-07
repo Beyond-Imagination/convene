@@ -90,27 +90,35 @@ export function VideoStage({
     remoteParticipants.some((p) => pickScreenTrack(mediasoup.remoteMedia, p.socketId) !== null);
 
   // self(첫 칸) + 원격 카메라 타일을 한 배열로 만든 뒤 페이지 단위로 자른다.
-  const tiles: ReactNode[] = [
-    <VideoTile
-      key="self"
-      isSelf
-      label={nickname ?? '(미인증)'}
-      stream={mediasoup.localStream}
-      isVideoOff={mediasoup.isVideoMuted}
-      isAudioOff={mediasoup.isAudioMuted}
-    />,
+  // 배치(그리드/strip)가 바뀌어도 같은 key로 같은 자리에 남아야 <video>가 재생성되지 않으므로
+  // key를 노드와 함께 들고 다닌다.
+  const tiles: ReadonlyArray<{ key: string; node: ReactNode }> = [
+    {
+      key: 'self',
+      node: (
+        <VideoTile
+          isSelf
+          label={nickname ?? '(미인증)'}
+          stream={mediasoup.localStream}
+          isVideoOff={mediasoup.isVideoMuted}
+          isAudioOff={mediasoup.isAudioMuted}
+        />
+      ),
+    },
     ...remoteParticipants.map((p) => {
       const entry = pickVideoEntry(mediasoup.remoteMedia, p.socketId);
       const audioEntry = pickAudioEntry(mediasoup.remoteMedia, p.socketId);
-      return (
-        <VideoTile
-          key={p.socketId}
-          label={p.nickname}
-          track={entry?.track ?? null}
-          isVideoOff={entry === null || entry.paused}
-          isAudioOff={audioEntry === null || audioEntry.paused}
-        />
-      );
+      return {
+        key: p.socketId,
+        node: (
+          <VideoTile
+            label={p.nickname}
+            track={entry?.track ?? null}
+            isVideoOff={entry === null || entry.paused}
+            isAudioOff={audioEntry === null || audioEntry.paused}
+          />
+        ),
+      };
     }),
   ];
   const visibleTiles =
@@ -122,52 +130,59 @@ export function VideoStage({
   return (
     /* 중앙 비디오 영역 — 스크롤 차단(overflow-hidden) */
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
-      {hasScreen ? (
-        <>
-          {/* 화면 공유 stage */}
-          <div className="flex min-h-0 flex-1 items-center justify-center">
-            {mediasoup.isSharingScreen && mediasoup.screenStream !== null && (
+      {/* 화면 공유 stage. 공유가 없으면 자리만 비운다(타일 컨테이너의 형제 위치를 유지). */}
+      {hasScreen && (
+        <div className="flex min-h-0 flex-1 items-center justify-center">
+          {mediasoup.isSharingScreen && mediasoup.screenStream !== null && (
+            <ScreenTile
+              isSelf
+              stream={mediasoup.screenStream}
+            />
+          )}
+          {remoteParticipants.map((p) => {
+            const track = pickScreenTrack(mediasoup.remoteMedia, p.socketId);
+            if (track === null) return null;
+            return (
               <ScreenTile
-                isSelf
-                stream={mediasoup.screenStream}
+                key={`screen-${p.socketId}`}
+                nickname={p.nickname}
+                track={track}
               />
-            )}
-            {remoteParticipants.map((p) => {
-              const track = pickScreenTrack(mediasoup.remoteMedia, p.socketId);
-              if (track === null) return null;
-              return (
-                <ScreenTile
-                  key={`screen-${p.socketId}`}
-                  nickname={p.nickname}
-                  track={track}
-                />
-              );
-            })}
-          </div>
-          {/* 비디오 가로 strip */}
-          <div className="mt-3 flex shrink-0 gap-3 overflow-hidden">
-            {visibleTiles.map((tile, i) => (
-              <div
-                key={i}
-                className="aspect-video w-44 shrink-0"
-              >
-                {tile}
-              </div>
-            ))}
-          </div>
-        </>
-      ) : (
-        /* 비디오 균등 그리드 (self 첫 칸) — 빈칸 없이 영역을 꽉 채운다 */
-        <div
-          className="grid min-h-0 flex-1 gap-3"
-          style={{
-            gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-            gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
-          }}
-        >
-          {visibleTiles}
+            );
+          })}
         </div>
       )}
+
+      {/*
+        타일 컨테이너는 공유 여부와 무관하게 같은 자리·같은 구조를 유지하고 배치만 바꾼다.
+        트리 모양이 달라지면 React가 타일을 전부 재마운트해 <video>가 새로 만들어지고,
+        그 순간 모든 참가자 영상이 끊긴다. — MeetingScreen.rerender.spec.tsx
+          공유 중: 하단 가로 strip / 공유 없음: 빈칸 없이 꽉 채우는 균등 그리드
+      */}
+      <div
+        className={
+          hasScreen
+            ? 'mt-3 flex shrink-0 gap-3 overflow-hidden'
+            : 'grid min-h-0 flex-1 gap-3'
+        }
+        style={
+          hasScreen
+            ? undefined
+            : {
+                gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
+              }
+        }
+      >
+        {visibleTiles.map((tile) => (
+          <div
+            key={tile.key}
+            className={hasScreen ? 'aspect-video w-44 shrink-0' : 'min-h-0'}
+          >
+            {tile.node}
+          </div>
+        ))}
+      </div>
 
       {pageCount !== undefined && pageCount > 1 && (
         <nav
