@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 
 import { transcriptSegment } from '@/reports/domain/entries/transcript-segment';
-import { ReportTranscriptionCompletedPayload, ReportTranscriptionFailedPayload } from '@/shared-kernel/domain/events/report-transcription.payload';
+import { ReportTranscriptionCompletedPayload, ReportTranscriptionFailedPayload } from '@/shared-kernel/domain/domain-event.payloads';
 
 import { ReportFinalizationService } from './report-finalization.service';
 

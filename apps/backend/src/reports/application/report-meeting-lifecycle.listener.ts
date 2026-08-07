@@ -2,7 +2,7 @@ import { MEETING_EVENTS } from '@convene/shared-interfaces';
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 
-import { MeetingEndedPayload } from '@/shared-kernel/domain/events/meeting-ended.payload';
+import { MeetingEndedPayload } from '@/shared-kernel/domain/domain-event.payloads';
 
 import { ReportFinalizationService } from './report-finalization.service';
 

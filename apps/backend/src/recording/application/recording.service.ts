@@ -4,7 +4,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AUDIO_BUFFER_REPOSITORY, AudioBufferRepository } from '@/recording/domain/ports/audio-buffer.repository';
 import { AbsoluteTranscriptSegment, PARTIAL_TRANSCRIPT_STORE, PartialTranscriptStore } from '@/recording/domain/ports/partial-transcript.store';
 import { TRANSCRIBER, TranscriberPort } from '@/recording/domain/ports/transcriber.port';
-import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events/report-transcription.payload';
+import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/domain-event.payloads';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 

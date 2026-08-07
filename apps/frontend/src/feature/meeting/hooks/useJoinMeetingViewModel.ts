@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { type BaseSyntheticEvent, useState } from 'react';
 import { type FieldErrors, useForm, type UseFormRegisterReturn } from 'react-hook-form';
 
-import { saveNickname } from '@/shared/stores/nickname.storage';
+import { saveNickname } from '@/shared/stores/meeting.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
 export const MEETING_CODE_PATTERN = /^[a-z0-9]{8}$/;

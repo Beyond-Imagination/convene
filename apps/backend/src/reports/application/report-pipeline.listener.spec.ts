@@ -1,4 +1,4 @@
-import { ReportTranscriptionCompletedPayload, ReportTranscriptionFailedPayload } from '@/shared-kernel/domain/events/report-transcription.payload';
+import { ReportTranscriptionCompletedPayload, ReportTranscriptionFailedPayload } from '@/shared-kernel/domain/domain-event.payloads';
 import { stub } from '@/shared-kernel/testing/stub';
 
 import {

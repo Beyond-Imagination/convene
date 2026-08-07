@@ -10,7 +10,7 @@ import { CHAT_REPOSITORY, ChatRepository } from '@/meeting/domain/ports/chat.rep
 import { MEETING_REPOSITORY, MeetingRepository } from '@/meeting/domain/ports/meeting.repository';
 import { IdleTimeout } from '@/meeting/domain/value-objects/idle-timeout';
 import { RandomMeetingCodeGenerator } from '@/meeting/infrastructure/random-meeting-code.generator';
-import { MeetingEndedPayload, MeetingEndedReason } from '@/shared-kernel/domain/events/meeting-ended.payload';
+import { MeetingEndedPayload, MeetingEndedReason } from '@/shared-kernel/domain/domain-event.payloads';
 import { ChatEntry, chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
 import { ExternalReference } from '@/shared-kernel/domain/value-objects/external-reference';
 import { MeetingType } from '@/shared-kernel/domain/value-objects/meeting-type';

@@ -1,4 +1,4 @@
-import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events/report-transcription.payload';
+import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/domain-event.payloads';
 
 export const TRANSCRIBER = Symbol('TRANSCRIBER');
 

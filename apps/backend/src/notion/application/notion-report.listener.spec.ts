@@ -1,4 +1,4 @@
-import { ReportFinalizedPayload } from '@/shared-kernel/domain/events/report-finalized.payload';
+import { ReportFinalizedPayload } from '@/shared-kernel/domain/domain-event.payloads';
 import { stub } from '@/shared-kernel/testing/stub';
 
 import { NotionReportListener } from './notion-report.listener';

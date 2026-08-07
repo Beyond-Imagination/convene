@@ -12,8 +12,8 @@ import { SUMMARIZER } from '@/reports/domain/ports/summarizer.port';
 import { GeminiSummarizer } from '@/reports/infrastructure/gemini.summarizer';
 import { MongoReportRepository } from '@/reports/infrastructure/mongo-report.repository';
 import { NoopSummarizer } from '@/reports/infrastructure/noop.summarizer';
-import { ReportsController } from '@/reports/interface/controllers/reports.controller';
-import { ADMIN_API_TOKEN, AdminGuard } from '@/reports/interface/guards/admin.guard';
+import { ADMIN_API_TOKEN, AdminGuard } from '@/reports/interface/admin.guard';
+import { ReportsController } from '@/reports/interface/reports.controller';
 
 /**
  * Reports 기능을 구성하는 NestJS 모듈.

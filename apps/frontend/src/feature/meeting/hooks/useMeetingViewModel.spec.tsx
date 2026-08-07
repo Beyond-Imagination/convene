@@ -1,7 +1,7 @@
 import { type JoinMeetingAck, MEETING_WS_EVENTS } from '@convene/shared-interfaces';
 import { act, renderHook, waitFor } from '@testing-library/react';
 
-import { getHostToken, saveHostToken } from '@/shared/stores/host-token.storage';
+import { getHostToken, saveHostToken } from '@/shared/stores/meeting.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
 import { useMeetingViewModel } from './useMeetingViewModel';

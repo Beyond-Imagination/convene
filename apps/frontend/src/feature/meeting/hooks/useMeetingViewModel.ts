@@ -14,8 +14,12 @@ import type { Socket } from 'socket.io-client';
 
 import { closeMeeting } from '@/shared/api/meeting.api';
 import { connectMeetingSocket } from '@/shared/socket/meeting.socket';
-import { getHostToken, saveHostToken } from '@/shared/stores/host-token.storage';
-import { clearStoredNickname, getNickname } from '@/shared/stores/nickname.storage';
+import {
+  clearStoredNickname,
+  getHostToken,
+  getNickname,
+  saveHostToken,
+} from '@/shared/stores/meeting.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
 export type MeetingConnectionStatus = 'connecting' | 'joined' | 'error';

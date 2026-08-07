@@ -2,7 +2,7 @@ import { act, fireEvent, renderHook, waitFor } from '@testing-library/react';
 import { render } from '@testing-library/react';
 
 import { MeetingApiError } from '@/shared/api/meeting.api';
-import { getHostToken } from '@/shared/stores/host-token.storage';
+import { getHostToken } from '@/shared/stores/meeting.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
 import { useCreateMeetingViewModel } from './useCreateMeetingViewModel';

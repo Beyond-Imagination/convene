@@ -1,4 +1,4 @@
-import { ReportTranscriptionRequestedPayload } from '@/shared-kernel/domain/events/report-transcription.payload';
+import { ReportTranscriptionRequestedPayload } from '@/shared-kernel/domain/domain-event.payloads';
 import { stub } from '@/shared-kernel/testing/stub';
 
 import { RecordingService, RequestTranscriptionCommand } from './recording.service';

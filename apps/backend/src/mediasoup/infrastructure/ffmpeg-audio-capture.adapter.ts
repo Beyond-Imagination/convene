@@ -1,5 +1,4 @@
-import { ChildProcess, spawn } from 'node:child_process';
-import { AddressInfo, createServer } from 'node:net';
+import { ChildProcess } from 'node:child_process';
 
 import { Injectable } from '@nestjs/common';
 import { Consumer, PlainTransport } from 'mediasoup/node/lib/types';
@@ -8,6 +7,7 @@ import { AudioCapturePort, AudioCaptureStartInput } from '@/mediasoup/domain/por
 import { AudioBufferRepository } from '@/recording/domain/ports/audio-buffer.repository';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
+import { buildSdp, getFreePort, spawnFfmpeg } from './ffmpeg-process';
 import { MediasoupRouterAdapter } from './mediasoup-router.adapter';
 
 interface CaptureContext {
@@ -18,7 +18,6 @@ interface CaptureContext {
   readonly ffmpeg: ChildProcess;
 }
 
-const FFMPEG_BIN = process.env.FFMPEG_BIN ?? 'ffmpeg';
 /** PlainTransport.connect 직후 즉시 consumer.
  * resume하면 ffmpeg의 port binding이 끝나기 전에 RTP가 떨어져 packet loss. 1초 양보.
  * */
@@ -125,7 +124,7 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
     const codec = consumer.rtpParameters.codecs[0];
     const sdp = buildSdp(port, codec.payloadType, codec.clockRate, codec.channels ?? 2);
 
-    const ffmpeg = this.spawnFfmpeg(input.meetingCode, input.participantId);
+    const ffmpeg = spawnFfmpeg(this.logger, input.meetingCode, input.participantId);
     if (!ffmpeg.stdin || !ffmpeg.stdout) {
       throw new Error('ffmpeg stdin/stdout pipe missing');
     }
@@ -203,84 +202,7 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
     }
   }
 
-  private spawnFfmpeg(meetingCode: string, participantId: string): ChildProcess {
-    const ffmpeg = spawn(FFMPEG_BIN, [
-      '-loglevel',
-      'warning',
-      '-protocol_whitelist',
-      'rtp,file,udp,pipe',
-      '-reorder_queue_size',
-      '100',
-      '-f',
-      'sdp',
-      '-i',
-      'pipe:0',
-      '-analyzeduration',
-      '0',
-      '-probesize',
-      '32',
-      // 노이즈 게이트.
-      '-af',
-      'agate=threshold=-45dB:range=0.01:release=1000',
-      '-map',
-      '0:a',
-      '-acodec',
-      'pcm_s16le',
-      // AI STT 표준: 16kHz mono.
-      '-ac',
-      '1',
-      '-ar',
-      '16000',
-      '-flush_packets',
-      '1',
-      // raw PCM 출력 — wav 컨테이너보다 chunk 단위 자르기가 자유롭다(중간을 잘라도 valid).
-      '-f',
-      's16le',
-      'pipe:1',
-    ]);
-    ffmpeg.on('error', (err) => {
-      this.logger.error({ meetingCode, participantId, err }, 'ffmpeg spawn error');
-    });
-    ffmpeg.on('close', (exit) => {
-      this.logger.info({ meetingCode, participantId, exit }, 'ffmpeg closed');
-    });
-    if (ffmpeg.stderr) {
-      ffmpeg.stderr.on('data', (data: Buffer) => {
-        this.logger.debug(
-          { meetingCode, participantId, line: data.toString().trim() },
-          'ffmpeg stderr',
-        );
-      });
-    }
-    return ffmpeg;
-  }
-
   private key(meetingCode: string, participantId: string): string {
     return `${meetingCode}:${participantId}`;
   }
-}
-
-function buildSdp(port: number, payloadType: number, clockRate: number, channels: number): string {
-  return (
-    `v=0\n` +
-    `o=- 0 0 IN IP4 127.0.0.1\n` +
-    `s=mediasoup\n` +
-    `c=IN IP4 127.0.0.1\n` +
-    `t=0 0\n` +
-    `m=audio ${port} RTP/AVP ${payloadType}\n` +
-    `a=rtpmap:${payloadType} opus/${clockRate}/${channels}\n` +
-    `a=fmtp:${payloadType} sprop-stereo=1\n`
-  );
-}
-
-function getFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.unref();
-    server.on('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const port = (server.address() as AddressInfo).port;
-      server.close(() => resolve(port));
-    });
-  });
 }

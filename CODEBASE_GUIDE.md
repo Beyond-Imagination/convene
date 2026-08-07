@@ -16,21 +16,37 @@ Notion 문서(구 `ARCHITECTURE.md`)를 본다.
 ## 1. 디렉토리 맵
 
 ```
-apps/backend/src/<context>/        meeting · mediasoup · recording · reports
-  ├── interface/    controllers · gateways · dto(class-validator)
+apps/backend/src/<context>/        meeting · mediasoup · recording · reports · notion
+  ├── interface/    *.controller.ts · *.gateway.ts · <context>.dto.ts (class-validator)
   ├── application/  *.service.ts · *.listener.ts
   ├── domain/       {aggregate}.ts · value-objects/ · ports/  (프레임워크 import 0)
   └── infrastructure/  repository·adapter 구현
-  + shared-kernel/(공유 VO·이벤트 payload·Clock·EventPublisher·DomainError·DomainExceptionFilter), config/ redis/ mongo/
+  + shared-kernel/(공유 VO·domain-event.payloads·Clock·EventPublisher·DomainError·
+    DomainExceptionFilter·wsValidationPipe·testing/stub), config/ redis/ mongo/
 
 apps/frontend/src/
   ├── app/          라우트(정적 export): page.tsx, meetings/[code], reports, reports/[id]
   ├── feature/<name>/{components(View), hooks(ViewModel)}    meeting · reports
-  └── shared/{api(fetch + ApiError), socket(io+device), stores(zustand+sessionStorage), hooks(useRouteSegment)}
+  └── shared/{api(fetch + ApiError), socket(io+device+rpc), stores(zustand+meeting.storage), hooks(useRouteSegment)}
 
 apps/ai-worker/    FastAPI main.py — POST /transcribe (faster-whisper)
 packages/shared-interfaces/src/   meeting.ts · mediasoup.ts · reports.ts · events.ts
 ```
+
+### 파일 나누는 기준 (CNV-14)
+
+파일 개수가 아니라 **"한 번에 같이 고치는가"** 로 가른다. 같이 고칠 것은 한 파일에 두고,
+따로 고칠 것만 나눈다. 파일이 길어지는 것은 감수한다 — 파일을 오가는 비용이 더 크다.
+
+- **한 파일로 묶는다**: 한 gateway/controller가 쓰는 DTO 전부(`mediasoup.dto.ts`, `meeting.dto.ts`),
+  합성 관계인 VO(`report-summary.ts`가 ActionItem·KeyTopic 포함), 도메인 이벤트 payload 전부,
+  같은 마크업을 공유하는 View(`MeetingMedia.tsx`), 같은 저장소 종류(`meeting.storage.ts`).
+- **나눈다**: 기능이 달라 따로 열게 되는 것. `useMediasoupViewModel`(조립) ↔ transport/수신/송출,
+  `gemini.summarizer`(HTTP) ↔ `summary-prompt`(프롬프트 튜닝),
+  `ffmpeg-audio-capture.adapter`(캡처 lifecycle) ↔ `ffmpeg-process`(ffmpeg 인자·SDP).
+- **폴더는 파일이 2개 이상일 때만.** BC 4계층은 파일이 1개여도 유지하지만, 그 아래 `dto/`·`gateways/`
+  같은 하위 폴더는 두지 않는다.
+- 조립부(hook/컴포넌트/클래스)의 **공개 시그니처를 유지**하면 내부를 쪼개도 스펙이 안 바뀐다.
 
 ## 2. 핵심 흐름
 
@@ -79,8 +95,10 @@ packages/shared-interfaces/src/   meeting.ts · mediasoup.ts · reports.ts · ev
 
 ### 2.3 미디어 (Mediasoup SFU)
 
-1. **VM** `useMediasoupViewModel`
-   — getRtpCapabilities → createTransport(send/recv) → produce/consume RPC
+1. **VM** `useMediasoupViewModel` — 아래 셋을 조립만 한다(기능별로 한 파일만 열면 된다)
+   - `useMediasoupTransport` getRtpCapabilities → createTransport(send/recv), `status`/`errorMessage` 소유
+   - `useRemoteMedia` 원격 consume + `mediasoup:*` broadcast 구독
+   - `useLocalMedia` 마이크·카메라 토글 + 화면 공유 produce
    - lazy: 입장 시 getUserMedia 안 함 — toggle이 켤 때 취득+produce, 끄면 close + `CLOSE_PRODUCER`
 2. **GW** `mediasoup.gateway` (mediasoup:\* RPC)
 3. **Svc** `mediasoup-signaling.service` produce/consume/…
@@ -129,7 +147,8 @@ packages/shared-interfaces/src/   meeting.ts · mediasoup.ts · reports.ts · ev
 1. `packages/shared-interfaces/src/*.ts`에 wire 타입/이벤트 상수 추가 → `pnpm build:shared`.
 2. **domain**: aggregate 메서드/VO + spec.
 3. **application**: service 메서드(+이벤트 발행) + spec(Port fake 사용).
-4. **interface**: dto(class-validator) + controller/gateway + spec.
+4. **interface**: `<context>.dto.ts`에 DTO 추가(BC당 한 파일) + controller/gateway + spec.
+   WS gateway의 ValidationPipe는 `wsValidationPipe()`를 쓴다(직접 `new ValidationPipe` 금지).
 5. **infrastructure**: repository/adapter 구현 + spec.
 6. **frontend**: `shared/api` 또는 `shared/socket` → `useXxxViewModel`(+spec) → View(props, +spec).
    > 도메인 입력은 명시 타입, 외부 경계(controller/service command)는 optional 허용 후 `?? null` 같은
@@ -208,7 +227,7 @@ const meetings = stub<MeetingService>({ create: jest.fn(async () => ({ code: 'x'
 - **wire 계약**: `packages/shared-interfaces/src/{meeting,mediasoup,reports,events}.ts`
 - **env 해석**: `apps/backend/src/config/*.ts`(키·기본값의 단일 진실원), 템플릿은 `apps/*/.env.template`
 - **전역 파이프/CORS**: `apps/backend/src/main.ts`. 도메인 에러 → HTTP 매핑은 `shared-kernel/interface/domain-exception.filter.ts`(`DomainError.httpStatus` 사용)
-- 재요약 401/403: `ADMIN_API_TOKEN` 미설정시 엔드포인트 비활성(403), 설정 시 `Authorization: Bearer <token>` 불일치는 401(`reports/interface/guards/admin.guard.ts`)
+- 재요약 401/403: `ADMIN_API_TOKEN` 미설정시 엔드포인트 비활성(403), 설정 시 `Authorization: Bearer <token>` 불일치는 401(`reports/interface/admin.guard.ts`)
 - `EADDRINUSE`/옛 코드 응답: dev 재기동 시 좀비 node 프로세스 — 포트(5000/3000/8000) LISTEN 확인 후 종료
 - 오디오/STT 동작 안 함: 호스트에 `ffmpeg` 설치 확인, ai-worker(8000) 실행 확인
 - 회의록 요약이 비어 있음: `GEMINI_API_KEY` 미설정 시 `NoopSummarizer`로 동작(정상)

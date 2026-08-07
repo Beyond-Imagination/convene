@@ -5,8 +5,7 @@ import { type BaseSyntheticEvent, useState } from 'react';
 import { type FieldErrors, useForm, type UseFormRegisterReturn } from 'react-hook-form';
 
 import { createMeeting, MeetingApiError } from '@/shared/api/meeting.api';
-import { saveHostToken } from '@/shared/stores/host-token.storage';
-import { saveNickname } from '@/shared/stores/nickname.storage';
+import { saveHostToken, saveNickname } from '@/shared/stores/meeting.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
 export const NICKNAME_MIN = 1;

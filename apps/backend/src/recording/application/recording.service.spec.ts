@@ -1,6 +1,6 @@
 import { REPORT_EVENTS } from '@convene/shared-interfaces';
 
-import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/events/report-transcription.payload';
+import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/domain-event.payloads';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 import { stub } from '@/shared-kernel/testing/stub';
