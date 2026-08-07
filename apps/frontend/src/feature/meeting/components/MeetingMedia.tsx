@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { memo, useMemo, useRef } from 'react';
 
 import { MicOffIcon, VideoOffIcon } from '@/feature/meeting/components/icons';
 import { useMediaElementBinding } from '@/feature/meeting/hooks/useMediaElementBinding';
@@ -75,8 +75,13 @@ export interface VideoTileProps {
   readonly isAudioOff?: boolean;
 }
 
-/** 참가자 한 명의 카메라 타일. */
-export function VideoTile({
+/**
+ * 참가자 한 명의 카메라 타일.
+ *
+ * memo: 회의 화면은 채팅·참가자 입퇴장 등으로 자주 리렌더되는데, 타일은 화면에 참가자 수만큼
+ * 깔려 있어 비용이 곱해진다. props(라벨·트랙·on/off)가 그대로면 다시 그리지 않는다.
+ */
+export const VideoTile = memo(function VideoTile({
   label,
   isSelf,
   stream,
@@ -106,7 +111,7 @@ export function VideoTile({
       </figcaption>
     </figure>
   );
-}
+});
 
 export interface ScreenTileProps {
   readonly isSelf?: boolean;
@@ -116,8 +121,13 @@ export interface ScreenTileProps {
   readonly track?: MediaStreamTrack | null;
 }
 
-/** 화면 공유 비디오 한 칸. */
-export function ScreenTile({ isSelf, nickname, stream, track }: ScreenTileProps) {
+/** 화면 공유 비디오 한 칸. memo 이유는 VideoTile 과 같다. */
+export const ScreenTile = memo(function ScreenTile({
+  isSelf,
+  nickname,
+  stream,
+  track,
+}: ScreenTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   useMediaElementBinding({ ref: videoRef, stream: useTileStream(stream, track) });
   return (
@@ -137,9 +147,14 @@ export function ScreenTile({ isSelf, nickname, stream, track }: ScreenTileProps)
       </figcaption>
     </figure>
   );
-}
+});
 
-function RemoteAudioEntry({ track }: { readonly track: MediaStreamTrack }) {
+/** memo: 재생 중인 `<audio>`는 track 이 그대로면 건드리지 않는다. */
+const RemoteAudioEntry = memo(function RemoteAudioEntry({
+  track,
+}: {
+  readonly track: MediaStreamTrack;
+}) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const stream = useMemo(() => new MediaStream([track]), [track]);
   useMediaElementBinding({ ref: audioRef, stream });
@@ -150,7 +165,7 @@ function RemoteAudioEntry({ track }: { readonly track: MediaStreamTrack }) {
       playsInline
     />
   );
-}
+});
 
 export interface RemoteAudioPlayerProps {
   readonly remoteMedia: ReadonlyArray<RemoteMediaEntry>;

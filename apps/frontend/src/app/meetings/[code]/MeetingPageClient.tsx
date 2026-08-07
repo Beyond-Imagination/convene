@@ -1,5 +1,7 @@
 'use client';
 
+import type { Socket } from 'socket.io-client';
+
 import { ChatPanel } from '@/feature/meeting/components/ChatPanel';
 import { EmbedGate } from '@/feature/meeting/components/EmbedGate';
 import { MeetingScreen } from '@/feature/meeting/components/MeetingScreen';
@@ -14,10 +16,34 @@ import { useNicknameGateViewModel } from '@/feature/meeting/hooks/useNicknameGat
 import { useRouteSegment } from '@/shared/hooks/useRouteSegment';
 
 /**
- * 실제 회의 세션. 세 ViewModel hook을 합성한다:
+ * 채팅 ViewModel 을 회의 화면과 같은 컴포넌트에 두면 draft 한 글자마다 비디오 타일 전체가
+ * 다시 그려진다(참가자 수만큼 곱해진다). 채팅 상태를 이 경계 안에 가둬 비디오 트리와 끊는다.
+ * — `MeetingScreen.rerender.spec.tsx`
+ */
+function ChatSection({
+  socket,
+  code,
+  myNickname,
+}: {
+  readonly socket: Socket | null;
+  readonly code: string;
+  readonly myNickname: string | null;
+}) {
+  const chatVm = useChatViewModel(socket, code);
+  return (
+    <ChatPanel
+      {...chatVm}
+      myNickname={myNickname}
+    />
+  );
+}
+
+/**
+ * 실제 회의 세션. 두 ViewModel hook을 합성한다:
  *   - `useMeetingViewModel`
  *   - `useMediasoupViewModel`
- *   - `useChatViewModel`
+ *
+ * 채팅은 `ChatSection` 이 자기 ViewModel 을 직접 들고 있다(위 주석 참조).
  */
 function MeetingSession({ code }: { readonly code: string }) {
   const meetingVm = useMeetingViewModel(code);
@@ -27,7 +53,6 @@ function MeetingSession({ code }: { readonly code: string }) {
     meetingVm.status === 'joined' ? meetingVm.socket : null,
     code,
   );
-  const chatVm = useChatViewModel(meetingVm.socket, code);
   // self 타일(항상 1) + 원격 참가자 수 = 전체 비디오 타일 수.
   const totalTiles = 1 + meetingVm.remoteParticipants.length;
   const layout = useMeetingLayoutViewModel(totalTiles);
@@ -61,14 +86,18 @@ function MeetingSession({ code }: { readonly code: string }) {
         onPrevPage={layout.prevPage}
         onNextPage={layout.nextPage}
       />
-      {layout.isChatOpen && (
-        <aside className="border-border bg-surface flex w-80 shrink-0 flex-col border-l">
-          <ChatPanel
-            {...chatVm}
-            myNickname={meetingVm.nickname}
-          />
-        </aside>
-      )}
+      {/* 닫아도 unmount 하지 않는다 — 안 그러면 채팅 기록이 사라지고 그 동안의 메시지도 놓친다. */}
+      <aside
+        className={`border-border bg-surface w-80 shrink-0 flex-col border-l ${
+          layout.isChatOpen ? 'flex' : 'hidden'
+        }`}
+      >
+        <ChatSection
+          socket={meetingVm.socket}
+          code={code}
+          myNickname={meetingVm.nickname}
+        />
+      </aside>
     </div>
   );
 }
