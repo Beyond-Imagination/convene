@@ -20,8 +20,17 @@ function audioFilterArgs(): string[] {
   return ['-af', configured || DEFAULT_AUDIO_FILTER];
 }
 
-/** 정상 jitter를 패딩하지 않도록 하는 하한(16kHz mono pcm_s16le 200ms 분량). */
-export const PAD_THRESHOLD_BYTES = 6_400;
+/** 16kHz mono pcm_s16le. audio-chunker 의 상수와 같은 포맷을 전제한다. */
+const PCM_BYTES_PER_SECOND = 32_000;
+const PCM_BYTES_PER_SAMPLE = 2;
+
+/** 정상 jitter를 패딩하지 않도록 하는 하한(200ms 분량). */
+export const PAD_THRESHOLD_BYTES = PCM_BYTES_PER_SECOND / 5;
+
+/** 이 시간 이상 살아 있었으면 정상 동작 중 idle 타임아웃으로 죽은 것으로 본다. */
+export const HEALTHY_LIFETIME_MS = 5_000;
+/** 즉시 죽는 상황에서 허용할 연속 재시도 횟수. */
+const MAX_IMMEDIATE_FAILURES = 3;
 
 export interface SilencePaddingInput {
   /** 캡처 시작 이후 실제 경과 시간(ms). */
@@ -38,12 +47,31 @@ export interface RespawnDecisionInput {
   readonly lifetimeMs: number;
 }
 
-export function silencePaddingBytes(_input: SilencePaddingInput): number {
-  throw new Error('not implemented');
+/**
+ * 벽시계 대비 부족한 PCM 을 무음으로 채울 byte 수.
+ *
+ * Opus DTX 로 참가자가 말을 멈추면 브라우저가 RTP 전송을 멈추고, ffmpeg 도 그동안
+ * PCM 을 내보내지 않는다. 시간축은 `startedAtMs + 누적 byte` 로 계산하므로 그대로 두면
+ * 침묵이 삭제된 압축 시간축이 되어 이후 발화의 타임스탬프가 앞으로 밀린다.
+ */
+export function silencePaddingBytes(input: SilencePaddingInput): number {
+  const expectedBytes = Math.floor((input.elapsedMs / 1000) * PCM_BYTES_PER_SECOND);
+  const shortfall = expectedBytes - input.writtenBytes - input.incomingBytes;
+  if (shortfall < PAD_THRESHOLD_BYTES) return 0;
+  // sample 경계(2 byte)로 내림 — 홀수 byte 를 끼우면 이후 전체 sample 이 어긋난다.
+  return shortfall - (shortfall % PCM_BYTES_PER_SAMPLE);
 }
 
-export function shouldRespawnFfmpeg(_input: RespawnDecisionInput): boolean {
-  throw new Error('not implemented');
+/**
+ * 죽은 ffmpeg 을 다시 띄울지.
+ *
+ * RTP 가 10초 끊기면 ffmpeg 이 `Connection timed out` 으로 종료하는데, 이는 참가자가
+ * 잠시 말을 멈춘 정상 상황이므로 되살려야 한다. 다만 spawn 직후 즉시 죽는 상황이
+ * 반복되면(바이너리 부재·포트 점유 등) 무한 루프가 되므로 그때는 포기한다.
+ */
+export function shouldRespawnFfmpeg(input: RespawnDecisionInput): boolean {
+  if (input.lifetimeMs >= HEALTHY_LIFETIME_MS) return true;
+  return input.consecutiveFailures < MAX_IMMEDIATE_FAILURES;
 }
 
 /** mediasoup PlainTransport가 RTP를 흘려보낼 로컬 포트를 OS에서 하나 받아온다. */

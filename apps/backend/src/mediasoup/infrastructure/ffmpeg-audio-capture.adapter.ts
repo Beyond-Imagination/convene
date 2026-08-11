@@ -7,7 +7,14 @@ import { AudioCapturePort, AudioCaptureStartInput } from '@/mediasoup/domain/por
 import { AudioBufferRepository } from '@/recording/domain/ports/audio-buffer.repository';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
-import { buildSdp, getFreePort, spawnFfmpeg } from './ffmpeg-process';
+import {
+  buildSdp,
+  getFreePort,
+  HEALTHY_LIFETIME_MS,
+  shouldRespawnFfmpeg,
+  silencePaddingBytes,
+  spawnFfmpeg,
+} from './ffmpeg-process';
 import { MediasoupRouterAdapter } from './mediasoup-router.adapter';
 
 interface CaptureContext {
@@ -15,7 +22,18 @@ interface CaptureContext {
   readonly participantId: string;
   readonly transport: PlainTransport;
   readonly consumer: Consumer;
-  readonly ffmpeg: ChildProcess;
+  /** ffmpeg가 RTP idle로 죽으면 같은 포트로 다시 띄우므로 교체된다. */
+  ffmpeg: ChildProcess;
+  /** 재spawn 시 그대로 다시 먹일 SDP. mediasoup는 계속 같은 포트로 쏘고 있다. */
+  readonly sdp: string;
+  /** 캡처 시작 시각(epoch ms). 벽시계 대비 부족분을 무음으로 채우는 기준. */
+  readonly startedAtMs: number;
+  /** 현재 ffmpeg 프로세스를 띄운 시각. 즉시 죽는 상황을 판별한다. */
+  spawnedAtMs: number;
+  consecutiveFailures: number;
+  writtenBytes: number;
+  /** stop/stopAll로 의도적으로 내리는 중이면 재spawn하지 않는다. */
+  stopping: boolean;
 }
 
 /** PlainTransport.connect 직후 즉시 consumer.
@@ -24,6 +42,8 @@ interface CaptureContext {
 const RESUME_DELAY_MS = 1000;
 /** ffmpeg가 stdin 종료 후 자체 정리할 시간을 주고도 살아 있으면 SIGTERM. */
 const SIGTERM_DELAY_MS = 2000;
+/** 재spawn 간격. 포트가 풀릴 시간을 주고 spawn 폭주도 막는다. */
+const RESPAWN_DELAY_MS = 200;
 
 /**
  * `AudioCapturePort`의 mediasoup PlainTransport + ffmpeg 어댑터
@@ -124,23 +144,20 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
     const codec = consumer.rtpParameters.codecs[0];
     const sdp = buildSdp(port, codec.payloadType, codec.clockRate, codec.channels ?? 2);
 
-    const ffmpeg = spawnFfmpeg(this.logger, input.meetingCode, input.participantId);
-    if (!ffmpeg.stdin || !ffmpeg.stdout) {
-      throw new Error('ffmpeg stdin/stdout pipe missing');
-    }
-    ffmpeg.stdin.write(sdp);
-    ffmpeg.stdin.end();
-
-    ffmpeg.stdout.on('data', (chunk: Buffer) => {
-      this.audioBufferRepository
-        .append(input.meetingCode, input.participantId, chunk)
-        .catch((err) =>
-          this.logger.error(
-            { meetingCode: input.meetingCode, participantId: input.participantId, err },
-            'audio buffer append failed',
-          ),
-        );
-    });
+    const ctx: CaptureContext = {
+      meetingCode: input.meetingCode,
+      participantId: input.participantId,
+      transport,
+      consumer,
+      ffmpeg: spawnFfmpeg(this.logger, input.meetingCode, input.participantId),
+      sdp,
+      startedAtMs: Date.now(),
+      spawnedAtMs: Date.now(),
+      consecutiveFailures: 0,
+      writtenBytes: 0,
+      stopping: false,
+    };
+    this.attachFfmpeg(ctx);
 
     setTimeout(() => {
       consumer
@@ -156,7 +173,7 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
     // 참가자의 capture 시작 시각을 1회만 기록한다. RecordingService가 회의 시작 시각을 origin으로 잡고 본 값과의 차이를
     // segment.startMs/endMs에 가산해 시간축을 회의 기준으로 normalize. SETNX 성격이라 두 번째 capture가 들어와도 첫 호출 값만 유효.
     this.audioBufferRepository
-      .markStarted(input.meetingCode, input.participantId, Date.now())
+      .markStarted(input.meetingCode, input.participantId, ctx.startedAtMs)
       .catch((err) =>
         this.logger.error(
           { meetingCode: input.meetingCode, participantId: input.participantId, err },
@@ -164,16 +181,81 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
         ),
       );
 
-    return {
-      meetingCode: input.meetingCode,
-      participantId: input.participantId,
-      transport,
-      consumer,
-      ffmpeg,
-    };
+    return ctx;
+  }
+
+  /**
+   * ffmpeg 프로세스에 stdin(SDP)·stdout(PCM)·close 핸들러를 건다.
+   *
+   * 재spawn 때도 그대로 다시 호출된다 — PlainTransport와 consumer는 살아 있고
+   * mediasoup는 계속 같은 포트로 RTP를 쏘고 있으므로 ffmpeg만 갈아 끼우면 된다.
+   */
+  private attachFfmpeg(ctx: CaptureContext): void {
+    const { ffmpeg, meetingCode, participantId } = ctx;
+    if (!ffmpeg.stdin || !ffmpeg.stdout) {
+      throw new Error('ffmpeg stdin/stdout pipe missing');
+    }
+    ffmpeg.stdin.write(ctx.sdp);
+    ffmpeg.stdin.end();
+
+    ffmpeg.stdout.on('data', (chunk: Buffer) => {
+      void this.appendWithPadding(ctx, chunk);
+    });
+
+    ffmpeg.on('close', () => {
+      if (ctx.stopping) return;
+      const lifetimeMs = Date.now() - ctx.spawnedAtMs;
+      ctx.consecutiveFailures = lifetimeMs < HEALTHY_LIFETIME_MS ? ctx.consecutiveFailures + 1 : 0;
+      if (!shouldRespawnFfmpeg({ consecutiveFailures: ctx.consecutiveFailures, lifetimeMs })) {
+        this.logger.error(
+          { meetingCode, participantId, lifetimeMs, failures: ctx.consecutiveFailures },
+          'ffmpeg respawn abandoned',
+        );
+        return;
+      }
+      // RTP가 10초 끊기면 ffmpeg이 Connection timed out으로 죽는다(컴파일 타임 상수라
+      // 옵션으로 못 늘린다). 참가자가 잠시 침묵한 정상 상황이므로 되살린다.
+      setTimeout(() => {
+        if (ctx.stopping) return;
+        this.logger.info({ meetingCode, participantId, lifetimeMs }, 'ffmpeg respawn');
+        ctx.ffmpeg = spawnFfmpeg(this.logger, meetingCode, participantId);
+        ctx.spawnedAtMs = Date.now();
+        try {
+          this.attachFfmpeg(ctx);
+        } catch (err) {
+          this.logger.error({ meetingCode, participantId, err }, 'ffmpeg respawn failed');
+        }
+      }, RESPAWN_DELAY_MS);
+    });
+  }
+
+  /**
+   * 벽시계 대비 부족한 구간을 무음으로 메운 뒤 chunk를 append 한다.
+   *
+   * DTX 침묵과 ffmpeg 재시작 공백 양쪽에서 출력이 비는데, 시간축이
+   * `startedAtMs + 누적 byte`라 그대로 두면 이후 발화가 앞으로 밀린다.
+   */
+  private async appendWithPadding(ctx: CaptureContext, chunk: Buffer): Promise<void> {
+    const padding = silencePaddingBytes({
+      elapsedMs: Date.now() - ctx.startedAtMs,
+      writtenBytes: ctx.writtenBytes,
+      incomingBytes: chunk.length,
+    });
+    const payload = padding > 0 ? Buffer.concat([Buffer.alloc(padding), chunk]) : chunk;
+    ctx.writtenBytes += payload.length;
+    try {
+      await this.audioBufferRepository.append(ctx.meetingCode, ctx.participantId, payload);
+    } catch (err) {
+      this.logger.error(
+        { meetingCode: ctx.meetingCode, participantId: ctx.participantId, err },
+        'audio buffer append failed',
+      );
+    }
   }
 
   private async terminateContext(ctx: CaptureContext): Promise<void> {
+    // close 핸들러가 이걸 보고 재spawn을 건너뛴다 — 의도적 종료와 idle 타임아웃을 가른다.
+    ctx.stopping = true;
     if (ctx.ffmpeg.stdin && !ctx.ffmpeg.stdin.destroyed) {
       try {
         ctx.ffmpeg.stdin.end();
