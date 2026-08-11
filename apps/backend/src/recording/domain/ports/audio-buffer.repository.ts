@@ -17,19 +17,6 @@ export interface AudioBufferRepository {
   markStarted(meetingCode: string, participantId: string, startedAtMs: number): Promise<void>;
 
   /**
-   * 캡처가 끊겼던 구간을 시간축에만 반영한다 — 무음 byte 는 저장하지 않는다.
-   *
-   * mute 나 ffmpeg 재시작으로 PCM 이 비는 동안에도 회의는 흘러가므로, 공백을 무시하면
-   * 이후 발화가 실제보다 앞선 시각으로 기록된다. 그렇다고 공백만큼 무음을 채우면
-   * 장시간 mute 에서 수십 MB 가 한 번에 쌓인다. 그래서 커서만 앞당긴다.
-   *
-   * 공백은 항상 그 시점까지 쌓인 byte 뒤에 온다. `drainAvailable` 은 공백을 넘어
-   * 한 번에 drain 하지 않는다 — 공백 앞뒤가 한 chunk 로 합쳐지면 뒤쪽 시각을
-   * 표현할 수 없기 때문이다.
-   */
-  markCaptureGap(meetingCode: string, participantId: string, gapMs: number): Promise<void>;
-
-  /**
    * 누적 PCM 중 끝 `keepLastBytes` 만큼은 남기고 그 이전 데이터를 drain 한다.
    * 다음 chunk의 wav 입력을 만든다.
    *
