@@ -164,8 +164,8 @@ const makeAudioCapture = () => {
     async start(input: AudioCaptureStartInput) {
       calls.push({ name: 'start', args: [input] });
     },
-    async stop(code, pid) {
-      calls.push({ name: 'stop', args: [code, pid] });
+    async stop(code, pid, reason) {
+      calls.push({ name: 'stop', args: [code, pid, reason] });
     },
     async stopAll(code) {
       calls.push({ name: 'stopAll', args: [code] });
@@ -648,7 +648,11 @@ describe('MediasoupSignalingService.closeProducer', () => {
 
     // 캡처를 내리지 않으면 consumer가 죽은 채로 context만 남아, 다시 켤 때
     // start()가 dedup에 걸려 캡처가 영영 복구되지 않는다.
-    expect(ctx.audioCapture.calls).toContainEqual({ name: 'stop', args: [meetingCode, 's1'] });
+    // 'muted' 여야 어댑터가 배선을 잠시 살려 둔다 — 다시 켤 때 지연 없이 이어진다.
+    expect(ctx.audioCapture.calls).toContainEqual({
+      name: 'stop',
+      args: [meetingCode, 's1', 'muted'],
+    });
   });
 
   it('video producer를 close할 때는 audioCapture를 건드리지 않는다', async () => {

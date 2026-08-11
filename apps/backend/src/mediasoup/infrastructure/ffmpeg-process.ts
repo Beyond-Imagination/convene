@@ -1,4 +1,5 @@
 import { ChildProcess, spawn } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
 import { AddressInfo, createServer } from 'node:net';
 
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
@@ -22,24 +23,14 @@ function audioFilterArgs(): string[] {
 
 /** 16kHz mono pcm_s16le. audio-chunker 의 상수와 같은 포맷을 전제한다. */
 const PCM_BYTES_PER_SECOND = 32_000;
-const PCM_BYTES_PER_SAMPLE = 2;
-
-/** 정상 jitter를 패딩하지 않도록 하는 하한(200ms 분량). */
-export const PAD_THRESHOLD_BYTES = PCM_BYTES_PER_SECOND / 5;
 
 /** 이 시간 이상 살아 있었으면 정상 동작 중 idle 타임아웃으로 죽은 것으로 본다. */
 export const HEALTHY_LIFETIME_MS = 5_000;
 /** 즉시 죽는 상황에서 허용할 연속 재시도 횟수. */
 const MAX_IMMEDIATE_FAILURES = 3;
-
-export interface SilencePaddingInput {
-  /** 캡처 시작 이후 실제 경과 시간(ms). */
-  readonly elapsedMs: number;
-  /** 지금까지 버퍼에 기록한 PCM 총량(byte). */
-  readonly writtenBytes: number;
-  /** 이번에 기록할 chunk 크기(byte). */
-  readonly incomingBytes: number;
-}
+/** 포트 바인딩 확인 간격. */
+const PORT_POLL_INTERVAL_MS = 20;
+const RUN_DRIFT_TOLERANCE_MS = 1_000;
 
 export interface RespawnDecisionInput {
   readonly consecutiveFailures: number;
@@ -47,19 +38,63 @@ export interface RespawnDecisionInput {
   readonly lifetimeMs: number;
 }
 
+/** PCM byte 수를 재생 길이(ms)로 환산한다. chunk 도착 시각에서 빼면 첫 sample 의 시각이 된다. */
+export function pcmDurationMs(bytes: number): number {
+  return Math.floor((bytes / PCM_BYTES_PER_SECOND) * 1000);
+}
+
+export interface ChunkAnchor {
+  /** 현재 run 첫 sample 의 절대 시각(epoch ms). */
+  readonly startedAtMs: number;
+  /** 그 시각 이후 이 run 에서 흘려보낸 PCM 누적량. */
+  readonly bytes: number;
+}
+
+export interface AnchorChunkTimeInput {
+  readonly anchor: ChunkAnchor | undefined;
+  readonly arrivalMs: number;
+  readonly chunkBytes: number;
+}
+
 /**
- * 벽시계 대비 부족한 PCM 을 무음으로 채울 byte 수.
- *
- * Opus DTX 로 참가자가 말을 멈추면 브라우저가 RTP 전송을 멈추고, ffmpeg 도 그동안
- * PCM 을 내보내지 않는다. 시간축은 `startedAtMs + 누적 byte` 로 계산하므로 그대로 두면
- * 침묵이 삭제된 압축 시간축이 되어 이후 발화의 타임스탬프가 앞으로 밀린다.
+ * 도착 시각을 그대로 쓰면 이벤트 루프 지터가 시각에 실려 연속 오디오가 잘게 쪼개진다.
+ * 크게 늦어지면 실제로 오디오가 빈 것이므로 앵커를 다시 잡는다.
  */
-export function silencePaddingBytes(input: SilencePaddingInput): number {
-  const expectedBytes = Math.floor((input.elapsedMs / 1000) * PCM_BYTES_PER_SECOND);
-  const shortfall = expectedBytes - input.writtenBytes - input.incomingBytes;
-  if (shortfall < PAD_THRESHOLD_BYTES) return 0;
-  // sample 경계(2 byte)로 내림 — 홀수 byte 를 끼우면 이후 전체 sample 이 어긋난다.
-  return shortfall - (shortfall % PCM_BYTES_PER_SAMPLE);
+export function anchorChunkTime(input: AnchorChunkTimeInput): {
+  startedAtMs: number;
+  anchor: ChunkAnchor;
+} {
+  const arrivalStartMs = input.arrivalMs - pcmDurationMs(input.chunkBytes);
+  const expectedMs =
+    input.anchor === undefined
+      ? arrivalStartMs
+      : input.anchor.startedAtMs + pcmDurationMs(input.anchor.bytes);
+
+  if (input.anchor === undefined || arrivalStartMs - expectedMs > RUN_DRIFT_TOLERANCE_MS) {
+    return {
+      startedAtMs: arrivalStartMs,
+      anchor: { startedAtMs: arrivalStartMs, bytes: input.chunkBytes },
+    };
+  }
+  return {
+    startedAtMs: expectedMs,
+    anchor: {
+      startedAtMs: input.anchor.startedAtMs,
+      bytes: input.anchor.bytes + input.chunkBytes,
+    },
+  };
+}
+
+/** 직접 bind 로 확인하면 ffmpeg 의 bind 를 뺏을 수 있어, 읽기만으로 판별한다. */
+export function isUdpPortBound(procNetUdp: string, port: number): boolean {
+  const wanted = port.toString(16).toUpperCase().padStart(4, '0');
+  return procNetUdp
+    .split('\n')
+    .slice(1)
+    .some((line) => {
+      const local = line.trim().split(/\s+/)[1];
+      return local !== undefined && local.split(':')[1] === wanted;
+    });
 }
 
 /**
@@ -72,6 +107,25 @@ export function silencePaddingBytes(input: SilencePaddingInput): number {
 export function shouldRespawnFfmpeg(input: RespawnDecisionInput): boolean {
   if (input.lifetimeMs >= HEALTHY_LIFETIME_MS) return true;
   return input.consecutiveFailures < MAX_IMMEDIATE_FAILURES;
+}
+
+/** `unsupported` 만 호출 측이 고정 지연으로 물러난다 — `timeout` 은 이미 그만큼 기다렸다. */
+export type PortWaitResult = 'bound' | 'timeout' | 'unsupported';
+
+/** ffmpeg 이 포트를 잡을 때까지 대기. 고정 지연으로 기다리면 마이크를 켤 때마다 그만큼 유실된다. */
+export async function waitForUdpPort(port: number, timeoutMs: number): Promise<PortWaitResult> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    let table: string;
+    try {
+      table = await readFile('/proc/net/udp', 'utf8');
+    } catch {
+      return 'unsupported';
+    }
+    if (isUdpPortBound(table, port)) return 'bound';
+    await new Promise((resolve) => setTimeout(resolve, PORT_POLL_INTERVAL_MS));
+  }
+  return 'timeout';
 }
 
 /** mediasoup PlainTransport가 RTP를 흘려보낼 로컬 포트를 OS에서 하나 받아온다. */

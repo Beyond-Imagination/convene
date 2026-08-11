@@ -110,7 +110,7 @@ export class MediasoupSignalingService {
 
   async dismissParticipant(command: ParticipantCommand): Promise<void> {
     // audio capture가 진행 중이라면 먼저 정리한다. capture context가 없으면 no-op.
-    await this.audioCapture.stop(command.meetingCode, command.participantId);
+    await this.audioCapture.stop(command.meetingCode, command.participantId, 'left');
     const existing = await this.participantMediaRepository.findByParticipantId(
       command.participantId,
     );
@@ -263,7 +263,7 @@ export class MediasoupSignalingService {
     // ffmpeg만 RTP 없이 남아 죽고, 죽은 context가 어댑터에 잔류해 다시 켤 때 start()가
     // dedup에 걸린다 — 남은 회의 내내 캡처가 복구되지 않는다.
     if (owned.kind === 'audio') {
-      await this.audioCapture.stop(command.meetingCode, command.participantId);
+      await this.audioCapture.stop(command.meetingCode, command.participantId, 'muted');
     }
     await this.transportPort.closeProducer(command.producerId);
     await this.routerPort.cleanupPipeProducers(command.meetingCode, command.producerId);
