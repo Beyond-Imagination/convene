@@ -76,10 +76,17 @@ model = WhisperModel(
 app = FastAPI(title="convene-ai-worker", version="1.0.0")
 
 
-def dump_audio(audio: bytes) -> None:
-    """받은 wav를 STT_DUMP_DIR에 떨군다. 덤프 실패가 전사를 막지 않도록 예외는 삼킨다."""
+def safe_dir_name(raw: str | None) -> str:
+    """헤더로 들어온 식별자를 디렉터리 이름 한 조각으로 만든다(경로 주입 차단)."""
+    cleaned = "".join(ch for ch in (raw or "") if ch.isalnum() or ch in "-_")
+    return cleaned[:64] or "unknown"
+
+
+def dump_audio(audio: bytes, participant_id: str | None) -> None:
+    """받은 wav를 화자별 하위 폴더에 떨군다. 덤프 실패가 전사를 막지 않도록 예외는 삼킨다."""
     try:
-        directory = Path(DUMP_DIR)
+        # 마이크 편차 정규화 평가는 화자별로 묶어 봐야 하므로 참가자별로 나눈다.
+        directory = Path(DUMP_DIR) / safe_dir_name(participant_id)
         directory.mkdir(parents=True, exist_ok=True)
         path = directory / f"{int(time.time())}-{next(_dump_sequence):04d}.wav"
         path.write_bytes(audio)
@@ -136,7 +143,7 @@ async def transcribe(request: Request) -> dict[str, Any]:
     logger.info("transcribe: bytes=%d", len(audio))
 
     if DUMP_DIR:
-        dump_audio(audio)
+        dump_audio(audio, request.headers.get("x-participant-id"))
 
     try:
         # 전사는 CPU 바운드 블로킹 호출이라 threadpool 로 넘긴다. 이벤트 루프에서
