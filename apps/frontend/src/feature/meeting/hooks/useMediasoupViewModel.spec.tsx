@@ -950,6 +950,17 @@ describe('useMediasoupViewModel.muteToggle', () => {
     expect(result.current.isAudioMuted).toBe(false);
   });
 
+  it('오디오 produce는 opusDtx를 끈다 — DTX가 켜지면 무음 구간에 RTP가 끊겨 회의록 STT 캡처가 죽는다', async () => {
+    const { result, send } = await setupReady();
+    await act(async () => {
+      await result.current.toggleAudio();
+    });
+    expect(send.produce.mock.calls[0][0].codecOptions).toMatchObject({
+      opusDtx: false,
+      opusFec: true,
+    });
+  });
+
   it('켜진 뒤 toggleAudio를 다시 호출하면 producer.close + track.stop + CLOSE_PRODUCER emit + isAudioMuted=true', async () => {
     const { result, send, socket } = await setupReady();
     await act(async () => {
