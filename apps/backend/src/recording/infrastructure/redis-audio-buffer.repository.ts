@@ -57,6 +57,14 @@ export class RedisAudioBufferRepository implements AudioBufferRepository {
     return this.redis.smembers(this.meetingIndexKey(meetingCode));
   }
 
+  async markCaptureGap(
+    _meetingCode: string,
+    _participantId: string,
+    _gapMs: number,
+  ): Promise<void> {
+    throw new Error('not implemented');
+  }
+
   async markStarted(
     meetingCode: string,
     participantId: string,

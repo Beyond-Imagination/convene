@@ -21,6 +21,68 @@ describe('RedisAudioBufferRepository', () => {
     expect(await repo.consume('abc12xyz')).toEqual([]);
   });
 
+  describe('markCaptureGap', () => {
+    // 16kHz mono pcm_s16le = 32000 byte/s.
+    const ONE_SECOND = 32_000;
+    const pcm = (seconds: number): Buffer => Buffer.alloc(ONE_SECOND * seconds, 1);
+
+    it('공백만큼 시간축을 밀되 무음 byte 는 저장하지 않는다', async () => {
+      await repo.append('abc12xyz', 's1', pcm(4));
+      await repo.markCaptureGap('abc12xyz', 's1', 10_000);
+      await repo.append('abc12xyz', 's1', pcm(4));
+
+      // 공백 앞 4초를 먼저 받는다(공백이 drain 경계).
+      const before = await repo.drainAvailable('abc12xyz', 's1', 0);
+      expect(before.startMs).toBe(0);
+      expect(before.pcm.length).toBe(ONE_SECOND * 4);
+
+      // 공백 뒤 4초는 4초(앞 오디오) + 10초(공백) = 14초 지점에서 시작한다.
+      const after = await repo.drainAvailable('abc12xyz', 's1', 0);
+      expect(after.startMs).toBe(14_000);
+      expect(after.pcm.length).toBe(ONE_SECOND * 4);
+
+      // 저장된 것은 실제 오디오 8초뿐 — 공백 10초는 byte 로 남지 않는다.
+      expect(before.pcm.length + after.pcm.length).toBe(ONE_SECOND * 8);
+    });
+
+    it('공백 앞 데이터가 없으면 커서만 앞당긴다', async () => {
+      await repo.markCaptureGap('abc12xyz', 's1', 5_000);
+      await repo.append('abc12xyz', 's1', pcm(2));
+      const drained = await repo.drainAvailable('abc12xyz', 's1', 0);
+      expect(drained.startMs).toBe(5_000);
+      expect(drained.pcm.length).toBe(ONE_SECOND * 2);
+    });
+
+    it('공백이 연달아 발생해도 각각 누적된다', async () => {
+      await repo.markCaptureGap('abc12xyz', 's1', 3_000);
+      await repo.markCaptureGap('abc12xyz', 's1', 2_000);
+      await repo.append('abc12xyz', 's1', pcm(1));
+      const drained = await repo.drainAvailable('abc12xyz', 's1', 0);
+      expect(drained.startMs).toBe(5_000);
+    });
+
+    it('공백 경계에서는 keepLastBytes overlap 을 남기지 않는다', async () => {
+      // 공백 뒤 오디오와는 이어지지 않으므로 단어 잘림 보호가 의미 없다.
+      await repo.append('abc12xyz', 's1', pcm(4));
+      await repo.markCaptureGap('abc12xyz', 's1', 10_000);
+      await repo.append('abc12xyz', 's1', pcm(4));
+
+      const before = await repo.drainAvailable('abc12xyz', 's1', ONE_SECOND * 2);
+      expect(before.pcm.length).toBe(ONE_SECOND * 4);
+    });
+
+    it('공백 이후 남은 오디오도 consume 에서 올바른 startMs 를 갖는다', async () => {
+      await repo.append('abc12xyz', 's1', pcm(4));
+      await repo.markCaptureGap('abc12xyz', 's1', 10_000);
+      await repo.append('abc12xyz', 's1', pcm(4));
+      await repo.drainAvailable('abc12xyz', 's1', 0);
+
+      const consumed = await repo.consume('abc12xyz');
+      expect(consumed[0].startMs).toBe(14_000);
+      expect(consumed[0].audio.length).toBe(ONE_SECOND * 4);
+    });
+  });
+
   it('단일 participant의 단일 chunk가 그대로 round-trip 된다', async () => {
     const chunk = Buffer.from('hello');
     await repo.append('abc12xyz', 's1', chunk);
