@@ -11,6 +11,9 @@ import type { Socket } from 'socket.io-client';
 
 import type { MediasoupConnectionStatus } from '@/feature/meeting/hooks/useMediasoupTransport';
 
+/** 마이크 토글 쿨다운. 서버 배선 재생성이 뒤따르므로 연타를 흘려보내지 않는다. */
+const AUDIO_TOGGLE_COOLDOWN_MS = 700;
+
 export interface LocalMediaDeps {
   readonly socket: Socket | null;
   readonly code: string;
@@ -32,6 +35,8 @@ export interface UseLocalMedia {
    * 켜져 있으면 producer.close + track.stop으로 해제한다(lazy acquisition).
    */
   readonly toggleAudio: () => void;
+  /** 쿨다운 중이라 마이크 토글을 받지 않는 상태. 버튼을 비활성화하는 데 쓴다. */
+  readonly isAudioToggling: boolean;
   /** 카메라 켜기/끄기. toggleAudio와 동일하게 lazy 하게 취득/해제한다. */
   readonly toggleVideo: () => void;
   /**
@@ -61,6 +66,9 @@ export function useLocalMedia({
   const [isSharingScreen, setIsSharingScreen] = useState(false);
   // 미디어 기본 OFF — 입장 시엔 카메라/마이크를 잡지 않고(lazy), 사용자가 토글로 켤 때 비로소 getUserMedia로 취득한다. 따라서 초깃값은 muted=true.
   const [isAudioMuted, setIsAudioMuted] = useState(true);
+  // 토글마다 서버가 PlainTransport·ffmpeg 배선을 새로 만든다. 연속 클릭을 막는다.
+  const [isAudioToggling, setIsAudioToggling] = useState(false);
+  const audioCooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isVideoMuted, setIsVideoMuted] = useState(true);
   // video preview(self tile)용 stream. audio는 별도 audioStreamRef로 들고 끄기 시 각각 track.stop()으로 디바이스를 해제한다.
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -181,8 +189,22 @@ export function useLocalMedia({
   );
 
   const toggleAudio = useCallback(() => {
-    void toggleMedia('audio', audioProducerRef, audioStreamRef, setIsAudioMuted);
+    if (audioCooldownRef.current !== null) return;
+    setIsAudioToggling(true);
+    void toggleMedia('audio', audioProducerRef, audioStreamRef, setIsAudioMuted).finally(() => {
+      audioCooldownRef.current = setTimeout(() => {
+        audioCooldownRef.current = null;
+        setIsAudioToggling(false);
+      }, AUDIO_TOGGLE_COOLDOWN_MS);
+    });
   }, [toggleMedia]);
+
+  useEffect(
+    () => () => {
+      if (audioCooldownRef.current !== null) clearTimeout(audioCooldownRef.current);
+    },
+    [],
+  );
 
   const toggleVideo = useCallback(() => {
     void toggleMedia('video', videoProducerRef, localStreamRef, setIsVideoMuted);
@@ -254,6 +276,7 @@ export function useLocalMedia({
     isAudioMuted,
     isVideoMuted,
     toggleAudio,
+    isAudioToggling,
     toggleVideo,
     startScreenShare,
     stopScreenShare,

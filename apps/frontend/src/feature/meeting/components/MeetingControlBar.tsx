@@ -42,7 +42,8 @@ export function MeetingControlBar({
       <button
         type="button"
         onClick={mediasoup.toggleAudio}
-        className={`${controlButton} ${mediasoup.isAudioMuted ? controlDanger : controlNeutral}`}
+        disabled={mediasoup.isAudioToggling}
+        className={`${controlButton} ${mediasoup.isAudioMuted ? controlDanger : controlNeutral} disabled:cursor-not-allowed disabled:opacity-50`}
       >
         {mediasoup.isAudioMuted ? <MicOffIcon /> : <MicIcon />}
         {mediasoup.isAudioMuted ? '마이크 켜기' : '마이크 끄기'}
