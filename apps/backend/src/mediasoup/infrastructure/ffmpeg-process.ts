@@ -20,6 +20,32 @@ function audioFilterArgs(): string[] {
   return ['-af', configured || DEFAULT_AUDIO_FILTER];
 }
 
+/** 정상 jitter를 패딩하지 않도록 하는 하한(16kHz mono pcm_s16le 200ms 분량). */
+export const PAD_THRESHOLD_BYTES = 6_400;
+
+export interface SilencePaddingInput {
+  /** 캡처 시작 이후 실제 경과 시간(ms). */
+  readonly elapsedMs: number;
+  /** 지금까지 버퍼에 기록한 PCM 총량(byte). */
+  readonly writtenBytes: number;
+  /** 이번에 기록할 chunk 크기(byte). */
+  readonly incomingBytes: number;
+}
+
+export interface RespawnDecisionInput {
+  readonly consecutiveFailures: number;
+  /** 방금 죽은 ffmpeg 프로세스가 살아 있던 시간(ms). */
+  readonly lifetimeMs: number;
+}
+
+export function silencePaddingBytes(_input: SilencePaddingInput): number {
+  throw new Error('not implemented');
+}
+
+export function shouldRespawnFfmpeg(_input: RespawnDecisionInput): boolean {
+  throw new Error('not implemented');
+}
+
 /** mediasoup PlainTransport가 RTP를 흘려보낼 로컬 포트를 OS에서 하나 받아온다. */
 export function getFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
