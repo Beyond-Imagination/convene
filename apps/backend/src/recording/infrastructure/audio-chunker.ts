@@ -106,3 +106,75 @@ export function dropOverlapHeadSegments<T extends HasStartMs>(
   if (isFirstChunk) return [...segments];
   return segments.filter((s) => s.startMs >= overlapMs);
 }
+
+/** 배치 안에서 run 을 갈라 두는 무음 길이. VAD 가 별개 발화로 끊도록. */
+export const BATCH_GAP_MS = 400;
+/** 한 배치의 오디오 예산. Whisper 인코더 윈도우(30초)를 넘기지 않는다. */
+export const BATCH_BUDGET_MS = 28_000;
+
+export interface RunPlacement {
+  /** 배치 안에서 이 run 이 놓인 위치(ms). */
+  readonly offsetMs: number;
+  readonly durationMs: number;
+  /** 이 run 첫 sample 의 절대 시각(epoch ms). */
+  readonly startedAtMs: number;
+}
+
+export interface RunBatch {
+  readonly pcm: Buffer;
+  readonly placements: ReadonlyArray<RunPlacement>;
+}
+
+interface TimedRun {
+  readonly pcm: Buffer;
+  readonly startedAtMs: number;
+}
+
+/**
+ * 짧은 run 을 예산 안에서 묶는다. Whisper 인코더는 입력이 4초든 28초든 30초 윈도우
+ * 하나를 돌아서, 잦은 mute 로 갈린 run 을 한 건씩 보내면 연산이 몇 배로 샌다.
+ */
+export function packRunsIntoBatches(runs: ReadonlyArray<TimedRun>): RunBatch[] {
+  const batches: RunBatch[] = [];
+  let parts: Buffer[] = [];
+  let placements: RunPlacement[] = [];
+  let cursorMs = 0;
+
+  const flush = (): void => {
+    if (parts.length === 0) return;
+    batches.push({ pcm: Buffer.concat(parts), placements });
+    parts = [];
+    placements = [];
+    cursorMs = 0;
+  };
+
+  for (const run of runs) {
+    const durationMs = bytesToMs(run.pcm.length);
+    if (parts.length > 0 && cursorMs + BATCH_GAP_MS + durationMs > BATCH_BUDGET_MS) flush();
+    if (parts.length > 0) {
+      parts.push(Buffer.alloc(msToBytes(BATCH_GAP_MS)));
+      cursorMs += BATCH_GAP_MS;
+    }
+    placements.push({ offsetMs: cursorMs, durationMs, startedAtMs: run.startedAtMs });
+    parts.push(run.pcm);
+    cursorMs += durationMs;
+  }
+  flush();
+  return batches;
+}
+
+/** 배치 오프셋 → 절대 시각. 구분자 안에서 시작한 segment 는 다음 run 에 붙인다. */
+export function resolveSegmentStartMs(
+  placements: ReadonlyArray<RunPlacement>,
+  segmentStartMs: number,
+): number {
+  for (let i = 0; i < placements.length; i++) {
+    const p = placements[i];
+    if (segmentStartMs < p.offsetMs) return p.startedAtMs;
+    if (segmentStartMs <= p.offsetMs + p.durationMs) {
+      return p.startedAtMs + (segmentStartMs - p.offsetMs);
+    }
+  }
+  const last = placements[placements.length - 1];
+  return last.startedAtMs + (segmentStartMs - last.offsetMs);
+}

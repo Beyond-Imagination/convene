@@ -6,27 +6,20 @@ import { TRANSCRIBER, TranscriberPort } from '@/recording/domain/ports/transcrib
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 import {
-  dropOverlapHeadSegments,
+  packRunsIntoBatches,
   PCM_BYTES_PER_SECOND,
+  resolveSegmentStartMs,
+  RunBatch,
   wrapPcmAsWav,
 } from '../infrastructure/audio-chunker';
 
-/** chunk 경계 단어 잘림 보호를 위한 overlap(byte). 16kHz pcm_s16le 2초 분량. */
+/** 단어가 chunk 경계에 걸리지 않도록 매 drain 이 남기는 꼬리. 16kHz pcm_s16le 2초. */
 export const KEEP_LAST_BYTES = PCM_BYTES_PER_SECOND * 2;
 const PARTIAL_INTERVAL_MS = 30_000;
 
 /**
- * 회의 진행 중 매 N초 마다 누적된 audio chunk를 잘라 ai-worker로 보내고, 결과 segments를 회의 단위 partial transcript에 누적한다.
- *
- * - 매 `INTERVAL_MS` 마다 active 회의 enumerate.
- * - 각 (code, pid) 마다 `drainAvailable(KEEP_LAST_BYTES)`로 누적 PCM을 잘라낸다.
- * - 끝 `KEEP_LAST_BYTES`(2초)는 overlap으로 redis에 남는다.
- * - drain pcm → wav → `transcriber.transcribe()` →
- *   segment의 startMs/endMs에 `startedAtMs(epoch ms) + chunk.startMs(participant audio 시간축)`
- *   가산해 AbsoluteTranscriptSegment로 변환 후 store에 append.
- *
- * 회의 종료 시 `RecordingService.requestTranscription`이 partial store consume + 잔여 audio 처리 +
- * meetingStartedAtMs 정규화로 회의 시간축 transcript를 만든다.
+ * 회의 진행 중 매 N초 누적 audio 를 ai-worker 로 보내고 결과를 partial transcript 에 누적한다.
+ * 각 run 이 자기 절대 시각을 들고 오므로 segment 시각은 거기에 더하기만 하면 된다.
  *
  * 실패는 swallow + log — partial 누적은 best-effort이고, 잔여 audio는 회의 종료 시점에 어차피 다시 처리된다.
  */
@@ -68,35 +61,43 @@ export class PartialTranscriptionScheduler implements OnModuleInit, OnModuleDest
 
   private async processParticipant(meetingCode: string, participantId: string): Promise<void> {
     try {
-      const { pcm, startMs, startedAtMs } = await this.audioBufferRepository.drainAvailable(
+      const runs = await this.audioBufferRepository.drainAvailable(
         meetingCode,
         participantId,
         KEEP_LAST_BYTES,
       );
-      if (pcm.length === 0) return;
-      // startedAtMs가 아직 없으면 capture markStarted가 늦은 경우.
-      // drain 한 PCM은 redis에 다시 못 넣으니 origin을 0(=epoch)으로 두고 일단 진행한다.
-      const originMs = startedAtMs ?? 0;
-      const wav = wrapPcmAsWav(pcm);
-      const rawSegments = await this.transcriber.transcribe({
-        meetingCode,
-        audio: wav,
-      });
-      // 첫 partial(chunk.startMs === 0)이 아니면
-      // chunk-local startMs < overlapMs 안 segments는 이전 partial 끝과 중복 가능성 → skip.
-      const segments = dropOverlapHeadSegments(rawSegments, startMs === 0);
-      const absolute: AbsoluteTranscriptSegment[] = segments.map((s) => ({
-        speaker: participantId,
-        text: s.text,
-        absoluteStartMs: originMs + startMs + s.startMs,
-        absoluteEndMs: originMs + startMs + s.endMs,
-      }));
-      await this.partialTranscriptStore.append(meetingCode, absolute);
-    } catch (err) {
-      this.logger.error(
-        { meetingCode, participantId, err },
-        'partial transcribe failed',
+      if (runs.length === 0) return;
+      const batches = packRunsIntoBatches(runs);
+      this.logger.debug(
+        { meetingCode, participantId, runs: runs.length, batches: batches.length },
+        'partial drain',
       );
+      for (const batch of batches) {
+        await this.transcribeBatch(meetingCode, participantId, batch);
+      }
+    } catch (err) {
+      this.logger.error({ meetingCode, participantId, err }, 'partial transcribe failed');
     }
+  }
+
+  private async transcribeBatch(
+    meetingCode: string,
+    participantId: string,
+    batch: RunBatch,
+  ): Promise<void> {
+    if (batch.pcm.length === 0) return;
+    const segments = await this.transcriber.transcribe({
+      meetingCode,
+      participantId,
+      audio: wrapPcmAsWav(batch.pcm),
+    });
+    // drain 끼리 겹치지 않는다 — 여기서 dedup 하면 남긴 꼬리만큼 발화가 사라진다.
+    const absolute: AbsoluteTranscriptSegment[] = segments.map((s) => ({
+      speaker: participantId,
+      text: s.text,
+      absoluteStartMs: resolveSegmentStartMs(batch.placements, s.startMs),
+      absoluteEndMs: resolveSegmentStartMs(batch.placements, s.endMs),
+    }));
+    await this.partialTranscriptStore.append(meetingCode, absolute);
   }
 }

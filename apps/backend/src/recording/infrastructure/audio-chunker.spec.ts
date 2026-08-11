@@ -1,7 +1,10 @@
 import {
+  BATCH_GAP_MS,
   DEFAULT_OVERLAP_MS,
   dropOverlapHeadSegments,
+  packRunsIntoBatches,
   PCM_BYTES_PER_SECOND,
+  resolveSegmentStartMs,
   splitPcmIntoWavChunks,
   WAV_HEADER_BYTES,
   wrapPcmAsWav,
@@ -147,5 +150,64 @@ describe('dropOverlapHeadSegments', () => {
   it('빈 입력은 빈 배열', () => {
     expect(dropOverlapHeadSegments([], false)).toEqual([]);
     expect(dropOverlapHeadSegments([], true)).toEqual([]);
+  });
+});
+
+describe('packRunsIntoBatches', () => {
+  const BYTES_PER_MS = 32;
+  const run = (ms: number, startedAtMs: number) => ({
+    pcm: Buffer.alloc(ms * BYTES_PER_MS, 1),
+    startedAtMs,
+  });
+
+  it('짧은 run 여러 개를 한 배치로 묶는다 — 4초 조각도 30초 인코더 윈도우를 통째로 쓴다', () => {
+    const runs = [run(4_000, 1000), run(4_000, 20_000), run(4_000, 40_000)];
+    const batches = packRunsIntoBatches(runs);
+    expect(batches).toHaveLength(1);
+    expect(batches[0].placements.map((p) => p.startedAtMs)).toEqual([1000, 20_000, 40_000]);
+  });
+
+  it('run 사이에 무음 구분자를 끼워 별개 발화로 남긴다', () => {
+    const batches = packRunsIntoBatches([run(1_000, 0), run(1_000, 90_000)]);
+    const [first, second] = batches[0].placements;
+    expect(second.offsetMs).toBe(first.offsetMs + first.durationMs + BATCH_GAP_MS);
+    // 이어 붙인 총 길이 = run 2개 + 구분자 1개.
+    expect(batches[0].pcm.length).toBe((2_000 + BATCH_GAP_MS) * BYTES_PER_MS);
+  });
+
+  it('예산을 넘으면 다음 배치로 넘긴다 — 30초 윈도우를 두 개 쓰지 않도록', () => {
+    const runs = [run(20_000, 0), run(20_000, 60_000)];
+    const batches = packRunsIntoBatches(runs);
+    expect(batches).toHaveLength(2);
+  });
+
+  it('예산보다 긴 run 하나는 그대로 자기 배치가 된다', () => {
+    const batches = packRunsIntoBatches([run(50_000, 0)]);
+    expect(batches).toHaveLength(1);
+    expect(batches[0].placements).toHaveLength(1);
+  });
+
+  it('빈 입력은 빈 배열', () => {
+    expect(packRunsIntoBatches([])).toEqual([]);
+  });
+});
+
+describe('resolveSegmentStartMs', () => {
+  const placements = [
+    { offsetMs: 0, durationMs: 1_000, startedAtMs: 5_000 },
+    { offsetMs: 1_400, durationMs: 1_000, startedAtMs: 90_000 },
+  ];
+
+  it('배치 내 오프셋을 그 run 의 절대 시각으로 되돌린다', () => {
+    expect(resolveSegmentStartMs(placements, 300)).toBe(5_300);
+    expect(resolveSegmentStartMs(placements, 1_600)).toBe(90_200);
+  });
+
+  it('무음 구분자 안에서 시작한 segment 는 다음 run 의 시작으로 붙인다', () => {
+    expect(resolveSegmentStartMs(placements, 1_200)).toBe(90_000);
+  });
+
+  it('마지막 run 을 넘어선 오프셋은 마지막 run 기준으로 계산한다', () => {
+    expect(resolveSegmentStartMs(placements, 5_000)).toBe(90_000 + 3_600);
   });
 });

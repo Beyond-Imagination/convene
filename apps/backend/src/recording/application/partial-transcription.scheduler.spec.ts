@@ -1,4 +1,4 @@
-import { AudioBufferRepository } from '@/recording/domain/ports/audio-buffer.repository';
+import { AudioBufferRepository, AudioRun } from '@/recording/domain/ports/audio-buffer.repository';
 import { AbsoluteTranscriptSegment, PartialTranscriptStore } from '@/recording/domain/ports/partial-transcript.store';
 import { TranscriberPort } from '@/recording/domain/ports/transcriber.port';
 import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/domain-event.payloads';
@@ -11,17 +11,13 @@ import { KEEP_LAST_BYTES, PartialTranscriptionScheduler } from './partial-transc
 interface FakeRepoState {
   activeMeetings: string[];
   participantsByMeeting: Record<string, string[]>;
-  drainImpl: (
-    code: string,
-    pid: string,
-  ) => Promise<{ pcm: Buffer; startMs: number; startedAtMs?: number }>;
+  drainImpl: (code: string, pid: string) => Promise<ReadonlyArray<AudioRun>>;
 }
 
 const makeRepo = (state: Partial<FakeRepoState> = {}): AudioBufferRepository => ({
   append: async () => {},
-  markStarted: async () => {},
   drainAvailable: async (code, pid) => {
-    if (!state.drainImpl) return { pcm: Buffer.alloc(0), startMs: 0 };
+    if (!state.drainImpl) return [];
     return state.drainImpl(code, pid);
   },
   listActiveMeetings: async () => state.activeMeetings ?? [],
@@ -78,7 +74,7 @@ describe('PartialTranscriptionScheduler.tick', () => {
     const repo = makeRepo({
       activeMeetings: ['abc12xyz'],
       participantsByMeeting: { abc12xyz: ['s1'] },
-      drainImpl: async () => ({ pcm: Buffer.alloc(0), startMs: 0 }),
+      drainImpl: async () => [{ pcm: Buffer.alloc(0), startedAtMs: 0 }],
     });
     const transcriber = makeTranscriber();
     const store = makeStore();
@@ -98,7 +94,7 @@ describe('PartialTranscriptionScheduler.tick', () => {
     const repo = makeRepo({
       activeMeetings: ['abc12xyz'],
       participantsByMeeting: { abc12xyz: ['s1'] },
-      drainImpl: async () => ({ pcm, startMs: 0, startedAtMs: 1_000_000_000_000 }),
+      drainImpl: async () => [{ pcm, startedAtMs: 1_000_000_000_000 }],
     });
     const transcriber = makeTranscriber();
     const store = makeStore();
@@ -115,19 +111,14 @@ describe('PartialTranscriptionScheduler.tick', () => {
     expect(passed.subarray(WAV_HEADER_BYTES)).toEqual(pcm);
   });
 
-  it('segment의 startMs/endMs에 (startedAtMs + chunk.startMs)가 가산된 AbsoluteTranscriptSegment가 store에 append 된다', async () => {
+  it('segment의 startMs/endMs에 run의 절대 시각이 가산돼 store에 append 된다', async () => {
     const startedAtMs = 1_000_000_000_000;
     const chunkStartMs = 28_000;
     const repo = makeRepo({
       activeMeetings: ['abc12xyz'],
       participantsByMeeting: { abc12xyz: ['s1'] },
-      drainImpl: async () => ({
-        pcm: Buffer.alloc(100),
-        startMs: chunkStartMs,
-        startedAtMs,
-      }),
+      drainImpl: async () => [{ pcm: Buffer.alloc(100), startedAtMs: startedAtMs + chunkStartMs }],
     });
-    // chunkStartMs > 0 → 첫 partial이 아니므로 dedup 적용. startMs >= 2000만 keep.
     const transcriber = makeTranscriber(() => [
       { text: 'hi', startMs: 2500, endMs: 3000 },
       { text: 'bye', startMs: 4000, endMs: 4500 },
@@ -165,11 +156,7 @@ describe('PartialTranscriptionScheduler.tick', () => {
     const repo = makeRepo({
       activeMeetings: ['aaa11aaa', 'bbb22bbb'],
       participantsByMeeting: { aaa11aaa: ['s1', 's2'], bbb22bbb: ['s3'] },
-      drainImpl: async () => ({
-        pcm: Buffer.alloc(100),
-        startMs: 0,
-        startedAtMs: 1_000_000_000_000,
-      }),
+      drainImpl: async () => [{ pcm: Buffer.alloc(100), startedAtMs: 1_000_000_000_000 }],
     });
     const transcriber = makeTranscriber(() => [{ text: 'x', startMs: 0, endMs: 100 }]);
     const store = makeStore();
@@ -191,11 +178,7 @@ describe('PartialTranscriptionScheduler.tick', () => {
     const repo = makeRepo({
       activeMeetings: ['abc12xyz'],
       participantsByMeeting: { abc12xyz: ['s1', 's2'] },
-      drainImpl: async () => ({
-        pcm: Buffer.alloc(100),
-        startMs: 0,
-        startedAtMs: 1_000_000_000_000,
-      }),
+      drainImpl: async () => [{ pcm: Buffer.alloc(100), startedAtMs: 1_000_000_000_000 }],
     });
     const transcriber: TranscriberPort = {
       transcribe: jest
@@ -217,19 +200,19 @@ describe('PartialTranscriptionScheduler.tick', () => {
     expect(store.appended[0].segments[0].speaker).toBe('s2');
   });
 
-  it('첫 partial(startMs=0)이 아니면 transcribe 결과의 chunk-local startMs<2000ms segments는 dedup으로 skip 된다', async () => {
+  it('drain 간 구간이 겹치지 않으므로 앞부분 segment도 버리지 않는다', async () => {
     const startedAtMs = 1_000_000_000_000;
     const chunkStartMs = 28_000; // 두 번째 이상 partial 호출
     const repo = makeRepo({
       activeMeetings: ['abc12xyz'],
       participantsByMeeting: { abc12xyz: ['s1'] },
-      drainImpl: async () => ({ pcm: Buffer.alloc(100), startMs: chunkStartMs, startedAtMs }),
+      drainImpl: async () => [{ pcm: Buffer.alloc(100), startedAtMs: startedAtMs + chunkStartMs }],
     });
+    // 직전 drain 이 남긴 꼬리는 전사되지 않은 채 넘어온 것이라 중복이 아니다.
+    // 여기서 앞 2초를 버리면 매 drain 마다 그만큼 발화가 사라진다.
     const transcriber = makeTranscriber(() => [
-      // chunk-local startMs가 overlap 구간 안 — 이전 partial 끝과 중복 가능성
-      { text: 'overlap_dup', startMs: 500, endMs: 1_500 },
-      { text: 'overlap_dup2', startMs: 1_999, endMs: 2_000 },
-      // 2000ms 이상 — 정상
+      { text: 'head', startMs: 500, endMs: 1_500 },
+      { text: 'head2', startMs: 1_999, endMs: 2_000 },
       { text: 'keep', startMs: 2_000, endMs: 3_000 },
       { text: 'keep2', startMs: 5_000, endMs: 6_000 },
     ]);
@@ -241,15 +224,20 @@ describe('PartialTranscriptionScheduler.tick', () => {
       noopLogger(),
     );
     await scheduler.tick();
-    expect(store.appended[0].segments.map((s) => s.text)).toEqual(['keep', 'keep2']);
+    expect(store.appended[0].segments.map((s) => s.text)).toEqual([
+      'head',
+      'head2',
+      'keep',
+      'keep2',
+    ]);
   });
 
-  it('첫 partial(startMs=0)은 dedup 없이 모든 segment 유지', async () => {
+  it('run 첫 drain 의 모든 segment 를 유지한다', async () => {
     const startedAtMs = 1_000_000_000_000;
     const repo = makeRepo({
       activeMeetings: ['abc12xyz'],
       participantsByMeeting: { abc12xyz: ['s1'] },
-      drainImpl: async () => ({ pcm: Buffer.alloc(100), startMs: 0, startedAtMs }),
+      drainImpl: async () => [{ pcm: Buffer.alloc(100), startedAtMs: startedAtMs + 0 }],
     });
     const transcriber = makeTranscriber(() => [
       { text: 'first', startMs: 500, endMs: 1_500 },
@@ -267,13 +255,12 @@ describe('PartialTranscriptionScheduler.tick', () => {
     expect(store.appended[0].segments.map((s) => s.text)).toEqual(['first', 'second', 'third']);
   });
 
-  it('startedAtMs가 누락된 경우 originMs=0으로 처리(epoch ms 기준)', async () => {
+  it('run 의 절대 시각이 그대로 segment 시각의 기준이 된다', async () => {
     const repo = makeRepo({
       activeMeetings: ['abc12xyz'],
       participantsByMeeting: { abc12xyz: ['s1'] },
-      drainImpl: async () => ({ pcm: Buffer.alloc(100), startMs: 5_000 }),
+      drainImpl: async () => [{ pcm: Buffer.alloc(100), startedAtMs: 5_000 }],
     });
-    // chunk.startMs=5000 → 첫 partial 아님 → dedup. startMs >= 2000만 keep.
     const transcriber = makeTranscriber(() => [{ text: 'x', startMs: 2_500, endMs: 3_000 }]);
     const store = makeStore();
     const scheduler = new PartialTranscriptionScheduler(
