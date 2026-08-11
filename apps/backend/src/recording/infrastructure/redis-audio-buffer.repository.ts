@@ -1,53 +1,87 @@
 import { Inject, Injectable } from '@nestjs/common';
 import Redis from 'ioredis';
 
-import { AudioBufferRepository } from '@/recording/domain/ports/audio-buffer.repository';
+import { AudioBufferRepository, AudioRun } from '@/recording/domain/ports/audio-buffer.repository';
 
 import { PCM_BYTES_PER_SECOND } from './audio-chunker';
 
-const bytesToMs = (bytes: number): number => Math.floor((bytes / PCM_BYTES_PER_SECOND) * 1000);
-
 const PARTICIPANT_KEY_PREFIX = 'audio-buffer:';
 const MEETING_INDEX_KEY_PREFIX = 'audio-buffer:meeting:';
-const STARTED_AT_KEY_PREFIX = 'audio-buffer:startedAt:';
-const CURSOR_KEY_PREFIX = 'audio-buffer:cursor:';
+
+/** LIST 원소 = 시각 헤더(epoch ms, BE) + PCM 본문. */
+const STAMP_BYTES = 8;
+
+/** 같은 run 으로 볼 시간 오차 한계(ms). 도착 시각 기반이라 스케줄링 지터가 조금 낀다. */
+const RUN_TOLERANCE_MS = 120;
+
+const bytesToMs = (bytes: number): number => Math.floor((bytes / PCM_BYTES_PER_SECOND) * 1000);
+
+const encodeChunk = (pcm: Buffer, startedAtMs: number): Buffer => {
+  const stamped = Buffer.allocUnsafe(STAMP_BYTES + pcm.length);
+  stamped.writeBigUInt64BE(BigInt(startedAtMs), 0);
+  pcm.copy(stamped, STAMP_BYTES);
+  return stamped;
+};
+
+const decodeChunk = (stamped: Buffer): AudioRun => ({
+  startedAtMs: Number(stamped.readBigUInt64BE(0)),
+  pcm: stamped.subarray(STAMP_BYTES),
+});
+
+function groupIntoRuns(stamped: ReadonlyArray<Buffer>): AudioRun[] {
+  const runs: AudioRun[] = [];
+  let parts: Buffer[] = [];
+  let runStartMs = 0;
+  let expectedNextMs = 0;
+
+  for (const raw of stamped) {
+    const chunk = decodeChunk(raw);
+    const continues =
+      parts.length > 0 && Math.abs(chunk.startedAtMs - expectedNextMs) <= RUN_TOLERANCE_MS;
+    if (!continues && parts.length > 0) {
+      runs.push({ pcm: Buffer.concat(parts), startedAtMs: runStartMs });
+      parts = [];
+    }
+    if (parts.length === 0) runStartMs = chunk.startedAtMs;
+    parts.push(chunk.pcm);
+    expectedNextMs = chunk.startedAtMs + bytesToMs(chunk.pcm.length);
+  }
+  if (parts.length > 0) runs.push({ pcm: Buffer.concat(parts), startedAtMs: runStartMs });
+  return runs;
+}
 
 /**
  * 키 구조:
- *   - `audio-buffer:{meetingCode}:{participantId}` (LIST, binary) — chunk 누적
+ *   - `audio-buffer:{meetingCode}:{participantId}` (LIST, binary) — `시각(8B) + PCM` 원소
  *   - `audio-buffer:meeting:{meetingCode}` (SET) — 회의 안 participantId 색인
- *
- * binary chunk는 `rpush(key, buffer)`로 그대로 누적되고 `lrangeBuffer`로 다시 `Buffer[]`로 읽힌다(문자열 코덱 변환 없음).
- * `consume`은 회의 색인 SET으로 참가자 목록을 얻은 뒤 각 LIST를 LRANGE + DEL pipeline으로 묶어 한 번에 비운다 — 반환과 동시에 폐기한다.
- *
- * 누적 적이 없는 회의(audio capture 미트리거 또는 모두 leave)는 빈 배열 반환.
  */
 @Injectable()
 export class RedisAudioBufferRepository implements AudioBufferRepository {
   constructor(@Inject(Redis) private readonly redis: Redis) {}
 
-  async append(meetingCode: string, participantId: string, chunk: Buffer): Promise<void> {
+  async append(
+    meetingCode: string,
+    participantId: string,
+    chunk: Buffer,
+    startedAtMs: number,
+  ): Promise<void> {
     await this.redis
       .pipeline()
-      .rpush(this.participantKey(meetingCode, participantId), chunk)
+      .rpush(this.participantKey(meetingCode, participantId), encodeChunk(chunk, startedAtMs))
       .sadd(this.meetingIndexKey(meetingCode), participantId)
       .exec();
   }
 
   async listActiveMeetings(): Promise<string[]> {
+    const keyPrefix = this.redis.options.keyPrefix ?? '';
+    const indexPrefix = `${keyPrefix}${MEETING_INDEX_KEY_PREFIX}`;
     const out: string[] = [];
     let cursor = '0';
     do {
-      const [next, keys] = await this.redis.scan(
-        cursor,
-        'MATCH',
-        `${MEETING_INDEX_KEY_PREFIX}*`,
-        'COUNT',
-        100,
-      );
+      const [next, keys] = await this.redis.scan(cursor, 'MATCH', `${indexPrefix}*`, 'COUNT', 100);
       cursor = next;
       for (const k of keys) {
-        out.push(k.substring(MEETING_INDEX_KEY_PREFIX.length));
+        out.push(k.substring(indexPrefix.length));
       }
     } while (cursor !== '0');
     return out;
@@ -57,78 +91,48 @@ export class RedisAudioBufferRepository implements AudioBufferRepository {
     return this.redis.smembers(this.meetingIndexKey(meetingCode));
   }
 
-  async markStarted(
-    meetingCode: string,
-    participantId: string,
-    startedAtMs: number,
-  ): Promise<void> {
-    // SET ... NX로 첫 호출만 기록한다 — 같은 (code, pid) 두 번째 호출은 무시.
-    await this.redis.set(
-      this.startedAtKey(meetingCode, participantId),
-      startedAtMs.toString(),
-      'NX',
-    );
-  }
-
   async drainAvailable(
     meetingCode: string,
     participantId: string,
     keepLastBytes: number,
-  ): Promise<{ pcm: Buffer; startMs: number; startedAtMs?: number }> {
+  ): Promise<ReadonlyArray<AudioRun>> {
     const participantKey = this.participantKey(meetingCode, participantId);
-    const cursorKey = this.cursorKey(meetingCode, participantId);
-    const startedAtKey = this.startedAtKey(meetingCode, participantId);
 
-    // 누적 chunks + 메타데이터를 atomic으로 가져오고 LIST는 비운다.
     const fetched = await this.redis
       .multi()
       .lrangeBuffer(participantKey, 0, -1)
       .del(participantKey)
-      .get(cursorKey)
-      .get(startedAtKey)
       .exec();
-    if (!fetched) {
-      return { pcm: Buffer.alloc(0), startMs: 0 };
-    }
-    const [, chunks] = fetched[0] as [Error | null, Buffer[] | null];
-    const [, cursorStr] = fetched[2] as [Error | null, string | null];
-    const [, startedAtStr] = fetched[3] as [Error | null, string | null];
-    const cursorBefore = cursorStr !== null ? Number(cursorStr) : 0;
-    const startedAtMs = startedAtStr !== null ? Number(startedAtStr) : undefined;
-    const total = chunks && chunks.length > 0 ? Buffer.concat(chunks) : Buffer.alloc(0);
+    if (!fetched) return [];
+    const [, stamped] = fetched[0] as [Error | null, Buffer[] | null];
+    if (!stamped || stamped.length === 0) return [];
 
-    if (total.length <= keepLastBytes) {
-      // drain 할 게 없으면 들고 있던 데이터를 다시 채워둔다.
-      // LPUSH 라 그 사이 들어온 새 append(RPUSH)보다 앞에 놓여 시간 순서가 유지된다.
-      if (total.length > 0) await this.redis.lpush(participantKey, total);
-      return { pcm: Buffer.alloc(0), startMs: bytesToMs(cursorBefore), startedAtMs };
+    const runs = groupIntoRuns(stamped);
+    const last = runs[runs.length - 1];
+
+    // 마지막 run 의 꼬리만 남긴다 — 앞선 run 들은 뒤와 이어지지 않는다.
+    const keep = Math.min(keepLastBytes, last.pcm.length);
+    const drained = runs.slice(0, -1);
+    const lastDrainLen = last.pcm.length - keep;
+    if (lastDrainLen > 0) {
+      drained.push({ pcm: last.pcm.subarray(0, lastDrainLen), startedAtMs: last.startedAtMs });
     }
 
-    const drainLen = total.length - keepLastBytes;
-    const drainedPcm = total.subarray(0, drainLen);
-    const remaining = total.subarray(drainLen);
-
-    // remaining을 LPUSH(앞에 push)로 다시 채우고 cursor를 갱신한다.
-    // LRANGE+DEL 이후 새 append가 들어왔다면 LIST는 [new...] 상태이고, LPUSH remaining으로 [remaining, new...]가 된다 — 시간 순서 보존.
-    await this.redis
-      .multi()
-      .lpush(participantKey, Buffer.from(remaining))
-      .set(cursorKey, String(cursorBefore + drainLen))
-      .exec();
-
-    return {
-      pcm: Buffer.from(drainedPcm),
-      startMs: bytesToMs(cursorBefore),
-      startedAtMs,
-    };
+    if (keep > 0) {
+      // LPUSH 라 그 사이 들어온 새 append(RPUSH)보다 앞에 놓인다.
+      const remainder = last.pcm.subarray(lastDrainLen);
+      await this.redis.lpush(
+        participantKey,
+        encodeChunk(Buffer.from(remainder), last.startedAtMs + bytesToMs(lastDrainLen)),
+      );
+    }
+    return drained.map((run) => ({ pcm: Buffer.from(run.pcm), startedAtMs: run.startedAtMs }));
   }
 
   async consume(meetingCode: string): Promise<
     ReadonlyArray<{
       participantId: string;
-      audio: Buffer;
-      startedAtMs?: number;
-      startMs?: number;
+      runs: ReadonlyArray<AudioRun>;
     }>
   > {
     const indexKey = this.meetingIndexKey(meetingCode);
@@ -142,44 +146,24 @@ export class RedisAudioBufferRepository implements AudioBufferRepository {
     for (const pid of pids) {
       pipeline.lrangeBuffer(this.participantKey(meetingCode, pid), 0, -1);
       pipeline.del(this.participantKey(meetingCode, pid));
-      pipeline.get(this.startedAtKey(meetingCode, pid));
-      pipeline.del(this.startedAtKey(meetingCode, pid));
-      pipeline.get(this.cursorKey(meetingCode, pid));
-      pipeline.del(this.cursorKey(meetingCode, pid));
     }
     pipeline.del(indexKey);
     const results = await pipeline.exec();
     if (!results) return [];
 
-    const out: {
-      participantId: string;
-      audio: Buffer;
-      startedAtMs?: number;
-      startMs?: number;
-    }[] = [];
-    // pid 당 6명령(lrangeBuffer, del, get(startedAt), del, get(cursor), del).
-    // 마지막 del(indexKey)은 results 끝.
-    const COMMANDS_PER_PID = 6;
+    const out: { participantId: string; runs: ReadonlyArray<AudioRun> }[] = [];
+    const COMMANDS_PER_PID = 2;
     for (let i = 0; i < pids.length; i++) {
       const lrangeRes = results[i * COMMANDS_PER_PID];
-      const startedAtRes = results[i * COMMANDS_PER_PID + 2];
-      const cursorRes = results[i * COMMANDS_PER_PID + 4];
       if (!lrangeRes) continue;
-      const [err, chunks] = lrangeRes as [Error | null, Buffer[]];
+      const [err, stamped] = lrangeRes as [Error | null, Buffer[]];
       if (err) throw err;
-      if (!chunks || chunks.length === 0) continue;
-      const startedAtRaw = startedAtRes ? (startedAtRes as [Error | null, string | null])[1] : null;
-      const cursorRaw = cursorRes ? (cursorRes as [Error | null, string | null])[1] : null;
-      const startedAtMs =
-        startedAtRaw !== null && startedAtRaw !== undefined ? Number(startedAtRaw) : undefined;
-      const startMs =
-        cursorRaw !== null && cursorRaw !== undefined ? bytesToMs(Number(cursorRaw)) : undefined;
-      out.push({
-        participantId: pids[i],
-        audio: Buffer.concat(chunks),
-        startedAtMs,
-        startMs,
-      });
+      if (!stamped || stamped.length === 0) continue;
+      const runs = groupIntoRuns(stamped).map((run) => ({
+        pcm: Buffer.from(run.pcm),
+        startedAtMs: run.startedAtMs,
+      }));
+      out.push({ participantId: pids[i], runs });
     }
     return out;
   }
@@ -190,13 +174,5 @@ export class RedisAudioBufferRepository implements AudioBufferRepository {
 
   private meetingIndexKey(meetingCode: string): string {
     return `${MEETING_INDEX_KEY_PREFIX}${meetingCode}`;
-  }
-
-  private startedAtKey(meetingCode: string, participantId: string): string {
-    return `${STARTED_AT_KEY_PREFIX}${meetingCode}:${participantId}`;
-  }
-
-  private cursorKey(meetingCode: string, participantId: string): string {
-    return `${CURSOR_KEY_PREFIX}${meetingCode}:${participantId}`;
   }
 }
