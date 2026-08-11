@@ -5,18 +5,12 @@
 # 접근된다. Caddy 가 backend:5000 으로 reverse_proxy(HTTP+WS)하며 TLS 를 종단한다.
 #
 # 변수(${...})는 같은 디렉터리의 .env 에서 읽는다(deploy 워크플로가 GitHub Secrets/Variables 로 생성).
-#
-# ── mem_limit ────────────────────────────────────────────────────────────────
-# 호스트는 Lightsail 2GB. 제한이 없으면 STT 디코딩이 메모리를 밀어올릴 때 커널 OM killer 가 RSS 가 가장 큰 backend 를 죽인다.
-# 컨테이너별 상한을 두면 cgroup 단위로 죽으므로, 넘치는 쪽(ai-worker)만 죽고 restart 로 복구된다.
-# 상한 합(1,874MB)은 물리 RAM 을 조금 넘지만 상한은 예약이 아니라 캡이고, 정상 사용량은 이보다 훨씬 낮다(초과분은 swapfile 이 흡수).
-# 값은 벤치(apps/ai-worker/bench)의 피크 RSS 실측으로 조정한다.
 services:
   caddy:
     image: caddy:2-alpine
     container_name: convene-caddy
     restart: unless-stopped
-    mem_limit: 64m
+    mem_limit: 32m
     ports:
       - '80:80'
       - '443:443'
@@ -35,13 +29,12 @@ services:
     image: redis:7.2-alpine
     container_name: convene-redis
     restart: unless-stopped
-    # maxmemory 256mb + AOF 버퍼 + 단편화 여유.
-    mem_limit: 320m
+    mem_limit: 160m
     command: >-
       redis-server
       --appendonly yes
       --appendfsync everysec
-      --maxmemory 256mb
+      --maxmemory 128mb
       --maxmemory-policy volatile-lru
       --notify-keyspace-events Ex
     volumes:
@@ -57,8 +50,7 @@ services:
     image: ghcr.io/beyond-imagination/convene-ai-worker:${IMAGE_TAG:-latest}
     container_name: convene-ai-worker
     restart: unless-stopped
-    # small int8 가중치 250MB + 디코딩 중 RSS 500~700MB 기준.
-    mem_limit: 850m
+    mem_limit: 1280m
     environment:
       - PYTHONUNBUFFERED=1
       - STT_MODEL_SIZE=${STT_MODEL_SIZE:-small}
@@ -68,8 +60,7 @@ services:
     image: ghcr.io/beyond-imagination/convene-backend:${IMAGE_TAG:-latest}
     container_name: convene-backend
     restart: unless-stopped
-    # Node + mediasoup worker + 참가자당 ffmpeg. 회의가 끊기면 안 되므로 넉넉히 잡는다.
-    mem_limit: 640m
+    mem_limit: 512m
     depends_on:
       redis:
         condition: service_healthy

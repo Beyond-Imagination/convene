@@ -29,6 +29,23 @@ if ! docker compose version >/dev/null 2>&1; then
 	sudo apt-get update && sudo apt-get install -y docker-compose-plugin
 fi
 
+echo "==> userland-proxy 비활성 확인"
+# Docker 는 발행 포트마다 docker-proxy 프로세스를 띄운다.
+# RTC 포트 200개를 TCP·UDP 로 열어 두면 800개가 생겨 실측 209MB 를 먹는다(2GB 인스턴스의 11%).
+# 끄면 iptables DNAT 만 쓴다.
+#
+# 부수 효과로 컨테이너가 gateway 가 아닌 실제 클라이언트 IP 를 보게 된다(로그·차단에 유리).
+# 단, 이 설정에서는 `127.0.0.1:PORT` 로 발행한 포트가 외부에 노출된 사례가 있으므로 loopback 발행 포트를 추가하지 말 것
+if [ ! -f /etc/docker/daemon.json ]; then
+	echo '{ "userland-proxy": false }' | sudo tee /etc/docker/daemon.json >/dev/null
+	sudo systemctl restart docker
+elif ! grep -q '"userland-proxy"' /etc/docker/daemon.json; then
+	echo "    /etc/docker/daemon.json 이 이미 있다. 아래를 직접 병합할 것:"
+	echo '      "userland-proxy": false'
+else
+	echo "    이미 설정됨 — 건너뜀"
+fi
+
 echo "==> swapfile 확인 (${SWAP_SIZE})"
 # Lightsail 2GB 인스턴스는 기본 swap 이 없다. STT 모델 콜드로드 스파이크와
 # 컨테이너 mem_limit 합계가 물리 RAM 을 잠깐 넘는 구간을 흡수한다.
