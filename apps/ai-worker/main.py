@@ -23,7 +23,7 @@ from faster_whisper import WhisperModel
 logger = logging.getLogger("ai-worker")
 logging.basicConfig(level=logging.INFO)
 
-CPU_THREADS = int(os.getenv("STT_CPU_THREADS", "1"))
+CPU_THREADS = int(os.getenv("STT_CPU_THREADS", "2"))
 BEAM_SIZE = int(os.getenv("STT_BEAM_SIZE", "1"))
 MODEL_SIZE = os.getenv("STT_MODEL_SIZE", "small")
 LANGUAGE = os.getenv("STT_LANGUAGE", "ko")
@@ -49,20 +49,14 @@ def _env_bool(name: str, default: bool) -> bool:
     return raw.strip().lower() in ("1", "true", "yes", "on")
 
 
-# faster-whisper small 한국어 STT의 오인식·환각을 줄이는 디코딩 옵션.
+# VAD_FILTER: Silero VAD로 무음 구간을 잘라낸다. 회의 오디오는 긴 정적 구간이 많아
+# 그대로 디코드하면 무음에 환각 자막이 붙는다.
 #
-# - VAD_FILTER: Silero VAD로 무음 구간을 잘라낸다. 회의 오디오는 긴 정적
-#   구간이 많아 그대로 디코드하면 무음에 환각 자막이 붙는다(특히 30s 청크).
-# - INITIAL_PROMPT: 도메인 어휘를 모델에 미리 알려 영어 기술 용어 오인식
-#   (예: "MySQL" → "마이스쿨")을 줄인다. 빈 문자열이면 비활성(None).
-#   도메인이 다르면 STT_INITIAL_PROMPT로 교체한다.
-DEFAULT_INITIAL_PROMPT = (
-    "이 녹음은 IT 개발 동아리의 화상 회의입니다. "
-    "API, OAuth, MySQL, Redis, Docker, 백엔드, 프론트엔드, 배포, 리팩터링 같은 "
-    "기술 용어와 영어 약어가 자주 등장합니다."
-)
+# INITIAL_PROMPT 는 기본값을 두지 않는다. 서술형 프롬프트는 CER 을 10.35pp 올렸고(67.83%→57.48%),
+# 도메인 단어 리스트도 그 회의에 그 단어가 나올 때만 이득이라 무관한 목록에서는 오히려 4.7pp 나빠졌다.
+# 회의 주제는 매번 다르므로 고정 프롬프트는 평균적으로 손해다.
 VAD_FILTER = _env_bool("STT_VAD_FILTER", True)
-INITIAL_PROMPT = (os.getenv("STT_INITIAL_PROMPT", DEFAULT_INITIAL_PROMPT).strip() or None)
+INITIAL_PROMPT = os.getenv("STT_INITIAL_PROMPT", "").strip() or None
 
 # 모듈 import 시점에 모델을 1회 로드(warm-start). 컨테이너 부팅 시 cold-load 비용
 # 한 번만 지불하고, 이후 매 요청은 transcribe만 호출한다.
