@@ -248,6 +248,20 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
     this.scheduleResume(ctx);
   }
 
+  /**
+   * 복구를 포기한 캡처를 등록에서 지우고 배선을 정리한다.
+   *
+   * 지우지 않으면 start()의 dedup(`contexts.has(key)`)이 죽은 context를 살아 있다고 보고
+   * 새 produce를 무시한다 — 마이크를 다시 켜도 캡처가 복구되지 않는다.
+   */
+  private abandonContext(ctx: CaptureContext): void {
+    const key = this.key(ctx.meetingCode, ctx.participantId);
+    if (this.contexts.get(key) === ctx) this.contexts.delete(key);
+    ctx.stopping = true;
+    closeQuietly(ctx.consumer);
+    closeQuietly(ctx.transport);
+  }
+
   /** ffmpeg 프로세스에 stdin(SDP)·stdout(PCM)·close 핸들러를 건다. 재시작 때도 다시 호출된다. */
   private attachFfmpeg(ctx: CaptureContext): void {
     const { ffmpeg, meetingCode, participantId } = ctx;
@@ -268,17 +282,21 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
       if (!shouldRespawnFfmpeg({ consecutiveFailures: ctx.consecutiveFailures, lifetimeMs })) {
         this.logger.error(
           { meetingCode, participantId, lifetimeMs, failures: ctx.consecutiveFailures },
-          'ffmpeg respawn abandoned',
+          'capture restart abandoned',
         );
+        this.abandonContext(ctx);
         return;
       }
       // RTP가 10초 끊기면 ffmpeg이 Connection timed out으로 죽는다(컴파일 타임 상수라
       // 옵션으로 못 늘린다). 참가자가 잠시 침묵한 정상 상황이므로 되살린다.
       setTimeout(() => {
         this.logger.info({ meetingCode, participantId, lifetimeMs }, 'capture restart');
-        this.restartCapture(ctx).catch((err) =>
-          this.logger.error({ meetingCode, participantId, err }, 'capture restart failed'),
-        );
+        this.restartCapture(ctx).catch((err) => {
+          // 재생성 자체가 실패했다 — producer가 이미 닫혔거나(mute) router가 정리된 뒤일 수 있다.
+          // context를 남겨 두면 다시 produce 될 때 start()가 dedup에 걸려 캡처가 영영 안 살아난다.
+          this.logger.error({ meetingCode, participantId, err }, 'capture restart failed');
+          this.abandonContext(ctx);
+        });
       }, RESPAWN_DELAY_MS);
     });
   }
