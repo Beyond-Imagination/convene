@@ -1,0 +1,61 @@
+[
+  {
+    "name": "0-baseline(현행)",
+    "model": { "size": "small", "compute_type": "int8", "cpu_threads": 1 },
+    "decode": {
+      "language": "ko",
+      "beam_size": 1,
+      "vad_filter": true,
+      "condition_on_previous_text": false,
+      "initial_prompt": "이 녹음은 IT 개발 동아리의 화상 회의입니다. API, OAuth, MySQL, Redis, Docker, 백엔드, 프론트엔드, 배포, 리팩터링 같은 기술 용어와 영어 약어가 자주 등장합니다."
+    }
+  },
+  {
+    "name": "1-beam5",
+    "model": { "size": "small", "compute_type": "int8", "cpu_threads": 1 },
+    "decode": {
+      "language": "ko",
+      "beam_size": 5,
+      "vad_filter": true,
+      "condition_on_previous_text": false,
+      "initial_prompt": "이 녹음은 IT 개발 동아리의 화상 회의입니다. API, OAuth, MySQL, Redis, Docker, 백엔드, 프론트엔드, 배포, 리팩터링 같은 기술 용어와 영어 약어가 자주 등장합니다."
+    }
+  },
+  {
+    "name": "2-beam5+hotwords",
+    "model": { "size": "small", "compute_type": "int8", "cpu_threads": 1 },
+    "decode": {
+      "language": "ko",
+      "beam_size": 5,
+      "vad_filter": true,
+      "condition_on_previous_text": false,
+      "hotwords": "API, OAuth, MySQL, Redis, Docker, Kubernetes, 백엔드, 프론트엔드, 배포, 리팩터링, 스프린트, 마이그레이션"
+    }
+  },
+  {
+    "name": "3-beam5+hotwords+antiloop",
+    "model": { "size": "small", "compute_type": "int8", "cpu_threads": 1 },
+    "decode": {
+      "language": "ko",
+      "beam_size": 5,
+      "vad_filter": true,
+      "condition_on_previous_text": false,
+      "hotwords": "API, OAuth, MySQL, Redis, Docker, Kubernetes, 백엔드, 프론트엔드, 배포, 리팩터링, 스프린트, 마이그레이션",
+      "repetition_penalty": 1.1,
+      "no_repeat_ngram_size": 3
+    }
+  },
+  {
+    "name": "4-위+2threads",
+    "model": { "size": "small", "compute_type": "int8", "cpu_threads": 2 },
+    "decode": {
+      "language": "ko",
+      "beam_size": 5,
+      "vad_filter": true,
+      "condition_on_previous_text": false,
+      "hotwords": "API, OAuth, MySQL, Redis, Docker, Kubernetes, 백엔드, 프론트엔드, 배포, 리팩터링, 스프린트, 마이그레이션",
+      "repetition_penalty": 1.1,
+      "no_repeat_ngram_size": 3
+    }
+  }
+]

@@ -5,6 +5,21 @@ import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.ad
 
 const FFMPEG_BIN = process.env.FFMPEG_BIN ?? 'ffmpeg';
 
+/** 노이즈 게이트. -45dB 는 공격적이라 작게 말하는 참가자의 어두를 삼킬 수 있다(CNV-22에서 조정 예정). */
+const DEFAULT_AUDIO_FILTER = 'agate=threshold=-45dB:range=0.01:release=1000';
+
+/**
+ * STT 전처리 필터 체인. `FFMPEG_AUDIO_FILTER=none` 이면 필터 없이 raw 로 뽑는다.
+ *
+ * 벤치 샘플은 필터를 끈 상태로 떠내야 한다 — 그래야 후보 체인들을 같은 오디오에
+ * 오프라인으로 걸어 비교할 수 있다. 필터를 거친 오디오에는 다시 걸 수 없다.
+ */
+function audioFilterArgs(): string[] {
+  const configured = process.env.FFMPEG_AUDIO_FILTER?.trim();
+  if (configured === 'none') return [];
+  return ['-af', configured || DEFAULT_AUDIO_FILTER];
+}
+
 /** mediasoup PlainTransport가 RTP를 흘려보낼 로컬 포트를 OS에서 하나 받아온다. */
 export function getFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -61,9 +76,7 @@ export function spawnFfmpeg(
     '0',
     '-probesize',
     '32',
-    // 노이즈 게이트.
-    '-af',
-    'agate=threshold=-45dB:range=0.01:release=1000',
+    ...audioFilterArgs(),
     '-map',
     '0:a',
     '-acodec',

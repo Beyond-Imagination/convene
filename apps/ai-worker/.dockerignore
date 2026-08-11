@@ -1,0 +1,8 @@
+# 벤치 샘플(회의 녹음)과 결과는 이미지에 넣지 않는다. bench 코드 자체는 컨테이너 안에서
+# 돌려야 하므로 포함한다.
+bench/samples/
+bench/result*.json
+
+__pycache__/
+*.pyc
+.env

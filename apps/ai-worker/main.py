@@ -7,12 +7,17 @@ audio는 디스크에 남기지 않고 STT 후 즉시 폐기한다.
 
 from __future__ import annotations
 
+import asyncio
 import io
+import itertools
 import logging
 import os
+import time
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from faster_whisper import WhisperModel
 
 logger = logging.getLogger("ai-worker")
@@ -22,6 +27,18 @@ CPU_THREADS = int(os.getenv("STT_CPU_THREADS", "1"))
 BEAM_SIZE = int(os.getenv("STT_BEAM_SIZE", "1"))
 MODEL_SIZE = os.getenv("STT_MODEL_SIZE", "small")
 LANGUAGE = os.getenv("STT_LANGUAGE", "ko")
+
+# 개발 전용 오디오 덤프. 벤치 샘플(bench/samples/)을 실제 파이프라인에서 떠내기 위한 것으로,
+# 받은 body를 그대로 wav로 저장한다 — 모델이 보는 것과 바이트 단위로 동일하다.
+#
+# 운영에서는 절대 설정하지 않는다. CLAUDE.md 의 "audio is ephemeral" 규칙상 오디오를
+# 남기는 경로는 로컬 개발에만 존재해야 한다(docker-compose.prod.yml 은 이 변수를 넘기지 않는다).
+DUMP_DIR = os.getenv("STT_DUMP_DIR", "").strip()
+_dump_sequence = itertools.count()
+
+# 동시 디코드 상한. 2GB 인스턴스에서 디코드가 겹치면 RAM 피크가 배로 뛰어 컨테이너가
+# OOM 으로 죽는다. 백엔드 스케줄러도 직렬로 호출하지만, 여기서 한 번 더 막는다.
+TRANSCRIBE_SEMAPHORE = asyncio.Semaphore(1)
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -59,6 +76,50 @@ model = WhisperModel(
 app = FastAPI(title="convene-ai-worker", version="1.0.0")
 
 
+def dump_audio(audio: bytes) -> None:
+    """받은 wav를 STT_DUMP_DIR에 떨군다. 덤프 실패가 전사를 막지 않도록 예외는 삼킨다."""
+    try:
+        directory = Path(DUMP_DIR)
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / f"{int(time.time())}-{next(_dump_sequence):04d}.wav"
+        path.write_bytes(audio)
+        logger.info("audio dumped: %s (%d bytes)", path, len(audio))
+    except Exception:  # noqa: BLE001 — 개발 편의 기능이라 실패해도 전사는 계속한다.
+        logger.exception("audio dump failed")
+
+
+def run_transcription(audio: bytes) -> list[dict[str, Any]]:
+    """CPU 바운드 전사 본체. 이벤트 루프가 아닌 threadpool 에서 호출된다."""
+    # faster-whisper는 file path / BinaryIO / ndarray를 받는다.
+    # BytesIO로 감싸 디스크 통과 없이 메모리에서 바로 처리한다.
+    segments_iter, _info = model.transcribe(
+        io.BytesIO(audio),
+        beam_size=BEAM_SIZE,
+        language=LANGUAGE,
+        vad_filter=VAD_FILTER,
+        initial_prompt=INITIAL_PROMPT,
+        # 청크 전사는 청크마다 독립 호출이라 이전 청크 문맥이 없다. 기본값
+        # (True)은 직전 텍스트에 조건을 걸어 반복·드리프트 환각을 유발하므로
+        # 청크 단위 안정성을 위해 끈다.
+        condition_on_previous_text=False,
+    )
+
+    segments: list[dict[str, Any]] = []
+    for seg in segments_iter:
+        text = seg.text.strip()
+        if not text:
+            continue
+        segments.append(
+            {
+                "text": text,
+                # backend wire format은 정수 ms (TranscriptionSegmentPayload).
+                "startMs": int(round(seg.start * 1000)),
+                "endMs": int(round(seg.end * 1000)),
+            }
+        )
+    return segments
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -74,34 +135,16 @@ async def transcribe(request: Request) -> dict[str, Any]:
 
     logger.info("transcribe: bytes=%d", len(audio))
 
-    try:
-        # faster-whisper는 file path / BinaryIO / ndarray를 받는다.
-        # BytesIO로 감싸 디스크 통과 없이 메모리에서 바로 처리한다.
-        segments_iter, _info = model.transcribe(
-            io.BytesIO(audio),
-            beam_size=BEAM_SIZE,
-            language=LANGUAGE,
-            vad_filter=VAD_FILTER,
-            initial_prompt=INITIAL_PROMPT,
-            # 청크 전사는 청크마다 독립 호출이라 이전 청크 문맥이 없다. 기본값
-            # (True)은 직전 텍스트에 조건을 걸어 반복·드리프트 환각을 유발하므로
-            # 청크 단위 안정성을 위해 끈다.
-            condition_on_previous_text=False,
-        )
+    if DUMP_DIR:
+        dump_audio(audio)
 
-        segments: list[dict[str, Any]] = []
-        for seg in segments_iter:
-            text = seg.text.strip()
-            if not text:
-                continue
-            segments.append(
-                {
-                    "text": text,
-                    # backend wire format은 정수 ms (TranscriptionSegmentPayload).
-                    "startMs": int(round(seg.start * 1000)),
-                    "endMs": int(round(seg.end * 1000)),
-                }
-            )
+    try:
+        # 전사는 CPU 바운드 블로킹 호출이라 threadpool 로 넘긴다. 이벤트 루프에서
+        # 그대로 돌리면 디코딩 내내 /health 까지 막혀 헬스체크가 오탐한다.
+        # 세마포어로 동시 디코드를 1건으로 묶어 RAM 피크가 배로 뛰는 것을 막는다
+        # (CTranslate2 는 연산 중 GIL 을 놓으므로 threadpool 로도 병렬이 된다).
+        async with TRANSCRIBE_SEMAPHORE:
+            segments = await run_in_threadpool(run_transcription, audio)
 
         logger.info("transcribe done: %d segments", len(segments))
         return {"segments": segments}
