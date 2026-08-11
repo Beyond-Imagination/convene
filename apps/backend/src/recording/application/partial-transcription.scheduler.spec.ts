@@ -14,6 +14,13 @@ interface FakeRepoState {
   drainImpl: (code: string, pid: string) => Promise<ReadonlyArray<AudioRun>>;
 }
 
+/** 무음 필터에 걸리지 않도록 발화 수준 진폭을 채운 PCM. */
+const audible = (bytes: number): Buffer => {
+  const buf = Buffer.alloc(bytes);
+  for (let i = 0; i + 1 < bytes; i += 2) buf.writeInt16LE(6_000, i);
+  return buf;
+};
+
 const makeRepo = (state: Partial<FakeRepoState> = {}): AudioBufferRepository => ({
   append: async () => {},
   drainAvailable: async (code, pid) => {
@@ -89,8 +96,38 @@ describe('PartialTranscriptionScheduler.tick', () => {
     expect(store.appended).toEqual([]);
   });
 
+  it('무음뿐인 run 은 전사에 보내지 않는다 — 마이크만 켜 두면 무음이 계속 쌓인다', async () => {
+    const repo = makeRepo({
+      activeMeetings: ['abc12xyz'],
+      participantsByMeeting: { abc12xyz: ['s1'] },
+      drainImpl: async () => [{ pcm: Buffer.alloc(32_000), startedAtMs: 1_000 }],
+    });
+    const transcriber = makeTranscriber();
+    const store = makeStore();
+    const scheduler = new PartialTranscriptionScheduler(repo, transcriber, store, noopLogger());
+    await scheduler.tick();
+    expect(transcriber.transcribe).not.toHaveBeenCalled();
+  });
+
+  it('무음 run 은 걸러도 발화 run 은 남긴다', async () => {
+    const repo = makeRepo({
+      activeMeetings: ['abc12xyz'],
+      participantsByMeeting: { abc12xyz: ['s1'] },
+      drainImpl: async () => [
+        { pcm: Buffer.alloc(32_000), startedAtMs: 1_000 },
+        { pcm: audible(32_000), startedAtMs: 40_000 },
+      ],
+    });
+    const transcriber = makeTranscriber(() => [{ text: 'x', startMs: 0, endMs: 100 }]);
+    const store = makeStore();
+    const scheduler = new PartialTranscriptionScheduler(repo, transcriber, store, noopLogger());
+    await scheduler.tick();
+    expect(transcriber.transcribe).toHaveBeenCalledTimes(1);
+    expect(store.appended[0].segments[0].absoluteStartMs).toBe(40_000);
+  });
+
   it('drain pcm을 wav로 wrap 해서 transcribe 호출한다', async () => {
-    const pcm = Buffer.alloc(100, 0xab);
+    const pcm = audible(100);
     const repo = makeRepo({
       activeMeetings: ['abc12xyz'],
       participantsByMeeting: { abc12xyz: ['s1'] },
@@ -117,7 +154,7 @@ describe('PartialTranscriptionScheduler.tick', () => {
     const repo = makeRepo({
       activeMeetings: ['abc12xyz'],
       participantsByMeeting: { abc12xyz: ['s1'] },
-      drainImpl: async () => [{ pcm: Buffer.alloc(100), startedAtMs: startedAtMs + chunkStartMs }],
+      drainImpl: async () => [{ pcm: audible(100), startedAtMs: startedAtMs + chunkStartMs }],
     });
     const transcriber = makeTranscriber(() => [
       { text: 'hi', startMs: 2500, endMs: 3000 },
@@ -156,7 +193,7 @@ describe('PartialTranscriptionScheduler.tick', () => {
     const repo = makeRepo({
       activeMeetings: ['aaa11aaa', 'bbb22bbb'],
       participantsByMeeting: { aaa11aaa: ['s1', 's2'], bbb22bbb: ['s3'] },
-      drainImpl: async () => [{ pcm: Buffer.alloc(100), startedAtMs: 1_000_000_000_000 }],
+      drainImpl: async () => [{ pcm: audible(100), startedAtMs: 1_000_000_000_000 }],
     });
     const transcriber = makeTranscriber(() => [{ text: 'x', startMs: 0, endMs: 100 }]);
     const store = makeStore();
@@ -178,7 +215,7 @@ describe('PartialTranscriptionScheduler.tick', () => {
     const repo = makeRepo({
       activeMeetings: ['abc12xyz'],
       participantsByMeeting: { abc12xyz: ['s1', 's2'] },
-      drainImpl: async () => [{ pcm: Buffer.alloc(100), startedAtMs: 1_000_000_000_000 }],
+      drainImpl: async () => [{ pcm: audible(100), startedAtMs: 1_000_000_000_000 }],
     });
     const transcriber: TranscriberPort = {
       transcribe: jest
@@ -206,7 +243,7 @@ describe('PartialTranscriptionScheduler.tick', () => {
     const repo = makeRepo({
       activeMeetings: ['abc12xyz'],
       participantsByMeeting: { abc12xyz: ['s1'] },
-      drainImpl: async () => [{ pcm: Buffer.alloc(100), startedAtMs: startedAtMs + chunkStartMs }],
+      drainImpl: async () => [{ pcm: audible(100), startedAtMs: startedAtMs + chunkStartMs }],
     });
     // 직전 drain 이 남긴 꼬리는 전사되지 않은 채 넘어온 것이라 중복이 아니다.
     // 여기서 앞 2초를 버리면 매 drain 마다 그만큼 발화가 사라진다.
@@ -237,7 +274,7 @@ describe('PartialTranscriptionScheduler.tick', () => {
     const repo = makeRepo({
       activeMeetings: ['abc12xyz'],
       participantsByMeeting: { abc12xyz: ['s1'] },
-      drainImpl: async () => [{ pcm: Buffer.alloc(100), startedAtMs: startedAtMs + 0 }],
+      drainImpl: async () => [{ pcm: audible(100), startedAtMs: startedAtMs + 0 }],
     });
     const transcriber = makeTranscriber(() => [
       { text: 'first', startMs: 500, endMs: 1_500 },
@@ -259,7 +296,7 @@ describe('PartialTranscriptionScheduler.tick', () => {
     const repo = makeRepo({
       activeMeetings: ['abc12xyz'],
       participantsByMeeting: { abc12xyz: ['s1'] },
-      drainImpl: async () => [{ pcm: Buffer.alloc(100), startedAtMs: 5_000 }],
+      drainImpl: async () => [{ pcm: audible(100), startedAtMs: 5_000 }],
     });
     const transcriber = makeTranscriber(() => [{ text: 'x', startMs: 2_500, endMs: 3_000 }]);
     const store = makeStore();

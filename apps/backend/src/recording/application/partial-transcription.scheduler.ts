@@ -6,9 +6,9 @@ import { TRANSCRIBER, TranscriberPort } from '@/recording/domain/ports/transcrib
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 import {
+  isSilentPcm,
   packRunsIntoBatches,
   PCM_BYTES_PER_SECOND,
-  resolveSegmentStartMs,
   RunBatch,
   wrapPcmAsWav,
 } from '../infrastructure/audio-chunker';
@@ -66,8 +66,10 @@ export class PartialTranscriptionScheduler implements OnModuleInit, OnModuleDest
         participantId,
         KEEP_LAST_BYTES,
       );
-      if (runs.length === 0) return;
-      const batches = packRunsIntoBatches(runs);
+      // 마이크를 켠 채 말하지 않으면 무음 run 이 쌓인다. 보내 봐야 연산만 쓴다.
+      const spoken = runs.filter((run) => !isSilentPcm(run.pcm));
+      if (spoken.length === 0) return;
+      const batches = packRunsIntoBatches(spoken);
       this.logger.debug(
         { meetingCode, participantId, runs: runs.length, batches: batches.length },
         'partial drain',
@@ -95,8 +97,8 @@ export class PartialTranscriptionScheduler implements OnModuleInit, OnModuleDest
     const absolute: AbsoluteTranscriptSegment[] = segments.map((s) => ({
       speaker: participantId,
       text: s.text,
-      absoluteStartMs: resolveSegmentStartMs(batch.placements, s.startMs),
-      absoluteEndMs: resolveSegmentStartMs(batch.placements, s.endMs),
+      absoluteStartMs: batch.startedAtMs + s.startMs,
+      absoluteEndMs: batch.startedAtMs + s.endMs,
     }));
     await this.partialTranscriptStore.append(meetingCode, absolute);
   }

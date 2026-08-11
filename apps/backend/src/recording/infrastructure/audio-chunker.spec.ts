@@ -1,10 +1,10 @@
 import {
-  BATCH_GAP_MS,
+  BATCH_SILENCE_BUDGET_MS,
   DEFAULT_OVERLAP_MS,
   dropOverlapHeadSegments,
+  isSilentPcm,
   packRunsIntoBatches,
   PCM_BYTES_PER_SECOND,
-  resolveSegmentStartMs,
   splitPcmIntoWavChunks,
   WAV_HEADER_BYTES,
   wrapPcmAsWav,
@@ -160,31 +160,61 @@ describe('packRunsIntoBatches', () => {
     startedAtMs,
   });
 
-  it('짧은 run 여러 개를 한 배치로 묶는다 — 4초 조각도 30초 인코더 윈도우를 통째로 쓴다', () => {
-    const runs = [run(4_000, 1000), run(4_000, 20_000), run(4_000, 40_000)];
-    const batches = packRunsIntoBatches(runs);
+  it('시간이 가까운 run 들을 실제 간격만큼 무음을 끼워 이어 붙인다', () => {
+    // run A 0~1000ms, 500ms 쉬고, run B 1500~2500ms.
+    const batches = packRunsIntoBatches([run(1_000, 0), run(1_000, 1_500)]);
     expect(batches).toHaveLength(1);
-    expect(batches[0].placements.map((p) => p.startedAtMs)).toEqual([1000, 20_000, 40_000]);
+    expect(batches[0].startedAtMs).toBe(0);
+    // 배치 길이 = 실제 경과 시간(2500ms)과 같아야 한다.
+    expect(batches[0].pcm.length).toBe(2_500 * BYTES_PER_MS);
   });
 
-  it('run 사이에 무음 구분자를 끼워 별개 발화로 남긴다', () => {
-    const batches = packRunsIntoBatches([run(1_000, 0), run(1_000, 90_000)]);
-    const [first, second] = batches[0].placements;
-    expect(second.offsetMs).toBe(first.offsetMs + first.durationMs + BATCH_GAP_MS);
-    // 이어 붙인 총 길이 = run 2개 + 구분자 1개.
-    expect(batches[0].pcm.length).toBe((2_000 + BATCH_GAP_MS) * BYTES_PER_MS);
+  it('배치가 실제 시간축을 재현하므로 오프셋을 그대로 더하면 절대 시각이 된다', () => {
+    const batches = packRunsIntoBatches([run(1_000, 10_000), run(1_000, 11_500)]);
+    // 두 번째 run 의 첫 sample 은 배치 안 1500ms 지점 = 10_000 + 1500.
+    const offsetOfSecond = 1_500 * BYTES_PER_MS;
+    expect(batches[0].pcm.length).toBe(2_500 * BYTES_PER_MS);
+    expect(batches[0].startedAtMs + 1_500).toBe(11_500);
+    expect(offsetOfSecond).toBeGreaterThan(0);
   });
 
-  it('예산을 넘으면 다음 배치로 넘긴다 — 30초 윈도우를 두 개 쓰지 않도록', () => {
-    const runs = [run(20_000, 0), run(20_000, 60_000)];
+  it('간격이 멀면 배치를 나눈다 — 무음으로 채우면 예산만 먹는다', () => {
+    const batches = packRunsIntoBatches([run(1_000, 0), run(1_000, 600_000)]);
+    expect(batches).toHaveLength(2);
+    expect(batches[0].startedAtMs).toBe(0);
+    expect(batches[1].startedAtMs).toBe(600_000);
+  });
+
+  it('짧은 발화가 띄엄띄엄 와도 배치가 무음으로 채워지지 않는다', () => {
+    // 0.1초 발화 × 10개, 매번 4초 간격. 무음 예산이 없으면 40초 무음 + 1초 발화가 된다.
+    const runs = Array.from({ length: 10 }, (_, i) => run(100, i * 4_100));
     const batches = packRunsIntoBatches(runs);
+
+    for (const batch of batches) {
+      const totalMs = batch.pcm.length / BYTES_PER_MS;
+      const speechMs = runs
+        .filter(
+          (r) => r.startedAtMs >= batch.startedAtMs && r.startedAtMs < batch.startedAtMs + totalMs,
+        )
+        .reduce((sum, r) => sum + r.pcm.length / BYTES_PER_MS, 0);
+      expect(totalMs - speechMs).toBeLessThanOrEqual(BATCH_SILENCE_BUDGET_MS);
+    }
+  });
+
+  it('발화가 예산을 채우면 무음 예산이 남아도 배치를 나눈다', () => {
+    const batches = packRunsIntoBatches([run(20_000, 0), run(20_000, 20_500)]);
+    expect(batches).toHaveLength(2);
+  });
+
+  it('예산을 넘으면 다음 배치로 넘긴다', () => {
+    const batches = packRunsIntoBatches([run(20_000, 0), run(20_000, 21_000)]);
     expect(batches).toHaveLength(2);
   });
 
   it('예산보다 긴 run 하나는 그대로 자기 배치가 된다', () => {
     const batches = packRunsIntoBatches([run(50_000, 0)]);
     expect(batches).toHaveLength(1);
-    expect(batches[0].placements).toHaveLength(1);
+    expect(batches[0].pcm.length).toBe(50_000 * BYTES_PER_MS);
   });
 
   it('빈 입력은 빈 배열', () => {
@@ -192,22 +222,32 @@ describe('packRunsIntoBatches', () => {
   });
 });
 
-describe('resolveSegmentStartMs', () => {
-  const placements = [
-    { offsetMs: 0, durationMs: 1_000, startedAtMs: 5_000 },
-    { offsetMs: 1_400, durationMs: 1_000, startedAtMs: 90_000 },
-  ];
+describe('isSilentPcm', () => {
+  const sample = (value: number, count: number): Buffer => {
+    const buf = Buffer.alloc(count * 2);
+    for (let i = 0; i < count; i++) buf.writeInt16LE(value, i * 2);
+    return buf;
+  };
 
-  it('배치 내 오프셋을 그 run 의 절대 시각으로 되돌린다', () => {
-    expect(resolveSegmentStartMs(placements, 300)).toBe(5_300);
-    expect(resolveSegmentStartMs(placements, 1_600)).toBe(90_200);
+  it('전부 0이면 무음', () => {
+    expect(isSilentPcm(Buffer.alloc(32_000))).toBe(true);
   });
 
-  it('무음 구분자 안에서 시작한 segment 는 다음 run 의 시작으로 붙인다', () => {
-    expect(resolveSegmentStartMs(placements, 1_200)).toBe(90_000);
+  it('빈 버퍼도 무음', () => {
+    expect(isSilentPcm(Buffer.alloc(0))).toBe(true);
   });
 
-  it('마지막 run 을 넘어선 오프셋은 마지막 run 기준으로 계산한다', () => {
-    expect(resolveSegmentStartMs(placements, 5_000)).toBe(90_000 + 3_600);
+  it('임계치 아래 잔잔한 잡음은 무음으로 본다', () => {
+    expect(isSilentPcm(sample(100, 16_000))).toBe(true);
+  });
+
+  it('말소리 수준의 진폭은 무음이 아니다', () => {
+    expect(isSilentPcm(sample(4_000, 16_000))).toBe(false);
+  });
+
+  it('대부분 무음이라도 발화가 섞여 있으면 무음이 아니다', () => {
+    const quiet = sample(50, 15_000);
+    const loud = sample(6_000, 1_000);
+    expect(isSilentPcm(Buffer.concat([quiet, loud]))).toBe(false);
   });
 });
