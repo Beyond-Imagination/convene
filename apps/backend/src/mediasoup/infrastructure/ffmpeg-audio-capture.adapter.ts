@@ -20,12 +20,13 @@ import { MediasoupRouterAdapter } from './mediasoup-router.adapter';
 interface CaptureContext {
   readonly meetingCode: string;
   readonly participantId: string;
-  readonly transport: PlainTransport;
-  readonly consumer: Consumer;
-  /** ffmpeg가 RTP idle로 죽으면 같은 포트로 다시 띄우므로 교체된다. */
+  /** 캡처 재시작 시 consumer를 다시 만들려면 필요하다. */
+  readonly producerId: string;
+  /** 재시작 때 배선을 통째로 새로 깔므로 전부 교체된다. */
+  transport: PlainTransport;
+  consumer: Consumer;
   ffmpeg: ChildProcess;
-  /** 재spawn 시 그대로 다시 먹일 SDP. mediasoup는 계속 같은 포트로 쏘고 있다. */
-  readonly sdp: string;
+  sdp: string;
   /** 캡처 시작 시각(epoch ms). 벽시계 대비 부족분을 무음으로 채우는 기준. */
   readonly startedAtMs: number;
   /** 현재 ffmpeg 프로세스를 띄운 시각. 즉시 죽는 상황을 판별한다. */
@@ -42,8 +43,17 @@ interface CaptureContext {
 const RESUME_DELAY_MS = 1000;
 /** ffmpeg가 stdin 종료 후 자체 정리할 시간을 주고도 살아 있으면 SIGTERM. */
 const SIGTERM_DELAY_MS = 2000;
-/** 재spawn 간격. 포트가 풀릴 시간을 주고 spawn 폭주도 막는다. */
+/** 재시작 간격. 포트가 풀릴 시간을 주고 spawn 폭주도 막는다. */
 const RESPAWN_DELAY_MS = 200;
+
+/** 이미 닫혔거나 닫는 중 터지는 예외는 정리 단계에서 의미가 없다. */
+function closeQuietly(resource: { closed: boolean; close: () => void }): void {
+  try {
+    if (!resource.closed) resource.close();
+  } catch {
+    /* swallow */
+  }
+}
 
 /**
  * `AudioCapturePort`의 mediasoup PlainTransport + ffmpeg 어댑터
@@ -125,6 +135,43 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
   }
 
   private async createCaptureContext(input: AudioCaptureStartInput): Promise<CaptureContext> {
+    const plumbing = await this.createMediaPlumbing(input);
+
+    const ctx: CaptureContext = {
+      meetingCode: input.meetingCode,
+      participantId: input.participantId,
+      producerId: input.producerId,
+      transport: plumbing.transport,
+      consumer: plumbing.consumer,
+      ffmpeg: spawnFfmpeg(this.logger, input.meetingCode, input.participantId),
+      sdp: plumbing.sdp,
+      startedAtMs: Date.now(),
+      spawnedAtMs: Date.now(),
+      consecutiveFailures: 0,
+      writtenBytes: 0,
+      stopping: false,
+    };
+    this.attachFfmpeg(ctx);
+    this.scheduleResume(ctx);
+
+    // 참가자의 capture 시작 시각을 1회만 기록한다. RecordingService가 회의 시작 시각을 origin으로 잡고 본 값과의 차이를
+    // segment.startMs/endMs에 가산해 시간축을 회의 기준으로 normalize. SETNX 성격이라 두 번째 capture가 들어와도 첫 호출 값만 유효.
+    this.audioBufferRepository
+      .markStarted(input.meetingCode, input.participantId, ctx.startedAtMs)
+      .catch((err) =>
+        this.logger.error(
+          { meetingCode: input.meetingCode, participantId: input.participantId, err },
+          'markStarted failed',
+        ),
+      );
+
+    return ctx;
+  }
+
+  /** PlainTransport + Consumer + 그 포트를 가리키는 SDP 한 벌. 재시작 때 통째로 다시 만든다. */
+  private async createMediaPlumbing(
+    input: AudioCaptureStartInput,
+  ): Promise<{ transport: PlainTransport; consumer: Consumer; sdp: string }> {
     const router = this.routerAdapter.getParticipantRouter(input.meetingCode, input.participantId);
 
     const transport = await router.createPlainTransport({
@@ -142,54 +189,66 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
     });
 
     const codec = consumer.rtpParameters.codecs[0];
-    const sdp = buildSdp(port, codec.payloadType, codec.clockRate, codec.channels ?? 2);
-
-    const ctx: CaptureContext = {
-      meetingCode: input.meetingCode,
-      participantId: input.participantId,
+    return {
       transport,
       consumer,
-      ffmpeg: spawnFfmpeg(this.logger, input.meetingCode, input.participantId),
-      sdp,
-      startedAtMs: Date.now(),
-      spawnedAtMs: Date.now(),
-      consecutiveFailures: 0,
-      writtenBytes: 0,
-      stopping: false,
+      sdp: buildSdp(port, codec.payloadType, codec.clockRate, codec.channels ?? 2),
     };
-    this.attachFfmpeg(ctx);
+  }
 
+  /**
+   * PlainTransport.connect 직후 즉시 resume하면 ffmpeg의 port binding이 끝나기 전에
+   * RTP가 떨어져 packet loss가 난다. 1초 양보한다.
+   */
+  private scheduleResume(ctx: CaptureContext): void {
+    const consumer = ctx.consumer;
     setTimeout(() => {
+      if (ctx.stopping || consumer.closed) return;
       consumer
         .resume()
         .catch((err) =>
           this.logger.error(
-            { meetingCode: input.meetingCode, participantId: input.participantId, err },
+            { meetingCode: ctx.meetingCode, participantId: ctx.participantId, err },
             'consumer resume failed',
           ),
         );
     }, RESUME_DELAY_MS);
-
-    // 참가자의 capture 시작 시각을 1회만 기록한다. RecordingService가 회의 시작 시각을 origin으로 잡고 본 값과의 차이를
-    // segment.startMs/endMs에 가산해 시간축을 회의 기준으로 normalize. SETNX 성격이라 두 번째 capture가 들어와도 첫 호출 값만 유효.
-    this.audioBufferRepository
-      .markStarted(input.meetingCode, input.participantId, ctx.startedAtMs)
-      .catch((err) =>
-        this.logger.error(
-          { meetingCode: input.meetingCode, participantId: input.participantId, err },
-          'markStarted failed',
-        ),
-      );
-
-    return ctx;
   }
 
   /**
-   * ffmpeg 프로세스에 stdin(SDP)·stdout(PCM)·close 핸들러를 건다.
+   * 죽은 캡처를 되살린다 — ffmpeg 뿐 아니라 PlainTransport와 consumer까지 새로 만든다.
    *
-   * 재spawn 때도 그대로 다시 호출된다 — PlainTransport와 consumer는 살아 있고
-   * mediasoup는 계속 같은 포트로 RTP를 쏘고 있으므로 ffmpeg만 갈아 끼우면 된다.
+   * ffmpeg가 죽으면 그 UDP 포트가 닫히고, 그때 loopback이 돌려주는 ICMP port unreachable이
+   * mediasoup의 connect된 송신 소켓을 망가뜨린다. 그래서 ffmpeg만 같은 포트로 다시 띄우면
+   * RTP가 한 바이트도 오지 않는다(실측: 재spawn 프로세스는 전부 캡처 0바이트로 20초 만에
+   * 타임아웃). 새 포트로 배선을 통째로 다시 깔아야 스트림이 돌아온다.
    */
+  private async restartCapture(ctx: CaptureContext): Promise<void> {
+    if (ctx.stopping) return;
+    closeQuietly(ctx.consumer);
+    closeQuietly(ctx.transport);
+
+    const plumbing = await this.createMediaPlumbing({
+      meetingCode: ctx.meetingCode,
+      participantId: ctx.participantId,
+      producerId: ctx.producerId,
+    });
+    if (ctx.stopping) {
+      closeQuietly(plumbing.consumer);
+      closeQuietly(plumbing.transport);
+      return;
+    }
+
+    ctx.transport = plumbing.transport;
+    ctx.consumer = plumbing.consumer;
+    ctx.sdp = plumbing.sdp;
+    ctx.ffmpeg = spawnFfmpeg(this.logger, ctx.meetingCode, ctx.participantId);
+    ctx.spawnedAtMs = Date.now();
+    this.attachFfmpeg(ctx);
+    this.scheduleResume(ctx);
+  }
+
+  /** ffmpeg 프로세스에 stdin(SDP)·stdout(PCM)·close 핸들러를 건다. 재시작 때도 다시 호출된다. */
   private attachFfmpeg(ctx: CaptureContext): void {
     const { ffmpeg, meetingCode, participantId } = ctx;
     if (!ffmpeg.stdin || !ffmpeg.stdout) {
@@ -216,15 +275,10 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
       // RTP가 10초 끊기면 ffmpeg이 Connection timed out으로 죽는다(컴파일 타임 상수라
       // 옵션으로 못 늘린다). 참가자가 잠시 침묵한 정상 상황이므로 되살린다.
       setTimeout(() => {
-        if (ctx.stopping) return;
-        this.logger.info({ meetingCode, participantId, lifetimeMs }, 'ffmpeg respawn');
-        ctx.ffmpeg = spawnFfmpeg(this.logger, meetingCode, participantId);
-        ctx.spawnedAtMs = Date.now();
-        try {
-          this.attachFfmpeg(ctx);
-        } catch (err) {
-          this.logger.error({ meetingCode, participantId, err }, 'ffmpeg respawn failed');
-        }
+        this.logger.info({ meetingCode, participantId, lifetimeMs }, 'capture restart');
+        this.restartCapture(ctx).catch((err) =>
+          this.logger.error({ meetingCode, participantId, err }, 'capture restart failed'),
+        );
       }, RESPAWN_DELAY_MS);
     });
   }
@@ -272,16 +326,8 @@ export class FfmpegAudioCaptureAdapter implements AudioCapturePort {
         }
       }
     }, SIGTERM_DELAY_MS);
-    try {
-      if (!ctx.consumer.closed) ctx.consumer.close();
-    } catch {
-      /* swallow */
-    }
-    try {
-      if (!ctx.transport.closed) ctx.transport.close();
-    } catch {
-      /* swallow */
-    }
+    closeQuietly(ctx.consumer);
+    closeQuietly(ctx.transport);
   }
 
   private key(meetingCode: string, participantId: string): string {
