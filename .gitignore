@@ -42,3 +42,5 @@ venv/
 apps/ai-worker/bench/samples/*
 !apps/ai-worker/bench/samples/.gitkeep
 apps/ai-worker/bench/result*.json
+apps/ai-worker/bench/configs*.json
+apps/ai-worker/bench/flow_check.py

@@ -8,9 +8,8 @@
 
 한국어는 어절 단위 WER 이 띄어쓰기 차이에 과민해서 **CER 을 주 지표**로 본다. WER 은 참고용으로만 같이 낸다.
 
-사용법:
-    python bench/run_bench.py
-    python bench/run_bench.py --configs bench/configs.custom.json --out result.json
+사용법(설정 JSON 작성 예시는 bench/README.md):
+    python bench/run_bench.py --configs bench/configs.mine.json --out bench/result.json
 """
 
 from __future__ import annotations
@@ -32,7 +31,6 @@ except ImportError:  # pragma: no cover - 플랫폼 분기
 
 BENCH_DIR = Path(__file__).resolve().parent
 SAMPLES_DIR = BENCH_DIR / "samples"
-DEFAULT_CONFIGS_PATH = BENCH_DIR / "configs.json"
 
 # 자식 프로세스 하나를 기다리는 상한. 첫 실행은 모델 다운로드가 끼므로 넉넉히 잡는다.
 CONFIG_TIMEOUT_S = 3600
@@ -79,21 +77,25 @@ def wav_seconds(path: Path) -> float:
 
 
 def load_samples() -> list[Sample]:
-    """`samples/<name>.wav` + `samples/<name>.txt`(정답 전사) 쌍을 모은다."""
+    """`<name>.wav` + `<name>.txt`(정답 전사) 쌍을 모은다. 화자별 하위 폴더까지 훑는다."""
     if not SAMPLES_DIR.is_dir():
         raise SystemExit(f"샘플 디렉터리가 없습니다: {SAMPLES_DIR}")
 
     samples: list[Sample] = []
-    for audio_path in sorted(SAMPLES_DIR.glob("*.wav")):
+    for audio_path in sorted(SAMPLES_DIR.rglob("*.wav")):
+        # 비교용으로 남겨 둔 과거 수집분은 벤치 대상이 아니다.
+        if any(part.startswith("prev-") for part in audio_path.relative_to(SAMPLES_DIR).parts):
+            continue
         reference_path = audio_path.with_suffix(".txt")
         if not reference_path.is_file():
             print(f"  건너뜀: {audio_path.name} — 정답 전사({reference_path.name})가 없습니다.")
             continue
         reference = reference_path.read_text(encoding="utf-8").strip()
         if not reference:
-            print(f"  건너뜀: {audio_path.name} — 정답 전사가 비어 있습니다.")
             continue
-        samples.append(Sample(audio_path.stem, audio_path, reference, wav_seconds(audio_path)))
+        # 화자 폴더 이름을 붙여 결과 표에서 구분되게 한다.
+        label = f"{audio_path.parent.name}/{audio_path.stem}"
+        samples.append(Sample(label, audio_path, reference, wav_seconds(audio_path)))
 
     if not samples:
         raise SystemExit(
@@ -220,15 +222,12 @@ def format_table(results: list[dict[str, Any]]) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="faster-whisper 설정 비교 벤치")
-    parser.add_argument(
-        "--configs",
-        type=Path,
-        default=DEFAULT_CONFIGS_PATH,
-        help=f"설정 JSON 경로 (기본: {DEFAULT_CONFIGS_PATH})",
-    )
+    parser.add_argument("--configs", type=Path, required=True, help="비교할 설정 JSON 경로")
     parser.add_argument("--out", type=Path, help="결과 JSON 을 저장할 경로")
     args = parser.parse_args()
 
+    if not args.configs.is_file():
+        raise SystemExit(f"설정 파일이 없습니다: {args.configs} — 작성 예시는 bench/README.md 참고")
     configs = json.loads(args.configs.read_text(encoding="utf-8"))
     samples = load_samples()
     total_seconds = sum(sample.seconds for sample in samples)
@@ -236,8 +235,11 @@ def main() -> None:
 
     results = []
     for config in configs:
-        print(f"→ {config.get('name', '?')} 측정 중...")
-        results.append(measure(config, samples))
+        print(f"→ {config.get('name', '?')} 측정 중...", flush=True)
+        result = measure(config, samples)
+        results.append(result)
+        # 오래 걸리는 sweep 에서 중간 결과를 볼 수 있게 설정마다 바로 찍는다.
+        print(format_table([result]).splitlines()[-1], flush=True)
 
     print("\n" + format_table(results))
 

@@ -6,13 +6,17 @@
 
 ## 샘플 준비
 
-`samples/` 에 오디오와 정답 전사를 **같은 이름으로** 넣는다.
+오디오와 정답 전사를 **같은 이름으로** 나란히 둔다. 화자별 하위 폴더까지 훑으므로
+덤프된 자리에서 바로 채우면 된다. 비어 있는 `.txt` 는 자동으로 건너뛴다.
 
 ```
-samples/
-├── standup-01.wav   # 파이프라인에서 떠낸 오디오
-└── standup-01.txt   # 사람이 받아쓴 정답 전사
+samples/raw/
+├── {화자A}/1786457659-0002.wav
+├── {화자A}/1786457659-0002.txt   # 사람이 받아쓴 정답 전사
+└── INDEX.md                      # 파일·길이 체크리스트
 ```
+
+`prev-` 로 시작하는 폴더는 과거 수집분 보관용이라 벤치에서 제외된다.
 
 오디오는 git 에 커밋하지 않는다(`.gitignore` 처리됨).
 실제 회의 녹음이라 개인정보가 들어 있고, 이미지에도 넣을 이유가 없다.
@@ -51,6 +55,9 @@ ffmpeg -i samples/standup-01.wav \
 
 ### 정답 전사 작성 규칙
 
+**형식은 그냥 평문이다.** 한 줄로 쭉 써도 되고 여러 줄로 나눠도 된다 — 하네스가 공백·줄바꿈을
+하나로 합치므로 결과가 같다. 화자 표기나 타임스탬프는 넣지 않는다(파일 하나가 곧 한 화자다).
+
 하네스가 문장부호·대소문자·중복 공백을 정규화하므로 거기엔 신경 쓰지 않아도 된다. 대신 아래는 지킨다.
 
 - **영어 기술 용어는 원하는 출력 형태로 적는다** — `API`(O) / `에이피아이`(X). hotwords 평가의 정답이 바로 이 표기다.
@@ -74,12 +81,24 @@ faster-whisper 가 설치된 곳에서 돌린다(= ai-worker 컨테이너 안).
 
 ```bash
 docker compose -f docker-compose.local.yml run --rm \
-  ai-worker python bench/run_bench.py --out bench/result.json
+  ai-worker python bench/run_bench.py --configs bench/configs.mine.json --out bench/result.json
 ```
 
-설정을 바꿔가며 비교하려면 `configs.json` 을 편집하거나 `--configs` 로 다른 파일을 준다.
-`decode` 의 키는 `WhisperModel.transcribe()` 에 그대로 전달되므로, 새 파라미터를
-시험할 때 하네스 코드를 고칠 필요가 없다.
+비교할 설정은 매번 직접 쓴다. 지난 sweep 정의는 그때의 가설에만 맞아서 커밋하지 않는다
+(`configs.*.json` · `result*.json` 은 ignore 대상).
+
+```json
+[
+  {
+    "name": "baseline",
+    "model": { "size": "small", "compute_type": "int8", "cpu_threads": 2 },
+    "decode": { "language": "ko", "beam_size": 1, "vad_filter": true, "condition_on_previous_text": false }
+  }
+]
+```
+
+`model` 은 `WhisperModel()` 로(`size` 만 빼서 첫 인자로), `decode` 는 `transcribe()` 로 그대로
+넘어간다. 새 파라미터를 시험할 때 하네스 코드를 고칠 필요가 없다.
 
 ## 지표 읽는 법
 
