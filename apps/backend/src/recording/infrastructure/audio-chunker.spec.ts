@@ -116,13 +116,13 @@ describe('splitPcmIntoWavChunks', () => {
   });
 
   it('마지막 chunk가 chunkMs보다 짧으면 남은 PCM 끝까지 마지막 chunk로 포함된다', () => {
-    // 70s PCM, chunk=30s, step=28s
-    // chunk0=[0..30], chunk1=[28..58], chunk2=[56..70] (14s)
-    const pcm = makePcm(70);
+    // step 을 두 번 지나고 꼬리가 남는 길이 → chunk2 는 step*2 부터 끝까지.
+    const TAIL_SECONDS = 14;
+    const pcm = makePcm(STEP_SECONDS * 2 + TAIL_SECONDS);
     const chunks = splitPcmIntoWavChunks(pcm);
     expect(chunks).toHaveLength(3);
-    expect(chunks[2].startMs).toBe(56_000);
-    expect(chunks[2].wav.subarray(WAV_HEADER_BYTES).length).toBe(14 * SECOND);
+    expect(chunks[2].startMs).toBe(STEP_SECONDS * 2 * 1000);
+    expect(chunks[2].wav.subarray(WAV_HEADER_BYTES).length).toBe(TAIL_SECONDS * SECOND);
   });
 
   it('option으로 chunkMs/overlapMs를 override 할 수 있다', () => {

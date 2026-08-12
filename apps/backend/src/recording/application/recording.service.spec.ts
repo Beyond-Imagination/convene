@@ -6,11 +6,18 @@ import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.ad
 import { stub } from '@/shared-kernel/testing/stub';
 
 import {
+  DEFAULT_CHUNK_MS,
+  DEFAULT_OVERLAP_MS,
   PCM_BYTES_PER_SECOND,
   WAV_HEADER_BYTES,
   wrapPcmAsWav,
 } from '../infrastructure/audio-chunker';
 import { RecordingService } from './recording.service';
+
+/** chunk N+1 이 시작하는 지점. chunk 길이가 바뀌어도 스펙이 따라가게 상수에서 끌어온다. */
+const CHUNK_STEP_MS = DEFAULT_CHUNK_MS - DEFAULT_OVERLAP_MS;
+/** chunk 가 정확히 2개로 갈리는 PCM 길이(step 을 한 번 넘고 꼬리가 남는다). */
+const TWO_CHUNK_SECONDS = CHUNK_STEP_MS / 1000 + 10;
 
 interface CapturedEvent {
   name: string;
@@ -296,10 +303,9 @@ describe('RecordingService.requestTranscription', () => {
     ]);
   });
 
-  it('30s 이상 PCM은 30s+2s overlap으로 chunk가 나뉘어 transcribe가 N 번 호출되고 segment에 chunk startMs가 가산된다', async () => {
-    // 58s PCM → chunk0=[0..30], chunk1=[28..58]
-    // chunk1의 segment startMs는 dedup 임계(2000ms)보다 커야 keep 된다.
-    const pcm = pcmOfSeconds(58);
+  it('chunk 길이를 넘는 PCM은 overlap 을 두고 나뉘어 transcribe가 N 번 호출되고 segment에 chunk startMs가 가산된다', async () => {
+    // chunk1 의 segment startMs 는 dedup 임계(overlapMs)보다 커야 keep 된다.
+    const pcm = pcmOfSeconds(TWO_CHUNK_SECONDS);
     let call = 0;
     const transcribeMock = jest.fn(async () => {
       call += 1;
@@ -326,14 +332,14 @@ describe('RecordingService.requestTranscription', () => {
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
     expect(payload.transcript).toEqual([
       { speaker: 's1', text: 'c0', startMs: 1000, endMs: 1500 },
-      { speaker: 's1', text: 'c1', startMs: 30_500, endMs: 30_900 },
+      { speaker: 's1', text: 'c1', startMs: CHUNK_STEP_MS + 2_500, endMs: CHUNK_STEP_MS + 2_900 },
     ]);
   });
 
-  it('잔여 audio가 여러 chunk로 split 될 때 2번째 chunk부터 첫 2초 안 segments는 dedup으로 skip', async () => {
-    // 58s PCM → 2 chunks. chunk0의 모든 segment 유지, chunk1의 chunk-local
-    // startMs < 2000ms segment는 chunk0의 마지막 overlap과 중복으로 보고 skip.
-    const pcm = pcmOfSeconds(58);
+  it('잔여 audio가 여러 chunk로 split 될 때 2번째 chunk부터 overlap 안 segments는 dedup으로 skip', async () => {
+    // chunk0의 모든 segment 유지, chunk1의 chunk-local startMs < overlapMs segment 는
+    // chunk0의 마지막 overlap 과 중복으로 보고 skip.
+    const pcm = pcmOfSeconds(TWO_CHUNK_SECONDS);
     let call = 0;
     const transcribeMock = jest.fn(async () => {
       call += 1;
@@ -370,8 +376,13 @@ describe('RecordingService.requestTranscription', () => {
     expect(payload.transcript).toEqual([
       { speaker: 's1', text: 'c0_a', startMs: 1_000, endMs: 1_500 },
       { speaker: 's1', text: 'c0_last', startMs: 27_000, endMs: 29_500 },
-      // c1_dup은 chunk-local startMs=100 < 2000 → dedup. c1_keep만 유지(absolute=28000+2500=30500).
-      { speaker: 's1', text: 'c1_keep', startMs: 30_500, endMs: 31_500 },
+      // c1_dup 은 chunk-local startMs 가 overlap 안이라 dedup. c1_keep 만 chunk offset 을 얹어 남는다.
+      {
+        speaker: 's1',
+        text: 'c1_keep',
+        startMs: CHUNK_STEP_MS + 2_500,
+        endMs: CHUNK_STEP_MS + 3_500,
+      },
     ]);
   });
 
@@ -437,7 +448,7 @@ describe('RecordingService.requestTranscription', () => {
   it('run 의 절대 시각 위에 chunk offset 이 누적된다', async () => {
     const meetingStartedAtMs = 1_000_000_000_000;
     const s1StartedAtMs = meetingStartedAtMs + 10_000; // s1이 10초 늦게 입장
-    const pcm = pcmOfSeconds(58); // 2 chunks
+    const pcm = pcmOfSeconds(TWO_CHUNK_SECONDS);
     let call = 0;
     const transcribeMock = jest.fn(async () => {
       call += 1;
@@ -461,11 +472,15 @@ describe('RecordingService.requestTranscription', () => {
     );
     await service.requestTranscription({ reportId, meetingCode, meetingStartedAtMs });
     const payload = events[0].payload as { transcript: TranscriptionSegmentPayload[] };
-    // run 시작(회의 +10초) + chunk0 offset 0 → 10000
-    // run 시작(회의 +10초) + chunk1 offset 28_000 + seg 2_500 → 40500
+    // c0 = run 시작(회의 +10초) + chunk0 offset 0, c1 = 거기에 chunk1 offset + seg 2_500.
     expect(payload.transcript).toEqual([
       { speaker: 's1', text: 'c0', startMs: 10_000, endMs: 10_100 },
-      { speaker: 's1', text: 'c1', startMs: 40_500, endMs: 40_600 },
+      {
+        speaker: 's1',
+        text: 'c1',
+        startMs: 10_000 + CHUNK_STEP_MS + 2_500,
+        endMs: 10_000 + CHUNK_STEP_MS + 2_600,
+      },
     ]);
   });
 

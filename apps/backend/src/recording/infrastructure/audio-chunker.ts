@@ -1,5 +1,5 @@
 /**
- * raw PCM(16kHz mono pcm_s16le) buffer를 30초(default) chunk 단위로 split 한다.
+ * raw PCM(16kHz mono pcm_s16le) buffer를 `chunkMs` 단위로 split 한다.
  *
  * 회의 종료 후 누적 audio를 한 번에 ai-worker로 보내지 않고, 본 헬퍼로 잘라 N 번 호출한다.
  * chunk 경계의 단어 잘림을 줄이기 위해 인접 chunk 사이에 `overlapMs` 만큼 겹친다.
@@ -17,7 +17,12 @@ export const PCM_BYTES_PER_SECOND = PCM_SAMPLE_RATE * PCM_CHANNELS * PCM_BYTES_P
 
 export const WAV_HEADER_BYTES = 44;
 
-export const DEFAULT_CHUNK_MS = 30_000;
+/**
+ * Whisper 는 30초 창 단위로 디코드하는데, 창 하나에 딱 맞춰 보내면 발화가 창 끝에서 잘린 채
+ * 문맥 없이 디코드된다. 창을 여러 개 걸치도록 길게 보내면 그 경계 손실이 줄어든다.
+ * 더 늘려도 이득이 없어 90초에서 멈춘다.
+ */
+export const DEFAULT_CHUNK_MS = 90_000;
 export const DEFAULT_OVERLAP_MS = 2_000;
 
 export interface PcmChunk {
@@ -107,9 +112,15 @@ export function dropOverlapHeadSegments<T extends HasStartMs>(
   return segments.filter((s) => s.startMs >= overlapMs);
 }
 
-/** 발화와 무음에 예산을 따로 둬, 무음이 배치를 채워 버리는 것을 막는다. */
-export const BATCH_SPEECH_BUDGET_MS = 28_000;
-export const BATCH_SILENCE_BUDGET_MS = 5_000;
+/**
+ * 발화와 무음에 예산을 따로 둬, 무음이 배치를 채워 버리는 것을 막는다.
+ * 발화 예산은 `DEFAULT_CHUNK_MS` 와 같은 이유로 Whisper 창보다 크게 잡고,
+ * drain 주기(`PARTIAL_INTERVAL_MS`)보다 작아지지 않게 유지한다 — 작으면 한 번 걷은
+ * 오디오가 배치로 갈려 창을 걸치는 이득이 사라진다.
+ */
+export const BATCH_SPEECH_BUDGET_MS = 90_000;
+/** 발화 예산이 커진 만큼 그 사이 자연스러운 침묵도 길어진다. 다만 무음 디코드는 낭비라 상한을 둔다. */
+export const BATCH_SILENCE_BUDGET_MS = 15_000;
 
 export interface RunBatch {
   readonly pcm: Buffer;
@@ -123,8 +134,9 @@ interface TimedRun {
 }
 
 /**
- * 짧은 run 을 예산 안에서 묶는다. Whisper 인코더는 입력이 4초든 28초든 30초 윈도우
- * 하나를 돌아서, 잦은 mute 로 갈린 run 을 한 건씩 보내면 연산이 몇 배로 샌다.
+ * 짧은 run 을 예산 안에서 묶는다. Whisper 는 아무리 짧은 입력도 창 하나를 다 돌아서,
+ * 잦은 mute 로 갈린 run 을 한 건씩 보내면 연산이 몇 배로 샌다. 반대로 창 여러 개에 걸치도록
+ * 크게 묶으면 창 경계에서 잘리는 발화가 줄어 품질까지 같이 오른다.
  * run 사이는 실제 경과 시간만큼 무음으로 메워, 배치 안 오프셋이 곧 실제 경과가 되게 한다.
  */
 export function packRunsIntoBatches(runs: ReadonlyArray<TimedRun>): RunBatch[] {
