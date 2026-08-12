@@ -110,7 +110,7 @@ export class MediasoupSignalingService {
 
   async dismissParticipant(command: ParticipantCommand): Promise<void> {
     // audio capture가 진행 중이라면 먼저 정리한다. capture context가 없으면 no-op.
-    await this.audioCapture.stop(command.meetingCode, command.participantId);
+    await this.audioCapture.stop(command.meetingCode, command.participantId, 'left');
     const existing = await this.participantMediaRepository.findByParticipantId(
       command.participantId,
     );
@@ -253,11 +253,17 @@ export class MediasoupSignalingService {
    */
   async closeProducer(command: CloseProducerCommand): Promise<void> {
     const media = await this.requireParticipantMedia(command.participantId);
-    const owns = media.producers.some((p) => p.id === command.producerId);
-    if (!owns) {
+    const owned = media.producers.find((p) => p.id === command.producerId);
+    if (!owned) {
       throw new Error(
         `Producer "${command.producerId}" is not owned by participant "${command.participantId}"`,
       );
+    }
+    // 마이크를 끄면 producer가 닫히고 consumer도 따라 닫힌다. capture를 같이 내리지 않으면
+    // ffmpeg만 RTP 없이 남아 죽고, 죽은 context가 어댑터에 잔류해 다시 켤 때 start()가
+    // dedup에 걸린다 — 남은 회의 내내 캡처가 복구되지 않는다.
+    if (owned.kind === 'audio') {
+      await this.audioCapture.stop(command.meetingCode, command.participantId, 'muted');
     }
     await this.transportPort.closeProducer(command.producerId);
     await this.routerPort.cleanupPipeProducers(command.meetingCode, command.producerId);

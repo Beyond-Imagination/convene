@@ -950,6 +950,32 @@ describe('useMediasoupViewModel.muteToggle', () => {
     expect(result.current.isAudioMuted).toBe(false);
   });
 
+  it('연속 토글을 막는다 — 토글마다 캡처 배선이 새로 만들어지므로 쿨다운을 둔다', async () => {
+    const { result, send } = await setupReady();
+    await act(async () => {
+      await result.current.toggleAudio();
+    });
+    expect(send.produce).toHaveBeenCalledTimes(1);
+    expect(result.current.isAudioToggling).toBe(true);
+
+    // 쿨다운 중 재클릭은 무시된다(끄기가 일어나지 않는다).
+    await act(async () => {
+      await result.current.toggleAudio();
+    });
+    expect(result.current.isAudioMuted).toBe(false);
+  });
+
+  it('오디오 produce는 opusDtx를 끈다 — DTX가 켜지면 무음 구간에 RTP가 끊겨 회의록 STT 캡처가 죽는다', async () => {
+    const { result, send } = await setupReady();
+    await act(async () => {
+      await result.current.toggleAudio();
+    });
+    expect(send.produce.mock.calls[0][0].codecOptions).toMatchObject({
+      opusDtx: false,
+      opusFec: true,
+    });
+  });
+
   it('켜진 뒤 toggleAudio를 다시 호출하면 producer.close + track.stop + CLOSE_PRODUCER emit + isAudioMuted=true', async () => {
     const { result, send, socket } = await setupReady();
     await act(async () => {
@@ -958,6 +984,8 @@ describe('useMediasoupViewModel.muteToggle', () => {
     const producer = (await send.produce.mock.results[0].value) as FakeProducer;
     const stream = (await getUserMediaMock.mock.results[0].value) as FakeMediaStream;
     socket.emit.mockClear();
+    // 연타 방지 쿨다운이 풀린 뒤라야 끄기가 받아진다.
+    await waitFor(() => expect(result.current.isAudioToggling).toBe(false), { timeout: 2000 });
     await act(async () => {
       await result.current.toggleAudio();
     });

@@ -37,3 +37,10 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# STT 벤치 샘플 — 실제 회의 녹음이라 커밋하지 않는다. 정답 전사(.txt)도 함께 제외.
+apps/ai-worker/bench/samples/*
+!apps/ai-worker/bench/samples/.gitkeep
+apps/ai-worker/bench/result*.json
+apps/ai-worker/bench/configs*.json
+apps/ai-worker/bench/flow_check.py

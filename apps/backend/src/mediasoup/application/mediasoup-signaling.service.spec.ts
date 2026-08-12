@@ -164,8 +164,8 @@ const makeAudioCapture = () => {
     async start(input: AudioCaptureStartInput) {
       calls.push({ name: 'start', args: [input] });
     },
-    async stop(code, pid) {
-      calls.push({ name: 'stop', args: [code, pid] });
+    async stop(code, pid, reason) {
+      calls.push({ name: 'stop', args: [code, pid, reason] });
     },
     async stopAll(code) {
       calls.push({ name: 'stopAll', args: [code] });
@@ -623,6 +623,43 @@ describe('MediasoupSignalingService.closeProducer', () => {
     });
     const media = await repo.repository.findByParticipantId('s1');
     expect(media?.producers.some((p) => p.id === producerId)).toBe(false);
+  });
+
+  it('audio producer를 close하면 audioCapture.stop으로 캡처도 내린다', async () => {
+    const ctx = makeService();
+    await ctx.service.openRoom({ meetingCode });
+    await ctx.service.admitParticipant({ meetingCode, participantId: 's1' });
+    await ctx.service.createTransport({ meetingCode, participantId: 's1', direction: 'send' });
+    const produced = await ctx.service.produce({
+      meetingCode,
+      participantId: 's1',
+      transportId: 't-1',
+      kind: 'audio',
+      source: 'audio',
+      rtpParameters: {},
+    });
+    ctx.audioCapture.calls.length = 0;
+
+    await ctx.service.closeProducer({
+      meetingCode,
+      participantId: 's1',
+      producerId: produced.producerId,
+    });
+
+    // 캡처를 내리지 않으면 consumer가 죽은 채로 context만 남아, 다시 켤 때
+    // start()가 dedup에 걸려 캡처가 영영 복구되지 않는다.
+    // 'muted' 여야 어댑터가 배선을 잠시 살려 둔다 — 다시 켤 때 지연 없이 이어진다.
+    expect(ctx.audioCapture.calls).toContainEqual({
+      name: 'stop',
+      args: [meetingCode, 's1', 'muted'],
+    });
+  });
+
+  it('video producer를 close할 때는 audioCapture를 건드리지 않는다', async () => {
+    const { service, audioCapture, producerId } = await setupWithScreenProducer();
+    audioCapture.calls.length = 0;
+    await service.closeProducer({ meetingCode, participantId: 's1', producerId });
+    expect(audioCapture.calls).toEqual([]);
   });
 
   it('자기 소유가 아닌 producerId의 close는 거부하고 transport를 건드리지 않는다', async () => {

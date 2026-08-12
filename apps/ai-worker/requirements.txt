@@ -1,7 +1,5 @@
 fastapi==0.115.5
 uvicorn[standard]==0.32.1
-faster-whisper==1.0.3
-# faster-whisper 1.0.3 은 모델 다운로드 시 huggingface-hub 의 local_dir_use_symlinks 인자를
-# 쓰는데 hub 1.x 에서 제거됨 → 0.x 로 고정(미고정 시 pip 가 1.x 를 끌어와 빌드 실패).
-huggingface-hub<0.26
+faster-whisper==1.2.1
+huggingface-hub
 requests>=2.31.0

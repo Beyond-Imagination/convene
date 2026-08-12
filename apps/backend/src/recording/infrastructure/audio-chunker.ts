@@ -1,5 +1,5 @@
 /**
- * raw PCM(16kHz mono pcm_s16le) buffer를 30초(default) chunk 단위로 split 한다.
+ * raw PCM(16kHz mono pcm_s16le) buffer를 `chunkMs` 단위로 split 한다.
  *
  * 회의 종료 후 누적 audio를 한 번에 ai-worker로 보내지 않고, 본 헬퍼로 잘라 N 번 호출한다.
  * chunk 경계의 단어 잘림을 줄이기 위해 인접 chunk 사이에 `overlapMs` 만큼 겹친다.
@@ -17,7 +17,8 @@ export const PCM_BYTES_PER_SECOND = PCM_SAMPLE_RATE * PCM_CHANNELS * PCM_BYTES_P
 
 export const WAV_HEADER_BYTES = 44;
 
-export const DEFAULT_CHUNK_MS = 30_000;
+/** Whisper 창(30초)보다 길게 잡아 창 경계에서 잘리는 발화를 줄인다. */
+export const DEFAULT_CHUNK_MS = 90_000;
 export const DEFAULT_OVERLAP_MS = 2_000;
 
 export interface PcmChunk {
@@ -105,4 +106,76 @@ export function dropOverlapHeadSegments<T extends HasStartMs>(
 ): T[] {
   if (isFirstChunk) return [...segments];
   return segments.filter((s) => s.startMs >= overlapMs);
+}
+
+/** 발화와 무음에 예산을 따로 둬, 무음이 배치를 채워 버리는 것을 막는다. */
+export const BATCH_SPEECH_BUDGET_MS = 90_000;
+export const BATCH_SILENCE_BUDGET_MS = 15_000;
+
+export interface RunBatch {
+  readonly pcm: Buffer;
+  /** 배치 첫 sample 의 절대 시각(epoch ms). segment 시각은 여기에 오프셋을 더하면 된다. */
+  readonly startedAtMs: number;
+}
+
+interface TimedRun {
+  readonly pcm: Buffer;
+  readonly startedAtMs: number;
+}
+
+/**
+ * 짧은 run 을 예산 안에서 묶는다. Whisper 는 아무리 짧은 입력도 창 하나를 다 돌므로
+ * 한 건씩 보내면 연산이 샌다.
+ * run 사이는 실제 경과 시간만큼 무음으로 메워, 배치 안 오프셋이 곧 실제 경과가 되게 한다.
+ */
+export function packRunsIntoBatches(runs: ReadonlyArray<TimedRun>): RunBatch[] {
+  const batches: RunBatch[] = [];
+  let parts: Buffer[] = [];
+  let batchStartMs = 0;
+  let nextOffsetMs = 0;
+  let speechMs = 0;
+  let silenceMs = 0;
+
+  const flush = (): void => {
+    if (parts.length === 0) return;
+    batches.push({ pcm: Buffer.concat(parts), startedAtMs: batchStartMs });
+    parts = [];
+    nextOffsetMs = 0;
+    speechMs = 0;
+    silenceMs = 0;
+  };
+
+  for (const run of runs) {
+    const durationMs = bytesToMs(run.pcm.length);
+    const gapMs = parts.length === 0 ? 0 : run.startedAtMs - (batchStartMs + nextOffsetMs);
+    if (
+      parts.length > 0 &&
+      (speechMs + durationMs > BATCH_SPEECH_BUDGET_MS ||
+        silenceMs + gapMs > BATCH_SILENCE_BUDGET_MS)
+    ) {
+      flush();
+    }
+    if (parts.length === 0) {
+      batchStartMs = run.startedAtMs;
+    } else if (gapMs > 0) {
+      parts.push(Buffer.alloc(msToBytes(gapMs)));
+      nextOffsetMs += gapMs;
+      silenceMs += gapMs;
+    }
+    parts.push(run.pcm);
+    nextOffsetMs += durationMs;
+    speechMs += durationMs;
+  }
+  flush();
+  return batches;
+}
+
+/** 이 진폭(16bit 기준 약 -36dBFS)을 넘는 sample 이 하나도 없으면 발화가 없다고 본다. */
+const SILENCE_PEAK_THRESHOLD = 500;
+
+export function isSilentPcm(pcm: Buffer): boolean {
+  for (let i = 0; i + 1 < pcm.length; i += 2) {
+    if (Math.abs(pcm.readInt16LE(i)) >= SILENCE_PEAK_THRESHOLD) return false;
+  }
+  return true;
 }

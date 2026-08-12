@@ -12,5 +12,6 @@ export interface TranscriberPort {
 
 export interface TranscriberInput {
   readonly meetingCode: string;
+  readonly participantId: string;
   readonly audio: Buffer;
 }

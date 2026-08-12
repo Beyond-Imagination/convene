@@ -10,6 +10,7 @@ services:
     image: caddy:2-alpine
     container_name: convene-caddy
     restart: unless-stopped
+    mem_limit: 32m
     ports:
       - '80:80'
       - '443:443'
@@ -28,11 +29,12 @@ services:
     image: redis:7.2-alpine
     container_name: convene-redis
     restart: unless-stopped
+    mem_limit: 160m
     command: >-
       redis-server
       --appendonly yes
       --appendfsync everysec
-      --maxmemory 256mb
+      --maxmemory 128mb
       --maxmemory-policy volatile-lru
       --notify-keyspace-events Ex
     volumes:
@@ -48,6 +50,7 @@ services:
     image: ghcr.io/beyond-imagination/convene-ai-worker:${IMAGE_TAG:-latest}
     container_name: convene-ai-worker
     restart: unless-stopped
+    mem_limit: 1280m
     environment:
       - PYTHONUNBUFFERED=1
       - STT_MODEL_SIZE=${STT_MODEL_SIZE:-small}
@@ -57,6 +60,7 @@ services:
     image: ghcr.io/beyond-imagination/convene-backend:${IMAGE_TAG:-latest}
     container_name: convene-backend
     restart: unless-stopped
+    mem_limit: 512m
     depends_on:
       redis:
         condition: service_healthy

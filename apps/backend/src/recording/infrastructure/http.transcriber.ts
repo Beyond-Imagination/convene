@@ -19,7 +19,12 @@ export class HttpTranscriber implements TranscriberPort {
   async transcribe(input: TranscriberInput): Promise<ReadonlyArray<TranscriptionSegmentPayload>> {
     const response = await this.fetchFn(`${this.baseUrl}/transcribe`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/octet-stream' },
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        // 벤치 샘플을 화자별로 묶기 위한 식별자. ai-worker 는 덤프가 켜졌을 때만 쓴다.
+        'X-Meeting-Code': input.meetingCode,
+        'X-Participant-Id': input.participantId,
+      },
       body: input.audio,
     });
 

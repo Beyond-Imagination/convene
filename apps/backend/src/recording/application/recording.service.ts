@@ -13,10 +13,7 @@ import { dropOverlapHeadSegments, splitPcmIntoWavChunks } from '../infrastructur
 export interface RequestTranscriptionCommand {
   reportId: string;
   meetingCode: string;
-  /**
-   * 회의 시작 시각(epoch ms). 참가자별 capture 시작 시각을 본 origin으로 normalize 해 segment.
-   * startMs/endMs를 회의 시간축으로 보정한다. 중간 join 한 참가자도 회의 시작점 기준으로 정렬된다.
-   */
+  /** 회의 시작 시각(epoch ms). 절대 시각인 segment 를 이 기준의 relative ms 로 정규화한다. */
   meetingStartedAtMs: number;
   /**
    * participantId(socket id) → 표시용 nickname 매핑.
@@ -30,11 +27,8 @@ export interface RequestTranscriptionCommand {
 /**
  * 회의 오디오를 STT로 전사하는 서비스.
  *
- * Reports BC가 발행한 이벤트를 받아 회의의 참가자별 누적 오디오 버퍼를 소비하고, 각 참가자 audio에 대해 `TranscriberPort`로 STT를 호출한다.
- * 각 segment에는 `speaker = participantId`를 채워서 시간순으로 merge 한 결과를 `report.transcription.completed`로 발행한다.
- *
- * 참가자별 audio capture의 시간축 origin은 현재는 보정하지 않는다.
- * 참가자가 동시에 발화하는 구간은 startMs가 가까운 segment 들이 인접하게 정렬된다.
+ * Reports BC가 발행한 이벤트를 받아 참가자별 누적 오디오를 소비하고 `TranscriberPort`로 STT를 호출한다.
+ * 각 segment에 `speaker = participantId`를 채워 시간순 merge 한 결과를 `report.transcription.completed`로 발행한다.
  *
  * 본 서비스는 throw 하지 않는다. STT 실패는 정상 흐름의 일부이며, 모든 실패를 `failed` 이벤트로 표현해 Reports BC가 처리하게 한다.
  */
@@ -52,7 +46,7 @@ export class RecordingService {
     try {
       // 1) partial scheduler가 누적해 둔 segments를 가져온다(절대 epoch ms).
       const partial = await this.partialTranscriptStore.consume(command.meetingCode);
-      // 2) 회의 종료 시점의 잔여 audio를 consume. scheduler가 사전 drain 한 만큼은 `startMs`(시간축 위치)로 표현된다.
+      // 2) 회의 종료 시점의 잔여 audio를 run 단위로 consume.
       const audios = await this.audioBufferRepository.consume(command.meetingCode);
 
       if (partial.length === 0 && audios.length === 0) {
@@ -70,36 +64,26 @@ export class RecordingService {
       // 3) partial + 잔여 STT 결과를 모두 절대 시간축으로 모은 뒤, 회의 종료 시 한 번에 회의 시작 origin 기준 relative ms로 정규화한다.
       const absolute: AbsoluteTranscriptSegment[] = [...partial];
 
-      for (const { participantId, audio, startedAtMs, startMs: consumeStartMs } of audios) {
-        // 회의 시간축 origin(절대 시각). 두 가지 clamp:
-        // - startedAtMs 누락 → 회의 시작 시각 사용(participant offset = 0).
-        // - startedAtMs가 회의 시작보다 이전 → 회의 시작 시각으로 clamp(음수 offset 방지).
-        //   이 경우 segment의 endMs까지 깎이지 않도록 normalize 단계가 아니라 origin 자체를 미리 clamp 한다.
-        const originMs =
-          startedAtMs !== undefined
-            ? Math.max(startedAtMs, command.meetingStartedAtMs)
-            : command.meetingStartedAtMs;
-        // scheduler가 사전 drain 한 시간축 위치. drain 없었으면 0.
-        const baseAudioMs = consumeStartMs ?? 0;
-        const chunks = splitPcmIntoWavChunks(audio);
-        const hadPriorPartial = baseAudioMs > 0;
-        for (let i = 0; i < chunks.length; i++) {
-          const chunk = chunks[i];
-          const rawSegments = await this.transcriber.transcribe({
-            meetingCode: command.meetingCode,
-            audio: chunk.wav,
-          });
-          // chunk 경계 dedup — 첫 chunk(i=0) 라도 직전에 partial scheduler가
-          // 사전 drain 한 적이 있으면(baseAudioMs > 0) 그 끝과 overlap으로 중복 가능.
-          const isFirstChunk = i === 0 && !hadPriorPartial;
-          const segments = dropOverlapHeadSegments(rawSegments, isFirstChunk);
-          for (const seg of segments) {
-            absolute.push({
-              speaker: participantId,
-              text: seg.text,
-              absoluteStartMs: originMs + baseAudioMs + chunk.startMs + seg.startMs,
-              absoluteEndMs: originMs + baseAudioMs + chunk.startMs + seg.endMs,
+      for (const { participantId, runs } of audios) {
+        for (const run of runs) {
+          const originMs = Math.max(run.startedAtMs, command.meetingStartedAtMs);
+          const chunks = splitPcmIntoWavChunks(run.pcm);
+          for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i];
+            const rawSegments = await this.transcriber.transcribe({
+              meetingCode: command.meetingCode,
+              participantId,
+              audio: chunk.wav,
             });
+            const segments = dropOverlapHeadSegments(rawSegments, i === 0);
+            for (const seg of segments) {
+              absolute.push({
+                speaker: participantId,
+                text: seg.text,
+                absoluteStartMs: originMs + chunk.startMs + seg.startMs,
+                absoluteEndMs: originMs + chunk.startMs + seg.endMs,
+              });
+            }
           }
         }
       }

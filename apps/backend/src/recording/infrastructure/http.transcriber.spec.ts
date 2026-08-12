@@ -14,7 +14,7 @@ describe('HttpTranscriber', () => {
     const transcriber = new HttpTranscriber(baseUrl, fetchMock as unknown as typeof fetch);
     const audio = Buffer.from([1, 2, 3, 4, 5]);
 
-    await transcriber.transcribe({ meetingCode: 'abc12xyz', audio });
+    await transcriber.transcribe({ meetingCode: 'abc12xyz', participantId: 's1', audio });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -39,6 +39,7 @@ describe('HttpTranscriber', () => {
 
     const result = await transcriber.transcribe({
       meetingCode: 'abc12xyz',
+      participantId: 's1',
       audio: Buffer.from('x'),
     });
     expect(result).toEqual([
@@ -53,15 +54,15 @@ describe('HttpTranscriber', () => {
       .mockResolvedValueOnce(okResponse({ segments: [] }))
       .mockResolvedValueOnce(okResponse({}));
     const transcriber = new HttpTranscriber(baseUrl, fetchMock as unknown as typeof fetch);
-    expect(await transcriber.transcribe({ meetingCode: 'a', audio: Buffer.from('x') })).toEqual([]);
-    expect(await transcriber.transcribe({ meetingCode: 'b', audio: Buffer.from('x') })).toEqual([]);
+    expect(await transcriber.transcribe({ meetingCode: 'a', participantId: 's1', audio: Buffer.from('x') })).toEqual([]);
+    expect(await transcriber.transcribe({ meetingCode: 'b', participantId: 's1', audio: Buffer.from('x') })).toEqual([]);
   });
 
   it('응답이 non-2xx 면 status가 포함된 에러를 throw 한다', async () => {
     const fetchMock = jest.fn().mockResolvedValueOnce(new Response('boom', { status: 500 }));
     const transcriber = new HttpTranscriber(baseUrl, fetchMock as unknown as typeof fetch);
     await expect(
-      transcriber.transcribe({ meetingCode: 'abc12xyz', audio: Buffer.from('x') }),
+      transcriber.transcribe({ meetingCode: 'abc12xyz', participantId: 's1', audio: Buffer.from('x') }),
     ).rejects.toThrow(/500/);
   });
 
@@ -69,7 +70,7 @@ describe('HttpTranscriber', () => {
     const fetchMock = jest.fn().mockRejectedValueOnce(new Error('ECONNREFUSED'));
     const transcriber = new HttpTranscriber(baseUrl, fetchMock as unknown as typeof fetch);
     await expect(
-      transcriber.transcribe({ meetingCode: 'abc12xyz', audio: Buffer.from('x') }),
+      transcriber.transcribe({ meetingCode: 'abc12xyz', participantId: 's1', audio: Buffer.from('x') }),
     ).rejects.toThrow(/ECONNREFUSED/);
   });
 });

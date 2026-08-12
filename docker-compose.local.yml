@@ -5,7 +5,7 @@ services:
     image: redis:7.2-alpine
     container_name: convene-redis
     ports:
-      - '6379:6379'
+      - '127.0.0.1:6379:6379'
     command: >-
       redis-server
       --appendonly yes
@@ -34,10 +34,15 @@ services:
         STT_MODEL_SIZE: ${STT_MODEL_SIZE:-small}
     container_name: convene-ai-worker
     ports:
-      - '8000:8000'
+      - '127.0.0.1:8000:8000'
     environment:
       - PYTHONUNBUFFERED=1
       - STT_MODEL_SIZE=${STT_MODEL_SIZE:-small}
+      # 벤치 샘플 수집 — STT_DUMP_DIR 를 채우면 받은 wav 를 그대로 떨군다.
+      - STT_DUMP_DIR=${STT_DUMP_DIR:-}
+    volumes:
+      # 떠낸 샘플과 벤치 스크립트를 호스트와 공유한다.
+      - ./apps/ai-worker/bench:/app/bench
     restart: unless-stopped
 
   # NestJS backend (운영 이미지 검증용). 평상시 dev 는 호스트에서 `nest start --watch`
@@ -73,6 +78,9 @@ services:
       - RTC_MIN_PORT=${RTC_MIN_PORT:-40000}
       - RTC_MAX_PORT=${RTC_MAX_PORT:-40020}
       - MEDIASOUP_WORKER_NUM=${MEDIASOUP_WORKER_NUM:-1}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      # 벤치 샘플 수집 — `none` 이면 STT 전처리 필터를 끄고 raw 로 뽑는다.
+      - FFMPEG_AUDIO_FILTER=${FFMPEG_AUDIO_FILTER:-}
     ports:
       - '5000:5000'
       - '40000-40020:40000-40020/udp'
