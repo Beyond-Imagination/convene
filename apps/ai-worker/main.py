@@ -49,12 +49,8 @@ def _env_bool(name: str, default: bool) -> bool:
     return raw.strip().lower() in ("1", "true", "yes", "on")
 
 
-# VAD_FILTER: Silero VAD로 무음 구간을 잘라낸다. 회의 오디오는 긴 정적 구간이 많아
-# 그대로 디코드하면 무음에 환각 자막이 붙는다.
-#
-# INITIAL_PROMPT 는 기본값을 두지 않는다. 서술형 프롬프트는 CER 을 10.35pp 올렸고(67.83%→57.48%),
-# 도메인 단어 리스트도 그 회의에 그 단어가 나올 때만 이득이라 무관한 목록에서는 오히려 4.7pp 나빠졌다.
-# 회의 주제는 매번 다르므로 고정 프롬프트는 평균적으로 손해다.
+# VAD_FILTER: Silero VAD로 무음 구간을 잘라낸다. 무음을 걷어내 디코딩 양이 줄어 전사도 빨라진다.
+# INITIAL_PROMPT: 회의 주제가 매번 달라 고정 프롬프트를 두지 않는다.
 VAD_FILTER = _env_bool("STT_VAD_FILTER", True)
 INITIAL_PROMPT = os.getenv("STT_INITIAL_PROMPT", "").strip() or None
 
