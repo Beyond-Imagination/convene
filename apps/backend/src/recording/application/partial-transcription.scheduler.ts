@@ -15,7 +15,12 @@ import {
 
 /** 단어가 chunk 경계에 걸리지 않도록 매 drain 이 남기는 꼬리. 16kHz pcm_s16le 2초. */
 export const KEEP_LAST_BYTES = PCM_BYTES_PER_SECOND * 2;
-const PARTIAL_INTERVAL_MS = 30_000;
+
+/**
+ * drain 주기. 한 번 걷은 오디오가 배치 하나에 들어가야 하므로
+ * `BATCH_SPEECH_BUDGET_MS` 를 넘지 않아야 한다 — 넘으면 그 자리에서 배치가 갈린다.
+ */
+export const PARTIAL_INTERVAL_MS = 30_000;
 
 /**
  * 회의 진행 중 매 N초 누적 audio 를 ai-worker 로 보내고 결과를 partial transcript 에 누적한다.

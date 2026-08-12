@@ -5,8 +5,12 @@ import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/domain-event
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 import { stub } from '@/shared-kernel/testing/stub';
 
-import { WAV_HEADER_BYTES } from '../infrastructure/audio-chunker';
-import { KEEP_LAST_BYTES, PartialTranscriptionScheduler } from './partial-transcription.scheduler';
+import { BATCH_SPEECH_BUDGET_MS, WAV_HEADER_BYTES } from '../infrastructure/audio-chunker';
+import {
+  KEEP_LAST_BYTES,
+  PARTIAL_INTERVAL_MS,
+  PartialTranscriptionScheduler,
+} from './partial-transcription.scheduler';
 
 interface FakeRepoState {
   activeMeetings: string[];
@@ -146,6 +150,10 @@ describe('PartialTranscriptionScheduler.tick', () => {
     const passed = (transcriber.transcribe as jest.Mock).mock.calls[0][0].audio as Buffer;
     expect(passed.subarray(0, 4).toString('ascii')).toBe('RIFF');
     expect(passed.subarray(WAV_HEADER_BYTES)).toEqual(pcm);
+  });
+
+  it('drain 주기가 배치 발화 예산을 넘지 않는다 — 넘으면 한 번 걷은 오디오가 배치로 갈린다', () => {
+    expect(PARTIAL_INTERVAL_MS).toBeLessThanOrEqual(BATCH_SPEECH_BUDGET_MS);
   });
 
   it('segment의 startMs/endMs에 run의 절대 시각이 가산돼 store에 append 된다', async () => {

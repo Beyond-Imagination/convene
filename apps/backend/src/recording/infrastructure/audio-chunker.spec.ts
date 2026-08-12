@@ -1,5 +1,7 @@
 import {
   BATCH_SILENCE_BUDGET_MS,
+  BATCH_SPEECH_BUDGET_MS,
+  DEFAULT_CHUNK_MS,
   DEFAULT_OVERLAP_MS,
   dropOverlapHeadSegments,
   isSilentPcm,
@@ -11,6 +13,14 @@ import {
 } from './audio-chunker';
 
 const SECOND = PCM_BYTES_PER_SECOND;
+
+/** Whisper 인코더가 한 번에 보는 창. 배치가 이보다 길면 여러 창에 걸친다. */
+const WHISPER_WINDOW_MS = 30_000;
+
+// chunk 길이는 측정에 따라 바뀌는 값이라 스펙이 상수를 따라가게 둔다.
+const CHUNK_SECONDS = DEFAULT_CHUNK_MS / 1000;
+const OVERLAP_SECONDS = DEFAULT_OVERLAP_MS / 1000;
+const STEP_SECONDS = CHUNK_SECONDS - OVERLAP_SECONDS;
 
 const makePcm = (seconds: number): Buffer => {
   const buf = Buffer.alloc(seconds * SECOND);
@@ -66,36 +76,42 @@ describe('splitPcmIntoWavChunks', () => {
   });
 
   it('정확히 chunkMs 길이 PCM은 단일 chunk, startMs=0', () => {
-    const pcm = makePcm(30);
+    const pcm = makePcm(CHUNK_SECONDS);
     const chunks = splitPcmIntoWavChunks(pcm);
     expect(chunks).toHaveLength(1);
     expect(chunks[0].startMs).toBe(0);
   });
 
+  it('기본 chunk 는 Whisper 창 하나보다 길다 — 창을 걸쳐야 경계에서 잘리는 발화가 줄어든다', () => {
+    expect(DEFAULT_CHUNK_MS).toBeGreaterThan(WHISPER_WINDOW_MS);
+  });
+
   it('chunk size + step size 길이 PCM → 2 chunks가 (chunkMs - overlapMs) step으로 정렬된다', () => {
-    // 30s chunk + 28s step → 2번째 chunk가 28s부터 시작해 58s까지 30s 길이.
-    // step + chunk = 28 + 30 = 58s. 총 58s PCM 이면 chunk0=[0..30], chunk1=[28..58].
-    const pcm = makePcm(58);
+    // 총 step + chunk 길이 PCM 이면 chunk0=[0..chunk], chunk1=[step..step+chunk].
+    const pcm = makePcm(STEP_SECONDS + CHUNK_SECONDS);
     const chunks = splitPcmIntoWavChunks(pcm);
     expect(chunks).toHaveLength(2);
     expect(chunks[0].startMs).toBe(0);
-    expect(chunks[1].startMs).toBe(28_000);
+    expect(chunks[1].startMs).toBe(DEFAULT_CHUNK_MS - DEFAULT_OVERLAP_MS);
     // 각 chunk wav body가 PCM의 해당 구간과 일치
-    expect(chunks[0].wav.subarray(WAV_HEADER_BYTES, WAV_HEADER_BYTES + 30 * SECOND)).toEqual(
-      pcm.subarray(0, 30 * SECOND),
-    );
-    expect(chunks[1].wav.subarray(WAV_HEADER_BYTES)).toEqual(pcm.subarray(28 * SECOND));
+    expect(
+      chunks[0].wav.subarray(WAV_HEADER_BYTES, WAV_HEADER_BYTES + CHUNK_SECONDS * SECOND),
+    ).toEqual(pcm.subarray(0, CHUNK_SECONDS * SECOND));
+    expect(chunks[1].wav.subarray(WAV_HEADER_BYTES)).toEqual(pcm.subarray(STEP_SECONDS * SECOND));
   });
 
   it('overlap 구간 PCM이 인접 chunk 양쪽에 모두 포함된다', () => {
-    const pcm = makePcm(58);
+    const pcm = makePcm(STEP_SECONDS + CHUNK_SECONDS);
     const chunks = splitPcmIntoWavChunks(pcm);
-    // chunk0의 마지막 2초 = chunk1의 첫 2초
+    // chunk0의 마지막 overlap 구간 = chunk1의 첫 overlap 구간
     const chunk0Tail = chunks[0].wav.subarray(
-      WAV_HEADER_BYTES + 28 * SECOND,
-      WAV_HEADER_BYTES + 30 * SECOND,
+      WAV_HEADER_BYTES + STEP_SECONDS * SECOND,
+      WAV_HEADER_BYTES + CHUNK_SECONDS * SECOND,
     );
-    const chunk1Head = chunks[1].wav.subarray(WAV_HEADER_BYTES, WAV_HEADER_BYTES + 2 * SECOND);
+    const chunk1Head = chunks[1].wav.subarray(
+      WAV_HEADER_BYTES,
+      WAV_HEADER_BYTES + OVERLAP_SECONDS * SECOND,
+    );
     expect(chunk0Tail).toEqual(chunk1Head);
   });
 
@@ -201,20 +217,32 @@ describe('packRunsIntoBatches', () => {
     }
   });
 
+  it('배치는 Whisper 창 하나에 맞추지 않는다 — 창을 걸쳐야 경계에서 잘리는 발화가 줄어든다', () => {
+    const batches = packRunsIntoBatches([
+      run(WHISPER_WINDOW_MS, 0),
+      run(WHISPER_WINDOW_MS, WHISPER_WINDOW_MS + 500),
+    ]);
+    expect(batches).toHaveLength(1);
+    expect(batches[0].pcm.length / BYTES_PER_MS).toBeGreaterThan(WHISPER_WINDOW_MS * 2);
+  });
+
   it('발화가 예산을 채우면 무음 예산이 남아도 배치를 나눈다', () => {
-    const batches = packRunsIntoBatches([run(20_000, 0), run(20_000, 20_500)]);
+    const overHalf = Math.ceil(BATCH_SPEECH_BUDGET_MS * 0.6);
+    const batches = packRunsIntoBatches([run(overHalf, 0), run(overHalf, overHalf + 500)]);
     expect(batches).toHaveLength(2);
   });
 
   it('예산을 넘으면 다음 배치로 넘긴다', () => {
-    const batches = packRunsIntoBatches([run(20_000, 0), run(20_000, 21_000)]);
+    const overHalf = Math.ceil(BATCH_SPEECH_BUDGET_MS * 0.6);
+    const batches = packRunsIntoBatches([run(overHalf, 0), run(overHalf, overHalf + 1_000)]);
     expect(batches).toHaveLength(2);
   });
 
   it('예산보다 긴 run 하나는 그대로 자기 배치가 된다', () => {
-    const batches = packRunsIntoBatches([run(50_000, 0)]);
+    const longer = BATCH_SPEECH_BUDGET_MS + 10_000;
+    const batches = packRunsIntoBatches([run(longer, 0)]);
     expect(batches).toHaveLength(1);
-    expect(batches[0].pcm.length).toBe(50_000 * BYTES_PER_MS);
+    expect(batches[0].pcm.length).toBe(longer * BYTES_PER_MS);
   });
 
   it('빈 입력은 빈 배열', () => {
