@@ -14,10 +14,10 @@ import {
 
 const SECOND = PCM_BYTES_PER_SECOND;
 
-/** Whisper 인코더가 한 번에 보는 창. 배치가 이보다 길면 여러 창에 걸친다. */
+/** Whisper 인코더가 한 번에 보는 창. */
 const WHISPER_WINDOW_MS = 30_000;
 
-// chunk 길이는 측정에 따라 바뀌는 값이라 스펙이 상수를 따라가게 둔다.
+// chunk 길이는 바뀔 수 있는 값이라 스펙이 숫자를 따로 들지 않는다.
 const CHUNK_SECONDS = DEFAULT_CHUNK_MS / 1000;
 const OVERLAP_SECONDS = DEFAULT_OVERLAP_MS / 1000;
 const STEP_SECONDS = CHUNK_SECONDS - OVERLAP_SECONDS;

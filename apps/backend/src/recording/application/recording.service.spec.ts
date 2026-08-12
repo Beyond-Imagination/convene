@@ -14,7 +14,7 @@ import {
 } from '../infrastructure/audio-chunker';
 import { RecordingService } from './recording.service';
 
-/** chunk N+1 이 시작하는 지점. chunk 길이가 바뀌어도 스펙이 따라가게 상수에서 끌어온다. */
+/** chunk N+1 이 시작하는 지점. */
 const CHUNK_STEP_MS = DEFAULT_CHUNK_MS - DEFAULT_OVERLAP_MS;
 /** chunk 가 정확히 2개로 갈리는 PCM 길이(step 을 한 번 넘고 꼬리가 남는다). */
 const TWO_CHUNK_SECONDS = CHUNK_STEP_MS / 1000 + 10;
