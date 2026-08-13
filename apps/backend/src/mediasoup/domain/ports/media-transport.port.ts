@@ -54,5 +54,8 @@ export interface MediaTransportPort {
 
   closeProducer(producerId: string): Promise<void>;
 
+  /** transport·producer·consumer를 유지한 채 ICE만 재협상한다. */
+  restartIce(transportId: string): Promise<{ iceParameters: unknown }>;
+
   closeTransport(transportId: string): Promise<void>;
 }

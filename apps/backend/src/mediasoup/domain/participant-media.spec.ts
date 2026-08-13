@@ -55,6 +55,48 @@ describe('ParticipantMedia aggregate', () => {
     });
   });
 
+  describe('releaseTransport', () => {
+    it('이전 transport와 그 위에 얹혀 있던 producer를 함께 놓아 준다 (재연결 재생성 대비)', () => {
+      const pm = baseSpawn();
+      pm.attachTransport('send', 't-send-1');
+      pm.addProducer('p1', { kind: 'audio', source: 'audio' });
+      pm.addProducer('p2', { kind: 'video', source: 'video' });
+
+      const released = pm.releaseTransport('send');
+
+      expect(released).toEqual({ transportId: 't-send-1', producerIds: ['p1', 'p2'], consumerIds: [] });
+      expect(pm.sendTransportId).toBeNull();
+      expect(pm.producers).toEqual([]);
+    });
+
+    it('recv를 놓으면 consumer만 정리되고 producer는 남는다', () => {
+      const pm = baseSpawn();
+      pm.attachTransport('send', 't-send-1');
+      pm.attachTransport('recv', 't-recv-1');
+      pm.addProducer('p1', { kind: 'audio', source: 'audio' });
+      pm.addConsumer('c1', { producerId: 'other', kind: 'audio', source: 'audio' });
+
+      const released = pm.releaseTransport('recv');
+
+      expect(released).toEqual({ transportId: 't-recv-1', producerIds: [], consumerIds: ['c1'] });
+      expect(pm.recvTransportId).toBeNull();
+      expect(pm.consumers).toEqual([]);
+      expect(pm.producers.map((x) => x.id)).toEqual(['p1']);
+    });
+
+    it('놓을 transport가 없으면 null', () => {
+      expect(baseSpawn().releaseTransport('send')).toBeNull();
+    });
+
+    it('놓은 뒤에는 같은 방향에 다시 부착할 수 있다', () => {
+      const pm = baseSpawn();
+      pm.attachTransport('send', 't1');
+      pm.releaseTransport('send');
+      expect(() => pm.attachTransport('send', 't2')).not.toThrow();
+      expect(pm.sendTransportId).toBe('t2');
+    });
+  });
+
   describe('addProducer', () => {
     it('send transport 없이 추가하면 거부한다', () => {
       const pm = baseSpawn();

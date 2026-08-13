@@ -8,6 +8,7 @@ import {
   MEDIA_TYPES,
   type MediaType,
   type ProduceRequest,
+  type RestartIceRequest,
   type ResumeConsumerRequest,
   type ToggleProducerRequest,
   TRANSPORT_DIRECTIONS,
@@ -111,4 +112,10 @@ export class CloseProducerDto extends MeetingScopedDto implements CloseProducerR
   @IsString()
   @MaxLength(ID_MAX)
   producerId!: string;
+}
+
+export class RestartIceDto extends MeetingScopedDto implements RestartIceRequest {
+  @IsString()
+  @MaxLength(ID_MAX)
+  transportId!: string;
 }
