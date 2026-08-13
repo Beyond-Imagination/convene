@@ -29,6 +29,8 @@ export const MEDIASOUP_WS_EVENTS = {
   LIST_PRODUCERS: 'mediasoup:listProducers',
   TOGGLE_PRODUCER: 'mediasoup:toggleProducer',
   CLOSE_PRODUCER: 'mediasoup:closeProducer',
+  /** 경로가 바뀐 재연결(WiFi↔LTE, NAT rebind)에서 producer·consumer를 보존한 채 연결만 복구한다. */
+  RESTART_ICE: 'mediasoup:restartIce',
   NEW_PRODUCER: 'mediasoup:newProducer',
   PRODUCER_CLOSED: 'mediasoup:producerClosed',
   CONSUMER_CLOSED: 'mediasoup:consumerClosed',
@@ -103,6 +105,15 @@ export interface ResumeConsumerRequest {
   consumerId: string;
 }
 
+export interface RestartIceRequest {
+  code: string;
+  transportId: string;
+}
+
+export interface RestartIceResponse {
+  iceParameters: unknown;
+}
+
 /**
  * 회의에 늦게 입장한 참가자가 기존 producer 들을 받아오기 위해 호출하는 RPC.
  * 자기 자신의 producer는 제외한다. 응답을 받은 클라이언트는 각 항목을
@@ -148,7 +159,7 @@ export interface CloseProducerRequest {
  * 수신 측은 `mediasoup:consume`으로 이어서 구독한다.
  */
 export interface NewProducerBroadcast {
-  peerSocketId: string;
+  peerId: string;
   producerId: string;
   kind: 'audio' | 'video';
   source: MediaType;

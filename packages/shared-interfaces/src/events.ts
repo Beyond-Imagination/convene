@@ -17,6 +17,10 @@ export const MEETING_EVENTS = {
    */
   OPENED: 'meeting.opened',
   PARTICIPANT_JOINED: 'meeting.participant.joined',
+  /** 연결만 끊김. 유예 안에 돌아오면 복귀하므로 퇴장이 아니고, 미디어도 정리하지 않는다. */
+  PARTICIPANT_DISCONNECTED: 'meeting.participant.disconnected',
+  PARTICIPANT_RECONNECTED: 'meeting.participant.reconnected',
+  /** 명시적 퇴장이거나 유예가 만료된 경우. 이때만 미디어를 정리한다. */
   PARTICIPANT_LEFT: 'meeting.participant.left',
   CHAT_POSTED: 'meeting.chat.posted',
   IDLE_DETECTED: 'meeting.idle.detected',

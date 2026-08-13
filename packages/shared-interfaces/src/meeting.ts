@@ -74,6 +74,9 @@ export const MEETING_WS_EVENTS = {
   CHAT: 'meeting:chat',
   PARTICIPANT_JOINED: 'meeting:participantJoined',
   PARTICIPANT_LEFT: 'meeting:participantLeft',
+  /** 유예 안에 돌아오면 RECONNECTED, 넘기면 LEFT가 이어진다. 수신 측은 타일을 지우지 않는다. */
+  PARTICIPANT_DISCONNECTED: 'meeting:participantDisconnected',
+  PARTICIPANT_RECONNECTED: 'meeting:participantReconnected',
   /**
    * 새로 입장한 참가자에게만 emit.
    * 회의 입장 직후 기존 참가자 목록을 한 번 전달해 자동 재연결/늦은 입장에서 stale 한 빈 목록을 보지 않게 한다.
@@ -95,6 +98,8 @@ export type MeetingWsEventName = (typeof MEETING_WS_EVENTS)[keyof typeof MEETING
 export interface JoinMeetingMessage {
   code: string;
   nickname: string;
+  /** 재연결·새로고침을 넘어 유지되는 식별자. 없으면 서버가 socket.id로 대체한다. */
+  participantId?: string;
 }
 
 export interface LeaveMeetingMessage {
@@ -117,19 +122,33 @@ export interface ChatMessage {
 export interface JoinMeetingAck {
   ok: true;
   hostToken: string | null;
+  participantId: string;
+  reconnected: boolean;
+  /** 끊긴 동안 오간 대화를 복원하는 경로. 새로고침·늦은 입장도 이걸로 채워진다. */
+  chat: ChatPostedBroadcast[];
 }
 
 // ---------- server → client (broadcast) ----------
 
 export interface ParticipantJoinedBroadcast {
-  socketId: string;
+  participantId: string;
   nickname: string;
   joinedAt: string;
 }
 
 export interface ParticipantLeftBroadcast {
-  socketId: string;
+  participantId: string;
   leftAt: string;
+}
+
+export interface ParticipantDisconnectedBroadcast {
+  participantId: string;
+  disconnectedAt: string;
+}
+
+export interface ParticipantReconnectedBroadcast {
+  participantId: string;
+  reconnectedAt: string;
 }
 
 export interface ChatPostedBroadcast {
@@ -138,11 +157,18 @@ export interface ChatPostedBroadcast {
   sentAt: string;
 }
 
+export interface MeetingParticipantEntry {
+  participantId: string;
+  nickname: string;
+  joinedAt: string;
+  disconnected: boolean;
+}
+
 /**
  * 회의 입장 직후 본인에게만 전달되는 기존 참가자 목록.
  */
 export interface MeetingParticipantsBroadcast {
-  participants: ParticipantJoinedBroadcast[];
+  participants: MeetingParticipantEntry[];
 }
 
 /**
