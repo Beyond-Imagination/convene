@@ -101,6 +101,17 @@ describe('RedisMeetingRepository', () => {
     expect(p?.isActive).toBe(false);
   });
 
+  it('연결 정보(connectionId·끊김 시각)가 round-trip 된다 — 재시작 후에도 재접속으로 붙어야 한다', async () => {
+    const meeting = makeMeeting('abc12xyz');
+    meeting.addParticipant('p-1', 'alice', t30s, 'socket-a');
+    meeting.disconnectParticipant('socket-a', t1m);
+    await repo.save(meeting);
+
+    const found = await repo.findByCode('abc12xyz');
+    expect(found!.findByConnectionId('socket-a')?.id).toBe('p-1');
+    expect(found!.findParticipant('p-1')?.disconnectedAt?.getTime()).toBe(t1m.getTime());
+  });
+
   it('같은 code로 두 번 save 하면 마지막 상태로 덮어쓴다', async () => {
     const m1 = makeMeeting('abc12xyz');
     await repo.save(m1);

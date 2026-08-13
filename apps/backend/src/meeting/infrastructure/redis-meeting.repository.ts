@@ -27,6 +27,9 @@ interface ParticipantWire {
   readonly nickname: string;
   readonly joinedAt: string;
   readonly leftAt: string | null;
+  // 과거 도큐먼트에는 없다. 복원 시 Participant.fromSnapshot이 id로 대체한다.
+  readonly connectionId?: string;
+  readonly disconnectedAt?: string | null;
 }
 
 interface MeetingWire {
@@ -115,6 +118,8 @@ export class RedisMeetingRepository implements MeetingRepository {
           nickname: p.nickname,
           joinedAt: p.joinedAt.toISOString(),
           leftAt: p.leftAt ? p.leftAt.toISOString() : null,
+          connectionId: p.connectionId,
+          disconnectedAt: p.disconnectedAt ? p.disconnectedAt.toISOString() : null,
         }),
       ),
       hostToken: snapshot.hostToken,
@@ -139,6 +144,8 @@ export class RedisMeetingRepository implements MeetingRepository {
           nickname: p.nickname,
           joinedAt: new Date(p.joinedAt),
           leftAt: p.leftAt ? new Date(p.leftAt) : null,
+          connectionId: p.connectionId,
+          disconnectedAt: p.disconnectedAt ? new Date(p.disconnectedAt) : null,
         }),
       ),
       // 레거시 도큐먼트는 빈 문자열로 복원 — isHost가 빈 토큰을 항상 거부하므로 누구도 종료 권한을 갖지 못하고 idle로만 종료된다.

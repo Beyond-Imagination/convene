@@ -731,3 +731,266 @@ describe('MeetingService.sweepIdleMeetings', () => {
     expect(events).toHaveLength(0);
   });
 });
+
+describe('MeetingService.joinMeeting 재접속', () => {
+  const t0 = new Date('2026-01-01T00:00:00Z');
+  const t30s = new Date('2026-01-01T00:00:30Z');
+  const t1m = new Date('2026-01-01T00:01:00Z');
+
+  const makeService = (meeting: Meeting, chat: ChatEntry[] = []) => {
+    const saved: Meeting[] = [];
+    const { events, publisher } = makeEventPublisher();
+    const service = new MeetingService(
+      {
+        findByCode: async (c) => (c === meeting.code.value ? meeting : null),
+        listOpenCodes: async () => [],
+        save: async (m) => {
+          saved.push(m);
+        },
+      },
+      { append: async () => {}, listByCode: async () => chat },
+      { next: () => code },
+      { now: () => t1m },
+      publisher,
+      noopLogger(),
+    );
+    return { service, saved, events };
+  };
+
+  /** 이미 한 번 입장해 있는 상태를 만들고 그때까지의 이벤트는 비운다. */
+  const alreadyJoined = async (meeting: Meeting) => {
+    const { service, events } = makeService(meeting);
+    await service.joinMeeting({
+      code: 'abc12xyz',
+      participantId: 'p-1',
+      connectionId: 'socket-a',
+      nickname: 'alice',
+    });
+    events.length = 0;
+    return { service, events };
+  };
+
+  it('같은 participantId로 다시 들어오면 새 참가자를 만들지 않고 같은 참가자를 유지한다', async () => {
+    const meeting = makeMeeting(t0);
+    const { service } = await alreadyJoined(meeting);
+    meeting.disconnectParticipant('socket-a', t30s);
+
+    const result = await service.joinMeeting({
+      code: 'abc12xyz',
+      participantId: 'p-1',
+      connectionId: 'socket-b',
+      nickname: 'alice',
+    });
+
+    expect(result.reconnected).toBe(true);
+    expect(result.participant.id).toBe('p-1');
+    expect(meeting.activeParticipantCount).toBe(1);
+    expect(meeting.findByConnectionId('socket-b')?.id).toBe('p-1');
+  });
+
+  it('재접속은 participant.joined 대신 participant.reconnected를 발행한다', async () => {
+    const meeting = makeMeeting(t0);
+    const { service, events } = await alreadyJoined(meeting);
+    meeting.disconnectParticipant('socket-a', t30s);
+
+    await service.joinMeeting({
+      code: 'abc12xyz',
+      participantId: 'p-1',
+      connectionId: 'socket-b',
+      nickname: 'alice',
+    });
+
+    expect(events).toEqual([
+      {
+        name: MEETING_EVENTS.PARTICIPANT_RECONNECTED,
+        payload: { code: 'abc12xyz', participantId: 'p-1', reconnectedAt: t1m },
+      },
+    ]);
+  });
+
+  it('재접속은 host를 새로 가져가지 않는다 (본인이 활성 참가자로 남아 있었다)', async () => {
+    const meeting = makeMeeting(t0);
+    const { service } = await alreadyJoined(meeting);
+    meeting.disconnectParticipant('socket-a', t30s);
+
+    const result = await service.joinMeeting({
+      code: 'abc12xyz',
+      participantId: 'p-1',
+      connectionId: 'socket-b',
+      nickname: 'alice',
+    });
+
+    expect(result.hostToken).toBeNull();
+  });
+
+  it('끊김 통보 전에 재접속해도(새로고침) 같은 참가자로 붙는다', async () => {
+    const meeting = makeMeeting(t0);
+    const { service } = await alreadyJoined(meeting);
+
+    const result = await service.joinMeeting({
+      code: 'abc12xyz',
+      participantId: 'p-1',
+      connectionId: 'socket-b',
+      nickname: 'alice',
+    });
+
+    expect(result.reconnected).toBe(true);
+    expect(meeting.activeParticipantCount).toBe(1);
+  });
+
+  it('입장 결과에 지금까지의 채팅을 담아 끊긴 구간의 대화를 복원할 수 있게 한다', async () => {
+    const meeting = makeMeeting(t0);
+    const history = [chatEntry({ nickname: 'bob', text: '먼저 시작할게요', sentAt: t30s })];
+    const { service } = makeService(meeting, history);
+
+    const result = await service.joinMeeting({
+      code: 'abc12xyz',
+      participantId: 'p-1',
+      connectionId: 'socket-a',
+      nickname: 'alice',
+    });
+
+    expect(result.chat).toEqual(history);
+  });
+});
+
+describe('MeetingService.disconnectParticipant', () => {
+  const t0 = new Date('2026-01-01T00:00:00Z');
+  const t30s = new Date('2026-01-01T00:00:30Z');
+
+  const makeService = (meeting: Meeting) => {
+    const saved: Meeting[] = [];
+    const { events, publisher } = makeEventPublisher();
+    const service = new MeetingService(
+      {
+        findByCode: async (c) => (c === meeting.code.value ? meeting : null),
+        listOpenCodes: async () => [],
+        save: async (m) => {
+          saved.push(m);
+        },
+      },
+      noopChatRepository(),
+      { next: () => code },
+      { now: () => t30s },
+      publisher,
+      noopLogger(),
+    );
+    return { service, saved, events };
+  };
+
+  const withParticipant = () => {
+    const m = makeMeeting(t0);
+    m.addParticipant('p-1', 'alice', t0, 'socket-a');
+    return m;
+  };
+
+  it('참가자를 퇴장시키지 않고 끊김만 기록한 뒤 save한다', async () => {
+    const meeting = withParticipant();
+    const { service, saved } = makeService(meeting);
+
+    const result = await service.disconnectParticipant({
+      code: 'abc12xyz',
+      connectionId: 'socket-a',
+    });
+
+    expect(result?.id).toBe('p-1');
+    expect(meeting.activeParticipantCount).toBe(1);
+    expect(meeting.findParticipant('p-1')?.isDisconnected).toBe(true);
+    expect(saved).toHaveLength(1);
+  });
+
+  it('participant.disconnected를 발행한다 (left가 아니다)', async () => {
+    const meeting = withParticipant();
+    const { service, events } = makeService(meeting);
+
+    await service.disconnectParticipant({ code: 'abc12xyz', connectionId: 'socket-a' });
+
+    expect(events).toEqual([
+      {
+        name: MEETING_EVENTS.PARTICIPANT_DISCONNECTED,
+        payload: { code: 'abc12xyz', participantId: 'p-1', disconnectedAt: t30s },
+      },
+    ]);
+  });
+
+  it('회의에 없는 연결이면 no-op — 이벤트도 save도 없다', async () => {
+    const meeting = withParticipant();
+    const { service, saved, events } = makeService(meeting);
+
+    await expect(
+      service.disconnectParticipant({ code: 'abc12xyz', connectionId: 'socket-z' }),
+    ).resolves.toBeUndefined();
+    expect(events).toHaveLength(0);
+    expect(saved).toHaveLength(0);
+  });
+
+  it('없는 회의여도 던지지 않는다 (연결 종료는 best-effort다)', async () => {
+    const meeting = withParticipant();
+    const { service, events } = makeService(meeting);
+
+    await expect(
+      service.disconnectParticipant({ code: 'zzz99zzz', connectionId: 'socket-a' }),
+    ).resolves.toBeUndefined();
+    expect(events).toHaveLength(0);
+  });
+});
+
+describe('MeetingService.sweepIdleMeetings 유예 만료', () => {
+  const t0 = new Date('2026-01-01T00:00:00Z');
+  const t30s = new Date('2026-01-01T00:00:30Z');
+  const tSweep = new Date('2026-01-01T00:02:00Z');
+
+  const makeService = (meeting: Meeting, now: Date) => {
+    const { publisher, events } = makeEventPublisher();
+    const service = new MeetingService(
+      {
+        findByCode: async (c) => (c === meeting.code.value ? meeting : null),
+        listOpenCodes: async () => [meeting.code.value],
+        save: async () => {},
+      },
+      noopChatRepository(),
+      { next: () => code },
+      { now: () => now },
+      publisher,
+      noopLogger(),
+    );
+    return { service, events };
+  };
+
+  const disconnectedMeeting = () => {
+    const m = makeMeeting(t0);
+    m.addParticipant('p-1', 'alice', t0, 'socket-a');
+    m.disconnectParticipant('socket-a', t30s);
+    return m;
+  };
+
+  it('유예를 넘긴 참가자를 퇴장 처리하고 participant.left를 발행한다', async () => {
+    const meeting = disconnectedMeeting();
+    const { service, events } = makeService(meeting, tSweep);
+
+    await service.sweepIdleMeetings();
+
+    expect(meeting.activeParticipantCount).toBe(0);
+    expect(events[0]).toEqual({
+      name: MEETING_EVENTS.PARTICIPANT_LEFT,
+      payload: { code: 'abc12xyz', participantId: 'p-1', leftAt: tSweep },
+    });
+  });
+
+  it('만료된 그 sweep에서는 회의를 닫지 않는다 (idle 시계는 만료 시점부터 돈다)', async () => {
+    const meeting = disconnectedMeeting();
+    const { service } = makeService(meeting, tSweep);
+
+    await expect(service.sweepIdleMeetings()).resolves.toEqual({ scanned: 1, closed: 0 });
+    expect(meeting.isOpen).toBe(true);
+  });
+
+  it('유예 안이면 아무 일도 일어나지 않는다', async () => {
+    const meeting = disconnectedMeeting();
+    const { service, events } = makeService(meeting, new Date('2026-01-01T00:00:45Z'));
+
+    await expect(service.sweepIdleMeetings()).resolves.toEqual({ scanned: 1, closed: 0 });
+    expect(meeting.activeParticipantCount).toBe(1);
+    expect(events).toHaveLength(0);
+  });
+});

@@ -4,7 +4,7 @@ import { MEETING_EVENTS } from '@convene/shared-interfaces';
 import { Inject, Injectable } from '@nestjs/common';
 
 import { MeetingNotFoundError, NotHostError } from '@/meeting/application/meeting.errors';
-import { Meeting } from '@/meeting/domain/meeting';
+import { Meeting, RECONNECT_GRACE_MS } from '@/meeting/domain/meeting';
 import { Participant } from '@/meeting/domain/participant';
 import { CHAT_REPOSITORY, ChatRepository } from '@/meeting/domain/ports/chat.repository';
 import { MEETING_REPOSITORY, MeetingRepository } from '@/meeting/domain/ports/meeting.repository';
@@ -47,6 +47,8 @@ interface CreateMeetingCommand {
 interface JoinMeetingCommand {
   code: string;
   participantId: string;
+  /** 미지정이면 participantId를 그대로 쓴다(구버전 클라이언트). */
+  connectionId?: string;
   nickname: string;
 }
 
@@ -55,11 +57,18 @@ interface JoinMeetingResult {
   participant: Participant;
   /** host 권한을 가져간 참가자에게만 준다. 아니면 null. */
   hostToken: string | null;
+  reconnected: boolean;
+  chat: ChatEntry[];
 }
 
 interface LeaveMeetingCommand {
   code: string;
   participantId: string;
+}
+
+interface DisconnectParticipantCommand {
+  code: string;
+  connectionId: string;
 }
 
 interface LeaveMeetingResult {
@@ -158,15 +167,40 @@ export class MeetingService {
 
   async joinMeeting(command: JoinMeetingCommand): Promise<JoinMeetingResult> {
     const meeting = await this.requireMeeting(command.code);
+    const now = this.clock.now();
+    const connectionId = command.connectionId ?? command.participantId;
+    const existing = meeting.findParticipant(command.participantId);
+
+    // 활성 참가자로 남아 있었으므로 host 승격 대상이 아니다.
+    if (existing?.isActive) {
+      const participant = meeting.reconnectParticipant(command.participantId, connectionId, now);
+      await this.repository.save(meeting);
+      await this.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_RECONNECTED, {
+        code: command.code,
+        participantId: participant.id,
+        reconnectedAt: now,
+      });
+      this.logger.info(
+        { meetingCode: command.code, participantId: participant.id },
+        'participant reconnected',
+      );
+      return {
+        meeting,
+        participant,
+        hostToken: null,
+        reconnected: true,
+        chat: await this.chatRepository.listByCode(command.code),
+      };
+    }
+
     // 빈 방에 들어오는 사람이 방장이 된다. 노션이 만든 회의는 생성자(백엔드)가 접속하지 않아
     // 이 승격이 없으면 아무도 회의를 종료할 수 없다.
     const claimsHost = meeting.activeParticipantCount === 0;
     const wasScheduled = meeting.status === 'scheduled';
-    const participant = meeting.addParticipant(
-      command.participantId,
-      command.nickname,
-      this.clock.now(),
-    );
+    // 유예가 만료돼 퇴장 처리된 참가자가 돌아온 경우는 같은 Entity를 되살린다(중복 방지).
+    const participant = existing
+      ? meeting.rejoinParticipant(command.participantId, connectionId, now)
+      : meeting.addParticipant(command.participantId, command.nickname, now, connectionId);
     await this.repository.save(meeting);
     // 참가자 입장을 알리기 전에 방부터 연다(미디어 리소스가 먼저 준비돼야 한다).
     if (wasScheduled) {
@@ -182,7 +216,35 @@ export class MeetingService {
       { meetingCode: command.code, participantId: participant.id },
       'participant joined',
     );
-    return { meeting, participant, hostToken: claimsHost ? meeting.hostToken : null };
+    return {
+      meeting,
+      participant,
+      hostToken: claimsHost ? meeting.hostToken : null,
+      reconnected: false,
+      chat: await this.chatRepository.listByCode(command.code),
+    };
+  }
+
+  /** 연결 종료 경로는 best-effort라 던지지 않는다 — 이미 종료된 회의나 모르는 연결이면 no-op. */
+  async disconnectParticipant(
+    command: DisconnectParticipantCommand,
+  ): Promise<Participant | undefined> {
+    const meeting = await this.repository.findByCode(command.code);
+    if (!meeting) return undefined;
+    const now = this.clock.now();
+    const participant = meeting.disconnectParticipant(command.connectionId, now);
+    if (!participant) return undefined;
+    await this.repository.save(meeting);
+    await this.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_DISCONNECTED, {
+      code: command.code,
+      participantId: participant.id,
+      disconnectedAt: now,
+    });
+    this.logger.info(
+      { meetingCode: command.code, participantId: participant.id },
+      'participant disconnected',
+    );
+    return participant;
   }
 
   async leaveMeeting(command: LeaveMeetingCommand): Promise<LeaveMeetingResult> {
@@ -245,12 +307,33 @@ export class MeetingService {
     let closed = 0;
     for (const code of codes) {
       try {
+        // 끊긴 참가자는 활성으로 세므로, 만료를 먼저 확정하지 않으면 idle 판정이 항상 false다.
+        await this.expireDisconnectedParticipants(code);
         if (await this.detectIdleAndClose({ code })) closed += 1;
       } catch (error) {
         this.logger.error({ meetingCode: code, err: error }, 'idle 판정 실패');
       }
     }
     return { scanned: codes.length, closed };
+  }
+
+  async expireDisconnectedParticipants(code: string): Promise<number> {
+    const meeting = await this.requireMeeting(code);
+    const expired = meeting.expireDisconnected(this.clock.now(), RECONNECT_GRACE_MS);
+    if (expired.length === 0) return 0;
+    await this.repository.save(meeting);
+    for (const participant of expired) {
+      await this.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_LEFT, {
+        code,
+        participantId: participant.id,
+        leftAt: participant.leftAt,
+      });
+      this.logger.info(
+        { meetingCode: code, participantId: participant.id },
+        'participant left by reconnect grace expiry',
+      );
+    }
+    return expired.length;
   }
 
   /**
@@ -290,7 +373,13 @@ export class MeetingService {
       startedAt: snapshot.startedAt,
       endedAt,
       reason,
-      participants: snapshot.participants,
+      // 연결 정보(connectionId·disconnectedAt)는 회의 진행용이라 회의록으로 넘기지 않는다.
+      participants: snapshot.participants.map((p) => ({
+        id: p.id,
+        nickname: p.nickname,
+        joinedAt: p.joinedAt,
+        leftAt: p.leftAt,
+      })),
       chat,
       title: snapshot.title,
     };
