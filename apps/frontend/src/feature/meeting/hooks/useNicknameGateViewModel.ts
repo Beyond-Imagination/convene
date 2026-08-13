@@ -3,6 +3,7 @@
 import { type BaseSyntheticEvent, useState } from 'react';
 import { type FieldErrors, useForm, type UseFormRegisterReturn } from 'react-hook-form';
 
+import { getLastNickname, saveLastNickname, saveNickname } from '@/shared/stores/meeting.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
 const NICKNAME_MIN = 1;
@@ -27,7 +28,7 @@ export interface UseNicknameGateViewModel {
  * 회의 코드는 URL에서 이미 정해지므로 닉네임만 받는다.
  * submit 성공 시 session store에 닉네임을 set 하면, `useMeetingViewModel`이 그 nickname을 보고 socket을 만들어 정상 입장한다.
  */
-export function useNicknameGateViewModel(): UseNicknameGateViewModel {
+export function useNicknameGateViewModel(code: string): UseNicknameGateViewModel {
   const setNickname = useSessionStore((s) => s.setNickname);
   const [status, setStatus] = useState<NicknameGateStatus>('idle');
 
@@ -36,13 +37,17 @@ export function useNicknameGateViewModel(): UseNicknameGateViewModel {
     handleSubmit: rhfHandleSubmit,
     formState: { errors },
   } = useForm<NicknameGateFormValues>({
-    defaultValues: { nickname: '' },
+    defaultValues: { nickname: getLastNickname() },
     mode: 'onSubmit',
   });
 
   const handleSubmit = rhfHandleSubmit((values) => {
     setStatus('submitting');
-    setNickname(values.nickname.trim());
+    const trimmed = values.nickname.trim();
+    // store에만 넣으면 새로고침 한 번에 게이트로 되돌아간다.
+    saveNickname(code, trimmed);
+    saveLastNickname(trimmed);
+    setNickname(trimmed);
   });
 
   const registerField: UseNicknameGateViewModel['register'] = (name) =>

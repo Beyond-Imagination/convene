@@ -61,26 +61,26 @@ const fakeTrack = (kind: 'audio' | 'video'): MediaStreamTrack =>
   ({ kind }) as unknown as MediaStreamTrack;
 
 const participants: ReadonlyArray<RemoteParticipant> = [
-  { socketId: 's1', nickname: '민준', joinedAt: '2026-08-07T00:00:00.000Z' },
-  { socketId: 's2', nickname: '서연', joinedAt: '2026-08-07T00:00:01.000Z' },
-  { socketId: 's3', nickname: '도윤', joinedAt: '2026-08-07T00:00:02.000Z' },
+  { participantId: 's1', nickname: '민준', joinedAt: '2026-08-07T00:00:00.000Z', disconnected: false },
+  { participantId: 's2', nickname: '서연', joinedAt: '2026-08-07T00:00:01.000Z', disconnected: false },
+  { participantId: 's3', nickname: '도윤', joinedAt: '2026-08-07T00:00:02.000Z', disconnected: false },
 ];
 const TILE_COUNT = 1 + participants.length;
 
 const remoteMedia: ReadonlyArray<RemoteMediaEntry> = participants.flatMap((p) => [
   {
-    consumerId: `c-${p.socketId}-v`,
-    peerSocketId: p.socketId,
-    producerId: `p-${p.socketId}-v`,
+    consumerId: `c-${p.participantId}-v`,
+    peerId: p.participantId,
+    producerId: `p-${p.participantId}-v`,
     kind: 'video' as const,
     source: 'video' as const,
     track: fakeTrack('video'),
     paused: false,
   },
   {
-    consumerId: `c-${p.socketId}-a`,
-    peerSocketId: p.socketId,
-    producerId: `p-${p.socketId}-a`,
+    consumerId: `c-${p.participantId}-a`,
+    peerId: p.participantId,
+    producerId: `p-${p.participantId}-a`,
     kind: 'audio' as const,
     source: 'audio' as const,
     track: fakeTrack('audio'),
@@ -127,7 +127,7 @@ const meetingVm: UseMeetingViewModel = {
   remoteParticipants: participants,
   errorMessage: null,
   socket: fakeSocket,
-  reconnectGen: 0,
+  rejoinGen: 0,
   isHost: true,
   isNavigatingAway: false,
   leave: vi.fn(),
@@ -160,7 +160,7 @@ const typeInto = (input: HTMLInputElement, text: string): void => {
 
 const screenEntry: RemoteMediaEntry = {
   consumerId: 'c-s1-screen',
-  peerSocketId: 's1',
+  peerId: 's1',
   producerId: 'p-s1-screen',
   kind: 'video',
   source: 'screen',
@@ -236,7 +236,7 @@ describe('한 사람의 미디어 변화는 그 사람 타일만 다시 그린�
 
     // useRemoteMedia 의 onProducerToggled 와 같은 갱신 방식 — 배열 전체를 새로 만든다.
     const toggled = remoteMedia.map((m) =>
-      m.peerSocketId === 's1' && m.kind === 'audio' ? { ...m, paused: true } : m,
+      m.peerId === 's1' && m.kind === 'audio' ? { ...m, paused: true } : m,
     );
     rerender(
       <MeetingScreen

@@ -5,7 +5,7 @@ import { useSessionStore } from '@/shared/stores/session.store';
 import { useNicknameGateViewModel } from './useNicknameGateViewModel';
 
 function Harness() {
-  const vm = useNicknameGateViewModel();
+  const vm = useNicknameGateViewModel('abc12xyz');
   return (
     <form
       aria-label="gate-form"
@@ -31,6 +31,9 @@ const setInput = (value: string): void => {
 describe('useNicknameGateViewModel', () => {
   beforeEach(() => {
     useSessionStore.setState({ nickname: null });
+    // 폼 기본값이 보관 닉네임에서 채워지므로, 빈 입력 검증에는 비워 둔 상태가 필요하다.
+    window.localStorage.clear();
+    window.sessionStorage.clear();
   });
 
   it('유효한 닉네임 submit 시 trim 해서 session store에 저장한다', async () => {

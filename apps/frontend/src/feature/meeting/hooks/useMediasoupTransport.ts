@@ -7,12 +7,15 @@ import {
   type MediaType,
   type ProduceRequest,
   type ProduceResponse,
+  type RestartIceResponse,
 } from '@convene/shared-interfaces';
 import type { Device, Transport } from 'mediasoup-client/types';
 import { type MutableRefObject, useCallback, useEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 
 import { rpcWithTimeout } from '@/shared/socket/mediasoup.rpc';
+
+const RESTART_ICE_TIMEOUT_MS = 2_000;
 import { createMediasoupDevice } from '@/shared/socket/mediasoup-device.factory';
 
 export type MediasoupConnectionStatus = 'idle' | 'preparing' | 'ready' | 'error';
@@ -22,6 +25,8 @@ export interface UseMediasoupTransport {
   readonly errorMessage: string | null;
   /** transport 밖(로컬 미디어 취득 등)에서 난 오류도 같은 창구로 모은다. */
   readonly reportError: (message: string) => void;
+  /** transport를 재생성하지 않고 복귀한 횟수. `useRemoteMedia`가 재구축 대신 재동기화를 돈다. */
+  readonly resumeGen: number;
   readonly deviceRef: MutableRefObject<Device | null>;
   readonly sendTransportRef: MutableRefObject<Transport | null>;
   readonly recvTransportRef: MutableRefObject<Transport | null>;
@@ -39,34 +44,66 @@ export interface UseMediasoupTransport {
  * 준비가 끝나면 status='ready'가 되고, 그 위에 쌓이는 produce/consume은
  * `useLocalMedia`·`useRemoteMedia`가 여기서 받은 ref로 처리한다.
  */
-export function useMediasoupTransport(socket: Socket | null, code: string): UseMediasoupTransport {
+export function useMediasoupTransport(
+  socket: Socket | null,
+  code: string,
+  rejoinGen: number,
+  /** 서버가 내 미디어를 유예 동안 살려 뒀는지. false면 재사용할 것이 없다. */
+  mediaPreserved: boolean,
+): UseMediasoupTransport {
   const [status, setStatus] = useState<MediasoupConnectionStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reconnectGen, setReconnectGen] = useState(0);
+  const [resumeGen, setResumeGen] = useState(0);
   const deviceRef = useRef<Device | null>(null);
   const sendTransportRef = useRef<Transport | null>(null);
   const recvTransportRef = useRef<Transport | null>(null);
-  const connectCountRef = useRef(0);
 
   /**
-   * socket의 'connect' 이벤트를 감시해 자동 재연결을 감지한다.
-   * 두 번째 이상 'connect' = 재연결 → reconnectGen 증가 → main effect 재실행 →
-   * 기존 transport.close + 새 transport 생성. 첫 'connect' 는 카운트만 올린다.
+   * WebRTC transport는 시그널링 소켓과 독립이라, 소켓이 끊겼다고 미디어가 끊긴 것은 아니다.
+   * connected면 재동기화만, 끊겼으면 ICE만 재협상, 그마저 실패하면 전면 재생성.
    */
-  useEffect(() => {
-    if (socket === null) return undefined;
-    connectCountRef.current = 0;
-    const onConnect = (): void => {
-      connectCountRef.current += 1;
-      if (connectCountRef.current > 1) {
-        setReconnectGen((g) => g + 1);
+  const recover = useCallback(async (): Promise<void> => {
+    if (socket === null) return;
+    if (!mediaPreserved) {
+      setReconnectGen((g) => g + 1);
+      return;
+    }
+    const transports = [sendTransportRef.current, recvTransportRef.current];
+    if (transports.some((t) => t === null || t.closed)) {
+      setReconnectGen((g) => g + 1);
+      return;
+    }
+    const broken = (transports as Transport[]).filter((t) => t.connectionState !== 'connected');
+    if (broken.length === 0) {
+      setResumeGen((g) => g + 1);
+      return;
+    }
+    try {
+      for (const transport of broken) {
+        const res = await rpcWithTimeout<RestartIceResponse>(
+          socket,
+          MEDIASOUP_WS_EVENTS.RESTART_ICE,
+          { code, transportId: transport.id },
+          // 서버 로컬 연산이라 즉답이 정상이다. 실패는 ack 없이 오므로,
+          // 기본 타임아웃을 쓰면 전면 재생성으로 내려가기까지 10초를 버린다.
+          RESTART_ICE_TIMEOUT_MS,
+        );
+        await transport.restartIce({ iceParameters: res.iceParameters as never });
       }
-    };
-    socket.on('connect', onConnect);
-    return () => {
-      socket.off('connect', onConnect);
-    };
-  }, [socket]);
+      setResumeGen((g) => g + 1);
+    } catch (err) {
+      console.warn('[mediasoup] ICE restart 실패 — 전면 재생성으로 내려간다', err);
+      setReconnectGen((g) => g + 1);
+    }
+  }, [socket, code, mediaPreserved]);
+
+  // 소켓 'connect'가 아니라 재입장 ack을 기다린다. 그 전에 RPC를 보내면 서버가 이 소켓의
+  // 신원을 몰라 socket.id로 대체하고, 그 ID의 미디어는 없으므로 요청이 통째로 실패한다.
+  useEffect(() => {
+    if (rejoinGen === 0) return;
+    void recover();
+  }, [rejoinGen, recover]);
 
   useEffect(() => {
     if (socket === null) return undefined;
@@ -184,6 +221,7 @@ export function useMediasoupTransport(socket: Socket | null, code: string): UseM
     status,
     errorMessage,
     reportError,
+    resumeGen,
     deviceRef,
     sendTransportRef,
     recvTransportRef,
