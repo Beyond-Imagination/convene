@@ -29,6 +29,7 @@ const makeMeeting = () =>
 
 interface Broadcast {
   room: string;
+  except?: string;
   event: string;
   payload: unknown;
 }
@@ -36,7 +37,7 @@ interface Broadcast {
 const makeSocket = (id: string) => {
   const joined = new Set<string>();
   const broadcasts: Broadcast[] = [];
-  const data: { code?: string } = {};
+  const data: { code?: string; participantId?: string } = {};
   const selfEmits: Array<{ event: string; payload: unknown }> = [];
   const socket = {
     id,
@@ -64,10 +65,13 @@ const makeSocket = (id: string) => {
   return { socket, joined, broadcasts, data, selfEmits };
 };
 
-const dtoOf = (code = 'abc12xyz', nickname = 'alice'): JoinMeetingDto => {
+const dtoOf = (
+  overrides: Partial<Pick<JoinMeetingDto, 'code' | 'nickname' | 'participantId'>> = {},
+): JoinMeetingDto => {
   const dto = new JoinMeetingDto();
-  dto.code = code;
-  dto.nickname = nickname;
+  dto.code = overrides.code ?? 'abc12xyz';
+  dto.nickname = overrides.nickname ?? 'alice';
+  if (overrides.participantId !== undefined) dto.participantId = overrides.participantId;
   return dto;
 };
 
@@ -88,138 +92,325 @@ const makeServer = () => {
   const broadcasts: Broadcast[] = [];
   const server = {
     to(room: string) {
-      return {
+      const target = {
+        except(except: string) {
+          return {
+            emit(event: string, payload: unknown): boolean {
+              broadcasts.push({ room, except, event, payload });
+              return true;
+            },
+          };
+        },
         emit(event: string, payload: unknown): boolean {
           broadcasts.push({ room, event, payload });
           return true;
         },
       };
+      return target;
     },
   };
   return { server, broadcasts };
 };
 
 describe('MeetingGateway.handleJoin', () => {
-  const makeGateway = () => {
+  const makeGateway = (reconnected = false, chat = [] as ReturnType<typeof chatEntry>[]) => {
     const meeting = makeMeeting();
-    const participant = meeting.addParticipant('s1', 'alice', t1);
-    const calls: Array<{ code: string; participantId: string; nickname: string }> = [];
+    const participant = meeting.addParticipant('p-1', 'alice', t1, 's1');
+    const calls: Array<{
+      code: string;
+      participantId: string;
+      connectionId: string;
+      nickname: string;
+    }> = [];
     const service = {
-      joinMeeting: jest.fn(
-        async (cmd: { code: string; participantId: string; nickname: string }) => {
-          calls.push(cmd);
-          return { meeting, participant };
-        },
-      ),
+      joinMeeting: jest.fn(async (cmd: (typeof calls)[number]) => {
+        calls.push(cmd);
+        return { meeting, participant, hostToken: 'host-token-1', reconnected, chat };
+      }),
     };
 
-    const gateway = new MeetingGateway(service as any, fakeLogger as any);
-    return { gateway, service, calls };
+    const gateway = new MeetingGateway(service as never, fakeLogger as never);
+    const { server, broadcasts } = makeServer();
+    gateway.server = server as never;
+    return { gateway, service, calls, meeting, broadcasts };
   };
 
-  it('service.joinMeeting을 socket.id를 participantId로 호출한다', async () => {
+  it('dto의 안정 participantId와 이번 소켓 연결(connectionId)을 함께 넘긴다', async () => {
+    const { gateway, calls } = makeGateway();
+    const { socket } = makeSocket('s1');
+    await gateway.handleJoin(dtoOf({ participantId: 'p-1' }), socket as unknown as Socket);
+    expect(calls).toEqual([
+      { code: 'abc12xyz', participantId: 'p-1', connectionId: 's1', nickname: 'alice' },
+    ]);
+  });
+
+  it('participantId를 보내지 않는 구버전 클라이언트는 socket.id를 신원으로 쓴다', async () => {
     const { gateway, calls } = makeGateway();
     const { socket } = makeSocket('s1');
     await gateway.handleJoin(dtoOf(), socket as unknown as Socket);
-    expect(calls).toEqual([{ code: 'abc12xyz', participantId: 's1', nickname: 'alice' }]);
+    expect(calls[0].participantId).toBe('s1');
   });
 
-  it('소켓을 meeting:{code} room에 join 시킨다', async () => {
+  it('회의 room과 참가자 전용 room 두 곳에 join 시킨다', async () => {
     const { gateway } = makeGateway();
     const { socket, joined } = makeSocket('s1');
-    await gateway.handleJoin(dtoOf(), socket as unknown as Socket);
+    await gateway.handleJoin(dtoOf({ participantId: 'p-1' }), socket as unknown as Socket);
     expect(joined.has('meeting:abc12xyz')).toBe(true);
+    // socket.id가 바뀌어도 이 참가자를 지목·제외할 수 있게 하는 room.
+    expect(joined.has('p-1')).toBe(true);
   });
 
-  it('같은 room의 다른 참가자에게 participantJoined 브로드캐스트', async () => {
+  it('handleDisconnect가 복원할 수 있도록 socket.data에 code와 participantId를 저장한다', async () => {
     const { gateway } = makeGateway();
-    const { socket, broadcasts } = makeSocket('s1');
-    await gateway.handleJoin(dtoOf(), socket as unknown as Socket);
-    expect(broadcasts).toEqual([
+    const { socket, data } = makeSocket('s1');
+    await gateway.handleJoin(dtoOf({ participantId: 'p-1' }), socket as unknown as Socket);
+    expect(data).toEqual({ code: 'abc12xyz', participantId: 'p-1' });
+  });
+
+  it('ack에 확정된 participantId·재접속 여부·채팅 히스토리를 담아 돌려준다', async () => {
+    const history = [chatEntry({ nickname: 'bob', text: '먼저 시작할게요', sentAt: t1 })];
+    const { gateway } = makeGateway(true, history);
+    const { socket } = makeSocket('s1');
+    const ack = await gateway.handleJoin(
+      dtoOf({ participantId: 'p-1' }),
+      socket as unknown as Socket,
+    );
+    expect(ack).toEqual({
+      ok: true,
+      hostToken: 'host-token-1',
+      participantId: 'p-1',
+      reconnected: true,
+      chat: [{ nickname: 'bob', text: '먼저 시작할게요', sentAt: t1.toISOString() }],
+    });
+  });
+
+  it('본인에게만 기존 참가자 스냅숏을 보내며 자기 자신은 제외한다', async () => {
+    const { gateway, meeting } = makeGateway();
+    meeting.addParticipant('p-2', 'bob', t1, 's2');
+    const { socket, selfEmits } = makeSocket('s1');
+    await gateway.handleJoin(dtoOf({ participantId: 'p-1' }), socket as unknown as Socket);
+    expect(selfEmits).toEqual([
       {
-        room: 'meeting:abc12xyz',
-        event: MEETING_WS_EVENTS.PARTICIPANT_JOINED,
+        event: MEETING_WS_EVENTS.PARTICIPANTS,
         payload: {
-          socketId: 's1',
-          nickname: 'alice',
-          joinedAt: t1.toISOString(),
+          participants: [
+            {
+              participantId: 'p-2',
+              nickname: 'bob',
+              joinedAt: t1.toISOString(),
+              disconnected: false,
+            },
+          ],
         },
       },
     ]);
   });
 
-  it('handleDisconnect가 회의 code를 찾을 수 있도록 socket.data.code를 저장한다', async () => {
-    const { gateway } = makeGateway();
-    const { socket, data } = makeSocket('s1');
-    await gateway.handleJoin(dtoOf(), socket as unknown as Socket);
-    expect(data.code).toBe('abc12xyz');
+  it('스냅숏은 지금 끊겨 있는 참가자를 disconnected로 표시한다', async () => {
+    const { gateway, meeting } = makeGateway();
+    meeting.addParticipant('p-2', 'bob', t1, 's2');
+    meeting.disconnectParticipant('s2', t1);
+    const { socket, selfEmits } = makeSocket('s1');
+    await gateway.handleJoin(dtoOf({ participantId: 'p-1' }), socket as unknown as Socket);
+    const payload = selfEmits[0].payload as { participants: Array<{ disconnected: boolean }> };
+    expect(payload.participants[0].disconnected).toBe(true);
+  });
+
+  it('참가자 입장 broadcast는 handleJoin이 직접 보내지 않는다 (도메인 이벤트 구독이 담당)', async () => {
+    const { gateway, broadcasts } = makeGateway();
+    const { socket, broadcasts: clientBroadcasts } = makeSocket('s1');
+    await gateway.handleJoin(dtoOf({ participantId: 'p-1' }), socket as unknown as Socket);
+    expect(broadcasts).toEqual([]);
+    expect(clientBroadcasts).toEqual([]);
+  });
+});
+
+describe('MeetingGateway 참가자 상태 broadcast', () => {
+  const makeGateway = () => {
+    const gateway = new MeetingGateway({} as never, fakeLogger as never);
+    const { server, broadcasts } = makeServer();
+    gateway.server = server as never;
+    return { gateway, broadcasts };
+  };
+
+  it('입장은 본인을 제외한 같은 room에 알린다', () => {
+    const { gateway, broadcasts } = makeGateway();
+    gateway.onParticipantJoined({
+      code: 'abc12xyz',
+      participantId: 'p-1',
+      nickname: 'alice',
+      joinedAt: t1,
+    });
+    expect(broadcasts).toEqual([
+      {
+        room: 'meeting:abc12xyz',
+        except: 'p-1',
+        event: MEETING_WS_EVENTS.PARTICIPANT_JOINED,
+        payload: { participantId: 'p-1', nickname: 'alice', joinedAt: t1.toISOString() },
+      },
+    ]);
+  });
+
+  it('퇴장은 스케줄러가 일으킨 유예 만료도 같은 경로로 알린다', () => {
+    const { gateway, broadcasts } = makeGateway();
+    gateway.onParticipantLeft({ code: 'abc12xyz', participantId: 'p-1', leftAt: t1 });
+    expect(broadcasts).toEqual([
+      {
+        room: 'meeting:abc12xyz',
+        except: 'p-1',
+        event: MEETING_WS_EVENTS.PARTICIPANT_LEFT,
+        payload: { participantId: 'p-1', leftAt: t1.toISOString() },
+      },
+    ]);
+  });
+
+  it('연결 끊김은 퇴장과 별개 채널로 알린다 (수신 측이 타일을 지우지 않게)', () => {
+    const { gateway, broadcasts } = makeGateway();
+    gateway.onParticipantDisconnected({
+      code: 'abc12xyz',
+      participantId: 'p-1',
+      disconnectedAt: t1,
+    });
+    expect(broadcasts).toEqual([
+      {
+        room: 'meeting:abc12xyz',
+        except: 'p-1',
+        event: MEETING_WS_EVENTS.PARTICIPANT_DISCONNECTED,
+        payload: { participantId: 'p-1', disconnectedAt: t1.toISOString() },
+      },
+    ]);
+  });
+
+  it('재접속은 입장이 아니라 복구로 알린다', () => {
+    const { gateway, broadcasts } = makeGateway();
+    gateway.onParticipantReconnected({
+      code: 'abc12xyz',
+      participantId: 'p-1',
+      reconnectedAt: t1,
+    });
+    expect(broadcasts).toEqual([
+      {
+        room: 'meeting:abc12xyz',
+        except: 'p-1',
+        event: MEETING_WS_EVENTS.PARTICIPANT_RECONNECTED,
+        payload: { participantId: 'p-1', reconnectedAt: t1.toISOString() },
+      },
+    ]);
   });
 });
 
 describe('MeetingGateway.handleLeave', () => {
-  const t2 = new Date('2026-01-01T00:02:00Z');
-
-  const makeGateway = () => {
-    const meeting = makeMeeting();
-    const participant = meeting.addParticipant('s1', 'alice', t1);
-    participant.leave(t2);
+  const makeGateway = (leave?: jest.Mock) => {
     const calls: Array<{ code: string; participantId: string }> = [];
     const service = {
-      leaveMeeting: jest.fn(async (cmd: { code: string; participantId: string }) => {
-        calls.push(cmd);
-        return { meeting, participant };
-      }),
+      leaveMeeting:
+        leave ??
+        jest.fn(async (cmd: { code: string; participantId: string }) => {
+          calls.push(cmd);
+          return {};
+        }),
     };
 
-    const gateway = new MeetingGateway(service as any, fakeLogger as any);
-    return { gateway, service, calls };
+    const gateway = new MeetingGateway(service as never, fakeLogger as never);
+    const { server, broadcasts } = makeServer();
+    gateway.server = server as never;
+    return { gateway, calls, broadcasts };
   };
 
-  it('service.leaveMeeting을 socket.id를 participantId로 호출한다', async () => {
+  it('socket.data의 안정 participantId로 leaveMeeting을 호출한다', async () => {
     const { gateway, calls } = makeGateway();
-    const { socket } = makeSocket('s1');
+    const { socket, data } = makeSocket('s1');
+    data.participantId = 'p-1';
     await gateway.handleLeave(leaveDtoOf(), socket as unknown as Socket);
-    expect(calls).toEqual([{ code: 'abc12xyz', participantId: 's1' }]);
+    expect(calls).toEqual([{ code: 'abc12xyz', participantId: 'p-1' }]);
   });
 
-  it('소켓을 meeting:{code} room에서 leave 시킨다', async () => {
+  it('회의 room과 참가자 room 양쪽에서 빠진다', async () => {
     const { gateway } = makeGateway();
-    const { socket, joined } = makeSocket('s1');
+    const { socket, joined, data } = makeSocket('s1');
+    data.participantId = 'p-1';
     joined.add('meeting:abc12xyz');
+    joined.add('p-1');
     await gateway.handleLeave(leaveDtoOf(), socket as unknown as Socket);
     expect(joined.has('meeting:abc12xyz')).toBe(false);
+    expect(joined.has('p-1')).toBe(false);
   });
 
-  it('같은 room의 남은 참가자에게 participantLeft 브로드캐스트', async () => {
+  it('퇴장 처리 즉시 socket.data.code를 비워 뒤따르는 disconnect가 되살리지 못하게 한다', async () => {
     const { gateway } = makeGateway();
-    const { socket, broadcasts } = makeSocket('s1');
+    const { socket, data } = makeSocket('s1');
+    data.code = 'abc12xyz';
+    data.participantId = 'p-1';
     await gateway.handleLeave(leaveDtoOf(), socket as unknown as Socket);
-    expect(broadcasts).toEqual([
-      {
-        room: 'meeting:abc12xyz',
-        event: MEETING_WS_EVENTS.PARTICIPANT_LEFT,
-        payload: {
-          socketId: 's1',
-          leftAt: t2.toISOString(),
-        },
-      },
-    ]);
+    expect(data.code).toBeUndefined();
   });
 
-  it('service.leaveMeeting이 throw 해도(이미 종료된 회의 등) swallow + socket.leave 진행 + ok 반환', async () => {
-    const service = {
-      leaveMeeting: jest.fn(async () => {
-        throw new Error('Cannot removeParticipant: meeting is already closed');
-      }),
-    };
-
-    const gateway = new MeetingGateway(service as any, fakeLogger as any);
-    const { socket, broadcasts, joined } = makeSocket('s1');
+  it('leaveMeeting이 throw 해도(이미 종료된 회의 등) swallow + room 정리 + ok 반환', async () => {
+    const leave = jest.fn(async () => {
+      throw new Error('Cannot removeParticipant: meeting is already closed');
+    });
+    const { gateway } = makeGateway(leave);
+    const { socket, joined, data } = makeSocket('s1');
+    data.participantId = 'p-1';
     joined.add('meeting:abc12xyz');
     const result = await gateway.handleLeave(leaveDtoOf(), socket as unknown as Socket);
     expect(result).toEqual({ ok: true });
-    expect(broadcasts).toEqual([]);
     expect(joined.has('meeting:abc12xyz')).toBe(false);
+  });
+});
+
+describe('MeetingGateway.handleDisconnect', () => {
+  const makeGateway = (disconnect?: jest.Mock) => {
+    const calls: Array<{ code: string; connectionId: string }> = [];
+    const leaveMeeting = jest.fn();
+    const service = {
+      leaveMeeting,
+      disconnectParticipant:
+        disconnect ??
+        jest.fn(async (cmd: { code: string; connectionId: string }) => {
+          calls.push(cmd);
+          return undefined;
+        }),
+    };
+
+    const gateway = new MeetingGateway(service as never, fakeLogger as never);
+    const { server, broadcasts } = makeServer();
+    gateway.server = server as never;
+    return { gateway, calls, broadcasts, leaveMeeting };
+  };
+
+  it('퇴장이 아니라 유예 대기로 넘긴다 — 소켓 연결로 disconnectParticipant를 호출한다', async () => {
+    const { gateway, calls } = makeGateway();
+    const { socket, data } = makeSocket('s1');
+    data.code = 'abc12xyz';
+    data.participantId = 'p-1';
+    await gateway.handleDisconnect(socket as unknown as Socket);
+    expect(calls).toEqual([{ code: 'abc12xyz', connectionId: 's1' }]);
+  });
+
+  it('leaveMeeting은 호출하지 않는다 (유예 만료는 스케줄러가 확정한다)', async () => {
+    const { gateway, leaveMeeting } = makeGateway();
+    const { socket, data } = makeSocket('s1');
+    data.code = 'abc12xyz';
+    await gateway.handleDisconnect(socket as unknown as Socket);
+    expect(leaveMeeting).not.toHaveBeenCalled();
+  });
+
+  it('socket.data.code가 없으면 service 호출 없이 조용히 종료한다(join 전 disconnect)', async () => {
+    const { gateway, calls } = makeGateway();
+    const { socket } = makeSocket('s1');
+    await gateway.handleDisconnect(socket as unknown as Socket);
+    expect(calls).toEqual([]);
+  });
+
+  it('service가 throw해도 swallow한다', async () => {
+    const disconnect = jest.fn(async () => {
+      throw new Error('redis down');
+    });
+    const { gateway } = makeGateway(disconnect);
+    const { socket, data } = makeSocket('s1');
+    data.code = 'abc12xyz';
+    await expect(gateway.handleDisconnect(socket as unknown as Socket)).resolves.toBeUndefined();
   });
 });
 
@@ -227,11 +418,10 @@ describe('MeetingGateway.onMeetingEnded', () => {
   const tEnded = new Date('2026-01-01T00:30:00Z');
 
   const makeGateway = () => {
-    const gateway = new MeetingGateway({} as any, fakeLogger as any);
-    const { server, broadcasts: serverBroadcasts } = makeServer();
-
-    gateway.server = server as any;
-    return { gateway, serverBroadcasts };
+    const gateway = new MeetingGateway({} as never, fakeLogger as never);
+    const { server, broadcasts } = makeServer();
+    gateway.server = server as never;
+    return { gateway, broadcasts };
   };
 
   // 본 핸들러 검증에는 payload의 code/endedAt만 사용된다. 나머지 도메인 필드는
@@ -249,10 +439,10 @@ describe('MeetingGateway.onMeetingEnded', () => {
     title: null,
   };
 
-  it('meeting.ended 페이로드를 받아 같은 room에 meeting:ended를 broadcast 한다', () => {
-    const { gateway, serverBroadcasts } = makeGateway();
+  it('meeting.ended 페이로드를 받아 같은 room 전체에 meeting:ended를 broadcast 한다', () => {
+    const { gateway, broadcasts } = makeGateway();
     gateway.onMeetingEnded(payload);
-    expect(serverBroadcasts).toEqual([
+    expect(broadcasts).toEqual([
       {
         room: 'meeting:abc12xyz',
         event: MEETING_WS_EVENTS.ENDED,
@@ -275,114 +465,45 @@ describe('MeetingGateway.handleChat', () => {
       }),
     };
 
-    const gateway = new MeetingGateway(service as any, fakeLogger as any);
-    const { server, broadcasts: serverBroadcasts } = makeServer();
-
-    gateway.server = server as any;
-    return { gateway, service, calls, entry, serverBroadcasts };
+    const gateway = new MeetingGateway(service as never, fakeLogger as never);
+    const { server, broadcasts } = makeServer();
+    gateway.server = server as never;
+    return { gateway, service, calls, broadcasts };
   };
 
-  it('service.postChat을 socket.id를 participantId로 호출한다', async () => {
+  it('socket.data의 안정 participantId로 postChat을 호출한다', async () => {
     const { gateway, calls } = makeGateway();
-    const { socket } = makeSocket('s1');
+    const { socket, data } = makeSocket('s1');
+    data.participantId = 'p-1';
     await gateway.handleChat(chatDtoOf(), socket as unknown as Socket);
-    expect(calls).toEqual([{ code: 'abc12xyz', participantId: 's1', text: 'hello' }]);
+    expect(calls).toEqual([{ code: 'abc12xyz', participantId: 'p-1', text: 'hello' }]);
   });
 
-  it('자신을 포함한 같은 room 전체에 chatPosted를 브로드캐스트한다 (server.to)', async () => {
-    const { gateway, serverBroadcasts } = makeGateway();
+  it('자신을 포함한 같은 room 전체에 chatPosted를 브로드캐스트한다', async () => {
+    const { gateway, broadcasts } = makeGateway();
     const { socket, broadcasts: clientBroadcasts } = makeSocket('s1');
     await gateway.handleChat(chatDtoOf(), socket as unknown as Socket);
-    expect(serverBroadcasts).toEqual([
+    expect(broadcasts).toEqual([
       {
         room: 'meeting:abc12xyz',
         event: MEETING_WS_EVENTS.CHAT_POSTED,
-        payload: {
-          nickname: 'alice',
-          text: 'hello',
-          sentAt: tChat.toISOString(),
-        },
+        payload: { nickname: 'alice', text: 'hello', sentAt: tChat.toISOString() },
       },
     ]);
-    // client.to(...)로는 발송하지 않는다 — 자신도 받아야 하므로 server.to만 사용.
     expect(clientBroadcasts).toEqual([]);
   });
 
-  it('service.postChat이 throw하면 broadcast하지 않는다', async () => {
-    const { gateway, serverBroadcasts } = makeGateway();
-
-    (gateway as any).service.postChat = jest.fn(async () => {
-      throw new Error('Meeting "abc12xyz" not found');
-    });
+  it('postChat이 throw하면 broadcast하지 않는다', async () => {
+    const { gateway, broadcasts } = makeGateway();
+    (gateway as unknown as { service: { postChat: jest.Mock } }).service.postChat = jest.fn(
+      async () => {
+        throw new Error('Meeting "abc12xyz" not found');
+      },
+    );
     const { socket } = makeSocket('s1');
     await expect(gateway.handleChat(chatDtoOf(), socket as unknown as Socket)).rejects.toThrow(
       /not found/,
     );
-    expect(serverBroadcasts).toEqual([]);
-  });
-});
-
-describe('MeetingGateway.handleDisconnect', () => {
-  const tLeave = new Date('2026-01-01T00:05:00Z');
-
-  const makeGateway = (overrides?: { leave?: jest.Mock }) => {
-    const meeting = makeMeeting();
-    const participant = meeting.addParticipant('s1', 'alice', t1);
-    participant.leave(tLeave);
-    const calls: Array<{ code: string; participantId: string }> = [];
-    const defaultLeave = jest.fn(async (cmd: { code: string; participantId: string }) => {
-      calls.push(cmd);
-      return { meeting, participant };
-    });
-    const service = {
-      leaveMeeting: overrides?.leave ?? defaultLeave,
-    };
-
-    const gateway = new MeetingGateway(service as any, fakeLogger as any);
-    return { gateway, service, calls };
-  };
-
-  it('socket.data.code가 있으면 service.leaveMeeting을 socket.id로 호출한다', async () => {
-    const { gateway, calls } = makeGateway();
-    const { socket, data } = makeSocket('s1');
-    data.code = 'abc12xyz';
-    await gateway.handleDisconnect(socket as unknown as Socket);
-    expect(calls).toEqual([{ code: 'abc12xyz', participantId: 's1' }]);
-  });
-
-  it('socket.data.code가 있으면 같은 room에 participantLeft를 브로드캐스트한다', async () => {
-    const { gateway } = makeGateway();
-    const { socket, data, broadcasts } = makeSocket('s1');
-    data.code = 'abc12xyz';
-    await gateway.handleDisconnect(socket as unknown as Socket);
-    expect(broadcasts).toEqual([
-      {
-        room: 'meeting:abc12xyz',
-        event: MEETING_WS_EVENTS.PARTICIPANT_LEFT,
-        payload: {
-          socketId: 's1',
-          leftAt: tLeave.toISOString(),
-        },
-      },
-    ]);
-  });
-
-  it('socket.data.code가 없으면 service 호출 없이 조용히 종료한다(join 전 disconnect)', async () => {
-    const { gateway, calls } = makeGateway();
-    const { socket, broadcasts } = makeSocket('s1');
-    await gateway.handleDisconnect(socket as unknown as Socket);
-    expect(calls).toEqual([]);
-    expect(broadcasts).toEqual([]);
-  });
-
-  it('service.leaveMeeting이 throw해도 swallow한다 (이미 종료된 회의 등)', async () => {
-    const leave = jest.fn(async () => {
-      throw new Error('Meeting "abc12xyz" not found');
-    });
-    const { gateway } = makeGateway({ leave });
-    const { socket, data, broadcasts } = makeSocket('s1');
-    data.code = 'abc12xyz';
-    await expect(gateway.handleDisconnect(socket as unknown as Socket)).resolves.toBeUndefined();
     expect(broadcasts).toEqual([]);
   });
 });
