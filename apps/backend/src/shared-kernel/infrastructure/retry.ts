@@ -1,8 +1,4 @@
-/**
- * 외부 API 호출의 일시적 실패를 지수 백오프로 재시도한다.
- *
- * 무엇이 "일시적"인지는 호출부가 정한다 — 어댑터마다 에러 타입이 다르기 때문이다.
- */
+/** 무엇이 일시적 실패인지는 호출부가 정한다 — 어댑터마다 에러 타입이 다르다. */
 
 export const RETRY_MAX_DELAY_MS = 8_000;
 
@@ -10,15 +6,11 @@ export interface RetryPolicy {
   /** 첫 호출 포함 총 시도 횟수. 1이면 재시도 없음. */
   readonly maxAttempts: number;
   readonly baseDelayMs: number;
-  /** 다시 호출하면 결과가 달라질 수 있는 실패인지 판정한다. */
   readonly isRetryable: (error: unknown) => boolean;
   readonly onRetry?: (attempt: number, delayMs: number, error: unknown) => void;
 }
 
-/**
- * 재시도 대기 시간. 시도마다 2배로 늘리되 상한에서 멈추고, 상한의 절반~상한 사이에서 jitter를 준다.
- * `attempt`는 방금 실패한 시도 번호(1부터).
- */
+/** `attempt`는 방금 실패한 시도 번호(1부터). */
 export function retryDelayMs(
   attempt: number,
   baseDelayMs: number,
@@ -29,7 +21,7 @@ export function retryDelayMs(
   return Math.floor(half + random() * half);
 }
 
-/** 요청이 잘못됐거나 권한이 없는 경우(4xx)는 몇 번을 보내도 같은 응답이 온다. */
+/** 4xx는 몇 번을 보내도 같은 응답이 온다. 408·429는 예외. */
 export function isRetryableHttpStatus(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
 }

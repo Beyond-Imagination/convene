@@ -99,11 +99,7 @@ describe('HttpTranscriber', () => {
     ).rejects.toThrow(/ECONNREFUSED/);
   });
 
-  /**
-   * STT 실패 하나가 회의록 전체를 날린다 — 최종 전사는 chunk 하나만 throw 해도
-   * `RecordingService`가 전체를 transcription.failed로 처리하고, 부분 전사는 이미 drain 한
-   * 오디오라 실패하면 그 구간이 사라진다. ai-worker 재기동·과부하를 넘길 수 있어야 한다.
-   */
+  /** 전사 실패는 곧 회의록 손실이다 — 최종 전사는 전체가 날아가고, 부분 전사는 drain 한 구간이 사라진다. */
   describe('재시도', () => {
     const audio = Buffer.from([9, 8, 7]);
 

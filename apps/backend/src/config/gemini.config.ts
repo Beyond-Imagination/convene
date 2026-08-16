@@ -11,7 +11,6 @@ export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_TIMEOUT_MS = 30_000;
 export const DEFAULT_GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com';
 
-/** 첫 호출 포함 총 시도 횟수. 1이면 재시도 없음. */
 export const DEFAULT_GEMINI_MAX_ATTEMPTS = 3;
 export const DEFAULT_GEMINI_RETRY_BASE_DELAY_MS = 500;
 

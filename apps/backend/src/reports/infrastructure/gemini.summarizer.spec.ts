@@ -217,10 +217,7 @@ describe('GeminiSummarizer', () => {
     await expect(summarizer.summarize({ transcript: [], chat: [], meta })).rejects.toThrow(/title/);
   });
 
-  /**
-   * 외부 API라 일시적 실패(rate limit·서버 오류·네트워크 단절)가 정상 경로에 섞여 들어온다.
-   * 다시 호출하면 결과가 달라질 수 있는 실패만 재시도하고, 그렇지 않은 실패는 즉시 포기한다.
-   */
+  /** 다시 호출하면 결과가 달라질 수 있는 실패만 재시도한다. */
   describe('재시도', () => {
     it('5xx 응답은 재시도하고, 성공하면 요약을 돌려준다', async () => {
       const fetchMock = jest

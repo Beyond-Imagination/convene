@@ -22,7 +22,7 @@ import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.ad
     RedisAudioBufferRepository,
     { provide: AUDIO_BUFFER_REPOSITORY, useExisting: RedisAudioBufferRepository },
     { provide: PARTIAL_TRANSCRIPT_STORE, useClass: RedisPartialTranscriptStore },
-    // ai-worker base URL이 런타임 설정이라 동적 생성이 필요하다.
+    // ai-worker 접속·재시도 설정이 런타임 값이라 동적 생성이 필요하다.
     {
       provide: TRANSCRIBER,
       useFactory: (logger: PinoLogger) =>

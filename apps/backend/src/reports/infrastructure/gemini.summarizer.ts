@@ -11,7 +11,6 @@ export interface GeminiSummarizerOptions {
   readonly model: string;
   readonly baseUrl: string;
   readonly timeoutMs: number;
-  /** 첫 호출 포함 총 시도 횟수. 1이면 재시도 없음. */
   readonly maxAttempts: number;
   readonly retryBaseDelayMs: number;
 }
@@ -26,7 +25,6 @@ interface GeminiGenerateContentResponse {
   candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
 }
 
-/** Gemini REST가 2xx가 아닌 응답을 돌려줄 때 던지는 에러. */
 class GeminiApiError extends Error {
   constructor(
     readonly status: number,
@@ -67,8 +65,7 @@ export class GeminiSummarizer implements SummarizerPort {
       },
     });
 
-    // 응답 본문 해석(candidate 추출·JSON.parse·VO 검증)은 재시도 대상이 아니다 —
-    // 모델이 같은 입력에 같은 형식으로 답할 뿐인데 호출 비용만 늘어난다.
+    // 아래 응답 해석은 재시도 밖에 둔다 — 같은 입력에 같은 형식으로 답할 뿐인데 호출 비용만 늘어난다.
     const payload = await withRetry(
       {
         maxAttempts: this.options.maxAttempts,
