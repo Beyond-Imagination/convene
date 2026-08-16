@@ -1,7 +1,11 @@
-import { resolveAiWorkerBaseUrl } from './ai-worker.config';
+import { resolveAiWorkerConfig } from './ai-worker.config';
 import { resolveGeminiConfig } from './gemini.config';
 import { resolveLogLevel } from './logger.config';
-import { resolveNumWorkers, resolveWebRtcTransportOptions, resolveWorkerOptions } from './mediasoup.config';
+import {
+  resolveNumWorkers,
+  resolveWebRtcTransportOptions,
+  resolveWorkerOptions,
+} from './mediasoup.config';
 import { resolveMongoDbName, resolveMongoUri } from './mongo.config';
 import { resolveNotionConfig } from './notion.config';
 import { resolveRedisKeyPrefix, resolveRedisUrl } from './redis.config';
@@ -21,7 +25,7 @@ const RESOLVERS: ReadonlyArray<Resolver> = [
   resolveRedisKeyPrefix,
   resolveMongoUri,
   resolveMongoDbName,
-  resolveAiWorkerBaseUrl,
+  resolveAiWorkerConfig,
   resolveNumWorkers,
   resolveWorkerOptions,
   resolveWebRtcTransportOptions,

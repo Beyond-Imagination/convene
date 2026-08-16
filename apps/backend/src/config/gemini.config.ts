@@ -5,6 +5,8 @@
  * - 모델/타임아웃/재시도는 미설정 시 디폴트 사용.
  */
 
+import { positiveInteger } from './required-env';
+
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_TIMEOUT_MS = 30_000;
 export const DEFAULT_GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com';
@@ -20,17 +22,6 @@ export interface GeminiConfig {
   readonly baseUrl: string;
   readonly maxAttempts: number;
   readonly retryBaseDelayMs: number;
-}
-
-function positiveInteger(raw: string | undefined, name: string, fallback: number): number {
-  const value = raw?.trim();
-  if (value === undefined || value.length === 0) return fallback;
-
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error(`${name} must be a positive integer: "${value}"`);
-  }
-  return parsed;
 }
 
 export function resolveGeminiConfig(env: NodeJS.ProcessEnv = process.env): GeminiConfig | null {
@@ -51,19 +42,11 @@ export function resolveGeminiConfig(env: NodeJS.ProcessEnv = process.env): Gemin
   return {
     apiKey,
     model: model === undefined || model.length === 0 ? DEFAULT_GEMINI_MODEL : model,
-    timeoutMs: positiveInteger(
-      env.GEMINI_TIMEOUT_MS,
-      'GEMINI_TIMEOUT_MS',
-      DEFAULT_GEMINI_TIMEOUT_MS,
-    ),
+    timeoutMs: positiveInteger(env, 'GEMINI_TIMEOUT_MS', DEFAULT_GEMINI_TIMEOUT_MS),
     baseUrl,
-    maxAttempts: positiveInteger(
-      env.GEMINI_MAX_ATTEMPTS,
-      'GEMINI_MAX_ATTEMPTS',
-      DEFAULT_GEMINI_MAX_ATTEMPTS,
-    ),
+    maxAttempts: positiveInteger(env, 'GEMINI_MAX_ATTEMPTS', DEFAULT_GEMINI_MAX_ATTEMPTS),
     retryBaseDelayMs: positiveInteger(
-      env.GEMINI_RETRY_BASE_DELAY_MS,
+      env,
       'GEMINI_RETRY_BASE_DELAY_MS',
       DEFAULT_GEMINI_RETRY_BASE_DELAY_MS,
     ),
