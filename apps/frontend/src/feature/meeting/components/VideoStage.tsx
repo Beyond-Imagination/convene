@@ -10,10 +10,10 @@ import type { RemoteParticipant } from '@/feature/meeting/hooks/useMeetingViewMo
 /** 같은 참가자의 카메라(screen 제외) 비디오 entry를 찾는다. */
 const pickVideoEntry = (
   remoteMedia: ReadonlyArray<RemoteMediaEntry>,
-  peerSocketId: string,
+  peerId: string,
 ): RemoteMediaEntry | null => {
   for (const m of remoteMedia) {
-    if (m.peerSocketId === peerSocketId && m.kind === 'video' && m.source !== 'screen') {
+    if (m.peerId === peerId && m.kind === 'video' && m.source !== 'screen') {
       return m;
     }
   }
@@ -23,20 +23,20 @@ const pickVideoEntry = (
 /** 같은 참가자의 마이크(audio) entry를 찾는다. */
 const pickAudioEntry = (
   remoteMedia: ReadonlyArray<RemoteMediaEntry>,
-  peerSocketId: string,
+  peerId: string,
 ): RemoteMediaEntry | null => {
   for (const m of remoteMedia) {
-    if (m.peerSocketId === peerSocketId && m.kind === 'audio') return m;
+    if (m.peerId === peerId && m.kind === 'audio') return m;
   }
   return null;
 };
 
 const pickScreenTrack = (
   remoteMedia: ReadonlyArray<RemoteMediaEntry>,
-  peerSocketId: string,
+  peerId: string,
 ): MediaStreamTrack | null => {
   for (const m of remoteMedia) {
-    if (m.peerSocketId === peerSocketId && m.source === 'screen') return m.track;
+    if (m.peerId === peerId && m.source === 'screen') return m.track;
   }
   return null;
 };
@@ -87,7 +87,7 @@ export function VideoStage({
 }: VideoStageProps) {
   const hasScreen =
     mediasoup.isSharingScreen ||
-    remoteParticipants.some((p) => pickScreenTrack(mediasoup.remoteMedia, p.socketId) !== null);
+    remoteParticipants.some((p) => pickScreenTrack(mediasoup.remoteMedia, p.participantId) !== null);
 
   // self(첫 칸) + 원격 카메라 타일을 한 배열로 만든 뒤 페이지 단위로 자른다.
   // 배치(그리드/strip)가 바뀌어도 같은 key로 같은 자리에 남아야 <video>가 재생성되지 않으므로
@@ -106,16 +106,17 @@ export function VideoStage({
       ),
     },
     ...remoteParticipants.map((p) => {
-      const entry = pickVideoEntry(mediasoup.remoteMedia, p.socketId);
-      const audioEntry = pickAudioEntry(mediasoup.remoteMedia, p.socketId);
+      const entry = pickVideoEntry(mediasoup.remoteMedia, p.participantId);
+      const audioEntry = pickAudioEntry(mediasoup.remoteMedia, p.participantId);
       return {
-        key: p.socketId,
+        key: p.participantId,
         node: (
           <VideoTile
             label={p.nickname}
             track={entry?.track ?? null}
             isVideoOff={entry === null || entry.paused}
             isAudioOff={audioEntry === null || audioEntry.paused}
+            isDisconnected={p.disconnected}
           />
         ),
       };
@@ -140,11 +141,11 @@ export function VideoStage({
             />
           )}
           {remoteParticipants.map((p) => {
-            const track = pickScreenTrack(mediasoup.remoteMedia, p.socketId);
+            const track = pickScreenTrack(mediasoup.remoteMedia, p.participantId);
             if (track === null) return null;
             return (
               <ScreenTile
-                key={`screen-${p.socketId}`}
+                key={`screen-${p.participantId}`}
                 nickname={p.nickname}
                 track={track}
               />

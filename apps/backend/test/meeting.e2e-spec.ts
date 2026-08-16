@@ -6,10 +6,13 @@ import {
   type CreateMeetingResponse,
   type CreateTransportResponse,
   type GetRtpCapabilitiesResponse,
+  type JoinMeetingAck,
   MEDIASOUP_WS_EVENTS,
   MEETING_WS_EVENTS,
+  type ParticipantDisconnectedBroadcast,
   type ParticipantJoinedBroadcast,
   type ParticipantLeftBroadcast,
+  type ParticipantReconnectedBroadcast,
 } from '@convene/shared-interfaces';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { IoAdapter } from '@nestjs/platform-socket.io';
@@ -109,7 +112,7 @@ describe('Meeting e2e', () => {
       bob.emit(MEETING_WS_EVENTS.JOIN, { code, nickname: 'bob' });
       const joinPayload = await aliceGotJoin;
       expect(joinPayload.nickname).toBe('bob');
-      expect(joinPayload.socketId).toBe(bob.id);
+      expect(joinPayload.participantId).toBe(bob.id);
 
       // 5) alice가 chat 발화 → bob도 alice도 chatPosted 수신.
       const aliceGotChat = waitFor<ChatPostedBroadcast>(alice, MEETING_WS_EVENTS.CHAT_POSTED);
@@ -130,7 +133,7 @@ describe('Meeting e2e', () => {
       );
       bob.emit(MEETING_WS_EVENTS.LEAVE, { code });
       const leftPayload = await aliceGotLeft;
-      expect(leftPayload.socketId).toBe(bob.id);
+      expect(leftPayload.participantId).toBe(bob.id);
     } finally {
       alice.disconnect();
       bob.disconnect();
@@ -230,6 +233,105 @@ describe('Meeting e2e', () => {
 
       const broadcast = await bobGotJoinAfter;
       expect(broadcast).toBeNull();
+    } finally {
+      alice.disconnect();
+      bob.disconnect();
+    }
+  });
+
+  it('연결이 끊겼다 같은 participantId로 돌아오면 퇴장이 아니라 재접속으로 처리된다', async () => {
+    const created = await request(httpServer).post('/meetings').send({ source: 'web' }).expect(201);
+    const { code } = created.body as CreateMeetingResponse;
+
+    const alice = await connectClient(baseUrl);
+    let bob = await connectClient(baseUrl);
+
+    try {
+      await alice.emitWithAck(MEETING_WS_EVENTS.JOIN, {
+        code,
+        nickname: 'alice',
+        participantId: 'p-alice',
+      });
+
+      const aliceGotJoin = waitFor<ParticipantJoinedBroadcast>(
+        alice,
+        MEETING_WS_EVENTS.PARTICIPANT_JOINED,
+      );
+      await bob.emitWithAck(MEETING_WS_EVENTS.JOIN, {
+        code,
+        nickname: 'bob',
+        participantId: 'p-bob',
+      });
+      expect((await aliceGotJoin).participantId).toBe('p-bob');
+
+      // 비정상 종료: 퇴장이 아니라 끊김으로만 통보돼야 한다.
+      const aliceGotDisconnected = waitFor<ParticipantDisconnectedBroadcast>(
+        alice,
+        MEETING_WS_EVENTS.PARTICIPANT_DISCONNECTED,
+      );
+      const aliceGotLeft = waitFor<ParticipantLeftBroadcast>(
+        alice,
+        MEETING_WS_EVENTS.PARTICIPANT_LEFT,
+      );
+      bob.disconnect();
+      expect((await aliceGotDisconnected).participantId).toBe('p-bob');
+
+      // 유예 안의 복귀: 새 소켓이지만 같은 신원이므로 재접속으로 알려야 한다.
+      bob = await connectClient(baseUrl);
+      const aliceGotReconnected = waitFor<ParticipantReconnectedBroadcast>(
+        alice,
+        MEETING_WS_EVENTS.PARTICIPANT_RECONNECTED,
+      );
+      const ack = await bob.emitWithAck(MEETING_WS_EVENTS.JOIN, {
+        code,
+        nickname: 'bob',
+        participantId: 'p-bob',
+      });
+      expect((ack as JoinMeetingAck).reconnected).toBe(true);
+      expect((ack as JoinMeetingAck).participantId).toBe('p-bob');
+      expect((await aliceGotReconnected).participantId).toBe('p-bob');
+
+      // 끊김~복귀 사이에 participantLeft가 나가지 않았다.
+      await expect(
+        Promise.race([aliceGotLeft, new Promise((r) => setTimeout(() => r('no-left'), 100))]),
+      ).resolves.toBe('no-left');
+    } finally {
+      alice.disconnect();
+      bob.disconnect();
+    }
+  });
+
+  it('재입장 시 그 사이 오간 채팅을 ack으로 되돌려 준다', async () => {
+    const created = await request(httpServer).post('/meetings').send({ source: 'web' }).expect(201);
+    const { code } = created.body as CreateMeetingResponse;
+
+    const alice = await connectClient(baseUrl);
+    let bob = await connectClient(baseUrl);
+
+    try {
+      await bob.emitWithAck(MEETING_WS_EVENTS.JOIN, {
+        code,
+        nickname: 'bob',
+        participantId: 'p-bob',
+      });
+      await alice.emitWithAck(MEETING_WS_EVENTS.JOIN, {
+        code,
+        nickname: 'alice',
+        participantId: 'p-alice',
+      });
+
+      bob.disconnect();
+      // bob이 끊긴 사이 alice가 발화 → broadcast로는 bob에게 닿지 않는다.
+      await alice.emitWithAck(MEETING_WS_EVENTS.CHAT, { code, text: '먼저 시작할게요' });
+
+      bob = await connectClient(baseUrl);
+      const ack = (await bob.emitWithAck(MEETING_WS_EVENTS.JOIN, {
+        code,
+        nickname: 'bob',
+        participantId: 'p-bob',
+      })) as JoinMeetingAck;
+
+      expect(ack.chat.map((c) => c.text)).toContain('먼저 시작할게요');
     } finally {
       alice.disconnect();
       bob.disconnect();

@@ -70,6 +70,10 @@ class FakeProducer {
 class FakeTransport {
   readonly id: string;
   readonly listeners = new Map<string, Array<(...args: unknown[]) => void>>();
+  // 복구 단계 판정이 읽는 값. 기본은 살아 있는 연결.
+  connectionState = 'connected';
+  closed = false;
+  readonly restartIce = vi.fn(async () => {});
   readonly close = vi.fn();
   readonly produce = vi.fn(
     async (opts: { track: FakeTrack }): Promise<FakeProducer> =>
@@ -122,6 +126,26 @@ class FakeSocket {
 
 const code = 'abc12xyz';
 
+/**
+ * 재연결 복구는 소켓 'connect'가 아니라 재입장 ack(rejoinGen 증가)이 트리거한다.
+ * `rejoin()`이 그 ack 도착을 흉내낸다.
+ */
+const renderMediasoup = (socket: FakeSocket) => {
+  const hook = renderHook(
+    ({ gen, preserved }: { gen: number; preserved: boolean }) =>
+      useMediasoupViewModel(socket as unknown as never, code, gen, preserved),
+    { initialProps: { gen: 0, preserved: false } },
+  );
+  let gen = 0;
+  /** preserved=false는 유예가 만료돼 서버에 내 미디어가 남아 있지 않은 복귀. */
+  const rejoin = (preserved = false): void => {
+    gen += 1;
+    hook.rerender({ gen, preserved });
+  };
+  return { ...hook, rejoin };
+};
+
+
 const setupSocketAcks = (socket: FakeSocket) => {
   socket.emitWithAck.mockImplementation(async (event: string, _payload: unknown) => {
     if (event === MEDIASOUP_WS_EVENTS.GET_RTP_CAPABILITIES) {
@@ -158,6 +182,9 @@ const setupSocketAcks = (socket: FakeSocket) => {
     if (event === MEDIASOUP_WS_EVENTS.LIST_PRODUCERS) {
       return { producers: [] };
     }
+    if (event === MEDIASOUP_WS_EVENTS.RESTART_ICE) {
+      return { iceParameters: { usernameFragment: 'restarted' } };
+    }
     throw new Error(`unexpected RPC ${event}`);
   });
 };
@@ -175,6 +202,7 @@ describe('useMediasoupViewModel.mount', () => {
     vi.stubGlobal('navigator', {
       mediaDevices: { getUserMedia: getUserMediaMock },
     });
+    window.sessionStorage.clear();
   });
 
   afterEach(() => {
@@ -336,6 +364,7 @@ describe('useMediasoupViewModel.remoteConsume', () => {
     vi.stubGlobal('navigator', {
       mediaDevices: { getUserMedia: getUserMediaMock },
     });
+    window.sessionStorage.clear();
   });
 
   afterEach(() => {
@@ -352,7 +381,7 @@ describe('useMediasoupViewModel.remoteConsume', () => {
     const handler = captureSocketListener(socket, MEDIASOUP_WS_EVENTS.NEW_PRODUCER);
     socket.emitWithAck.mockClear();
     handler({
-      peerSocketId: 's2',
+      peerId: 's2',
       producerId: 'p-remote-audio',
       kind: 'audio',
       source: 'audio',
@@ -383,7 +412,7 @@ describe('useMediasoupViewModel.remoteConsume', () => {
 
     const handler = captureSocketListener(socket, MEDIASOUP_WS_EVENTS.NEW_PRODUCER);
     handler({
-      peerSocketId: 's2',
+      peerId: 's2',
       producerId: 'p-remote-audio',
       kind: 'audio',
       source: 'audio',
@@ -393,7 +422,7 @@ describe('useMediasoupViewModel.remoteConsume', () => {
     expect(result.current.remoteMedia[0]).toEqual(
       expect.objectContaining({
         consumerId: 'c-p-remote-audio',
-        peerSocketId: 's2',
+        peerId: 's2',
         producerId: 'p-remote-audio',
         kind: 'audio',
         source: 'audio',
@@ -416,12 +445,12 @@ describe('useMediasoupViewModel.remoteConsume', () => {
   it('PRODUCER_CLOSED 수신 시 해당 producerId 항목이 remoteMedia에서 제거된다', async () => {
     const socket = new FakeSocket();
     setupSocketAcks(socket);
-    const { result } = renderHook(() => useMediasoupViewModel(socket as unknown as never, code));
+    const { result } = renderMediasoup(socket);
     await waitFor(() => expect(result.current.status).toBe('ready'));
 
     const onNewProducer = captureSocketListener(socket, MEDIASOUP_WS_EVENTS.NEW_PRODUCER);
     onNewProducer({
-      peerSocketId: 's2',
+      peerId: 's2',
       producerId: 'p-remote-audio',
       kind: 'audio',
       source: 'audio',
@@ -436,12 +465,12 @@ describe('useMediasoupViewModel.remoteConsume', () => {
   it('CONSUMER_CLOSED 수신 시 해당 consumerId 항목이 remoteMedia에서 제거된다', async () => {
     const socket = new FakeSocket();
     setupSocketAcks(socket);
-    const { result } = renderHook(() => useMediasoupViewModel(socket as unknown as never, code));
+    const { result } = renderMediasoup(socket);
     await waitFor(() => expect(result.current.status).toBe('ready'));
 
     const onNewProducer = captureSocketListener(socket, MEDIASOUP_WS_EVENTS.NEW_PRODUCER);
     onNewProducer({
-      peerSocketId: 's2',
+      peerId: 's2',
       producerId: 'p-remote-audio',
       kind: 'audio',
       source: 'audio',
@@ -456,13 +485,13 @@ describe('useMediasoupViewModel.remoteConsume', () => {
   it('PARTICIPANT_LEFT 수신 시 그 참가자의 remoteMedia가 모두 제거된다(비정상 종료 포함)', async () => {
     const socket = new FakeSocket();
     setupSocketAcks(socket);
-    const { result } = renderHook(() => useMediasoupViewModel(socket as unknown as never, code));
+    const { result } = renderMediasoup(socket);
     await waitFor(() => expect(result.current.status).toBe('ready'));
 
     const onNewProducer = captureSocketListener(socket, MEDIASOUP_WS_EVENTS.NEW_PRODUCER);
     // s2가 화면 공유 중인 상태.
     onNewProducer({
-      peerSocketId: 's2',
+      peerId: 's2',
       producerId: 'p-remote-screen',
       kind: 'video',
       source: 'screen',
@@ -472,7 +501,7 @@ describe('useMediasoupViewModel.remoteConsume', () => {
 
     // s2가 비정상 종료(탭 닫기 등) → 서버가 PARTICIPANT_LEFT broadcast.
     const onLeft = captureSocketListener(socket, MEETING_WS_EVENTS.PARTICIPANT_LEFT);
-    act(() => onLeft({ socketId: 's2', leftAt: '2026-01-01T00:05:00.000Z' }));
+    act(() => onLeft({ participantId: 's2', leftAt: '2026-01-01T00:05:00.000Z' }));
 
     await waitFor(() => expect(result.current.remoteMedia).toHaveLength(0));
     // 떠난 사람의 screen이 사라졌으니 제약이 풀린다.
@@ -519,6 +548,7 @@ describe('useMediasoupViewModel.reconnect', () => {
     vi.stubGlobal('navigator', {
       mediaDevices: { getUserMedia: getUserMediaMock },
     });
+    window.sessionStorage.clear();
   });
 
   afterEach(() => {
@@ -528,15 +558,13 @@ describe('useMediasoupViewModel.reconnect', () => {
   it('socket 두 번째 connect 시 기존 transport가 close 되고 새 transport가 생성된다', async () => {
     const socket = new FakeSocket();
     setupSocketAcks(socket);
-    const { result } = renderHook(() => useMediasoupViewModel(socket as unknown as never, code));
+    const { result, rejoin } = renderMediasoup(socket);
     await waitFor(() => expect(result.current.status).toBe('ready'));
     const sendOld = fakeDevice.createSendTransport.mock.results[0].value as FakeTransport;
     const recvOld = fakeDevice.createRecvTransport.mock.results[0].value as FakeTransport;
 
-    const onConnect = captureSocketListener(socket, 'connect');
     await act(async () => {
-      onConnect(); // 첫 connect 등록(count=1, reconnect 아님)
-      onConnect(); // 두 번째 connect = 재연결
+      rejoin();
     });
 
     await waitFor(() => expect(fakeDevice.createSendTransport).toHaveBeenCalledTimes(2));
@@ -548,24 +576,186 @@ describe('useMediasoupViewModel.reconnect', () => {
   it('재연결 시 remoteMedia가 초기화되어 stale 항목이 제거된다', async () => {
     const socket = new FakeSocket();
     setupSocketAcks(socket);
-    const { result } = renderHook(() => useMediasoupViewModel(socket as unknown as never, code));
+    const { result, rejoin } = renderMediasoup(socket);
     await waitFor(() => expect(result.current.status).toBe('ready'));
 
     const onNewProducer = captureSocketListener(socket, MEDIASOUP_WS_EVENTS.NEW_PRODUCER);
     onNewProducer({
-      peerSocketId: 's2',
+      peerId: 's2',
       producerId: 'p-stale',
       kind: 'audio',
       source: 'audio',
     });
     await waitFor(() => expect(result.current.remoteMedia).toHaveLength(1));
 
-    const onConnect = captureSocketListener(socket, 'connect');
     await act(async () => {
-      onConnect();
-      onConnect();
+      rejoin();
     });
     await waitFor(() => expect(result.current.remoteMedia).toEqual([]));
+  });
+});
+
+describe('useMediasoupViewModel.recoveryStage', () => {
+  beforeEach(() => {
+    fakeDevice = new FakeDevice();
+    getUserMediaMock = vi.fn(async () => new FakeMediaStream());
+    vi.stubGlobal('navigator', {
+      mediaDevices: { getUserMedia: getUserMediaMock },
+    });
+    window.sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('유예가 만료된 복귀는 ICE restart를 시도하지 않고 곧바로 전면 재생성한다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result, rejoin } = renderMediasoup(socket);
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    socket.emit.mockClear();
+
+    await act(async () => {
+      rejoin(false);
+    });
+
+    await waitFor(() => expect(fakeDevice.createSendTransport).toHaveBeenCalledTimes(2));
+    // 서버가 이미 정리한 transportId로 RPC를 보내면 소유권 검사에서 거부된다.
+    expect(
+      socket.emit.mock.calls.some((c) => c[0] === MEDIASOUP_WS_EVENTS.RESTART_ICE),
+    ).toBe(false);
+  });
+
+  it('유예 안 복귀이고 transport가 살아 있으면 아무것도 재생성하지 않는다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result, rejoin } = renderMediasoup(socket);
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    await act(async () => {
+      rejoin(true);
+    });
+
+    expect(fakeDevice.createSendTransport).toHaveBeenCalledTimes(1);
+    expect(fakeDevice.createRecvTransport).toHaveBeenCalledTimes(1);
+  });
+
+  it('유예 안 복귀인데 연결이 끊겼으면 ICE만 다시 협상하고 transport는 유지한다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result, rejoin } = renderMediasoup(socket);
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    const send = fakeDevice.createSendTransport.mock.results[0].value as FakeTransport;
+    const recv = fakeDevice.createRecvTransport.mock.results[0].value as FakeTransport;
+    send.connectionState = 'disconnected';
+    recv.connectionState = 'disconnected';
+
+    await act(async () => {
+      rejoin(true);
+    });
+
+    await waitFor(() => expect(send.restartIce).toHaveBeenCalled());
+    expect(recv.restartIce).toHaveBeenCalled();
+    expect(fakeDevice.createSendTransport).toHaveBeenCalledTimes(1);
+    expect(send.close).not.toHaveBeenCalled();
+  });
+});
+
+describe('useMediasoupViewModel.mediaRestore', () => {
+  beforeEach(() => {
+    fakeDevice = new FakeDevice();
+    getUserMediaMock = vi.fn(async () => new FakeMediaStream());
+    vi.stubGlobal('navigator', {
+      mediaDevices: { getUserMedia: getUserMediaMock },
+    });
+    window.sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const setupReady = async (socket: FakeSocket) => {
+    const hook = renderMediasoup(socket);
+    await waitFor(() => expect(hook.result.current.status).toBe('ready'));
+    return hook;
+  };
+
+  it('켜 둔 마이크·카메라는 전면 재생성 후에도 자동으로 다시 켜진다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result, rejoin } = await setupReady(socket);
+    await act(async () => {
+      result.current.toggleAudio();
+      result.current.toggleVideo();
+    });
+    await waitFor(() => expect(result.current.isAudioMuted).toBe(false));
+    await waitFor(() => expect(result.current.isVideoMuted).toBe(false));
+
+    await act(async () => {
+      rejoin();
+    });
+
+    await waitFor(() => expect(fakeDevice.createSendTransport).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(result.current.isAudioMuted).toBe(false));
+    await waitFor(() => expect(result.current.isVideoMuted).toBe(false));
+  });
+
+  it('꺼 둔 상태는 전면 재생성 후에도 꺼진 채로 남는다 (임의로 켜지 않는다)', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result, rejoin } = await setupReady(socket);
+
+    await act(async () => {
+      rejoin();
+    });
+
+    await waitFor(() => expect(fakeDevice.createSendTransport).toHaveBeenCalledTimes(2));
+    expect(result.current.isAudioMuted).toBe(true);
+    expect(result.current.isVideoMuted).toBe(true);
+    expect(getUserMediaMock).not.toHaveBeenCalled();
+  });
+
+  it('새로고침(hook 재마운트)에서도 켜 둔 상태가 복원된다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const first = await setupReady(socket);
+    await act(async () => {
+      first.result.current.toggleAudio();
+    });
+    await waitFor(() => expect(first.result.current.isAudioMuted).toBe(false));
+    first.unmount();
+
+    fakeDevice = new FakeDevice();
+    const nextSocket = new FakeSocket();
+    setupSocketAcks(nextSocket);
+    const second = await setupReady(nextSocket);
+
+    await waitFor(() => expect(second.result.current.isAudioMuted).toBe(false));
+  });
+
+  it('직접 끄면 복원 대상에서 빠진다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const first = await setupReady(socket);
+    await act(async () => {
+      first.result.current.toggleAudio();
+    });
+    await waitFor(() => expect(first.result.current.isAudioMuted).toBe(false));
+    await waitFor(() => expect(first.result.current.isAudioToggling).toBe(false));
+    await act(async () => {
+      first.result.current.toggleAudio();
+    });
+    await waitFor(() => expect(first.result.current.isAudioMuted).toBe(true));
+    first.unmount();
+
+    fakeDevice = new FakeDevice();
+    const nextSocket = new FakeSocket();
+    setupSocketAcks(nextSocket);
+    const second = await setupReady(nextSocket);
+
+    expect(second.result.current.isAudioMuted).toBe(true);
   });
 });
 
@@ -606,12 +796,12 @@ describe('useMediasoupViewModel.screenShare', () => {
   it('원격 참가자가 screen source producer를 만들면 isRemoteSharingScreen=true', async () => {
     const socket = new FakeSocket();
     setupSocketAcks(socket);
-    const { result } = renderHook(() => useMediasoupViewModel(socket as unknown as never, code));
+    const { result } = renderMediasoup(socket);
     await waitFor(() => expect(result.current.status).toBe('ready'));
 
     const onNewProducer = captureSocketListener(socket, MEDIASOUP_WS_EVENTS.NEW_PRODUCER);
     onNewProducer({
-      peerSocketId: 's2',
+      peerId: 's2',
       producerId: 'p-remote-screen',
       kind: 'video',
       source: 'screen',
@@ -760,11 +950,11 @@ describe('useMediasoupViewModel.screenShare', () => {
   });
 
   it('재연결 시 화면 공유 상태가 초기화되고 stale producer를 서버에 알리지 않는다', async () => {
-    // 재연결하면 participantId(socket.id)가 새로 발급된다. 재시작 전에 만든 producerId로
-    // CLOSE_PRODUCER를 보내면 서버가 새 참가자 기준으로 소유권을 검사해 거부한다.
+    // 전면 재생성으로 이전 transport가 닫히면 그 위의 producer도 서버에서 사라진다.
+    // 사라진 producerId로 CLOSE_PRODUCER를 보내면 서버가 소유권 검사에서 거부한다.
     const socket = new FakeSocket();
     setupSocketAcks(socket);
-    const { result } = renderHook(() => useMediasoupViewModel(socket as unknown as never, code));
+    const { result, rejoin } = renderMediasoup(socket);
     await waitFor(() => expect(result.current.status).toBe('ready'));
     await act(async () => {
       await result.current.startScreenShare();
@@ -773,10 +963,8 @@ describe('useMediasoupViewModel.screenShare', () => {
     expect(result.current.isSharingScreen).toBe(true);
 
     socket.emit.mockClear();
-    const onConnect = captureSocketListener(socket, 'connect');
     await act(async () => {
-      onConnect();
-      onConnect();
+      rejoin();
     });
     await waitFor(() => expect(result.current.status).toBe('ready'));
 
@@ -792,16 +980,14 @@ describe('useMediasoupViewModel.screenShare', () => {
   it('재연결 후 화면 공유를 다시 시작할 수 있다', async () => {
     const socket = new FakeSocket();
     setupSocketAcks(socket);
-    const { result } = renderHook(() => useMediasoupViewModel(socket as unknown as never, code));
+    const { result, rejoin } = renderMediasoup(socket);
     await waitFor(() => expect(result.current.status).toBe('ready'));
     await act(async () => {
       await result.current.startScreenShare();
     });
 
-    const onConnect = captureSocketListener(socket, 'connect');
     await act(async () => {
-      onConnect();
-      onConnect();
+      rejoin();
     });
     await waitFor(() => expect(result.current.status).toBe('ready'));
 
@@ -821,6 +1007,7 @@ describe('useMediasoupViewModel.listProducers (기존 producer 합류)', () => {
     vi.stubGlobal('navigator', {
       mediaDevices: { getUserMedia: getUserMediaMock },
     });
+    window.sessionStorage.clear();
   });
 
   afterEach(() => {
@@ -877,13 +1064,13 @@ describe('useMediasoupViewModel.listProducers (기존 producer 합류)', () => {
         return {
           producers: [
             {
-              peerSocketId: 's2',
+              peerId: 's2',
               producerId: 'p-existing-aud',
               kind: 'audio',
               source: 'audio',
             },
             {
-              peerSocketId: 's2',
+              peerId: 's2',
               producerId: 'p-existing-vid',
               kind: 'video',
               source: 'video',
@@ -907,6 +1094,7 @@ describe('useMediasoupViewModel.muteToggle', () => {
     vi.stubGlobal('navigator', {
       mediaDevices: { getUserMedia: getUserMediaMock },
     });
+    window.sessionStorage.clear();
   });
 
   afterEach(() => {
@@ -1032,7 +1220,7 @@ describe('useMediasoupViewModel.muteToggle', () => {
     const { socket, result } = await setupReady();
     const onNewProducer = captureSocketListener(socket, MEDIASOUP_WS_EVENTS.NEW_PRODUCER);
     onNewProducer({
-      peerSocketId: 's2',
+      peerId: 's2',
       producerId: 'p-remote-audio',
       kind: 'audio',
       source: 'audio',

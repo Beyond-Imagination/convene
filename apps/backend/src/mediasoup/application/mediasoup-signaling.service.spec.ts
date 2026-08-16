@@ -127,6 +127,10 @@ const makeTransportPort = () => {
     async closeProducer(producerId) {
       calls.push({ name: 'closeProducer', args: [producerId] });
     },
+    async restartIce(transportId) {
+      calls.push({ name: 'restartIce', args: [transportId] });
+      return { iceParameters: { usernameFragment: 'restarted' } };
+    },
     async closeTransport(transportId) {
       calls.push({ name: 'closeTransport', args: [transportId] });
     },
@@ -352,6 +356,107 @@ describe('MediasoupSignalingService.connectTransport', () => {
           JSON.stringify(c.args[1]) === JSON.stringify({ fingerprints: ['fp'] }),
       ),
     ).toBe(true);
+  });
+});
+
+describe('MediasoupSignalingService.createTransport 재생성', () => {
+  const setupWithProducer = async () => {
+    const ctx = makeService();
+    await ctx.service.openRoom({ meetingCode });
+    await ctx.service.admitParticipant({ meetingCode, participantId: 's1' });
+    const t = await ctx.service.createTransport({
+      meetingCode,
+      participantId: 's1',
+      direction: 'send',
+    });
+    await ctx.service.produce({
+      meetingCode,
+      participantId: 's1',
+      transportId: t.id,
+      kind: 'audio',
+      source: 'audio',
+      rtpParameters: {},
+    });
+    ctx.events.length = 0;
+    return ctx;
+  };
+
+  it('같은 방향으로 다시 요청하면 이전 transport를 닫고 새 것으로 교체한다', async () => {
+    const { service, transport } = await setupWithProducer();
+
+    const next = await service.createTransport({
+      meetingCode,
+      participantId: 's1',
+      direction: 'send',
+    });
+
+    expect(next.id).not.toBe('t-1');
+    expect(transport.calls.some((c) => c.name === 'closeTransport' && c.args[0] === 't-1')).toBe(
+      true,
+    );
+  });
+
+  it('교체로 사라진 producer를 mediasoup.producer.closed로 알린다 (남은 참가자의 유령 타일 방지)', async () => {
+    const { service, events } = await setupWithProducer();
+
+    await service.createTransport({ meetingCode, participantId: 's1', direction: 'send' });
+
+    expect(events).toEqual([
+      {
+        name: MEDIASOUP_EVENTS.PRODUCER_CLOSED,
+        payload: { meetingCode, participantId: 's1', producerId: 'p-1' },
+      },
+    ]);
+  });
+
+  it('교체 후 새 transport로 다시 produce 할 수 있다', async () => {
+    const { service } = await setupWithProducer();
+
+    const next = await service.createTransport({
+      meetingCode,
+      participantId: 's1',
+      direction: 'send',
+    });
+
+    await expect(
+      service.produce({
+        meetingCode,
+        participantId: 's1',
+        transportId: next.id,
+        kind: 'audio',
+        source: 'audio',
+        rtpParameters: {},
+      }),
+    ).resolves.toEqual({ producerId: expect.any(String) });
+  });
+});
+
+describe('MediasoupSignalingService.restartIce', () => {
+  const setupWithTransport = async () => {
+    const ctx = makeService();
+    await ctx.service.openRoom({ meetingCode });
+    await ctx.service.admitParticipant({ meetingCode, participantId: 's1' });
+    await ctx.service.createTransport({ meetingCode, participantId: 's1', direction: 'send' });
+    return ctx;
+  };
+
+  it('transport를 닫지 않고 새 iceParameters만 돌려준다', async () => {
+    const { service, transport } = await setupWithTransport();
+
+    const res = await service.restartIce({ meetingCode, participantId: 's1', transportId: 't-1' });
+
+    expect(res.iceParameters).toEqual({ usernameFragment: 'restarted' });
+    expect(transport.calls.some((c) => c.name === 'restartIce' && c.args[0] === 't-1')).toBe(true);
+    expect(transport.calls.some((c) => c.name === 'closeTransport')).toBe(false);
+  });
+
+  it('남의 transport는 재협상하지 못한다', async () => {
+    const { service } = await setupWithTransport();
+    await service.admitParticipant({ meetingCode, participantId: 's2' });
+
+    await expect(
+      service.restartIce({ meetingCode, participantId: 's2', transportId: 't-1' }),
+    ).rejects.toBeInstanceOf(Error);
   });
 });
 
@@ -801,7 +906,7 @@ describe('MediasoupSignalingService.listProducers', () => {
     });
     expect(res.producers).toHaveLength(2);
     expect(res.producers.map((p) => p.kind).sort()).toEqual(['audio', 'video']);
-    expect(res.producers.every((p) => p.peerSocketId === 's1')).toBe(true);
+    expect(res.producers.every((p) => p.peerId === 's1')).toBe(true);
   });
 
   it('자기 자신의 producer는 제외한다', async () => {

@@ -1,5 +1,6 @@
 'use client';
 
+import type { ChatPostedBroadcast } from '@convene/shared-interfaces';
 import type { Socket } from 'socket.io-client';
 
 import { ChatPanel } from '@/feature/meeting/components/ChatPanel';
@@ -24,12 +25,14 @@ function ChatSection({
   socket,
   code,
   myNickname,
+  history,
 }: {
   readonly socket: Socket | null;
   readonly code: string;
   readonly myNickname: string | null;
+  readonly history: ReadonlyArray<ChatPostedBroadcast>;
 }) {
-  const chatVm = useChatViewModel(socket, code);
+  const chatVm = useChatViewModel(socket, code, history);
   return (
     <ChatPanel
       {...chatVm}
@@ -49,14 +52,17 @@ function MeetingSession({ code }: { readonly code: string }) {
   const meetingVm = useMeetingViewModel(code);
   // 예약 회의는 join이 처리되는 순간 방이 열린다. 입장이 확인되기 전에는 socket을 넘기지 않아
   // 미디어 협상이 방보다 먼저 도착하는 것을 막는다.
+  // 재연결 중에도 socket을 유지해야 살아 있는 transport를 버리지 않고 복귀할 수 있다.
   const mediasoupVm = useMediasoupViewModel(
-    meetingVm.status === 'joined' ? meetingVm.socket : null,
+    meetingVm.status === 'joined' || meetingVm.status === 'reconnecting' ? meetingVm.socket : null,
     code,
+    meetingVm.rejoinGen,
+    meetingVm.rejoinPreservedMedia,
   );
   // self 타일(항상 1) + 원격 참가자 수 = 전체 비디오 타일 수.
   const totalTiles = 1 + meetingVm.remoteParticipants.length;
   const layout = useMeetingLayoutViewModel(totalTiles);
-  const gateVm = useNicknameGateViewModel();
+  const gateVm = useNicknameGateViewModel(code);
 
   // 닉네임이 없는 두 경우를 구분한다:
   //  - 회의 종료 후 이동 중(isNavigatingAway): 화면을 그리지 않아 "(미인증)" 깜박임 방지.
@@ -96,6 +102,7 @@ function MeetingSession({ code }: { readonly code: string }) {
           socket={meetingVm.socket}
           code={code}
           myNickname={meetingVm.nickname}
+          history={meetingVm.chatHistory}
         />
       </aside>
     </div>

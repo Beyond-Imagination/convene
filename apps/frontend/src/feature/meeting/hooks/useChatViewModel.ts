@@ -22,9 +22,19 @@ export interface UseChatViewModel {
  * socket이 null(아직 mount 전 / redirect 상태) 일 때는 no-op.
  * 채팅 메시지 형식은 wire format 그대로 보관한다.
  */
-export function useChatViewModel(socket: Socket | null, code: string): UseChatViewModel {
+export function useChatViewModel(
+  socket: Socket | null,
+  code: string,
+  history: ReadonlyArray<ChatPostedBroadcast> = [],
+): UseChatViewModel {
   const [messages, setMessages] = useState<ChatMessageView[]>([]);
   const [draft, setDraft] = useState('');
+
+  // 끊긴 동안 남이 보낸 메시지는 broadcast로 오지 않는다. 이 경로가 없으면 그 구간이 비어 버린다.
+  useEffect(() => {
+    if (history.length === 0) return;
+    setMessages([...history]);
+  }, [history]);
 
   useEffect(() => {
     if (socket === null) return undefined;

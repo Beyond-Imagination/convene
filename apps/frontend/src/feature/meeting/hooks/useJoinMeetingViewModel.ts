@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { type BaseSyntheticEvent, useState } from 'react';
 import { type FieldErrors, useForm, type UseFormRegisterReturn } from 'react-hook-form';
 
-import { saveNickname } from '@/shared/stores/meeting.storage';
+import { getLastNickname, saveLastNickname, saveNickname } from '@/shared/stores/meeting.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
 export const MEETING_CODE_PATTERN = /^[a-z0-9]{8}$/;
@@ -44,7 +44,7 @@ export function useJoinMeetingViewModel(): UseJoinMeetingViewModel {
     handleSubmit: rhfHandleSubmit,
     formState: { errors },
   } = useForm<JoinMeetingFormValues>({
-    defaultValues: { code: '', nickname: '' },
+    defaultValues: { code: '', nickname: getLastNickname() },
     mode: 'onSubmit',
   });
 
@@ -53,6 +53,7 @@ export function useJoinMeetingViewModel(): UseJoinMeetingViewModel {
     const trimmed = values.nickname.trim();
     // 닉네임을 code 별로 보관(리로드 생존) + reactive store에도 set.
     saveNickname(values.code, trimmed);
+    saveLastNickname(trimmed);
     setNickname(trimmed);
     router.push(`/meetings/${values.code}`);
   });

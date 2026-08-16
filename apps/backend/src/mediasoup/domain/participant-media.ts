@@ -3,7 +3,7 @@ import { MediaType, TransportDirection } from '@convene/shared-interfaces';
 /**
  * 한 회의에 참여한 **한 명의 미디어 상태**를 표현한다.
  *
- * - identity는 `participantId`(Meeting BC의 `Participant.id`와 동일한 socket id).
+ * - identity는 `participantId`(Meeting BC의 `Participant.id`와 동일한 안정 식별자. 재연결로 socket이 바뀌어도 유지된다).
  * - `meetingCode`는 그룹 키로, Mediasoup BC의 application 서비스가 같은 회의의 다른 ParticipantMedia들을 묶어 브로드캐스트 대상을 결정한다.
  * - `routerIndex`는 multi-router 전략에서 infrastructure의 `MediaRouterPort`가 할당해 준 라우터 인덱스. 도메인은 값을 신뢰하고 검증·재할당하지 않는다.
  */
@@ -27,6 +27,13 @@ interface ConsumerInfo {
 
 interface ConsumerEntry extends ConsumerInfo {
   readonly id: string;
+}
+
+/** 재생성을 위해 놓아 준 transport와, 그 위에 얹혀 있어 함께 정리돼야 할 미디어. */
+export interface ReleasedTransport {
+  readonly transportId: string;
+  readonly producerIds: ReadonlyArray<string>;
+  readonly consumerIds: ReadonlyArray<string>;
 }
 
 export interface ParticipantMediaSnapshot {
@@ -123,6 +130,10 @@ export class ParticipantMedia {
     return this._closed;
   }
 
+  ownsTransport(transportId: string): boolean {
+    return this._sendTransportId === transportId || this._recvTransportId === transportId;
+  }
+
   attachTransport(direction: TransportDirection, transportId: string): void {
     this.assertNotClosed();
     if (!transportId || transportId.trim() === '') {
@@ -139,6 +150,26 @@ export class ParticipantMedia {
       throw new Error(`ParticipantMedia(${this.participantId}) already has a recv transport`);
     }
     this._recvTransportId = transportId;
+  }
+
+  /**
+   * 재연결로 transport를 다시 만들 때 이전 것을 놓아 준다. producer는 send에, consumer는 recv에
+   * 얹혀 있으므로 해당 방향의 것만 함께 비운다 — transport를 닫으면 그것들도 같이 죽는다.
+   */
+  releaseTransport(direction: TransportDirection): ReleasedTransport | null {
+    this.assertNotClosed();
+    const transportId = direction === 'send' ? this._sendTransportId : this._recvTransportId;
+    if (transportId === null) return null;
+    const producerIds = direction === 'send' ? this.producers.map((p) => p.id) : [];
+    const consumerIds = direction === 'recv' ? this.consumers.map((c) => c.id) : [];
+    if (direction === 'send') {
+      this._sendTransportId = null;
+      this._producers.clear();
+    } else {
+      this._recvTransportId = null;
+      this._consumers.clear();
+    }
+    return { transportId, producerIds, consumerIds };
   }
 
   addProducer(id: string, info: ProducerInfo): void {

@@ -89,7 +89,15 @@ const ackJoin = (ack: JoinMeetingAck | null, err: Error | null = null): void => 
 };
 
 /** connect 후 서버가 join을 승인한 상태까지 진행한다. */
-const connect = (ack: JoinMeetingAck = { ok: true, hostToken: null }): void => {
+const defaultAck: JoinMeetingAck = {
+  ok: true,
+  hostToken: null,
+  participantId: 'p-1',
+  reconnected: false,
+  chat: [],
+};
+
+const connect = (ack: JoinMeetingAck = defaultAck): void => {
   act(() => {
     fakeSocket.connected = true;
     fakeSocket.trigger('connect');
@@ -114,7 +122,7 @@ describe('useMeetingViewModel', () => {
     connect();
     expect(fakeSocket.emit).toHaveBeenCalledWith(
       MEETING_WS_EVENTS.JOIN,
-      { code, nickname: '준' },
+      { code, nickname: '준', participantId: expect.any(String) },
       expect.any(Function),
     );
     expect(result.current.status).toBe('joined');
@@ -125,13 +133,13 @@ describe('useMeetingViewModel', () => {
     connect();
     act(() => {
       fakeSocket.trigger(MEETING_WS_EVENTS.PARTICIPANT_JOINED, {
-        socketId: 's2',
+        participantId: 's2',
         nickname: '아',
         joinedAt: '2026-01-01T00:01:00.000Z',
       });
     });
     expect(result.current.remoteParticipants).toEqual([
-      { socketId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z' },
+      { participantId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z', disconnected: false },
     ]);
   });
 
@@ -140,29 +148,29 @@ describe('useMeetingViewModel', () => {
     connect();
     act(() => {
       fakeSocket.trigger(MEETING_WS_EVENTS.PARTICIPANT_JOINED, {
-        socketId: 's2',
+        participantId: 's2',
         nickname: '아',
         joinedAt: '2026-01-01T00:01:00.000Z',
       });
       fakeSocket.trigger(MEETING_WS_EVENTS.PARTICIPANT_LEFT, {
-        socketId: 's2',
+        participantId: 's2',
         leftAt: '2026-01-01T00:02:00.000Z',
       });
     });
     expect(result.current.remoteParticipants).toEqual([]);
   });
 
-  it('같은 socketId가 다시 join 되면 중복되지 않고 갱신된다', () => {
+  it('같은 participantId가 다시 join 되면 중복되지 않고 갱신된다', () => {
     const { result } = setup('준');
     connect();
     act(() => {
       fakeSocket.trigger(MEETING_WS_EVENTS.PARTICIPANT_JOINED, {
-        socketId: 's2',
+        participantId: 's2',
         nickname: '아',
         joinedAt: '2026-01-01T00:01:00.000Z',
       });
       fakeSocket.trigger(MEETING_WS_EVENTS.PARTICIPANT_JOINED, {
-        socketId: 's2',
+        participantId: 's2',
         nickname: '아',
         joinedAt: '2026-01-01T00:01:00.000Z',
       });
@@ -225,7 +233,7 @@ describe('useMeetingViewModel', () => {
     it('빈 방에 처음 들어가 join 응답으로 hostToken을 받으면 host가 된다', () => {
       const { result } = setup('준');
 
-      connect({ ok: true, hostToken: 'tok-granted' });
+      connect({ ...defaultAck, hostToken: 'tok-granted' });
 
       expect(result.current.isHost).toBe(true);
       expect(getHostToken(code)).toBe('tok-granted');
@@ -235,7 +243,7 @@ describe('useMeetingViewModel', () => {
       saveHostToken(code, 'tok-host');
       const { result } = setup('준');
 
-      connect({ ok: true, hostToken: null });
+      connect({ ...defaultAck, hostToken: null });
 
       expect(result.current.isHost).toBe(true);
       expect(getHostToken(code)).toBe('tok-host');
@@ -244,7 +252,7 @@ describe('useMeetingViewModel', () => {
     it('host가 아닌 참가자는 join 응답 후에도 non-host로 남는다', () => {
       const { result } = setup('준');
 
-      connect({ ok: true, hostToken: null });
+      connect({ ...defaultAck, hostToken: null });
 
       expect(result.current.isHost).toBe(false);
     });
@@ -405,7 +413,7 @@ describe('useMeetingViewModel', () => {
     });
     expect(fakeSocket.emit).toHaveBeenCalledWith(
       MEETING_WS_EVENTS.JOIN,
-      { code, nickname: '준' },
+      { code, nickname: '준', participantId: expect.any(String) },
       expect.any(Function),
     );
   });
@@ -415,7 +423,7 @@ describe('useMeetingViewModel', () => {
     connect();
     act(() => {
       fakeSocket.trigger(MEETING_WS_EVENTS.PARTICIPANT_JOINED, {
-        socketId: 's2',
+        participantId: 's2',
         nickname: '아',
         joinedAt: '2026-01-01T00:01:00.000Z',
       });
@@ -427,17 +435,192 @@ describe('useMeetingViewModel', () => {
     expect(result.current.remoteParticipants).toEqual([]);
   });
 
-  it('재연결 후 reconnectGen이 증가해 외부에 노출된다', () => {
+  it('rejoinGen은 소켓 재연결이 아니라 재입장 ack이 와야 증가한다', () => {
     const { result } = setup('준');
     connect();
-    expect(result.current.reconnectGen).toBe(0);
+    expect(result.current.rejoinGen).toBe(0);
+
+    // 소켓만 다시 붙은 시점 — 서버는 아직 이 소켓의 신원을 모른다.
     act(() => {
       fakeSocket.trigger('connect');
     });
-    expect(result.current.reconnectGen).toBe(1);
+    expect(result.current.rejoinGen).toBe(0);
+
+    ackJoin(defaultAck);
+    expect(result.current.rejoinGen).toBe(1);
+
     act(() => {
       fakeSocket.trigger('connect');
     });
-    expect(result.current.reconnectGen).toBe(2);
+    ackJoin(defaultAck);
+    expect(result.current.rejoinGen).toBe(2);
+  });
+
+  describe('비정상 종료와 재접속', () => {
+    it('회의별 안정 participantId를 지참해 join 한다 — 재연결에서도 같은 값', () => {
+      setup('준');
+      connect();
+      const first = fakeSocket.emit.mock.calls.find((c) => c[0] === MEETING_WS_EVENTS.JOIN)?.[1] as {
+        participantId: string;
+      };
+      act(() => {
+        fakeSocket.trigger('connect');
+      });
+      const calls = fakeSocket.emit.mock.calls.filter((c) => c[0] === MEETING_WS_EVENTS.JOIN);
+      expect((calls[1][1] as { participantId: string }).participantId).toBe(first.participantId);
+    });
+
+    it('소켓이 끊기면 화면을 떠나지 않고 reconnecting 상태가 된다', () => {
+      const { result } = setup('준');
+      connect();
+      act(() => {
+        fakeSocket.trigger('disconnect');
+      });
+      expect(result.current.status).toBe('reconnecting');
+      expect(pushMock).not.toHaveBeenCalled();
+    });
+
+    it('입장 전 끊김은 reconnecting으로 올리지 않는다 (방보다 미디어 협상이 앞서면 안 된다)', () => {
+      const { result } = setup('준');
+      act(() => {
+        fakeSocket.trigger('disconnect');
+      });
+      expect(result.current.status).toBe('connecting');
+    });
+
+    it('재연결 시도 중 connect_error는 오류로 올리지 않는다', () => {
+      const { result } = setup('준');
+      connect();
+      act(() => {
+        fakeSocket.trigger('connect_error', new Error('ECONNREFUSED'));
+      });
+      expect(result.current.status).not.toBe('error');
+    });
+
+    it('상대의 연결 끊김은 목록에서 제거하지 않고 disconnected로만 표시한다', () => {
+      const { result } = setup('준');
+      connect();
+      act(() => {
+        fakeSocket.trigger(MEETING_WS_EVENTS.PARTICIPANT_JOINED, {
+          participantId: 'p-2',
+          nickname: '아',
+          joinedAt: '2026-01-01T00:01:00.000Z',
+        });
+        fakeSocket.trigger(MEETING_WS_EVENTS.PARTICIPANT_DISCONNECTED, {
+          participantId: 'p-2',
+          disconnectedAt: '2026-01-01T00:02:00.000Z',
+        });
+      });
+      expect(result.current.remoteParticipants).toEqual([
+        {
+          participantId: 'p-2',
+          nickname: '아',
+          joinedAt: '2026-01-01T00:01:00.000Z',
+          disconnected: true,
+        },
+      ]);
+    });
+
+    it('상대가 복귀하면 disconnected가 풀린다', () => {
+      const { result } = setup('준');
+      connect();
+      act(() => {
+        fakeSocket.trigger(MEETING_WS_EVENTS.PARTICIPANT_JOINED, {
+          participantId: 'p-2',
+          nickname: '아',
+          joinedAt: '2026-01-01T00:01:00.000Z',
+        });
+        fakeSocket.trigger(MEETING_WS_EVENTS.PARTICIPANT_DISCONNECTED, {
+          participantId: 'p-2',
+          disconnectedAt: '2026-01-01T00:02:00.000Z',
+        });
+        fakeSocket.trigger(MEETING_WS_EVENTS.PARTICIPANT_RECONNECTED, {
+          participantId: 'p-2',
+          reconnectedAt: '2026-01-01T00:02:10.000Z',
+        });
+      });
+      expect(result.current.remoteParticipants[0].disconnected).toBe(false);
+    });
+
+    it('참가자 스냅숏의 disconnected 상태를 그대로 반영한다', () => {
+      const { result } = setup('준');
+      connect();
+      act(() => {
+        fakeSocket.trigger(MEETING_WS_EVENTS.PARTICIPANTS, {
+          participants: [
+            {
+              participantId: 'p-2',
+              nickname: '아',
+              joinedAt: '2026-01-01T00:01:00.000Z',
+              disconnected: true,
+            },
+          ],
+        });
+      });
+      expect(result.current.remoteParticipants[0].disconnected).toBe(true);
+    });
+
+    it('ack의 채팅 히스토리를 노출해 끊긴 구간의 대화를 복원할 수 있게 한다', () => {
+      const { result } = setup('준');
+      const chat = [{ nickname: '아', text: '먼저 시작할게요', sentAt: '2026-01-01T00:00:10.000Z' }];
+      connect({ ...defaultAck, chat });
+      expect(result.current.chatHistory).toEqual(chat);
+    });
+
+    it('리로드·탭 닫기(pagehide)에서는 leave를 emit 하지 않는다 (유예 경로를 타야 한다)', () => {
+      const { unmount } = setup('준');
+      connect();
+      act(() => {
+        window.dispatchEvent(new Event('pagehide'));
+      });
+      unmount();
+      expect(fakeSocket.emit).not.toHaveBeenCalledWith(MEETING_WS_EVENTS.LEAVE, { code });
+    });
+
+    it('정상 퇴장은 이 회의의 모든 보관 상태를 지운다 (재입장 시 되살아나지 않게)', () => {
+      const { result } = setup('준');
+      connect();
+      window.sessionStorage.setItem('hostToken:abc12xyz', 'tok');
+      window.sessionStorage.setItem('mediaIntent:abc12xyz', '{"audio":true,"video":false}');
+      act(() => {
+        result.current.leave();
+      });
+      expect(window.sessionStorage.getItem('nickname:abc12xyz')).toBeNull();
+      expect(window.sessionStorage.getItem('hostToken:abc12xyz')).toBeNull();
+      expect(window.sessionStorage.getItem('participantId:abc12xyz')).toBeNull();
+      expect(window.sessionStorage.getItem('mediaIntent:abc12xyz')).toBeNull();
+    });
+
+    it('회의 종료 broadcast로 떠날 때도 전부 지운다', () => {
+      setup('준');
+      connect();
+      window.sessionStorage.setItem('mediaIntent:abc12xyz', '{"audio":true,"video":true}');
+      act(() => {
+        fakeSocket.trigger(MEETING_WS_EVENTS.ENDED, {
+          code,
+          endedAt: '2026-01-01T00:30:00.000Z',
+        });
+      });
+      expect(window.sessionStorage.getItem('mediaIntent:abc12xyz')).toBeNull();
+      expect(window.sessionStorage.getItem('participantId:abc12xyz')).toBeNull();
+    });
+
+    it('비정상 종료(pagehide)에서는 보관 상태를 지우지 않는다 — 재접속의 전제다', () => {
+      setup('준');
+      connect();
+      window.sessionStorage.setItem('mediaIntent:abc12xyz', '{"audio":true,"video":false}');
+      act(() => {
+        window.dispatchEvent(new Event('pagehide'));
+      });
+      expect(window.sessionStorage.getItem('participantId:abc12xyz')).not.toBeNull();
+      expect(window.sessionStorage.getItem('mediaIntent:abc12xyz')).not.toBeNull();
+    });
+
+    it('일반 unmount는 그대로 leave를 emit 한다', () => {
+      const { unmount } = setup('준');
+      connect();
+      unmount();
+      expect(fakeSocket.emit).toHaveBeenCalledWith(MEETING_WS_EVENTS.LEAVE, { code });
+    });
   });
 });

@@ -7,6 +7,9 @@ import { Source } from '@/shared-kernel/domain/value-objects/source';
 
 import { Participant, ParticipantSnapshot } from './participant';
 
+/** 이 창 안에서는 참가자가 활성으로 남아 idle 자동 종료를 막고, 같은 신원으로 복귀할 수 있다. */
+export const RECONNECT_GRACE_MS = 30 * 1000;
+
 export interface MeetingSnapshot {
   readonly code: string;
   readonly source: Source;
@@ -130,7 +133,7 @@ export class Meeting {
 
   // ---------- mutations ----------
 
-  addParticipant(id: string, nickname: string, at: Date): Participant {
+  addParticipant(id: string, nickname: string, at: Date, connectionId?: string): Participant {
     this.assertOpen('addParticipant');
     if (this.participants.has(id)) {
       throw new Error(`Participant with id "${id}" already exists in this meeting`);
@@ -141,10 +144,47 @@ export class Meeting {
       this._startedAt = at;
       this._lastActiveAt = at;
     }
-    const participant = Participant.join(id, nickname, at);
+    const participant = Participant.join(id, nickname, at, connectionId);
     this.participants.set(id, participant);
     this.touchActive(at);
     return participant;
+  }
+
+  /** 활동으로 치지 않으므로 `lastActiveAt`을 밀지 않는다 — 끊긴 채로 유예를 벌 수는 없다. */
+  disconnectParticipant(connectionId: string, at: Date): Participant | undefined {
+    if (this._endedAt !== null) return undefined;
+    const participant = this.findByConnectionId(connectionId);
+    if (!participant) return undefined;
+    participant.disconnect(at);
+    return participant;
+  }
+
+  reconnectParticipant(id: string, connectionId: string, at: Date): Participant {
+    const participant = this.requireParticipant(id, 'reconnectParticipant');
+    participant.reconnect(connectionId, at);
+    this.touchActive(at);
+    return participant;
+  }
+
+  rejoinParticipant(id: string, connectionId: string, at: Date): Participant {
+    const participant = this.requireParticipant(id, 'rejoinParticipant');
+    participant.rejoin(connectionId, at);
+    this.touchActive(at);
+    return participant;
+  }
+
+  /** 퇴장 시각을 `now`로 잡아 idle 시계가 만료 시점부터 돌게 한다. */
+  expireDisconnected(now: Date, graceMs: number): Participant[] {
+    if (this._endedAt !== null) return [];
+    const expired: Participant[] = [];
+    for (const p of this.participants.values()) {
+      if (p.isActive && p.isDisconnectedLongerThan(graceMs, now)) {
+        p.leave(now);
+        expired.push(p);
+      }
+    }
+    if (expired.length > 0) this.touchActive(now);
+    return expired;
   }
 
   removeParticipant(id: string, at: Date): Participant {
@@ -216,6 +256,14 @@ export class Meeting {
     return this.participants.get(id);
   }
 
+  /** 퇴장한 참가자의 옛 연결은 매칭하지 않는다. */
+  findByConnectionId(connectionId: string): Participant | undefined {
+    for (const p of this.participants.values()) {
+      if (p.isActive && p.connectionId === connectionId) return p;
+    }
+    return undefined;
+  }
+
   /** 아직 leave 하지 않은 참가자 수. */
   get activeParticipantCount(): number {
     let n = 0;
@@ -255,6 +303,15 @@ export class Meeting {
   }
 
   // ---------- internals ----------
+
+  private requireParticipant(id: string, op: string): Participant {
+    this.assertOpen(op);
+    const participant = this.participants.get(id);
+    if (!participant) {
+      throw new Error(`Participant with id "${id}" not found in this meeting`);
+    }
+    return participant;
+  }
 
   private assertOpen(op: string): void {
     if (this._endedAt !== null) {

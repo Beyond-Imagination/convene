@@ -24,6 +24,7 @@ import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
 
 const TITLE_MAX = 100;
 const NICKNAME_MAX = 40;
+const PARTICIPANT_ID_MAX = 64;
 const TEXT_MIN = 1;
 const TEXT_MAX = 1000;
 
@@ -67,6 +68,12 @@ export class JoinMeetingDto extends MeetingScopedDto implements JoinMeetingMessa
   @IsString()
   @Length(1, NICKNAME_MAX)
   nickname!: string;
+
+  /** 없으면 서버가 socket.id로 채운다 — 정적 배포된 구버전 클라이언트도 그대로 입장한다. */
+  @IsOptional()
+  @IsString()
+  @Length(1, PARTICIPANT_ID_MAX)
+  participantId?: string;
 }
 
 export class LeaveMeetingDto extends MeetingScopedDto implements LeaveMeetingMessage {}

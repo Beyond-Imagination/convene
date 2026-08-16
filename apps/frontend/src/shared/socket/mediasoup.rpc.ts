@@ -12,11 +12,12 @@ export const rpcWithTimeout = async <T>(
   socket: Socket,
   event: string,
   payload: unknown,
+  timeoutMs: number = RPC_TIMEOUT_MS,
 ): Promise<T> => {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(
-      () => reject(new Error(`mediasoup RPC '${event}' timeout after ${RPC_TIMEOUT_MS}ms`)),
-      RPC_TIMEOUT_MS,
+      () => reject(new Error(`mediasoup RPC '${event}' timeout after ${timeoutMs}ms`)),
+      timeoutMs,
     );
     socket.emitWithAck(event, payload).then(
       (res) => {

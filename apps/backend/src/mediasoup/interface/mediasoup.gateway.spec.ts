@@ -268,6 +268,21 @@ describe('MediasoupGateway.handleCloseProducer', () => {
   });
 });
 
+describe('MediasoupGateway.onProducerClosed', () => {
+  it('재연결로 사라진 producer를 같은 room에 알린다 (남은 참가자가 유령 타일을 붙들지 않게)', () => {
+    const { gateway, emits } = setup();
+    gateway.onProducerClosed({ meetingCode: codeStr, participantId: 's2', producerId: 'p-1' });
+    expect(emits).toEqual([
+      {
+        room: `meeting:${codeStr}`,
+        except: 's2',
+        event: MEDIASOUP_WS_EVENTS.PRODUCER_CLOSED,
+        payload: { producerId: 'p-1' },
+      },
+    ]);
+  });
+});
+
 describe('MediasoupGateway.onProducerCreated', () => {
   it('같은 회의 room에 newProducer 브로드캐스트를 보내되 producer 본인은 제외한다', () => {
     const { gateway, emits } = setup();
@@ -284,7 +299,7 @@ describe('MediasoupGateway.onProducerCreated', () => {
         except: 's2',
         event: MEDIASOUP_WS_EVENTS.NEW_PRODUCER,
         payload: {
-          peerSocketId: 's2',
+          peerId: 's2',
           producerId: 'p-1',
           kind: 'audio',
           source: 'audio',

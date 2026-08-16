@@ -73,6 +73,8 @@ export interface VideoTileProps {
   readonly isVideoOff?: boolean;
   /** 마이크가 음소거면 이름표에 마이크 OFF 배지를 표시한다. */
   readonly isAudioOff?: boolean;
+  /** 연결이 끊겨 복귀를 기다리는 중. 타일은 유지하고 상태만 덮어 보여준다. */
+  readonly isDisconnected?: boolean;
 }
 
 /**
@@ -88,6 +90,7 @@ export const VideoTile = memo(function VideoTile({
   track,
   isVideoOff,
   isAudioOff,
+  isDisconnected,
 }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   useMediaElementBinding({ ref: videoRef, stream: useTileStream(stream, track) });
@@ -104,6 +107,14 @@ export const VideoTile = memo(function VideoTile({
         className="h-full w-full object-cover"
       />
       {isVideoOff === true && <VideoTilePlaceholder label={label} />}
+      {isDisconnected === true && (
+        <div
+          data-testid="tile-disconnected"
+          className="absolute inset-0 flex items-center justify-center bg-black/60 text-xs font-medium text-amber-300"
+        >
+          연결 끊김 · 재접속 대기 중
+        </div>
+      )}
       <figcaption className="absolute bottom-2 left-2 flex items-center gap-1 rounded-md bg-black/60 px-2 py-0.5 text-xs font-medium text-white">
         {isAudioOff === true && <MicOffIcon className="text-danger h-3.5 w-3.5" />}
         {label}

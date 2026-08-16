@@ -5,7 +5,7 @@ import { type BaseSyntheticEvent, useState } from 'react';
 import { type FieldErrors, useForm, type UseFormRegisterReturn } from 'react-hook-form';
 
 import { createMeeting, MeetingApiError } from '@/shared/api/meeting.api';
-import { saveHostToken, saveNickname } from '@/shared/stores/meeting.storage';
+import { getLastNickname, saveHostToken, saveLastNickname, saveNickname } from '@/shared/stores/meeting.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
 export const NICKNAME_MIN = 1;
@@ -46,7 +46,7 @@ export function useCreateMeetingViewModel(): UseCreateMeetingViewModel {
     handleSubmit: rhfHandleSubmit,
     formState: { errors },
   } = useForm<CreateMeetingFormValues>({
-    defaultValues: { nickname: '', title: '' },
+    defaultValues: { nickname: getLastNickname(), title: '' },
     mode: 'onSubmit',
   });
 
@@ -63,6 +63,7 @@ export function useCreateMeetingViewModel(): UseCreateMeetingViewModel {
       });
       saveHostToken(res.code, res.hostToken);
       saveNickname(res.code, trimmed);
+      saveLastNickname(trimmed);
       setNickname(trimmed);
       router.push(`/meetings/${res.code}`);
     } catch (e) {

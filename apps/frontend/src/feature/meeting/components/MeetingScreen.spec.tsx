@@ -34,10 +34,10 @@ const fakeTrack = (kind: 'audio' | 'video'): MediaStreamTrack =>
 const fakeStream = (): MediaStream => ({}) as unknown as MediaStream;
 
 const remoteEntry = (
-  overrides: Partial<RemoteMediaEntry> & Pick<RemoteMediaEntry, 'peerSocketId' | 'kind'>,
+  overrides: Partial<RemoteMediaEntry> & Pick<RemoteMediaEntry, 'peerId' | 'kind'>,
 ): RemoteMediaEntry => ({
-  consumerId: `c-${overrides.peerSocketId}-${overrides.kind}`,
-  producerId: `p-${overrides.peerSocketId}-${overrides.kind}`,
+  consumerId: `c-${overrides.peerId}-${overrides.kind}`,
+  producerId: `p-${overrides.peerId}-${overrides.kind}`,
   source: overrides.kind === 'video' ? 'video' : 'audio',
   track: fakeTrack(overrides.kind),
   ...overrides,
@@ -50,7 +50,7 @@ const baseVm = (overrides: Partial<UseMeetingViewModel> = {}): UseMeetingViewMod
   remoteParticipants: [],
   errorMessage: null,
   socket: null,
-  reconnectGen: 0,
+  rejoinGen: 0,
   isHost: false,
   leave: vi.fn(),
   endMeeting: vi.fn(async () => {}),
@@ -80,10 +80,10 @@ describe('MeetingScreen View', () => {
     expect(screen.getByTestId('self-participant')).toHaveTextContent('준 (나)');
   });
 
-  it('원격 참가자 목록을 socketId 순서대로 렌더한다', () => {
+  it('원격 참가자 목록을 participantId 순서대로 렌더한다', () => {
     const remoteParticipants: RemoteParticipant[] = [
-      { socketId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z' },
-      { socketId: 's3', nickname: '벤', joinedAt: '2026-01-01T00:02:00.000Z' },
+      { participantId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z', disconnected: false },
+      { participantId: 's3', nickname: '벤', joinedAt: '2026-01-01T00:02:00.000Z', disconnected: false },
     ];
     renderScreen({ remoteParticipants });
     const items = screen.getAllByTestId('remote-participant');
@@ -159,12 +159,12 @@ describe('MeetingScreen View', () => {
 
   it('각 remoteParticipant에 대해 remote video tile이 닉네임과 함께 렌더된다', () => {
     const remoteParticipants: RemoteParticipant[] = [
-      { socketId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z' },
-      { socketId: 's3', nickname: '벤', joinedAt: '2026-01-01T00:02:00.000Z' },
+      { participantId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z', disconnected: false },
+      { participantId: 's3', nickname: '벤', joinedAt: '2026-01-01T00:02:00.000Z', disconnected: false },
     ];
     renderScreen(
       { remoteParticipants },
-      { remoteMedia: [remoteEntry({ peerSocketId: 's2', kind: 'video' })] },
+      { remoteMedia: [remoteEntry({ peerId: 's2', kind: 'video' })] },
     );
     const tiles = screen.getAllByTestId('remote-video-tile');
     expect(tiles).toHaveLength(2);
@@ -172,15 +172,15 @@ describe('MeetingScreen View', () => {
     expect(tiles[1]).toHaveTextContent('벤');
   });
 
-  it('peerSocketId와 매칭되는 video track의 srcObject가 video 요소에 attach 된다', () => {
+  it('peerId와 매칭되는 video track의 srcObject가 video 요소에 attach 된다', () => {
     const track = fakeTrack('video');
     const remoteParticipants: RemoteParticipant[] = [
-      { socketId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z' },
+      { participantId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z', disconnected: false },
     ];
     renderScreen(
       { remoteParticipants },
       {
-        remoteMedia: [{ ...remoteEntry({ peerSocketId: 's2', kind: 'video' }), track }],
+        remoteMedia: [{ ...remoteEntry({ peerId: 's2', kind: 'video' }), track }],
       },
     );
     const tile = screen.getByTestId('remote-video-tile');
@@ -195,12 +195,12 @@ describe('MeetingScreen View', () => {
   it('remoteMedia에 audio가 있으면 RemoteAudioPlayer가 audio 요소를 렌더한다', () => {
     const audioTrack = fakeTrack('audio');
     const remoteParticipants: RemoteParticipant[] = [
-      { socketId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z' },
+      { participantId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z', disconnected: false },
     ];
     renderScreen(
       { remoteParticipants },
       {
-        remoteMedia: [{ ...remoteEntry({ peerSocketId: 's2', kind: 'audio' }), track: audioTrack }],
+        remoteMedia: [{ ...remoteEntry({ peerId: 's2', kind: 'audio' }), track: audioTrack }],
       },
     );
     const audioPlayer = screen.getByTestId('remote-audio-player');
@@ -267,14 +267,14 @@ describe('MeetingScreen View', () => {
   it('원격 참가자의 source=screen 트랙이 있으면 별도 remote-screen-tile이 노출된다', () => {
     const screenTrack = fakeTrack('video');
     const remoteParticipants: RemoteParticipant[] = [
-      { socketId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z' },
+      { participantId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z', disconnected: false },
     ];
     renderScreen(
       { remoteParticipants },
       {
         remoteMedia: [
           {
-            ...remoteEntry({ peerSocketId: 's2', kind: 'video' }),
+            ...remoteEntry({ peerId: 's2', kind: 'video' }),
             source: 'screen',
             track: screenTrack,
           },

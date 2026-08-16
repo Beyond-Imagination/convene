@@ -335,4 +335,102 @@ describe('Meeting (Aggregate Root)', () => {
       expect(m.isOpen).toBe(false);
     });
   });
+
+  describe('연결 끊김 유예', () => {
+    const GRACE = 30_000;
+    const T_2m = new Date('2026-01-01T00:02:00Z');
+
+    it('connectionId로 참가자를 찾는다 (RPC는 소켓으로 들어오고 신원은 안정 ID다)', () => {
+      const m = newMeeting();
+      m.addParticipant('p-1', 'alice', T_0, 'socket-a');
+      expect(m.findByConnectionId('socket-a')?.id).toBe('p-1');
+      expect(m.findByConnectionId('socket-z')).toBeUndefined();
+    });
+
+    it('연결이 끊긴 참가자는 여전히 활성이므로 idle 자동 종료를 막는다', () => {
+      const m = newMeeting();
+      m.addParticipant('p-1', 'alice', T_0, 'socket-a');
+      m.disconnectParticipant('socket-a', T_30s);
+      expect(m.activeParticipantCount).toBe(1);
+      expect(m.isIdleSince(T_10m_after_T_1m)).toBe(false);
+    });
+
+    it('disconnect는 활동으로 치지 않는다 (lastActiveAt을 밀지 않는다)', () => {
+      const m = newMeeting();
+      m.addParticipant('p-1', 'alice', T_0, 'socket-a');
+      m.disconnectParticipant('socket-a', T_30s);
+      expect(m.lastActiveAt).toBe(T_0);
+    });
+
+    it('재접속은 같은 참가자를 유지하면서 연결만 바꾼다', () => {
+      const m = newMeeting();
+      m.addParticipant('p-1', 'alice', T_0, 'socket-a');
+      m.disconnectParticipant('socket-a', T_30s);
+      const p = m.reconnectParticipant('p-1', 'socket-b', T_1m);
+      expect(p.id).toBe('p-1');
+      expect(p.nickname).toBe('alice');
+      expect(p.joinedAt).toBe(T_0);
+      expect(m.findByConnectionId('socket-b')?.id).toBe('p-1');
+      expect(m.activeParticipantCount).toBe(1);
+    });
+
+    it('유예 안의 참가자는 만료 대상이 아니다', () => {
+      const m = newMeeting();
+      m.addParticipant('p-1', 'alice', T_0, 'socket-a');
+      m.disconnectParticipant('socket-a', T_30s);
+      expect(m.expireDisconnected(T_1m_minus, GRACE)).toEqual([]);
+      expect(m.activeParticipantCount).toBe(1);
+    });
+
+    it('유예를 넘긴 참가자는 그 시점에 퇴장 처리된다', () => {
+      const m = newMeeting();
+      m.addParticipant('p-1', 'alice', T_0, 'socket-a');
+      m.addParticipant('p-2', 'bob', T_0, 'socket-b');
+      m.disconnectParticipant('socket-a', T_30s);
+      const expired = m.expireDisconnected(T_2m, GRACE);
+      expect(expired.map((p) => p.id)).toEqual(['p-1']);
+      expect(expired[0].leftAt).toBe(T_2m);
+      expect(m.activeParticipantCount).toBe(1);
+    });
+
+    it('만료로 전원이 빠지면 그 시각부터 idle 시계가 돈다', () => {
+      const m = newMeeting();
+      m.addParticipant('p-1', 'alice', T_0, 'socket-a');
+      m.disconnectParticipant('socket-a', T_30s);
+      m.expireDisconnected(T_2m, GRACE);
+      expect(m.activeParticipantCount).toBe(0);
+      expect(m.lastActiveAt).toBe(T_2m);
+    });
+
+    it('재접속한 참가자는 이후 만료되지 않는다', () => {
+      const m = newMeeting();
+      m.addParticipant('p-1', 'alice', T_0, 'socket-a');
+      m.disconnectParticipant('socket-a', T_30s);
+      m.reconnectParticipant('p-1', 'socket-b', T_1m);
+      expect(m.expireDisconnected(T_2m, GRACE)).toEqual([]);
+      expect(m.activeParticipantCount).toBe(1);
+    });
+
+    it('유예가 만료된 뒤 돌아온 참가자는 같은 신원으로 다시 들어온다 (참가자 중복 없음)', () => {
+      const m = newMeeting();
+      m.addParticipant('p-1', 'alice', T_0, 'socket-a');
+      m.disconnectParticipant('socket-a', T_30s);
+      m.expireDisconnected(T_2m, GRACE);
+
+      const p = m.rejoinParticipant('p-1', 'socket-b', T_2m);
+
+      expect(p.id).toBe('p-1');
+      expect(m.activeParticipantCount).toBe(1);
+      expect(m.snapshot().participants).toHaveLength(1);
+    });
+
+    it('끊김 상태는 snapshot round-trip에서 보존된다', () => {
+      const m = newMeeting();
+      m.addParticipant('p-1', 'alice', T_0, 'socket-a');
+      m.disconnectParticipant('socket-a', T_30s);
+      const restored = Meeting.fromSnapshot(m.snapshot());
+      expect(restored.findByConnectionId('socket-a')?.id).toBe('p-1');
+      expect(restored.expireDisconnected(T_2m, GRACE).map((p) => p.id)).toEqual(['p-1']);
+    });
+  });
 });

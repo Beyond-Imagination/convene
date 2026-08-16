@@ -49,6 +49,9 @@ describe('useJoinMeetingViewModel', () => {
   beforeEach(() => {
     pushMock.mockReset();
     useSessionStore.setState({ nickname: null });
+    // 폼 기본값이 보관 닉네임에서 채워지므로, 빈 입력 검증에는 비워 둔 상태가 필요하다.
+    window.localStorage.clear();
+    window.sessionStorage.clear();
   });
 
   it('정상 입력 시 닉네임을 store에 저장하고 /meetings/{code} 로 이동한다', async () => {

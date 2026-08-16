@@ -21,6 +21,8 @@ import {
   type ProduceRequest,
   type ProduceResponse,
   type ProducerToggledBroadcast,
+  type RestartIceRequest,
+  type RestartIceResponse,
   type ResumeConsumerRequest,
   type ToggleProducerRequest,
   type ToggleProducerResponse,
@@ -35,10 +37,17 @@ describe('Mediasoup wire format', () => {
     }
   });
 
-  it('WS 이벤트 이름은 모두 서로 다르고 13개다 (RPC 9 + 브로드캐스트 4)', () => {
+  it('WS 이벤트 이름은 모두 서로 다르고 14개다 (RPC 10 + 브로드캐스트 4)', () => {
     const all = Object.values(MEDIASOUP_WS_EVENTS);
-    expect(all).toHaveLength(13);
+    expect(all).toHaveLength(14);
     expect(new Set(all).size).toBe(all.length);
+  });
+
+  it('restartIce는 transport를 버리지 않고 ICE만 갈아끼우기 위한 RPC다', () => {
+    expect(MEDIASOUP_WS_EVENTS.RESTART_ICE).toBe('mediasoup:restartIce');
+    const req: RestartIceRequest = { code: 'ABCDEFGH', transportId: 't1' };
+    const res: RestartIceResponse = { iceParameters: {} };
+    expect([req.transportId, res.iceParameters]).toEqual(['t1', {}]);
   });
 
   it('MediasoupWsEventName union은 상수 값과 일치한다', () => {
@@ -97,7 +106,7 @@ describe('Mediasoup wire format', () => {
     };
     const j: ResumeConsumerRequest = { code: 'ABCDEFGH', consumerId: 'c1' };
     const k: NewProducerBroadcast = {
-      peerSocketId: 's1',
+      peerId: 'p-ab12',
       producerId: 'p1',
       kind: 'video',
       source: 'screen',

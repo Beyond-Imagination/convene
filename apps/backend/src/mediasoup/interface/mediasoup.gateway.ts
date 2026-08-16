@@ -10,6 +10,7 @@ import {
   type ProducerClosedBroadcast,
   type ProduceResponse,
   type ProducerToggledBroadcast,
+  type RestartIceResponse,
   type ToggleProducerResponse,
 } from '@convene/shared-interfaces';
 import { UsePipes } from '@nestjs/common';
@@ -33,12 +34,19 @@ import {
   GetRtpCapabilitiesDto,
   ListProducersDto,
   ProduceDto,
+  RestartIceDto,
   ResumeConsumerDto,
   ToggleProducerDto,
 } from '@/mediasoup/interface/mediasoup.dto';
 import { wsValidationPipe } from '@/shared-kernel/interface/ws-validation.pipe';
 
 const roomOf = (code: string): string => `meeting:${code}`;
+
+interface ProducerClosedPayload {
+  meetingCode: string;
+  participantId: string;
+  producerId: string;
+}
 
 interface ProducerCreatedPayload {
   meetingCode: string;
@@ -82,7 +90,7 @@ export class MediasoupGateway {
   ): Promise<CreateTransportResponse> {
     return this.service.createTransport({
       meetingCode: dto.code,
-      participantId: client.id,
+      participantId: this.participantIdOf(client),
       direction: dto.direction,
     });
   }
@@ -97,18 +105,18 @@ export class MediasoupGateway {
     try {
       await this.service.connectTransport({
         meetingCode: dto.code,
-        participantId: client.id,
+        participantId: this.participantIdOf(client),
         transportId: dto.transportId,
         dtlsParameters: dto.dtlsParameters,
       });
       this.logger.info(
-        { participantId: client.id, transportId: dto.transportId },
+        { participantId: this.participantIdOf(client), transportId: dto.transportId },
         'connectTransport completed',
       );
       return { ok: true };
     } catch (err) {
       this.logger.error(
-        { participantId: client.id, transportId: dto.transportId, err },
+        { participantId: this.participantIdOf(client), transportId: dto.transportId, err },
         'connectTransport failed',
       );
       throw err;
@@ -123,7 +131,7 @@ export class MediasoupGateway {
     try {
       const res = await this.service.produce({
         meetingCode: dto.code,
-        participantId: client.id,
+        participantId: this.participantIdOf(client),
         transportId: dto.transportId,
         kind: dto.kind,
         source: dto.source,
@@ -132,7 +140,7 @@ export class MediasoupGateway {
       });
       this.logger.info(
         {
-          participantId: client.id,
+          participantId: this.participantIdOf(client),
           kind: dto.kind,
           source: dto.source,
           producerId: res.producerId,
@@ -141,7 +149,7 @@ export class MediasoupGateway {
       );
       return res;
     } catch (err) {
-      this.logger.error({ participantId: client.id, kind: dto.kind, err }, 'produce failed');
+      this.logger.error({ participantId: this.participantIdOf(client), kind: dto.kind, err }, 'produce failed');
       throw err;
     }
   }
@@ -154,19 +162,19 @@ export class MediasoupGateway {
     try {
       const res = await this.service.consume({
         meetingCode: dto.code,
-        participantId: client.id,
+        participantId: this.participantIdOf(client),
         transportId: dto.transportId,
         producerId: dto.producerId,
         rtpCapabilities: dto.rtpCapabilities,
       });
       this.logger.info(
-        { participantId: client.id, producerId: dto.producerId, consumerId: res.id },
+        { participantId: this.participantIdOf(client), producerId: dto.producerId, consumerId: res.id },
         'consume completed',
       );
       return res;
     } catch (err) {
       this.logger.error(
-        { participantId: client.id, producerId: dto.producerId, err },
+        { participantId: this.participantIdOf(client), producerId: dto.producerId, err },
         'consume failed',
       );
       throw err;
@@ -181,7 +189,7 @@ export class MediasoupGateway {
     // Promise<void> 회피 — handleConnectTransport 주석 참조.
     await this.service.resumeConsumer({
       meetingCode: dto.code,
-      participantId: client.id,
+      participantId: this.participantIdOf(client),
       consumerId: dto.consumerId,
     });
     return { ok: true };
@@ -194,7 +202,7 @@ export class MediasoupGateway {
   ): Promise<ListProducersResponse> {
     return this.service.listProducers({
       meetingCode: dto.code,
-      participantId: client.id,
+      participantId: this.participantIdOf(client),
     });
   }
 
@@ -206,7 +214,7 @@ export class MediasoupGateway {
     // 소유 검증 + pause/resume 위임. 남의 producerId 면 service가 throw.
     await this.service.toggleProducer({
       meetingCode: dto.code,
-      participantId: client.id,
+      participantId: this.participantIdOf(client),
       producerId: dto.producerId,
       paused: dto.paused,
     });
@@ -217,7 +225,7 @@ export class MediasoupGateway {
     };
     this.server
       .to(roomOf(dto.code))
-      .except(client.id)
+      .except(this.participantIdOf(client))
       .emit(MEDIASOUP_WS_EVENTS.PRODUCER_TOGGLED, broadcast);
     return { ok: true };
   }
@@ -229,23 +237,44 @@ export class MediasoupGateway {
   ): Promise<{ ok: true }> {
     await this.service.closeProducer({
       meetingCode: dto.code,
-      participantId: client.id,
+      participantId: this.participantIdOf(client),
       producerId: dto.producerId,
     });
     // 같은 회의의 다른 참가자에게 producer 종료를 알린다(본인은 이미 닫음).
     const broadcast: ProducerClosedBroadcast = { producerId: dto.producerId };
     this.server
       .to(roomOf(dto.code))
-      .except(client.id)
+      .except(this.participantIdOf(client))
       .emit(MEDIASOUP_WS_EVENTS.PRODUCER_CLOSED, broadcast);
     return { ok: true };
+  }
+
+  @SubscribeMessage(MEDIASOUP_WS_EVENTS.RESTART_ICE)
+  async handleRestartIce(
+    @MessageBody() dto: RestartIceDto,
+    @ConnectedSocket() client: Socket,
+  ): Promise<RestartIceResponse> {
+    return this.service.restartIce({
+      meetingCode: dto.code,
+      participantId: this.participantIdOf(client),
+      transportId: dto.transportId,
+    });
+  }
+
+  @OnEvent(MEDIASOUP_EVENTS.PRODUCER_CLOSED)
+  onProducerClosed(payload: ProducerClosedPayload): void {
+    const broadcast: ProducerClosedBroadcast = { producerId: payload.producerId };
+    this.server
+      .to(roomOf(payload.meetingCode))
+      .except(payload.participantId)
+      .emit(MEDIASOUP_WS_EVENTS.PRODUCER_CLOSED, broadcast);
   }
 
   @OnEvent(MEDIASOUP_EVENTS.PRODUCER_CREATED)
   onProducerCreated(payload: ProducerCreatedPayload): void {
     const room = roomOf(payload.meetingCode);
     const broadcast: NewProducerBroadcast = {
-      peerSocketId: payload.participantId,
+      peerId: payload.participantId,
       producerId: payload.producerId,
       kind: payload.kind,
       source: payload.source,
@@ -255,5 +284,10 @@ export class MediasoupGateway {
       .to(room)
       .except(payload.participantId)
       .emit(MEDIASOUP_WS_EVENTS.NEW_PRODUCER, broadcast);
+  }
+
+  /** MeetingGateway가 join 때 심어 둔 안정 ID. join 이전 요청은 socket.id로 대체한다. */
+  private participantIdOf(client: Socket): string {
+    return (client.data?.participantId as string | undefined) ?? client.id;
   }
 }

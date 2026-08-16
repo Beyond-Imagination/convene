@@ -38,8 +38,13 @@ export interface UseMediasoupViewModel {
  * transport가 만든 ref를 나머지 둘에게 넘기는 것이 유일한 결합점이라, 기능별로
  * (송출 → useLocalMedia, 수신 → useRemoteMedia) 한 파일만 열면 된다.
  */
-export function useMediasoupViewModel(socket: Socket | null, code: string): UseMediasoupViewModel {
-  const transport = useMediasoupTransport(socket, code);
+export function useMediasoupViewModel(
+  socket: Socket | null,
+  code: string,
+  rejoinGen = 0,
+  rejoinPreservedMedia = false,
+): UseMediasoupViewModel {
+  const transport = useMediasoupTransport(socket, code, rejoinGen, rejoinPreservedMedia);
 
   const remote = useRemoteMedia({
     socket,
@@ -47,6 +52,7 @@ export function useMediasoupViewModel(socket: Socket | null, code: string): UseM
     status: transport.status,
     deviceRef: transport.deviceRef,
     recvTransportRef: transport.recvTransportRef,
+    resumeGen: transport.resumeGen,
   });
 
   const local = useLocalMedia({

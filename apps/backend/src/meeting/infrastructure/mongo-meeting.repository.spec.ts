@@ -73,6 +73,18 @@ describe('MongoMeetingRepository', () => {
     expect(found!.snapshot()).toEqual(meeting.snapshot());
   });
 
+  it('연결 정보(connectionId·끊김 시각)가 round-trip 된다 — 재시작 후에도 재접속으로 붙어야 한다', async () => {
+    const meeting = makeMeeting('abc12xyz');
+    meeting.addParticipant('p-1', '가', t0, 'socket-a');
+    meeting.disconnectParticipant('socket-a', t0);
+    await repo.save(meeting);
+
+    const found = await repo.findByCode('abc12xyz');
+
+    expect(found!.findByConnectionId('socket-a')?.id).toBe('p-1');
+    expect(found!.findParticipant('p-1')?.isDisconnected).toBe(true);
+  });
+
   it('같은 code를 다시 save 하면 덮어쓴다', async () => {
     const meeting = makeMeeting('abc12xyz');
     await repo.save(meeting);

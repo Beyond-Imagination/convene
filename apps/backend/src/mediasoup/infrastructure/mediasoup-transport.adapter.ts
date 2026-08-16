@@ -131,6 +131,12 @@ export class MediasoupTransportAdapter implements MediaTransportPort {
     if (producer && !producer.closed) producer.close();
   }
 
+  async restartIce(transportId: string): Promise<{ iceParameters: unknown }> {
+    const transport = this.requireTransport(transportId);
+    const iceParameters = await transport.restartIce();
+    return { iceParameters };
+  }
+
   async closeTransport(transportId: string): Promise<void> {
     const transport = this.transports.get(transportId);
     if (transport && !transport.closed) transport.close();

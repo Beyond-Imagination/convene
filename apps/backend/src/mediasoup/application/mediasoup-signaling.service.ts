@@ -8,7 +8,7 @@ import {
 } from '@convene/shared-interfaces';
 import { Inject, Injectable } from '@nestjs/common';
 
-import { ParticipantMedia } from '@/mediasoup/domain/participant-media';
+import { ParticipantMedia, ReleasedTransport } from '@/mediasoup/domain/participant-media';
 import { AUDIO_CAPTURE, AudioCapturePort } from '@/mediasoup/domain/ports/audio-capture.port';
 import { MEDIA_ROUTER, MediaRouterPort } from '@/mediasoup/domain/ports/media-router.port';
 import { MEDIA_TRANSPORT, MediaTransportPort } from '@/mediasoup/domain/ports/media-transport.port';
@@ -32,6 +32,10 @@ interface CreateTransportCommand extends ParticipantCommand {
 interface ConnectTransportCommand extends ParticipantCommand {
   transportId: string;
   dtlsParameters: unknown;
+}
+
+interface RestartIceCommand extends ParticipantCommand {
+  transportId: string;
 }
 
 interface ProduceCommand extends ParticipantCommand {
@@ -127,8 +131,13 @@ export class MediasoupSignalingService {
     return this.routerPort.getRtpCapabilities(command.meetingCode);
   }
 
+  /**
+   * 재연결로 다시 요청하면 이전 transport를 교체한다. 유예 동안 미디어를 살려 두므로
+   * 전면 재생성(ICE restart 실패 등)이 올 때 슬롯이 차 있는 상태로 도착한다.
+   */
   async createTransport(command: CreateTransportCommand): Promise<CreateTransportResponse> {
     const media = await this.requireParticipantMedia(command.participantId);
+    const released = media.releaseTransport(command.direction);
     const res = await this.transportPort.createWebRtcTransport({
       meetingCode: command.meetingCode,
       participantId: command.participantId,
@@ -136,11 +145,43 @@ export class MediasoupSignalingService {
     });
     media.attachTransport(command.direction, res.id);
     await this.participantMediaRepository.save(media);
+    if (released) await this.discardReleasedTransport(command, released);
     return res;
+  }
+
+  private async discardReleasedTransport(
+    command: CreateTransportCommand,
+    released: ReleasedTransport,
+  ): Promise<void> {
+    // transport를 닫으면 그 위의 producer·consumer도 함께 죽는다.
+    await this.transportPort.closeTransport(released.transportId);
+    if (released.producerIds.length > 0) {
+      // 배선이 죽은 producer를 물고 있으면 새 producer의 start가 dedup으로 무시된다.
+      await this.audioCapture.stop(command.meetingCode, command.participantId, 'left');
+    }
+    for (const producerId of released.producerIds) {
+      await this.routerPort.cleanupPipeProducers(command.meetingCode, producerId);
+      await this.eventPublisher.publish(MEDIASOUP_EVENTS.PRODUCER_CLOSED, {
+        meetingCode: command.meetingCode,
+        participantId: command.participantId,
+        producerId,
+      });
+    }
   }
 
   async connectTransport(command: ConnectTransportCommand): Promise<void> {
     await this.transportPort.connectTransport(command.transportId, command.dtlsParameters);
+  }
+
+  /** transport·producer·consumer를 유지한 채 ICE만 재협상한다. 남의 transport면 거부. */
+  async restartIce(command: RestartIceCommand): Promise<{ iceParameters: unknown }> {
+    const media = await this.requireParticipantMedia(command.participantId);
+    if (!media.ownsTransport(command.transportId)) {
+      throw new Error(
+        `ParticipantMedia(${command.participantId}) does not own transport ${command.transportId}`,
+      );
+    }
+    return this.transportPort.restartIce(command.transportId);
   }
 
   async produce(command: ProduceCommand): Promise<{ producerId: string }> {
@@ -278,7 +319,7 @@ export class MediasoupSignalingService {
       if (peer.participantId === command.participantId) continue;
       for (const producer of peer.producers) {
         producers.push({
-          peerSocketId: peer.participantId,
+          peerId: peer.participantId,
           producerId: producer.id,
           kind: producer.kind,
           source: producer.source,

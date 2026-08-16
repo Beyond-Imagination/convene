@@ -10,6 +10,7 @@ import { type MutableRefObject, useCallback, useEffect, useRef, useState } from 
 import type { Socket } from 'socket.io-client';
 
 import type { MediasoupConnectionStatus } from '@/feature/meeting/hooks/useMediasoupTransport';
+import { getMediaIntent, saveMediaIntent } from '@/shared/stores/meeting.storage';
 
 /** 마이크 토글 쿨다운. 서버 배선 재생성이 뒤따르므로 연타를 흘려보내지 않는다. */
 const AUDIO_TOGGLE_COOLDOWN_MS = 700;
@@ -98,7 +99,7 @@ export function useLocalMedia({
       screenStreamRef.current = null;
       setScreenStream(null);
       setLocalStream(null);
-      // 재연결/unmount 후엔 다시 기본 OFF로 시작한다(사용자가 재요청해야 켜짐).
+      // 상태만 되돌린다. 켜 둔 의도는 보관돼 있어 transport가 다시 ready가 되면 복원된다.
       setIsAudioMuted(true);
       setIsVideoMuted(true);
       setIsSharingScreen(false);
@@ -136,6 +137,7 @@ export function useLocalMedia({
         streamRef.current = null;
         if (kind === 'video') setLocalStream(null);
         setMuted(true);
+        saveMediaIntent(code, kind, false);
         return;
       }
 
@@ -180,6 +182,7 @@ export function useLocalMedia({
         streamRef.current = stream;
         if (kind === 'video') setLocalStream(stream);
         setMuted(false);
+        saveMediaIntent(code, kind, true);
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         reportError(message);
@@ -209,6 +212,22 @@ export function useLocalMedia({
   const toggleVideo = useCallback(() => {
     void toggleMedia('video', videoProducerRef, localStreamRef, setIsVideoMuted);
   }, [toggleMedia]);
+
+  /**
+   * 전면 재생성·새로고침으로 producer가 사라졌을 때 켜 뒀던 것을 되살린다.
+   * 화면 공유는 제외 — getDisplayMedia는 매번 사용자 제스처를 요구해 자동 재개가 불가능하다.
+   */
+  useEffect(() => {
+    if (status !== 'ready') return;
+    const intent = getMediaIntent(code);
+    // 연타 방지 쿨다운은 사용자 클릭용이다. 복원까지 막으면 오디오가 조용히 안 돌아온다.
+    if (intent.audio && audioProducerRef.current === null) {
+      void toggleMedia('audio', audioProducerRef, audioStreamRef, setIsAudioMuted);
+    }
+    if (intent.video && videoProducerRef.current === null) {
+      void toggleMedia('video', videoProducerRef, localStreamRef, setIsVideoMuted);
+    }
+  }, [status, code, toggleMedia]);
 
   const startScreenShare = useCallback(async () => {
     if (screenProducerRef.current !== null) return;

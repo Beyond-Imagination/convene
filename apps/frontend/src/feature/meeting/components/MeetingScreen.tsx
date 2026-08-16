@@ -56,17 +56,31 @@ export function MeetingScreen({
             내 닉네임: {nickname ?? '(미인증)'} · 참가자 {participantCount}명
           </p>
         </div>
-        <span className="text-muted rounded-full bg-white/10 px-3 py-1 text-xs font-medium">
-          {status === 'joined' ? '연결됨' : status}
+        <span
+          className={`rounded-full px-3 py-1 text-xs font-medium ${
+            status === 'reconnecting' ? 'bg-amber-500/20 text-amber-300' : 'text-muted bg-white/10'
+          }`}
+          data-testid="connection-status"
+        >
+          {status === 'joined' ? '연결됨' : status === 'reconnecting' ? '재접속 중…' : status}
         </span>
       </header>
 
       {/* 상태 배너 (연결/미디어 진행·오류) — role/testid 보존 */}
       {(status === 'connecting' ||
+        status === 'reconnecting' ||
         (status === 'error' && errorMessage !== null) ||
         mediaPreparing ||
         (mediasoup.status === 'error' && mediasoup.errorMessage !== null)) && (
         <div className="flex flex-col gap-1 px-5 py-2">
+          {status === 'reconnecting' && (
+            <p
+              className="text-xs text-amber-300"
+              role="status"
+            >
+              연결이 끊겼습니다. 다시 연결하는 중입니다…
+            </p>
+          )}
           {status === 'connecting' && (
             <p
               role="status"
@@ -115,7 +129,7 @@ export function MeetingScreen({
           {nickname !== null && <li data-testid="self-participant">{nickname} (나)</li>}
           {remoteParticipants.map((p) => (
             <li
-              key={p.socketId}
+              key={p.participantId}
               data-testid="remote-participant"
             >
               {p.nickname}
