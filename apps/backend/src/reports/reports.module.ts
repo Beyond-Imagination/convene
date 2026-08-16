@@ -14,6 +14,7 @@ import { MongoReportRepository } from '@/reports/infrastructure/mongo-report.rep
 import { NoopSummarizer } from '@/reports/infrastructure/noop.summarizer';
 import { ADMIN_API_TOKEN, AdminGuard } from '@/reports/interface/admin.guard';
 import { ReportsController } from '@/reports/interface/reports.controller';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 /**
  * Reports 기능을 구성하는 NestJS 모듈.
@@ -42,7 +43,11 @@ import { ReportsController } from '@/reports/interface/reports.controller';
           );
           return new NoopSummarizer();
         }
-        return new GeminiSummarizer(config);
+        return new GeminiSummarizer(
+          config,
+          globalThis.fetch,
+          new PinoLoggerAdapter(logger, GeminiSummarizer.name),
+        );
       },
       inject: [PinoLogger],
     },

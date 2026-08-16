@@ -15,11 +15,14 @@ import { GeminiSummarizer, GeminiSummarizerOptions } from './gemini.summarizer';
  *   { candidates: [{ content: { parts: [{ text: '<json string>' }] } }] }
  */
 describe('GeminiSummarizer', () => {
+  // retryBaseDelayMs=0이면 백오프 대기가 0ms라 재시도 동작만 빠르게 검증할 수 있다.
   const options: GeminiSummarizerOptions = {
     apiKey: 'TEST_KEY',
     model: 'gemini-2.5-flash',
     baseUrl: 'https://generativelanguage.googleapis.com',
     timeoutMs: 30000,
+    maxAttempts: 3,
+    retryBaseDelayMs: 0,
   };
 
   const meta = {
@@ -165,16 +168,14 @@ describe('GeminiSummarizer', () => {
   });
 
   it('non-2xx 응답이면 status가 포함된 에러를 throw 한다', async () => {
-    const fetchMock = jest
-      .fn()
-      .mockResolvedValueOnce(new Response('quota exceeded', { status: 429 }));
+    const fetchMock = jest.fn().mockResolvedValue(new Response('bad request', { status: 400 }));
     const summarizer = new GeminiSummarizer(options, fetchMock as unknown as typeof fetch);
 
-    await expect(summarizer.summarize({ transcript: [], chat: [], meta })).rejects.toThrow(/429/);
+    await expect(summarizer.summarize({ transcript: [], chat: [], meta })).rejects.toThrow(/400/);
   });
 
   it('fetch 자체가 reject 하면(예: 네트워크 실패) 그 에러를 그대로 전파한다', async () => {
-    const fetchMock = jest.fn().mockRejectedValueOnce(new Error('ECONNREFUSED'));
+    const fetchMock = jest.fn().mockRejectedValue(new Error('ECONNREFUSED'));
     const summarizer = new GeminiSummarizer(options, fetchMock as unknown as typeof fetch);
 
     await expect(summarizer.summarize({ transcript: [], chat: [], meta })).rejects.toThrow(
@@ -214,5 +215,93 @@ describe('GeminiSummarizer', () => {
     const summarizer = new GeminiSummarizer(options, fetchMock as unknown as typeof fetch);
 
     await expect(summarizer.summarize({ transcript: [], chat: [], meta })).rejects.toThrow(/title/);
+  });
+
+  /** 다시 호출하면 결과가 달라질 수 있는 실패만 재시도한다. */
+  describe('재시도', () => {
+    it('5xx 응답은 재시도하고, 성공하면 요약을 돌려준다', async () => {
+      const fetchMock = jest
+        .fn()
+        .mockResolvedValueOnce(new Response('unavailable', { status: 503 }))
+        .mockResolvedValueOnce(okResponse(validSummaryJson));
+      const summarizer = new GeminiSummarizer(options, fetchMock as unknown as typeof fetch);
+
+      const summary = await summarizer.summarize({ transcript: [], chat: [], meta });
+      expect(summary.title).toBe('주간 동기화');
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('429(rate limit) 응답도 재시도한다', async () => {
+      const fetchMock = jest
+        .fn()
+        .mockResolvedValueOnce(new Response('quota exceeded', { status: 429 }))
+        .mockResolvedValueOnce(okResponse(validSummaryJson));
+      const summarizer = new GeminiSummarizer(options, fetchMock as unknown as typeof fetch);
+
+      await summarizer.summarize({ transcript: [], chat: [], meta });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('네트워크 실패(fetch reject)도 재시도한다', async () => {
+      const fetchMock = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('ECONNRESET'))
+        .mockResolvedValueOnce(okResponse(validSummaryJson));
+      const summarizer = new GeminiSummarizer(options, fetchMock as unknown as typeof fetch);
+
+      await summarizer.summarize({ transcript: [], chat: [], meta });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('4xx(요청·인증 문제)는 재시도하지 않고 즉시 실패한다', async () => {
+      const fetchMock = jest.fn().mockResolvedValue(new Response('forbidden', { status: 403 }));
+      const summarizer = new GeminiSummarizer(options, fetchMock as unknown as typeof fetch);
+
+      await expect(summarizer.summarize({ transcript: [], chat: [], meta })).rejects.toThrow();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('응답 본문 파싱 실패는 재시도하지 않는다', async () => {
+      const fetchMock = jest.fn().mockResolvedValue(okResponse('not a json'));
+      const summarizer = new GeminiSummarizer(options, fetchMock as unknown as typeof fetch);
+
+      await expect(summarizer.summarize({ transcript: [], chat: [], meta })).rejects.toThrow();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('maxAttempts 만큼만 시도하고 마지막 에러를 전파한다', async () => {
+      const fetchMock = jest.fn().mockResolvedValue(new Response('unavailable', { status: 503 }));
+      const summarizer = new GeminiSummarizer(options, fetchMock as unknown as typeof fetch);
+
+      await expect(summarizer.summarize({ transcript: [], chat: [], meta })).rejects.toThrow(/503/);
+      expect(fetchMock).toHaveBeenCalledTimes(options.maxAttempts);
+    });
+
+    it('maxAttempts=1이면 재시도하지 않는다', async () => {
+      const fetchMock = jest.fn().mockResolvedValue(new Response('unavailable', { status: 503 }));
+      const summarizer = new GeminiSummarizer(
+        { ...options, maxAttempts: 1 },
+        fetchMock as unknown as typeof fetch,
+      );
+
+      await expect(summarizer.summarize({ transcript: [], chat: [], meta })).rejects.toThrow();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('재시도 전에 백오프만큼 실제로 기다린다', async () => {
+      const fetchMock = jest
+        .fn()
+        .mockResolvedValueOnce(new Response('unavailable', { status: 503 }))
+        .mockResolvedValueOnce(okResponse(validSummaryJson));
+      const summarizer = new GeminiSummarizer(
+        { ...options, retryBaseDelayMs: 60 },
+        fetchMock as unknown as typeof fetch,
+      );
+
+      const startedAt = Date.now();
+      await summarizer.summarize({ transcript: [], chat: [], meta });
+      // jitter가 걸리므로 정확한 값이 아니라 하한(상한의 절반)만 단언한다.
+      expect(Date.now() - startedAt).toBeGreaterThanOrEqual(25);
+    });
   });
 });

@@ -1,15 +1,34 @@
-/**
- * ai-worker HTTP base URL을 환경변수에서 해석한다.
- */
+import { positiveInteger } from './required-env';
 
 export const DEFAULT_AI_WORKER_BASE_URL = 'http://localhost:8000';
 
-export function resolveAiWorkerBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
+export const DEFAULT_AI_WORKER_MAX_ATTEMPTS = 3;
+export const DEFAULT_AI_WORKER_RETRY_BASE_DELAY_MS = 500;
+
+export interface AiWorkerConfig {
+  readonly baseUrl: string;
+  readonly maxAttempts: number;
+  readonly retryBaseDelayMs: number;
+}
+
+export function resolveAiWorkerConfig(env: NodeJS.ProcessEnv = process.env): AiWorkerConfig {
   const raw = env.AI_WORKER_BASE_URL;
-  if (raw === undefined || raw.trim() === '') return DEFAULT_AI_WORKER_BASE_URL;
-  const trimmed = raw.trim().replace(/\/+$/, '');
-  if (!/^https?:\/\//.test(trimmed)) {
-    throw new Error(`AI_WORKER_BASE_URL must use the http:// or https:// scheme: "${raw}"`);
+
+  let baseUrl = DEFAULT_AI_WORKER_BASE_URL;
+  if (raw !== undefined && raw.trim() !== '') {
+    baseUrl = raw.trim().replace(/\/+$/, '');
+    if (!/^https?:\/\//.test(baseUrl)) {
+      throw new Error(`AI_WORKER_BASE_URL must use the http:// or https:// scheme: "${raw}"`);
+    }
   }
-  return trimmed;
+
+  return {
+    baseUrl,
+    maxAttempts: positiveInteger(env, 'AI_WORKER_MAX_ATTEMPTS', DEFAULT_AI_WORKER_MAX_ATTEMPTS),
+    retryBaseDelayMs: positiveInteger(
+      env,
+      'AI_WORKER_RETRY_BASE_DELAY_MS',
+      DEFAULT_AI_WORKER_RETRY_BASE_DELAY_MS,
+    ),
+  };
 }
