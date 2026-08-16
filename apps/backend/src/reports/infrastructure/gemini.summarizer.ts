@@ -1,14 +1,19 @@
 import { Injectable } from '@nestjs/common';
 
+import { geminiRetryDelayMs } from '@/config/gemini.config';
 import { SummarizerInput, SummarizerPort } from '@/reports/domain/ports/summarizer.port';
 import { buildPrompt, SUMMARY_RESPONSE_SCHEMA } from '@/reports/infrastructure/summary-prompt';
 import { ReportSummary, reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
+import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 
 export interface GeminiSummarizerOptions {
   readonly apiKey: string;
   readonly model: string;
   readonly baseUrl: string;
   readonly timeoutMs: number;
+  /** 첫 호출 포함 총 시도 횟수. 1이면 재시도 없음. */
+  readonly maxAttempts: number;
+  readonly retryBaseDelayMs: number;
 }
 
 /**
@@ -16,6 +21,33 @@ export interface GeminiSummarizerOptions {
  * Gemini default(1.0)보다 낮은 temperature로 출력 변동을 줄인다.
  */
 const SUMMARY_TEMPERATURE = 0.2;
+
+interface GeminiGenerateContentResponse {
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+}
+
+/** Gemini REST가 2xx가 아닌 응답을 돌려줄 때 던지는 에러. */
+class GeminiApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'GeminiApiError';
+  }
+}
+
+/**
+ * 다시 호출하면 결과가 달라질 수 있는 실패인지 판정한다.
+ * 요청 자체가 잘못됐거나(4xx) 키가 막힌 경우는 몇 번을 보내도 같으므로 재시도하지 않는다.
+ */
+function isRetryable(error: unknown): boolean {
+  if (error instanceof GeminiApiError) {
+    return error.status === 408 || error.status === 429 || error.status >= 500;
+  }
+  // fetch 자체의 reject — 네트워크 단절이거나 타임아웃 abort.
+  return true;
+}
 
 /**
  * Gemini `generateContent` REST API 기반 SummarizerPort 어댑터.
@@ -27,42 +59,21 @@ export class GeminiSummarizer implements SummarizerPort {
   constructor(
     private readonly options: GeminiSummarizerOptions,
     private readonly fetchFn: typeof fetch = globalThis.fetch,
+    private readonly logger: PinoLoggerAdapter | null = null,
   ) {}
 
   async summarize(input: SummarizerInput): Promise<ReportSummary> {
     const url = `${this.options.baseUrl}/v1beta/models/${this.options.model}:generateContent?key=${this.options.apiKey}`;
-    const prompt = buildPrompt(input);
+    const body = JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: buildPrompt(input) }] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: SUMMARY_TEMPERATURE,
+        responseSchema: SUMMARY_RESPONSE_SCHEMA,
+      },
+    });
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.options.timeoutMs);
-    let response: Response;
-    try {
-      response = await this.fetchFn(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            temperature: SUMMARY_TEMPERATURE,
-            responseSchema: SUMMARY_RESPONSE_SCHEMA,
-          },
-        }),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timer);
-    }
-
-    if (!response.ok) {
-      throw new Error(
-        `Gemini generateContent request failed: ${response.status} ${response.statusText}`,
-      );
-    }
-
-    const payload = (await response.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-    };
+    const payload = await this.requestWithRetry(url, body);
     const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (typeof text !== 'string' || text.length === 0) {
       throw new Error('Gemini generateContent response has no candidate text');
@@ -83,6 +94,55 @@ export class GeminiSummarizer implements SummarizerPort {
       actionItems: asActionItemArray(parsed.actionItems),
       keyTopics: asKeyTopicArray(parsed.keyTopics),
     });
+  }
+
+  /**
+   * 일시적 실패만 지수 백오프로 재시도한다.
+   *
+   * 응답 본문 해석(candidate 추출·JSON.parse·VO 검증)은 이 밖에서 하므로 재시도 대상이 아니다 —
+   * 모델이 같은 입력에 같은 형식으로 답할 뿐인데 호출 비용만 늘어난다.
+   */
+  private async requestWithRetry(
+    url: string,
+    body: string,
+  ): Promise<GeminiGenerateContentResponse> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.request(url, body);
+      } catch (error) {
+        if (attempt >= this.options.maxAttempts || !isRetryable(error)) throw error;
+
+        const delayMs = geminiRetryDelayMs(attempt, this.options.retryBaseDelayMs);
+        this.logger?.warn({ attempt, delayMs, err: error }, 'gemini summarize retrying');
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
+  /** 타임아웃은 시도마다 새로 잡는다. 응답 body 읽기까지 abort 보호 범위에 둔다. */
+  private async request(url: string, body: string): Promise<GeminiGenerateContentResponse> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.options.timeoutMs);
+
+    try {
+      const response = await this.fetchFn(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new GeminiApiError(
+          response.status,
+          `Gemini generateContent request failed: ${response.status} ${response.statusText}`,
+        );
+      }
+
+      return (await response.json()) as GeminiGenerateContentResponse;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 }
 
