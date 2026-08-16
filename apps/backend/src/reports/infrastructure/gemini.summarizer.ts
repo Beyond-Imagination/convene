@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 
-import { geminiRetryDelayMs } from '@/config/gemini.config';
 import { SummarizerInput, SummarizerPort } from '@/reports/domain/ports/summarizer.port';
 import { buildPrompt, SUMMARY_RESPONSE_SCHEMA } from '@/reports/infrastructure/summary-prompt';
 import { ReportSummary, reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
+import { isRetryableHttpStatus, withRetry } from '@/shared-kernel/infrastructure/retry';
 
 export interface GeminiSummarizerOptions {
   readonly apiKey: string;
@@ -37,14 +37,8 @@ class GeminiApiError extends Error {
   }
 }
 
-/**
- * 다시 호출하면 결과가 달라질 수 있는 실패인지 판정한다.
- * 요청 자체가 잘못됐거나(4xx) 키가 막힌 경우는 몇 번을 보내도 같으므로 재시도하지 않는다.
- */
 function isRetryable(error: unknown): boolean {
-  if (error instanceof GeminiApiError) {
-    return error.status === 408 || error.status === 429 || error.status >= 500;
-  }
+  if (error instanceof GeminiApiError) return isRetryableHttpStatus(error.status);
   // fetch 자체의 reject — 네트워크 단절이거나 타임아웃 abort.
   return true;
 }
@@ -73,7 +67,19 @@ export class GeminiSummarizer implements SummarizerPort {
       },
     });
 
-    const payload = await this.requestWithRetry(url, body);
+    // 응답 본문 해석(candidate 추출·JSON.parse·VO 검증)은 재시도 대상이 아니다 —
+    // 모델이 같은 입력에 같은 형식으로 답할 뿐인데 호출 비용만 늘어난다.
+    const payload = await withRetry(
+      {
+        maxAttempts: this.options.maxAttempts,
+        baseDelayMs: this.options.retryBaseDelayMs,
+        isRetryable,
+        onRetry: (attempt, delayMs, error) =>
+          this.logger?.warn({ attempt, delayMs, err: error }, 'gemini summarize retrying'),
+      },
+      () => this.request(url, body),
+    );
+
     const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (typeof text !== 'string' || text.length === 0) {
       throw new Error('Gemini generateContent response has no candidate text');
@@ -94,29 +100,6 @@ export class GeminiSummarizer implements SummarizerPort {
       actionItems: asActionItemArray(parsed.actionItems),
       keyTopics: asKeyTopicArray(parsed.keyTopics),
     });
-  }
-
-  /**
-   * 일시적 실패만 지수 백오프로 재시도한다.
-   *
-   * 응답 본문 해석(candidate 추출·JSON.parse·VO 검증)은 이 밖에서 하므로 재시도 대상이 아니다 —
-   * 모델이 같은 입력에 같은 형식으로 답할 뿐인데 호출 비용만 늘어난다.
-   */
-  private async requestWithRetry(
-    url: string,
-    body: string,
-  ): Promise<GeminiGenerateContentResponse> {
-    for (let attempt = 1; ; attempt++) {
-      try {
-        return await this.request(url, body);
-      } catch (error) {
-        if (attempt >= this.options.maxAttempts || !isRetryable(error)) throw error;
-
-        const delayMs = geminiRetryDelayMs(attempt, this.options.retryBaseDelayMs);
-        this.logger?.warn({ attempt, delayMs, err: error }, 'gemini summarize retrying');
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-      }
-    }
   }
 
   /** 타임아웃은 시도마다 새로 잡는다. 응답 body 읽기까지 abort 보호 범위에 둔다. */

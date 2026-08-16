@@ -4,8 +4,6 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_RETRY_BASE_DELAY_MS,
   DEFAULT_GEMINI_TIMEOUT_MS,
-  GEMINI_RETRY_MAX_DELAY_MS,
-  geminiRetryDelayMs,
   resolveGeminiConfig,
 } from './gemini.config';
 
@@ -87,22 +85,5 @@ describe('resolveGeminiConfig', () => {
         GEMINI_BASE_URL: 'ftp://x',
       }),
     ).toThrow(/GEMINI_BASE_URL/);
-  });
-});
-
-describe('geminiRetryDelayMs', () => {
-  it('재시도가 거듭될수록 대기 상한이 2배씩 늘어난다', () => {
-    expect(geminiRetryDelayMs(1, 500, () => 1)).toBe(500);
-    expect(geminiRetryDelayMs(2, 500, () => 1)).toBe(1_000);
-    expect(geminiRetryDelayMs(3, 500, () => 1)).toBe(2_000);
-  });
-
-  it('jitter로 상한의 절반에서 상한 사이를 흔든다', () => {
-    expect(geminiRetryDelayMs(1, 500, () => 0)).toBe(250);
-    expect(geminiRetryDelayMs(1, 500, () => 0.5)).toBe(375);
-  });
-
-  it('아무리 커져도 상한을 넘지 않는다', () => {
-    expect(geminiRetryDelayMs(100, 500, () => 1)).toBe(GEMINI_RETRY_MAX_DELAY_MS);
   });
 });
