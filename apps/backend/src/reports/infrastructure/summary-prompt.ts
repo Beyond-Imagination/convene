@@ -1,3 +1,4 @@
+import { TranscriptSegment } from '@/reports/domain/entries/transcript-segment';
 import { SummarizerInput } from '@/reports/domain/ports/summarizer.port';
 
 /**
@@ -44,6 +45,38 @@ export const SUMMARY_RESPONSE_SCHEMA = {
   propertyOrdering: ['title', 'overview', 'decisions', 'actionItems', 'keyTopics'],
 } as const;
 
+interface Utterance {
+  startMs: number;
+  speaker: string;
+  text: string;
+}
+
+/** 회의 시작 기준 경과 시각. 한 시간이 넘으면 분이 그대로 누적된다(`75:05`). */
+function formatOffset(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+  const seconds = String(totalSeconds % 60).padStart(2, '0');
+  return `${minutes}:${seconds}`;
+}
+
+/**
+ * STT가 5~8초 단위로 끊어 놓은 조각을 화자별로 다시 잇는다.
+ * 줄마다 반복되던 화자명이 사라지고, 잘린 문장이 온전해져 모델이 읽기도 낫다.
+ */
+function mergeConsecutive(transcript: ReadonlyArray<TranscriptSegment>): Utterance[] {
+  const merged: Utterance[] = [];
+  for (const seg of transcript) {
+    const speaker = seg.speaker ?? 'unknown';
+    const last = merged[merged.length - 1];
+    if (last !== undefined && last.speaker === speaker) {
+      last.text += ` ${seg.text}`;
+      continue;
+    }
+    merged.push({ startMs: seg.startMs, speaker, text: seg.text });
+  }
+  return merged;
+}
+
 /**
  * 프롬프트는 회의 메타(코드/시각) + transcript 발화별 라인 + chat 라인을 한 묶음으로 모델에 넘긴다.
  *
@@ -52,9 +85,13 @@ export const SUMMARY_RESPONSE_SCHEMA = {
  * transcript/chat 원본은 한국어 그대로 들어가며 번역하지 않는다.
  *
  * JSON 형식 강제는 `generationConfig.responseMimeType`으로도 한 번 더 보강.
+ *
+ * 발화·채팅 줄에는 회의 시작 기준 mm:ss만 남긴다 — 요약에 필요한 건 순서와 대략의 시점이고,
+ * ms 단위 구간은 줄마다 본문만 한 분량을 차지한다.
  */
 export function buildPrompt(input: SummarizerInput): string {
   const { transcript, chat, meta } = input;
+  const meetingStartMs = meta.startedAt.getTime();
   const lines: string[] = [];
   lines.push('You are an assistant that produces structured business-meeting minutes.');
   lines.push('Read the meeting inputs below and write a clean, decision-oriented summary.');
@@ -63,40 +100,40 @@ export function buildPrompt(input: SummarizerInput): string {
   );
   lines.push('');
   lines.push('## Meeting metadata');
-  lines.push(`- meetingId: ${meta.meetingId}`);
   lines.push(`- code: ${meta.code}`);
   lines.push(`- startedAt: ${meta.startedAt.toISOString()}`);
   lines.push(`- endedAt: ${meta.endedAt.toISOString()}`);
   lines.push('');
-  lines.push('## Transcript (speaker utterances)');
+  lines.push('## Transcript [mm:ss from start]');
   if (transcript.length === 0) {
     lines.push('(no utterances)');
   } else {
-    for (const seg of transcript) {
-      const speaker = seg.speaker ?? 'unknown';
-      lines.push(`- [${seg.startMs}ms~${seg.endMs}ms] ${speaker}: ${seg.text}`);
+    for (const utterance of mergeConsecutive(transcript)) {
+      lines.push(`- [${formatOffset(utterance.startMs)}] ${utterance.speaker}: ${utterance.text}`);
     }
   }
   lines.push('');
-  lines.push('## Chat messages');
+  lines.push('## Chat');
   if (chat.length === 0) {
     lines.push('(no chat)');
   } else {
     for (const c of chat) {
-      lines.push(`- [${c.sentAt.toISOString()}] ${c.nickname}: ${c.text}`);
+      lines.push(
+        `- [${formatOffset(c.sentAt.getTime() - meetingStartMs)}] ${c.nickname}: ${c.text}`,
+      );
     }
   }
   lines.push('');
   lines.push('## Output format');
   lines.push(
-    'Respond with a single raw JSON object that conforms exactly to the schema below. No code fences, no markdown, no commentary — JSON only. All string values must be written in Korean.',
+    'Respond with a single raw JSON object that conforms exactly to the schema below. No code fences, no markdown, no commentary — JSON only.',
   );
   lines.push('{');
-  lines.push('  "title": string,                       // Korean meeting title (1-200 chars)');
-  lines.push('  "overview": string,                    // Korean summary, 1-1000 chars');
-  lines.push('  "decisions": string[],                 // Korean decision statements');
+  lines.push('  "title": string, // ≤200 chars');
+  lines.push('  "overview": string, // ≤1000 chars');
+  lines.push('  "decisions": string[],');
   lines.push('  "actionItems": [{ "owner"?: string, "task": string, "due"?: string }],');
-  lines.push('  "keyTopics":   [{ "topic": string, "points": string[] }]');
+  lines.push('  "keyTopics": [{ "topic": string, "points": string[] }]');
   lines.push('}');
   return lines.join('\n');
 }
