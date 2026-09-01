@@ -29,7 +29,7 @@ export function JoinMeetingForm({ status, register, errors, handleSubmit }: Join
             id="join-code"
             type="text"
             autoComplete="off"
-            placeholder="예: abc-defg-hij"
+            placeholder="예: a3k9zq1m"
             className="field-input font-mono"
             aria-invalid={errors.code !== undefined}
             {...register('code')}
