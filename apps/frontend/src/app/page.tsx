@@ -1,11 +1,10 @@
 'use client';
 
-import Link from 'next/link';
-
 import { CreateMeetingForm } from '@/feature/meeting/components/CreateMeetingForm';
 import { JoinMeetingForm } from '@/feature/meeting/components/JoinMeetingForm';
 import { useCreateMeetingViewModel } from '@/feature/meeting/hooks/useCreateMeetingViewModel';
 import { useJoinMeetingViewModel } from '@/feature/meeting/hooks/useJoinMeetingViewModel';
+import { AppHeader } from '@/shared/AppHeader';
 
 /**
  * 홈 페이지. 세 액션을 노출:
@@ -20,22 +19,7 @@ export default function HomePage() {
   const joinVm = useJoinMeetingViewModel();
   return (
     <div className="bg-paper flex min-h-screen flex-col">
-      <header className="border-border px-gutter py-gutter-sm flex items-baseline justify-between gap-4 border-b">
-        <div className="flex items-baseline gap-3 md:gap-5">
-          <span className="text-text text-wordmark font-extrabold tracking-[-0.038em]">
-            Convene
-          </span>
-          <span className="text-muted text-meta hidden font-mono font-medium tracking-[0.03em] md:inline">
-            for Beyond_Imagination
-          </span>
-        </div>
-        <Link
-          href="/reports"
-          className="text-muted hover:text-accent-on text-meta font-semibold transition-colors"
-        >
-          회의록
-        </Link>
-      </header>
+      <AppHeader />
 
       <main className="grid flex-1 md:grid-cols-2">
         <section className="border-border px-gutter py-panel-y flex flex-col justify-center border-b md:max-w-[760px] md:border-b-0 md:border-r">
