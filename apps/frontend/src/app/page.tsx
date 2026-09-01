@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 
 import { CreateMeetingForm } from '@/feature/meeting/components/CreateMeetingForm';
@@ -20,39 +19,32 @@ export default function HomePage() {
   const createVm = useCreateMeetingViewModel();
   const joinVm = useJoinMeetingViewModel();
   return (
-    <main className="bg-bg flex min-h-screen flex-col items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md">
-        <header className="mb-8 text-center">
-          <div className="inline-flex items-center gap-2">
-            <Image src="/logo.svg" alt="" width={28} height={28} priority aria-hidden />
-            <span className="text-text text-2xl font-extrabold tracking-tight">Convene</span>
-          </div>
-          <p className="text-muted mt-2 text-sm">링크 하나로 시작하는 화상회의 · 채팅 · 회의록</p>
-        </header>
+    <div className="bg-paper flex min-h-screen flex-col">
+      <header className="border-border flex items-baseline justify-between gap-4 border-b px-5 pb-3.5 pt-11 md:px-16 md:pb-7 md:pt-8">
+        <div className="flex items-baseline gap-3 md:gap-5">
+          <span className="text-text text-2xl font-extrabold tracking-[-0.035em] md:text-4xl md:tracking-[-0.038em]">
+            Convene
+          </span>
+          <span className="text-muted hidden font-mono text-base font-medium tracking-[0.03em] md:inline">
+            for Beyond_Imagination
+          </span>
+        </div>
+        <Link
+          href="/reports"
+          className="text-muted hover:text-accent-on text-[13px] font-semibold transition-colors md:text-[17px]"
+        >
+          회의록
+        </Link>
+      </header>
 
-        <section className="border-border bg-surface rounded-xl border p-6 shadow-sm">
+      <main className="grid flex-1 md:grid-cols-2">
+        <section className="border-border flex flex-col justify-center border-b px-5 py-5 md:max-w-[760px] md:border-b-0 md:border-r md:px-16 md:py-[70px]">
           <CreateMeetingForm {...createVm} />
         </section>
-
-        <div className="text-muted my-6 flex items-center gap-3 text-xs">
-          <span className="bg-border h-px flex-1" />
-          또는
-          <span className="bg-border h-px flex-1" />
-        </div>
-
-        <section className="border-border bg-surface rounded-xl border p-6 shadow-sm">
+        <section className="flex flex-col justify-center px-5 py-5 md:max-w-[760px] md:px-16 md:py-[70px]">
           <JoinMeetingForm {...joinVm} />
         </section>
-
-        <nav className="mt-8 text-center">
-          <Link
-            href="/reports"
-            className="text-muted hover:text-accent text-sm font-medium transition-colors"
-          >
-            지난 회의록 보기 →
-          </Link>
-        </nav>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
