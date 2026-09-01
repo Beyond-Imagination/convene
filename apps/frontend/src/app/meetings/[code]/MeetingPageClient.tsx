@@ -26,17 +26,20 @@ function ChatSection({
   code,
   myNickname,
   history,
+  onClose,
 }: {
   readonly socket: Socket | null;
   readonly code: string;
   readonly myNickname: string | null;
   readonly history: ReadonlyArray<ChatPostedBroadcast>;
+  readonly onClose: () => void;
 }) {
   const chatVm = useChatViewModel(socket, code, history);
   return (
     <ChatPanel
       {...chatVm}
       myNickname={myNickname}
+      onClose={onClose}
     />
   );
 }
@@ -62,6 +65,8 @@ function MeetingSession({ code }: { readonly code: string }) {
   // self 타일(항상 1) + 원격 참가자 수 = 전체 비디오 타일 수.
   const totalTiles = 1 + meetingVm.remoteParticipants.length;
   const layout = useMeetingLayoutViewModel(totalTiles);
+  // 제목과 방이 열린 시각은 소켓 ack에 실려 오지 않아 회의 정보를 따로 읽는다.
+  const card = useMeetingCardViewModel(code);
   const gateVm = useNicknameGateViewModel(code);
 
   // 닉네임이 없는 두 경우를 구분한다:
@@ -72,18 +77,24 @@ function MeetingSession({ code }: { readonly code: string }) {
     return (
       <NicknameGate
         code={code}
+        title={card.meeting?.title ?? null}
         {...gateVm}
       />
     );
   }
 
   return (
-    <div className="theme-dark bg-bg text-text flex h-screen overflow-hidden">
+    <div className="bg-bg text-text flex h-screen overflow-hidden">
       <MeetingScreen
         {...meetingVm}
         mediasoup={mediasoupVm}
+        title={card.meeting?.title ?? null}
+        startedAt={card.meeting?.startedAt ?? null}
         isChatOpen={layout.isChatOpen}
         onToggleChat={layout.toggleChat}
+        variant={layout.variant}
+        isStripOpen={layout.isStripOpen}
+        onToggleStrip={layout.toggleStrip}
         page={layout.page}
         pageSize={layout.pageSize}
         pageCount={layout.pageCount}
@@ -94,7 +105,7 @@ function MeetingSession({ code }: { readonly code: string }) {
       />
       {/* 닫아도 unmount 하지 않는다 — 안 그러면 채팅 기록이 사라지고 그 동안의 메시지도 놓친다. */}
       <aside
-        className={`border-border bg-surface w-80 shrink-0 flex-col border-l ${
+        className={`border-border bg-paper fixed inset-0 z-20 flex-col border-l md:static md:z-auto md:w-[clamp(18rem,24vw,25rem)] md:shrink-0 md:pl-7 md:pr-8 ${
           layout.isChatOpen ? 'flex' : 'hidden'
         }`}
       >
@@ -103,6 +114,7 @@ function MeetingSession({ code }: { readonly code: string }) {
           code={code}
           myNickname={meetingVm.nickname}
           history={meetingVm.chatHistory}
+          onClose={layout.toggleChat}
         />
       </aside>
     </div>

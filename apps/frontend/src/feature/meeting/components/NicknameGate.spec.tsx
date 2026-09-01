@@ -27,6 +27,20 @@ describe('NicknameGate', () => {
     expect(screen.getByRole('button', { name: /입장/ })).toBeInTheDocument();
   });
 
+  it('회의 제목이 있으면 어떤 회의에 들어가는지 같이 보여준다', () => {
+    const { unmount } = render(<NicknameGate {...baseProps} />);
+    expect(screen.queryByText('주간 스프린트 회의')).toBeNull();
+    unmount();
+
+    render(
+      <NicknameGate
+        {...baseProps}
+        title="주간 스프린트 회의"
+      />,
+    );
+    expect(screen.getByText('주간 스프린트 회의')).toBeInTheDocument();
+  });
+
   it('errors.nickname이 있으면 에러 메시지를 노출한다', () => {
     render(
       <NicknameGate

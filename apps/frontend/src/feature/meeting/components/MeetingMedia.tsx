@@ -6,26 +6,24 @@ import { MicOffIcon, VideoOffIcon } from '@/feature/meeting/components/icons';
 import { useMediaElementBinding } from '@/feature/meeting/hooks/useMediaElementBinding';
 import type { RemoteMediaEntry } from '@/feature/meeting/hooks/useMediasoupViewModel';
 
-/**
- * red → orange → yellow → green → cyan → blue → violet → magenta.
- */
-const PALETTE = [
-  { avatar: 'bg-red-600', tile: 'bg-red-950' },
-  { avatar: 'bg-orange-600', tile: 'bg-orange-950' },
-  { avatar: 'bg-yellow-600', tile: 'bg-yellow-950' },
-  { avatar: 'bg-emerald-600', tile: 'bg-emerald-950' },
-  { avatar: 'bg-cyan-600', tile: 'bg-cyan-950' },
-  { avatar: 'bg-blue-600', tile: 'bg-blue-950' },
-  { avatar: 'bg-violet-600', tile: 'bg-violet-950' },
-  { avatar: 'bg-fuchsia-600', tile: 'bg-fuchsia-950' },
+/** 채도를 낮춰 타일 배경과 부딪히지 않게 고른 색들. */
+const AVATAR_COLORS = [
+  'bg-[#7a6a5c]',
+  'bg-[#5f8a74]',
+  'bg-[#8a6f64]',
+  'bg-[#7d6a83]',
+  'bg-[#5d7f86]',
+  'bg-[#8f7f6b]',
+  'bg-[#8a6a52]',
+  'bg-[#5f728a]',
 ] as const;
 
-const colorFor = (label: string): (typeof PALETTE)[number] => {
+const avatarColorFor = (label: string): string => {
   let hash = 0;
   for (let i = 0; i < label.length; i += 1) {
     hash = (hash * 31 + label.charCodeAt(i)) >>> 0;
   }
-  return PALETTE[hash % PALETTE.length];
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
 };
 
 /**
@@ -42,22 +40,17 @@ const useTileStream = (
 
 /**
  * 비디오가 꺼진(또는 아직 없는) 타일을 덮는 오버레이.
- * 검은 화면 대신 닉네임 이니셜 아바타 + 카메라 OFF 아이콘을 보여준다.
  * 색은 닉네임 해시로 정해 사람마다 다르되 같은 사람은 항상 같은 색을 쓴다.
  */
 function VideoTilePlaceholder({ label }: { readonly label: string }) {
   const initial = label.trim().charAt(0).toUpperCase() || '?';
-  const color = colorFor(label);
   return (
-    <div
-      className={`absolute inset-0 flex flex-col items-center justify-center gap-3 ${color.tile}`}
-    >
+    <div className="bg-tile-off absolute inset-0 grid place-items-center">
       <div
-        className={`flex h-16 w-16 items-center justify-center rounded-full text-2xl font-semibold text-white ${color.avatar}`}
+        className={`text-title grid h-11 w-11 place-items-center rounded-full font-bold text-white md:h-[58px] md:w-[58px] ${avatarColorFor(label)}`}
       >
         {initial}
       </div>
-      <VideoOffIcon className="h-7 w-7 text-white/70" />
     </div>
   );
 }
@@ -71,7 +64,7 @@ export interface VideoTileProps {
   readonly track?: MediaStreamTrack | null;
   /** 카메라가 꺼져 있으면 검은 화면 대신 placeholder를 덮는다. */
   readonly isVideoOff?: boolean;
-  /** 마이크가 음소거면 이름표에 마이크 OFF 배지를 표시한다. */
+  /** 마이크가 음소거면 배지를 표시한다. */
   readonly isAudioOff?: boolean;
   /** 연결이 끊겨 복귀를 기다리는 중. 타일은 유지하고 상태만 덮어 보여준다. */
   readonly isDisconnected?: boolean;
@@ -97,7 +90,7 @@ export const VideoTile = memo(function VideoTile({
   return (
     <figure
       data-testid={isSelf === true ? 'local-video-tile' : 'remote-video-tile'}
-      className="relative m-0 h-full w-full overflow-hidden rounded-lg bg-black"
+      className="bg-tile-off relative m-0 h-full w-full overflow-hidden rounded-xl shadow-[0_6px_18px_rgba(0,0,0,0.3)] md:rounded-2xl"
     >
       <video
         ref={videoRef}
@@ -110,16 +103,25 @@ export const VideoTile = memo(function VideoTile({
       {isDisconnected === true && (
         <div
           data-testid="tile-disconnected"
-          className="absolute inset-0 flex items-center justify-center bg-black/60 text-xs font-medium text-amber-300"
+          className="bg-bg/70 text-pending text-cap absolute inset-0 grid place-items-center px-2 text-center font-semibold"
         >
           연결 끊김 · 재접속 대기 중
         </div>
       )}
-      <figcaption className="absolute bottom-2 left-2 flex items-center gap-1 rounded-md bg-black/60 px-2 py-0.5 text-xs font-medium text-white">
-        {isAudioOff === true && <MicOffIcon className="text-danger h-3.5 w-3.5" />}
+      <figcaption className="bg-bg/70 text-text text-cap absolute bottom-2 left-2 max-w-[76%] truncate rounded-full px-2.5 py-1 font-bold md:bottom-[11px] md:left-[11px] md:px-[11px]">
         {label}
         {isSelf === true ? ' (나)' : ''}
       </figcaption>
+      {(isVideoOff === true || isAudioOff === true) && (
+        <div className="absolute bottom-2 right-2 flex items-center gap-1.5 md:bottom-[11px] md:right-[11px]">
+          {isVideoOff === true && <VideoOffIcon className="text-muted h-4 w-4" />}
+          {isAudioOff === true && (
+            <span className="bg-danger grid h-[22px] w-[22px] place-items-center rounded-full text-white md:h-[26px] md:w-[26px]">
+              <MicOffIcon className="h-3 w-3 md:h-3.5 md:w-3.5" />
+            </span>
+          )}
+        </div>
+      )}
     </figure>
   );
 });
@@ -132,7 +134,10 @@ export interface ScreenTileProps {
   readonly track?: MediaStreamTrack | null;
 }
 
-/** 화면 공유 비디오 한 칸. memo 이유는 VideoTile 과 같다. */
+/**
+ * 화면 공유 비디오 한 칸. 이름표는 공유되는 화면(대개 밝다) 위에 얹히므로
+ * 테마 토큰 대신 고정 색을 쓴다. memo 이유는 VideoTile 과 같다.
+ */
 export const ScreenTile = memo(function ScreenTile({
   isSelf,
   nickname,
@@ -144,17 +149,17 @@ export const ScreenTile = memo(function ScreenTile({
   return (
     <figure
       data-testid={isSelf === true ? 'local-screen-tile' : 'remote-screen-tile'}
-      className="border-accent/40 relative m-0 max-h-[60vh] overflow-hidden rounded-lg border bg-black"
+      className="relative m-0 h-full w-full overflow-hidden"
     >
       <video
         ref={videoRef}
         autoPlay
         muted
         playsInline
-        className="max-h-[60vh] w-full object-contain"
+        className="h-full w-full object-contain"
       />
-      <figcaption className="bg-accent/80 absolute bottom-2 left-2 rounded-md px-2 py-0.5 text-xs font-medium text-white">
-        {isSelf === true ? '내 화면 (공유 중)' : `${nickname ?? ''} 의 화면`}
+      <figcaption className="text-action absolute left-3 top-3 rounded-full bg-white/75 px-3 py-1.5 font-bold text-[#5b5349] md:left-[22px] md:top-5 md:px-4 md:py-2">
+        {isSelf === true ? '내 화면 (공유 중)' : `${nickname ?? ''}의 화면`}
       </figcaption>
     </figure>
   );

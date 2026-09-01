@@ -55,6 +55,21 @@ describe('ReportDetail View', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('주간 스프린트');
   });
 
+  it('노션에 푸시된 회의록만 동기화 배지를 단다', () => {
+    const { unmount } = render(<ReportDetail {...baseVm()} />);
+    expect(screen.queryByText(/NOTION/)).toBeNull();
+    unmount();
+
+    render(
+      <ReportDetail
+        {...baseVm({
+          report: baseDetail({ pushedToNotion: { pageId: 'p1', at: '2026-01-01T02:00:00.000Z' } }),
+        })}
+      />,
+    );
+    expect(screen.getByText(/NOTION/)).toBeInTheDocument();
+  });
+
   it('summary가 null 이면 "요약 진행 중" 안내를 노출한다', () => {
     render(
       <ReportDetail

@@ -22,12 +22,12 @@ const STATUS_LABEL: Record<CardStatus, string> = {
   closed: '종료된 회의',
 };
 
-const STATUS_TONE: Record<CardStatus, string> = {
-  loading: 'text-muted',
-  error: 'text-muted',
-  scheduled: 'text-text',
-  open: 'text-accent',
-  closed: 'text-muted',
+const STATUS_TONE: Record<CardStatus, { readonly text: string; readonly dot: string }> = {
+  loading: { text: 'text-muted', dot: 'bg-pending' },
+  error: { text: 'text-danger-on', dot: 'bg-danger' },
+  scheduled: { text: 'text-text', dot: 'bg-pending' },
+  open: { text: 'text-accent-on', dot: 'bg-positive' },
+  closed: { text: 'text-muted', dot: 'bg-pending' },
 };
 
 function resolveCardStatus(status: MeetingCardStatus, meeting: MeetingDetailResponse | null) {
@@ -44,36 +44,41 @@ export function EmbedGate({ code, pageUrl, status, meeting }: EmbedGateProps) {
   const cardStatus = resolveCardStatus(status, meeting);
   // 아직 열리지 않았거나 진행 중일 때만 입장할 수 있다. 종료·오류·조회 중에는 링크를 감춘다.
   const joinable = cardStatus === 'scheduled' || cardStatus === 'open';
+  const tone = STATUS_TONE[cardStatus];
 
   return (
-    <div className="theme-dark bg-bg text-text flex min-h-screen items-center justify-center p-4">
-      <div
-        data-meeting-status={cardStatus}
-        className="border-border bg-surface w-full max-w-md rounded-xl border p-5 shadow-lg"
-      >
-        <p className={`text-xs font-semibold ${STATUS_TONE[cardStatus]}`}>
-          {STATUS_LABEL[cardStatus]}
-          {cardStatus === 'open' && meeting !== null && ` · ${meeting.participantCount}명 참여 중`}
+    <div className="bg-bg text-text px-gutter-sm flex min-h-screen flex-col justify-center py-7">
+      <div data-meeting-status={cardStatus}>
+        <p className="flex items-center gap-2.5">
+          <span className={`h-[7px] w-[7px] shrink-0 rounded-full ${tone.dot}`} />
+          <span className={`cap ${tone.text} md:tracking-[0.12em]`}>
+            {STATUS_LABEL[cardStatus]}
+            {cardStatus === 'open' &&
+              meeting !== null &&
+              ` · ${meeting.participantCount}명 참여 중`}
+          </span>
         </p>
 
-        <h2 className="text-text mt-1 truncate text-lg font-bold">{meeting?.title ?? '회의'}</h2>
-        <p className="text-muted mt-0.5 font-mono text-sm tracking-wider">{code}</p>
+        <h2 className="text-text text-title mt-3 truncate font-extrabold tracking-[-0.032em]">
+          {meeting?.title ?? '회의'}
+        </h2>
+        <p className="text-muted text-meta mt-1.5 font-mono tracking-wider">{code}</p>
 
-        {joinable ? (
+        <p className="text-muted text-lead mt-4 max-w-[46ch]">
+          {cardStatus === 'closed'
+            ? '이미 종료된 회의입니다.'
+            : '삽입된 화면에서는 마이크와 카메라를 사용할 수 없어 새 탭에서 참가합니다.'}
+        </p>
+
+        {joinable && (
           <a
             href={pageUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn-primary mt-4 w-full"
+            className="btn-primary mt-6"
           >
             새 탭에서 참가하기
           </a>
-        ) : (
-          <p className="text-muted mt-4 text-xs">
-            {cardStatus === 'closed'
-              ? '이미 종료된 회의입니다.'
-              : '삽입된 화면에서는 마이크와 카메라를 사용할 수 없어 새 탭에서 참가합니다.'}
-          </p>
         )}
       </div>
     </div>

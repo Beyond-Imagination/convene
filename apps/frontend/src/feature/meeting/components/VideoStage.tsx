@@ -1,10 +1,11 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 import { ScreenTile, VideoTile } from '@/feature/meeting/components/MeetingMedia';
 import type { RemoteMediaEntry } from '@/feature/meeting/hooks/useMediasoupViewModel';
 import type { UseMediasoupViewModel } from '@/feature/meeting/hooks/useMediasoupViewModel';
+import type { MeetingLayoutVariant } from '@/feature/meeting/hooks/useMeetingLayoutViewModel';
 import type { RemoteParticipant } from '@/feature/meeting/hooks/useMeetingViewModel';
 
 /** 같은 참가자의 카메라(screen 제외) 비디오 entry를 찾는다. */
@@ -42,23 +43,77 @@ const pickScreenTrack = (
 };
 
 /**
- * 타일 수에 맞춰 빈칸 없이 영역을 채우는 열/행 수를 정한다(Zoom 갤러리 톤).
- * 2명이면 2칸, 3명이면 3칸으로 가로로 꽉 채우고, 그 이상은 균형 잡힌 격자로.
+ * 12트랙 위의 타일별 grid-column. 한 줄에 3개면 span 4, 2개면 span 6이고,
+ * 마지막 줄이 덜 찼으면 시작 위치를 밀어 가운데로 맞춘다.
  */
-const gridDims = (count: number): { cols: number; rows: number } => {
-  if (count <= 1) return { cols: 1, rows: 1 };
-  if (count === 2) return { cols: 2, rows: 1 };
-  if (count === 3) return { cols: 3, rows: 1 };
-  if (count === 4) return { cols: 2, rows: 2 };
-  if (count <= 6) return { cols: 3, rows: 2 };
-  if (count <= 9) return { cols: 3, rows: 3 };
-  return { cols: 4, rows: Math.ceil(count / 4) };
+const DESKTOP_SPANS: Record<number, ReadonlyArray<string>> = {
+  1: ['1 / span 12'],
+  2: ['1 / span 6', '7 / span 6'],
+  3: ['4 / span 6', '1 / span 6', '7 / span 6'],
+  4: ['1 / span 6', '7 / span 6', '1 / span 6', '7 / span 6'],
+  5: ['1 / span 4', '5 / span 4', '9 / span 4', '3 / span 4', '7 / span 4'],
+  6: ['1 / span 4', '5 / span 4', '9 / span 4', '1 / span 4', '5 / span 4', '9 / span 4'],
+  7: [
+    '1 / span 4',
+    '5 / span 4',
+    '9 / span 4',
+    '1 / span 4',
+    '5 / span 4',
+    '9 / span 4',
+    '5 / span 4',
+  ],
+  8: [
+    '1 / span 4',
+    '5 / span 4',
+    '9 / span 4',
+    '1 / span 4',
+    '5 / span 4',
+    '9 / span 4',
+    '3 / span 4',
+    '7 / span 4',
+  ],
+  9: [
+    '1 / span 4',
+    '5 / span 4',
+    '9 / span 4',
+    '1 / span 4',
+    '5 / span 4',
+    '9 / span 4',
+    '1 / span 4',
+    '5 / span 4',
+    '9 / span 4',
+  ],
 };
+
+const MOBILE_SPANS: Record<number, ReadonlyArray<string>> = {
+  1: ['1 / span 12'],
+  2: ['1 / span 12', '1 / span 12'],
+  3: ['4 / span 6', '1 / span 6', '7 / span 6'],
+  4: ['1 / span 6', '7 / span 6', '1 / span 6', '7 / span 6'],
+};
+
+const spansFor = (variant: MeetingLayoutVariant, count: number): ReadonlyArray<string> => {
+  const table = variant === 'mobile' ? MOBILE_SPANS : DESKTOP_SPANS;
+  return table[count] ?? DESKTOP_SPANS[9];
+};
+
+/**
+ * 행이 남은 높이를 나눠 갖는다. 타일에 고정 비율을 주면 뷰포트가 낮을 때
+ * 자연 높이가 영역을 넘어 아랫줄이 잘린다 — 비율은 video 의 object-fit 이 맡는다.
+ */
+const GRID_STYLE: CSSProperties = { gridAutoRows: 'minmax(0, 1fr)' };
+
+const pagerButton =
+  'grid h-12 w-12 place-items-center rounded-full bg-text/10 text-text transition-colors hover:bg-text/[0.18] disabled:cursor-not-allowed disabled:text-muted/50 md:h-11 md:w-11';
 
 export interface VideoStageProps {
   readonly nickname: string | null;
   readonly remoteParticipants: ReadonlyArray<RemoteParticipant>;
   readonly mediasoup: UseMediasoupViewModel;
+  readonly variant?: MeetingLayoutVariant;
+  /** 화면 공유 중 하단 참가자 줄 노출. */
+  readonly isStripOpen?: boolean;
+  readonly onToggleStrip?: () => void;
   /** 비디오 페이지네이션. 주어지지 않으면 전체 타일을 한 번에 표시한다. */
   readonly page?: number;
   readonly pageSize?: number;
@@ -70,13 +125,16 @@ export interface VideoStageProps {
 }
 
 /**
- * 회의 화면의 비디오 영역 — 공유 중이면 화면 stage + 가로 strip, 아니면 균등 그리드.
+ * 회의 화면의 비디오 영역 — 공유 중이면 화면 stage + 가로 strip, 아니면 12트랙 그리드.
  * self 타일이 항상 첫 칸이고, 페이지네이션이 주어지면 그 배열을 페이지 단위로 자른다.
  */
 export function VideoStage({
   nickname,
   remoteParticipants,
   mediasoup,
+  variant = 'desktop',
+  isStripOpen = true,
+  onToggleStrip,
   page,
   pageSize,
   pageCount,
@@ -87,7 +145,9 @@ export function VideoStage({
 }: VideoStageProps) {
   const hasScreen =
     mediasoup.isSharingScreen ||
-    remoteParticipants.some((p) => pickScreenTrack(mediasoup.remoteMedia, p.participantId) !== null);
+    remoteParticipants.some(
+      (p) => pickScreenTrack(mediasoup.remoteMedia, p.participantId) !== null,
+    );
 
   // self(첫 칸) + 원격 카메라 타일을 한 배열로 만든 뒤 페이지 단위로 자른다.
   // 배치(그리드/strip)가 바뀌어도 같은 key로 같은 자리에 남아야 <video>가 재생성되지 않으므로
@@ -126,14 +186,14 @@ export function VideoStage({
     page !== undefined && pageSize !== undefined
       ? tiles.slice(page * pageSize, page * pageSize + pageSize)
       : tiles;
-  const { cols, rows } = gridDims(visibleTiles.length);
+  const spans = spansFor(variant, visibleTiles.length);
 
   return (
     /* 중앙 비디오 영역 — 스크롤 차단(overflow-hidden) */
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
+    <div className="px-gutter-sm py-gutter-sm flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden md:gap-[18px]">
       {/* 화면 공유 stage. 공유가 없으면 자리만 비운다(타일 컨테이너의 형제 위치를 유지). */}
       {hasScreen && (
-        <div className="flex min-h-0 flex-1 items-center justify-center">
+        <div className="bg-screen-bg relative min-h-0 flex-1 overflow-hidden rounded-2xl shadow-[0_14px_40px_rgba(0,0,0,0.4)] md:rounded-[20px]">
           {mediasoup.isSharingScreen && mediasoup.screenStream !== null && (
             <ScreenTile
               isSelf
@@ -151,34 +211,52 @@ export function VideoStage({
               />
             );
           })}
+          {onToggleStrip !== undefined && (
+            <button
+              type="button"
+              onClick={onToggleStrip}
+              aria-expanded={isStripOpen}
+              className="absolute bottom-0 left-1/2 hidden h-[26px] w-[360px] -translate-x-1/2 place-items-center rounded-t-xl bg-white/75 text-sm font-semibold text-[#5b5349] md:grid"
+            >
+              <span aria-hidden>{isStripOpen ? '˅' : '˄'}</span>
+              <span className="sr-only">참가자 화면 {isStripOpen ? '접기' : '펼치기'}</span>
+            </button>
+          )}
         </div>
+      )}
+
+      {hasScreen && onToggleStrip !== undefined && (
+        <button
+          type="button"
+          onClick={onToggleStrip}
+          aria-expanded={isStripOpen}
+          className="bg-text/10 text-text hover:bg-text/[0.18] w-full shrink-0 rounded-xl py-2.5 text-xs font-semibold transition-colors md:hidden"
+        >
+          참가자 {isStripOpen ? '숨기기 ˄' : '보기 ˅'}
+        </button>
       )}
 
       {/*
         타일 컨테이너는 공유 여부와 무관하게 같은 자리·같은 구조를 유지하고 배치만 바꾼다.
         트리 모양이 달라지면 React가 타일을 전부 재마운트해 <video>가 새로 만들어지고,
         그 순간 모든 참가자 영상이 끊긴다. — MeetingScreen.rerender.spec.tsx
-          공유 중: 하단 가로 strip / 공유 없음: 빈칸 없이 꽉 채우는 균등 그리드
+          공유 중: 하단 가로 strip / 공유 없음: 12트랙 그리드
       */}
       <div
         className={
           hasScreen
-            ? 'mt-3 flex shrink-0 gap-3 overflow-hidden'
-            : 'grid min-h-0 flex-1 gap-3'
+            ? isStripOpen
+              ? 'flex shrink-0 gap-2 overflow-x-auto md:gap-3.5'
+              : 'hidden'
+            : 'grid min-h-0 w-full flex-1 grid-cols-12 content-center gap-2 md:gap-3.5'
         }
-        style={
-          hasScreen
-            ? undefined
-            : {
-                gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-                gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
-              }
-        }
+        style={hasScreen ? undefined : GRID_STYLE}
       >
-        {visibleTiles.map((tile) => (
+        {visibleTiles.map((tile, i) => (
           <div
             key={tile.key}
-            className={hasScreen ? 'aspect-video w-44 shrink-0' : 'min-h-0'}
+            className={hasScreen ? 'w-[168px] shrink-0 md:w-[236px]' : undefined}
+            style={hasScreen ? { aspectRatio: '16 / 9' } : { gridColumn: spans[i], minHeight: 0 }}
           >
             {tile.node}
           </div>
@@ -188,29 +266,31 @@ export function VideoStage({
       {pageCount !== undefined && pageCount > 1 && (
         <nav
           aria-label="비디오 페이지"
-          className="mt-3 flex shrink-0 items-center justify-center gap-3"
+          className="flex shrink-0 items-center justify-between gap-3 md:justify-center"
         >
-          <button
-            type="button"
-            onClick={onPrevPage}
-            disabled={canPrev === false}
-            aria-label="이전 페이지"
-            className="border-border text-text flex h-8 w-8 items-center justify-center rounded-full border transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            ‹
-          </button>
-          <span className="text-muted text-xs font-medium">
+          <span className="text-muted text-meta font-mono font-medium">
             {(page ?? 0) + 1} / {pageCount}
           </span>
-          <button
-            type="button"
-            onClick={onNextPage}
-            disabled={canNext === false}
-            aria-label="다음 페이지"
-            className="border-border text-text flex h-8 w-8 items-center justify-center rounded-full border transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            ›
-          </button>
+          <div className="flex items-center gap-2 md:gap-3">
+            <button
+              type="button"
+              onClick={onPrevPage}
+              disabled={canPrev === false}
+              aria-label="이전 페이지"
+              className={pagerButton}
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              onClick={onNextPage}
+              disabled={canNext === false}
+              aria-label="다음 페이지"
+              className={pagerButton}
+            >
+              ›
+            </button>
+          </div>
         </nav>
       )}
     </div>

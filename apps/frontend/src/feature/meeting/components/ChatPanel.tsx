@@ -11,6 +11,8 @@ import type { UseChatViewModel } from '@/feature/meeting/hooks/useChatViewModel'
 export type ChatPanelProps = UseChatViewModel & {
   /** 내 닉네임. 일치하는 메시지는 카톡식으로 우측(내 메시지)에 표시한다. */
   readonly myNickname?: string | null;
+  /** 모바일에서 패널이 화면을 덮으므로 닫는 길을 헤더에 둔다. */
+  readonly onClose?: () => void;
 };
 
 export function ChatPanel({
@@ -20,6 +22,7 @@ export function ChatPanel({
   setDraft,
   submit,
   myNickname,
+  onClose,
 }: ChatPanelProps) {
   const onSubmit = (e: FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
@@ -28,17 +31,29 @@ export function ChatPanel({
   return (
     <section
       aria-labelledby="chat-heading"
-      className="flex h-full flex-col"
+      className="flex h-full flex-col px-4 md:px-0"
     >
-      <h2
-        id="chat-heading"
-        className="border-border text-text border-b px-4 py-3 text-sm font-semibold"
-      >
-        채팅
-      </h2>
+      <div className="border-border flex items-center justify-between border-b py-3.5 md:pb-4">
+        <h2
+          id="chat-heading"
+          className="cap md:tracking-[0.12em]"
+        >
+          채팅
+        </h2>
+        {onClose !== undefined && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-muted text-xs font-semibold md:hidden"
+          >
+            닫기
+          </button>
+        )}
+      </div>
+
       <ul
         aria-label="chat-messages"
-        className="m-0 flex-1 list-none space-y-3 overflow-auto p-4"
+        className="m-0 flex flex-1 list-none flex-col gap-4 overflow-auto py-5"
       >
         {messages.length === 0 && <li className="text-muted text-sm">아직 메시지가 없습니다.</li>}
         {messages.map((m, idx) => {
@@ -50,10 +65,14 @@ export function ChatPanel({
               data-mine={isMine}
               className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
             >
-              {!isMine && <span className="text-muted mb-0.5 text-xs">{m.nickname}</span>}
+              {!isMine && (
+                <span className="text-muted text-meta mb-1.5 font-semibold">{m.nickname}</span>
+              )}
               <span
-                className={`inline-block max-w-[85%] break-words rounded-2xl px-3 py-1.5 text-sm ${
-                  isMine ? 'bg-accent text-white' : 'bg-neutral-700 text-white'
+                className={`text-body inline-block max-w-[86%] break-words px-4 py-3 ${
+                  isMine
+                    ? 'bg-accent text-accent-fg rounded-[16px_16px_5px_16px]'
+                    : 'bg-surface text-text rounded-[16px_16px_16px_5px]'
                 }`}
               >
                 {m.text}
@@ -62,10 +81,11 @@ export function ChatPanel({
           );
         })}
       </ul>
+
       <form
         aria-label="chat-form"
         onSubmit={onSubmit}
-        className="border-border flex items-center gap-2 border-t p-3"
+        className="border-border flex items-center gap-3.5 border-t pb-4 pt-4"
       >
         <label
           htmlFor="chat-input"
@@ -81,12 +101,12 @@ export function ChatPanel({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           disabled={!canSend}
-          className="field-input flex-1"
+          className="field-input flex-1 py-2"
         />
         <button
           type="submit"
           disabled={!canSend || draft.trim().length === 0}
-          className="btn-primary shrink-0"
+          className="text-accent-on text-action shrink-0 font-bold transition-opacity disabled:opacity-40"
         >
           보내기
         </button>

@@ -1,12 +1,10 @@
 'use client';
 
-import Image from 'next/image';
-import Link from 'next/link';
-
 import { CreateMeetingForm } from '@/feature/meeting/components/CreateMeetingForm';
 import { JoinMeetingForm } from '@/feature/meeting/components/JoinMeetingForm';
 import { useCreateMeetingViewModel } from '@/feature/meeting/hooks/useCreateMeetingViewModel';
 import { useJoinMeetingViewModel } from '@/feature/meeting/hooks/useJoinMeetingViewModel';
+import { AppHeader } from '@/shared/AppHeader';
 
 /**
  * 홈 페이지. 세 액션을 노출:
@@ -20,39 +18,17 @@ export default function HomePage() {
   const createVm = useCreateMeetingViewModel();
   const joinVm = useJoinMeetingViewModel();
   return (
-    <main className="bg-bg flex min-h-screen flex-col items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md">
-        <header className="mb-8 text-center">
-          <div className="inline-flex items-center gap-2">
-            <Image src="/logo.svg" alt="" width={28} height={28} priority aria-hidden />
-            <span className="text-text text-2xl font-extrabold tracking-tight">Convene</span>
-          </div>
-          <p className="text-muted mt-2 text-sm">링크 하나로 시작하는 화상회의 · 채팅 · 회의록</p>
-        </header>
+    <div className="bg-paper flex min-h-screen flex-col">
+      <AppHeader />
 
-        <section className="border-border bg-surface rounded-xl border p-6 shadow-sm">
+      <main className="grid flex-1 md:grid-cols-2">
+        <section className="border-border px-gutter py-panel-y flex flex-col justify-center border-b md:max-w-[760px] md:border-b-0 md:border-r">
           <CreateMeetingForm {...createVm} />
         </section>
-
-        <div className="text-muted my-6 flex items-center gap-3 text-xs">
-          <span className="bg-border h-px flex-1" />
-          또는
-          <span className="bg-border h-px flex-1" />
-        </div>
-
-        <section className="border-border bg-surface rounded-xl border p-6 shadow-sm">
+        <section className="px-gutter py-panel-y flex flex-col justify-center md:max-w-[760px]">
           <JoinMeetingForm {...joinVm} />
         </section>
-
-        <nav className="mt-8 text-center">
-          <Link
-            href="/reports"
-            className="text-muted hover:text-accent text-sm font-medium transition-colors"
-          >
-            지난 회의록 보기 →
-          </Link>
-        </nav>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

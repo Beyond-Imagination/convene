@@ -1,9 +1,8 @@
 'use client';
 
-import Link from 'next/link';
-
 import { ReportDetail } from '@/feature/reports/components/ReportDetail';
 import { useReportDetailViewModel } from '@/feature/reports/hooks/useReportDetailViewModel';
+import { AppHeader } from '@/shared/AppHeader';
 import { useRouteSegment } from '@/shared/hooks/useRouteSegment';
 
 /**
@@ -14,18 +13,12 @@ export function ReportDetailPageClient() {
   const id = useRouteSegment('reports', 'id');
   const vm = useReportDetailViewModel(id);
   return (
-    <main className="bg-bg min-h-screen px-4 py-10">
-      <div className="mx-auto max-w-3xl">
-        <nav className="mb-6">
-          <Link
-            href="/reports"
-            className="text-muted hover:text-accent text-sm font-medium transition-colors"
-          >
-            ← 회의록 목록
-          </Link>
-        </nav>
+    <div className="bg-paper flex min-h-screen flex-col">
+      <AppHeader current="reports" />
+
+      <main className="px-gutter py-panel-y flex-1">
         <ReportDetail {...vm} />
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

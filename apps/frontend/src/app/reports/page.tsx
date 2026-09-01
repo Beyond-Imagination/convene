@@ -1,9 +1,8 @@
 'use client';
 
-import Link from 'next/link';
-
 import { ReportList } from '@/feature/reports/components/ReportList';
 import { useReportListViewModel } from '@/feature/reports/hooks/useReportListViewModel';
+import { AppHeader } from '@/shared/AppHeader';
 
 /**
  * `/reports` 회의록 목록 페이지.
@@ -14,19 +13,20 @@ import { useReportListViewModel } from '@/feature/reports/hooks/useReportListVie
 export default function ReportListPage() {
   const vm = useReportListViewModel();
   return (
-    <main className="bg-bg min-h-screen px-4 py-10">
-      <div className="mx-auto max-w-3xl">
-        <header className="mb-6 flex items-center justify-between">
-          <h1 className="text-text text-2xl font-bold tracking-tight">회의록</h1>
-          <Link
-            href="/"
-            className="text-muted hover:text-accent text-sm font-medium transition-colors"
-          >
-            ← 홈으로
-          </Link>
-        </header>
+    <div className="bg-paper flex min-h-screen flex-col">
+      <AppHeader current="reports" />
+
+      <main className="px-gutter py-panel-y flex flex-1 flex-col">
+        <div className="border-border flex items-baseline justify-between gap-4 border-b pb-4 md:pb-[22px]">
+          <h1 className="text-text text-display font-extrabold tracking-[-0.035em]">회의록</h1>
+          {vm.status === 'loaded' && vm.items.length > 0 && (
+            <span className="text-muted text-meta shrink-0 font-mono font-medium">
+              {vm.items.length}건
+            </span>
+          )}
+        </div>
         <ReportList {...vm} />
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
