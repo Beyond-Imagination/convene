@@ -18,18 +18,16 @@ export function CreateMeetingForm({
       onSubmit={handleSubmit}
       className="flex flex-col"
     >
-      <h2 className="text-text text-[22px] font-extrabold tracking-[-0.03em] md:text-[40px] md:tracking-[-0.035em]">
-        회의 만들기
-      </h2>
-      <p className="text-muted mt-1.5 text-pretty text-[13.5px] leading-[1.65] md:mt-3.5 md:text-lg md:leading-[1.75]">
+      <h2 className="text-text text-display font-extrabold tracking-[-0.035em]">회의 만들기</h2>
+      <p className="text-muted text-lead mt-1.5 text-pretty md:mt-3.5">
         닉네임을 입력하면 새 회의를 만들고 바로 입장합니다. 제목은 선택입니다.
       </p>
 
-      <div className="mt-[18px] flex flex-col gap-4 md:mt-11 md:gap-8">
+      <div className="mt-[clamp(1.125rem,0.8rem+1.3vw,2.75rem)] flex flex-col gap-[clamp(1rem,0.6rem+1.6vw,2rem)]">
         <div>
           <label
             htmlFor="create-title"
-            className="field-label md:text-[13px]"
+            className="field-label"
           >
             회의 제목 (선택)
           </label>
@@ -38,7 +36,7 @@ export function CreateMeetingForm({
             type="text"
             autoComplete="off"
             placeholder="예: 주간 스프린트 회의"
-            className="field-input md:text-[22px]"
+            className="field-input"
             {...register('title')}
           />
         </div>
@@ -46,7 +44,7 @@ export function CreateMeetingForm({
         <div>
           <label
             htmlFor="create-nickname"
-            className="field-label md:text-[13px]"
+            className="field-label"
           >
             닉네임
           </label>
@@ -55,7 +53,7 @@ export function CreateMeetingForm({
             type="text"
             autoComplete="off"
             placeholder="예: 홍길동"
-            className="field-input md:text-[22px]"
+            className="field-input"
             aria-invalid={errors.nickname !== undefined}
             {...register('nickname')}
           />
@@ -74,7 +72,7 @@ export function CreateMeetingForm({
           <button
             type="submit"
             disabled={submitting}
-            className="btn-primary w-full md:py-5 md:text-[19px]"
+            className="btn-primary w-full"
           >
             {submitting ? '생성 중…' : '회의 만들기'}
           </button>

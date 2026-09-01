@@ -12,18 +12,16 @@ export function JoinMeetingForm({ status, register, errors, handleSubmit }: Join
       onSubmit={handleSubmit}
       className="flex flex-col"
     >
-      <h2 className="text-text text-[22px] font-extrabold tracking-[-0.03em] md:text-[40px] md:tracking-[-0.035em]">
-        회의 입장
-      </h2>
-      <p className="text-muted mt-1.5 text-pretty text-[13.5px] leading-[1.65] md:mt-3.5 md:text-lg md:leading-[1.75]">
+      <h2 className="text-text text-display font-extrabold tracking-[-0.035em]">회의 입장</h2>
+      <p className="text-muted text-lead mt-1.5 text-pretty md:mt-3.5">
         받은 회의 코드와 닉네임으로 기존 회의에 참여합니다.
       </p>
 
-      <div className="mt-[18px] flex flex-col gap-4 md:mt-11 md:gap-8">
+      <div className="mt-[clamp(1.125rem,0.8rem+1.3vw,2.75rem)] flex flex-col gap-[clamp(1rem,0.6rem+1.6vw,2rem)]">
         <div>
           <label
             htmlFor="join-code"
-            className="field-label md:text-[13px]"
+            className="field-label"
           >
             회의 코드
           </label>
@@ -32,7 +30,7 @@ export function JoinMeetingForm({ status, register, errors, handleSubmit }: Join
             type="text"
             autoComplete="off"
             placeholder="예: abc-defg-hij"
-            className="field-input font-mono md:text-[22px]"
+            className="field-input font-mono"
             aria-invalid={errors.code !== undefined}
             {...register('code')}
           />
@@ -50,7 +48,7 @@ export function JoinMeetingForm({ status, register, errors, handleSubmit }: Join
         <div>
           <label
             htmlFor="join-nickname"
-            className="field-label md:text-[13px]"
+            className="field-label"
           >
             닉네임
           </label>
@@ -59,7 +57,7 @@ export function JoinMeetingForm({ status, register, errors, handleSubmit }: Join
             type="text"
             autoComplete="off"
             placeholder="예: 홍길동"
-            className="field-input md:text-[22px]"
+            className="field-input"
             aria-invalid={errors.nickname !== undefined}
             {...register('nickname')}
           />
@@ -77,7 +75,7 @@ export function JoinMeetingForm({ status, register, errors, handleSubmit }: Join
         <button
           type="submit"
           disabled={submitting}
-          className="btn-ghost w-full md:py-[19px] md:text-[19px]"
+          className="btn-ghost w-full"
         >
           {submitting ? '입장 중…' : '입장'}
         </button>

@@ -48,18 +48,6 @@
   }
 }
 
-.theme-dark {
-  --bg: 34 31 27;
-  --paper: 38 34 32;
-  --surface: 51 45 40;
-  --border: 59 53 47;
-  --text: 244 239 231;
-  --muted: 164 154 142;
-  --tile-off: 44 38 34;
-  --accent-on: 127 201 164;
-  --danger-on: 240 160 154;
-}
-
 html,
 body {
   margin: 0;
@@ -76,10 +64,10 @@ body {
 
 @layer components {
   .cap {
-    @apply text-muted font-mono text-[11px] font-semibold uppercase tracking-[0.1em];
+    @apply text-muted text-cap font-mono font-semibold uppercase tracking-[0.1em];
   }
   .btn {
-    @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-base font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+    @apply text-action inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-5 py-btn-y font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
     @apply btn bg-accent text-accent-fg hover:bg-accent-hover active:bg-accent-active;
@@ -94,9 +82,9 @@ body {
     @apply cap mb-2 block;
   }
   .field-input {
-    @apply border-border text-text placeholder:text-muted/60 focus:border-accent aria-[invalid=true]:border-danger w-full border-x-0 border-b-[1.5px] border-t-0 bg-transparent px-0.5 py-2.5 text-base outline-none transition-colors;
+    @apply border-border text-text placeholder:text-muted/60 focus:border-accent aria-[invalid=true]:border-danger text-field w-full border-x-0 border-b-[1.5px] border-t-0 bg-transparent px-0.5 py-2.5 outline-none transition-colors;
   }
   .field-error {
-    @apply text-danger-on mt-2 text-sm;
+    @apply text-danger-on text-meta mt-2;
   }
 }

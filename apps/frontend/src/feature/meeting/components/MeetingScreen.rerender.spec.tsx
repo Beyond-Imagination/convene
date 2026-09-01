@@ -1,5 +1,5 @@
 import { type ChatPostedBroadcast, MEETING_WS_EVENTS } from '@convene/shared-interfaces';
-import { act, render } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { memo, type ReactNode, useEffect } from 'react';
 import type { Socket } from 'socket.io-client';
 
@@ -43,8 +43,7 @@ vi.mock('@/feature/meeting/hooks/useMediaElementBinding', async (importOriginal)
 });
 
 vi.mock('@/feature/meeting/components/MeetingMedia', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@/feature/meeting/components/MeetingMedia')>();
+  const actual = await importOriginal<typeof import('@/feature/meeting/components/MeetingMedia')>();
   const original = actual.VideoTile as unknown as
     | ((props: VideoTileProps) => ReactNode)
     | { $$typeof: symbol; type: (props: VideoTileProps) => ReactNode; compare?: unknown };
@@ -57,13 +56,72 @@ vi.mock('@/feature/meeting/components/MeetingMedia', async (importOriginal) => {
   return { ...actual, VideoTile: isMemo ? memo(counted, original.compare as never) : counted };
 });
 
+/**
+ * VideoStage 는 memo 가 없어 MeetingScreen 이 다시 그려지면 반드시 같이 불린다.
+ * VideoTile 카운터는 memo 에 가려지므로, 상위가 다시 그려졌는지는 이쪽으로 본다.
+ */
+const videoStageRenders = vi.fn();
+vi.mock('@/feature/meeting/components/VideoStage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/feature/meeting/components/VideoStage')>();
+  return {
+    ...actual,
+    VideoStage: (props: Parameters<typeof actual.VideoStage>[0]) => {
+      videoStageRenders();
+      return actual.VideoStage(props);
+    },
+  };
+});
+
+/** ChatPanel 은 memo 가 없으므로 그대로 감싸 렌더 횟수만 센다. */
+const chatPanelRenders = vi.fn();
+vi.mock('@/feature/meeting/components/ChatPanel', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/feature/meeting/components/ChatPanel')>();
+  return {
+    ...actual,
+    ChatPanel: (props: Parameters<typeof actual.ChatPanel>[0]) => {
+      chatPanelRenders();
+      return actual.ChatPanel(props);
+    },
+  };
+});
+
+/** 경과 시간이 실제로 흐르도록 방이 열린 시각을 준다. */
+vi.mock('@/feature/meeting/hooks/useMeetingCardViewModel', () => ({
+  useMeetingCardViewModel: () => ({
+    status: 'ready' as const,
+    meeting: {
+      code: 'abc-defg-hij',
+      title: null,
+      status: 'open' as const,
+      participantCount: 4,
+      startedAt: '2026-08-07T00:00:00.000Z',
+      endedAt: null,
+    },
+  }),
+}));
+
 const fakeTrack = (kind: 'audio' | 'video'): MediaStreamTrack =>
   ({ kind }) as unknown as MediaStreamTrack;
 
 const participants: ReadonlyArray<RemoteParticipant> = [
-  { participantId: 's1', nickname: '민준', joinedAt: '2026-08-07T00:00:00.000Z', disconnected: false },
-  { participantId: 's2', nickname: '서연', joinedAt: '2026-08-07T00:00:01.000Z', disconnected: false },
-  { participantId: 's3', nickname: '도윤', joinedAt: '2026-08-07T00:00:02.000Z', disconnected: false },
+  {
+    participantId: 's1',
+    nickname: '민준',
+    joinedAt: '2026-08-07T00:00:00.000Z',
+    disconnected: false,
+  },
+  {
+    participantId: 's2',
+    nickname: '서연',
+    joinedAt: '2026-08-07T00:00:01.000Z',
+    disconnected: false,
+  },
+  {
+    participantId: 's3',
+    nickname: '도윤',
+    joinedAt: '2026-08-07T00:00:02.000Z',
+    disconnected: false,
+  },
 ];
 const TILE_COUNT = 1 + participants.length;
 
@@ -172,6 +230,8 @@ const localStream = { id: 'local' } as unknown as MediaStream;
 beforeEach(() => {
   videoTileRenders.mockClear();
   mediaRebinds.mockClear();
+  chatPanelRenders.mockClear();
+  videoStageRenders.mockClear();
   socketHandlers.clear();
 });
 
@@ -338,5 +398,32 @@ describe('화면 공유 전환이 참가자 영상을 끊지 않는다', () => {
 
     expect(mediaRebinds).toHaveBeenCalledTimes(1);
     expect(videoTileRenders).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 헤더의 경과 시간은 1초마다 바뀐다. 그 틱이 형제 트리로 새어 나가면
+ * 비디오 타일과 채팅이 매초 다시 그려진다.
+ */
+describe('경과 시간 틱은 형제 트리로 새지 않는다', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const clock = (): string | null => screen.getByText(/^\d+:\d{2}:\d{2}$/).textContent;
+
+  it('1초 틱 3회는 비디오 타일도 채팅 패널도 다시 그리지 않는다', () => {
+    render(<MeetingPageClient />);
+    const before = clock();
+    videoTileRenders.mockClear();
+    chatPanelRenders.mockClear();
+    videoStageRenders.mockClear();
+
+    act(() => vi.advanceTimersByTime(3000));
+
+    // 시계가 실제로 움직였는지 먼저 본다. 안 움직이면 아래 단언은 공짜로 통과한다.
+    expect(clock()).not.toBe(before);
+    expect(videoStageRenders).not.toHaveBeenCalled();
+    expect(videoTileRenders).not.toHaveBeenCalled();
+    expect(chatPanelRenders).not.toHaveBeenCalled();
   });
 });

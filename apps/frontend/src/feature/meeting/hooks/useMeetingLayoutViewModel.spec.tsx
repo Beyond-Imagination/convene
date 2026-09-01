@@ -2,13 +2,25 @@ import { act, renderHook } from '@testing-library/react';
 
 import { useMeetingLayoutViewModel } from './useMeetingLayoutViewModel';
 
+const setWidth = (width: number): void => {
+  Object.defineProperty(window, 'innerWidth', { value: width, configurable: true });
+};
+
 describe('useMeetingLayoutViewModel', () => {
-  it('기본적으로 채팅 패널이 열려 있다', () => {
+  it('웹에서는 채팅 패널이 열린 채로 시작한다', () => {
+    setWidth(1280);
     const { result } = renderHook(() => useMeetingLayoutViewModel());
     expect(result.current.isChatOpen).toBe(true);
   });
 
+  it('모바일에서는 채팅이 화면을 덮으므로 닫힌 채로 시작한다', () => {
+    setWidth(390);
+    const { result } = renderHook(() => useMeetingLayoutViewModel());
+    expect(result.current.isChatOpen).toBe(false);
+  });
+
   it('toggleChat을 호출하면 열림/닫힘이 반전된다', () => {
+    setWidth(1280);
     const { result } = renderHook(() => useMeetingLayoutViewModel());
     act(() => result.current.toggleChat());
     expect(result.current.isChatOpen).toBe(false);
@@ -63,5 +75,37 @@ describe('useMeetingLayoutViewModel - 비디오 페이지네이션', () => {
     rerender({ n: size }); // 1 페이지로 축소
     expect(result.current.page).toBe(0);
     expect(result.current.pageCount).toBe(1);
+  });
+});
+
+describe('useMeetingLayoutViewModel - 배치 variant', () => {
+  it('넓은 뷰포트는 desktop 배치에 한 페이지 9칸이다', () => {
+    setWidth(1280);
+    const { result } = renderHook(() => useMeetingLayoutViewModel(0));
+    expect(result.current.variant).toBe('desktop');
+    expect(result.current.pageSize).toBe(9);
+  });
+
+  it('좁은 뷰포트는 mobile 배치에 한 페이지 4칸이다', () => {
+    setWidth(390);
+    const { result } = renderHook(() => useMeetingLayoutViewModel(0));
+    expect(result.current.variant).toBe('mobile');
+    expect(result.current.pageSize).toBe(4);
+  });
+
+  it('참가자 줄은 웹에서 펼침, 모바일에서 접힘으로 시작한다', () => {
+    setWidth(1280);
+    expect(renderHook(() => useMeetingLayoutViewModel(0)).result.current.isStripOpen).toBe(true);
+    setWidth(390);
+    expect(renderHook(() => useMeetingLayoutViewModel(0)).result.current.isStripOpen).toBe(false);
+  });
+
+  it('toggleStrip으로 뒤집은 선택이 유지된다', () => {
+    setWidth(1280);
+    const { result } = renderHook(() => useMeetingLayoutViewModel(0));
+    act(() => result.current.toggleStrip());
+    expect(result.current.isStripOpen).toBe(false);
+    act(() => result.current.toggleStrip());
+    expect(result.current.isStripOpen).toBe(true);
   });
 });

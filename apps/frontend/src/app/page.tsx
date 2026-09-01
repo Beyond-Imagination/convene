@@ -20,28 +20,28 @@ export default function HomePage() {
   const joinVm = useJoinMeetingViewModel();
   return (
     <div className="bg-paper flex min-h-screen flex-col">
-      <header className="border-border flex items-baseline justify-between gap-4 border-b px-5 pb-3.5 pt-11 md:px-16 md:pb-7 md:pt-8">
+      <header className="border-border px-gutter py-gutter-sm flex items-baseline justify-between gap-4 border-b">
         <div className="flex items-baseline gap-3 md:gap-5">
-          <span className="text-text text-2xl font-extrabold tracking-[-0.035em] md:text-4xl md:tracking-[-0.038em]">
+          <span className="text-text text-wordmark font-extrabold tracking-[-0.038em]">
             Convene
           </span>
-          <span className="text-muted hidden font-mono text-base font-medium tracking-[0.03em] md:inline">
+          <span className="text-muted text-meta hidden font-mono font-medium tracking-[0.03em] md:inline">
             for Beyond_Imagination
           </span>
         </div>
         <Link
           href="/reports"
-          className="text-muted hover:text-accent-on text-[13px] font-semibold transition-colors md:text-[17px]"
+          className="text-muted hover:text-accent-on text-meta font-semibold transition-colors"
         >
           회의록
         </Link>
       </header>
 
       <main className="grid flex-1 md:grid-cols-2">
-        <section className="border-border flex flex-col justify-center border-b px-5 py-5 md:max-w-[760px] md:border-b-0 md:border-r md:px-16 md:py-[70px]">
+        <section className="border-border px-gutter py-panel-y flex flex-col justify-center border-b md:max-w-[760px] md:border-b-0 md:border-r">
           <CreateMeetingForm {...createVm} />
         </section>
-        <section className="flex flex-col justify-center px-5 py-5 md:max-w-[760px] md:px-16 md:py-[70px]">
+        <section className="px-gutter py-panel-y flex flex-col justify-center md:max-w-[760px]">
           <JoinMeetingForm {...joinVm} />
         </section>
       </main>
