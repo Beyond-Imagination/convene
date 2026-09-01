@@ -15,7 +15,6 @@ const formatDate = (iso: string): string => {
   }
 };
 
-/** 문서 안의 한 섹션. 제목은 mono 대문자 캡션 + 밑줄로 본문과 구분한다. */
 function Section({
   title,
   testId,

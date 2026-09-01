@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 /** Tailwind `md` 와 같은 경계. 두 곳이 어긋나면 타일 비율과 배치가 따로 논다. */
 const MOBILE_MAX_WIDTH = 768;
 
-/** 한 페이지에 보일 비디오 타일 최대 수. 모바일은 4:3 4명, 웹은 16:9 9명. */
+/** 한 페이지에 보일 비디오 타일 최대 수. 타일 비율(16:9 / 4:3)과 함께 움직인다. */
 const PAGE_SIZE = { desktop: 9, mobile: 4 } as const;
 
 export type MeetingLayoutVariant = keyof typeof PAGE_SIZE;

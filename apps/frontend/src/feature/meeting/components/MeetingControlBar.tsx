@@ -12,10 +12,7 @@ import {
 } from '@/feature/meeting/components/icons';
 import type { UseMediasoupViewModel } from '@/feature/meeting/hooks/useMediasoupViewModel';
 
-/**
- * 모바일은 아이콘 위에 라벨을 얹은 균등 칸, 웹은 가로 알약.
- * 여섯 개가 한 줄에 다 못 들어가는 폭에서는 잘리는 대신 다음 줄로 넘긴다.
- */
+/** 여섯 개가 한 줄에 다 못 들어가는 폭에서는 잘리는 대신 다음 줄로 넘긴다. */
 const controlButton =
   'grid min-h-[60px] place-items-center gap-1.5 rounded-[18px] px-0.5 py-3 text-[10px] font-semibold transition-colors disabled:cursor-not-allowed md:text-action md:flex md:min-h-0 md:items-center md:gap-2.5 md:rounded-full md:px-[clamp(0.75rem,0.3rem+0.9vw,1.375rem)] md:py-3.5';
 const controlNeutral = 'bg-text/10 text-text hover:bg-text/[0.18]';
@@ -109,7 +106,7 @@ export function MeetingControlBar({
           <button
             type="button"
             onClick={() => void mediasoup.startScreenShare()}
-            // 화면 공유는 동시 1인. 다른 참가자가 공유 중이면 비활성화.
+            // 화면 공유는 동시 1인.
             disabled={shareDisabled}
             className={`${controlButton} ${shareDisabled ? controlBlocked : controlNeutral}`}
           >

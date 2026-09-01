@@ -111,7 +111,7 @@ export interface VideoStageProps {
   readonly remoteParticipants: ReadonlyArray<RemoteParticipant>;
   readonly mediasoup: UseMediasoupViewModel;
   readonly variant?: MeetingLayoutVariant;
-  /** 화면 공유 중 하단 참가자 줄 노출. 토글은 onToggleStrip 이 있을 때만 그린다. */
+  /** 화면 공유 중 하단 참가자 줄 노출. */
   readonly isStripOpen?: boolean;
   readonly onToggleStrip?: () => void;
   /** 비디오 페이지네이션. 주어지지 않으면 전체 타일을 한 번에 표시한다. */

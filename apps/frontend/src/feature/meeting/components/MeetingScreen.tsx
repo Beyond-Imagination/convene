@@ -11,7 +11,6 @@ import type {
   UseMeetingViewModel,
 } from '@/feature/meeting/hooks/useMeetingViewModel';
 
-/** 상태별 점·글자 색. 연결됨은 accent, 재접속·연결 중은 pending. */
 const STATUS_TONE: Partial<
   Record<MeetingConnectionStatus, { readonly text: string; readonly dot: string }>
 > = {
@@ -37,9 +36,8 @@ function MeetingElapsed({ startedAt }: { readonly startedAt: string | null }) {
 
 export interface MeetingScreenProps extends UseMeetingViewModel {
   readonly mediasoup: UseMediasoupViewModel;
-  /** 회의 제목. 있으면 헤더의 이름이 되고, 없으면 회의 코드가 그 자리를 대신한다. */
   readonly title?: string | null;
-  /** 방이 열린 시각(ISO). 경과 시간의 기준. */
+  /** ISO 문자열. 경과 시간의 기준이다. */
   readonly startedAt?: string | null;
   readonly isChatOpen?: boolean;
   readonly onToggleChat?: () => void;

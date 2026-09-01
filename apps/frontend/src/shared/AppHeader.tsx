@@ -3,7 +3,7 @@
 import Link from 'next/link';
 
 export interface AppHeaderProps {
-  /** 지금 보고 있는 화면. 해당 링크를 accent 로 표시한다. */
+  /** 지금 보고 있는 화면. */
   readonly current?: 'reports';
 }
 

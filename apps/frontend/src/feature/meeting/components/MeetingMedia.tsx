@@ -6,7 +6,7 @@ import { MicOffIcon, VideoOffIcon } from '@/feature/meeting/components/icons';
 import { useMediaElementBinding } from '@/feature/meeting/hooks/useMediaElementBinding';
 import type { RemoteMediaEntry } from '@/feature/meeting/hooks/useMediasoupViewModel';
 
-/** 이니셜 아바타 색. 채도를 낮춰 타일 배경과 부딪히지 않게 맞춘 8색. */
+/** 채도를 낮춰 타일 배경과 부딪히지 않게 고른 색들. */
 const AVATAR_COLORS = [
   'bg-[#7a6a5c]',
   'bg-[#5f8a74]',
@@ -64,7 +64,7 @@ export interface VideoTileProps {
   readonly track?: MediaStreamTrack | null;
   /** 카메라가 꺼져 있으면 검은 화면 대신 placeholder를 덮는다. */
   readonly isVideoOff?: boolean;
-  /** 마이크가 음소거면 우하단에 마이크 OFF 배지를 표시한다. */
+  /** 마이크가 음소거면 배지를 표시한다. */
   readonly isAudioOff?: boolean;
   /** 연결이 끊겨 복귀를 기다리는 중. 타일은 유지하고 상태만 덮어 보여준다. */
   readonly isDisconnected?: boolean;
