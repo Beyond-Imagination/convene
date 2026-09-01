@@ -77,6 +77,7 @@ function MeetingSession({ code }: { readonly code: string }) {
     return (
       <NicknameGate
         code={code}
+        title={card.meeting?.title ?? null}
         {...gateVm}
       />
     );
