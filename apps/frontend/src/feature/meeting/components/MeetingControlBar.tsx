@@ -55,15 +55,21 @@ export function MeetingControlBar({
 }: MeetingControlBarProps) {
   const micLabel = mediasoup.isAudioMuted ? '마이크 켜기' : '마이크 끄기';
   const camLabel = mediasoup.isVideoMuted ? '카메라 켜기' : '카메라 끄기';
+  // transport 가 붙기 전에는 토글이 조용히 무시된다. 눌러도 아무 일이 없는 대신 못 누르게 한다.
+  const mediaReady = mediasoup.status === 'ready';
+  const micDisabled = !mediaReady || mediasoup.isAudioToggling;
+  const shareDisabled = !mediaReady || mediasoup.isRemoteSharingScreen;
 
   return (
     <footer className="px-gutter-sm grid shrink-0 auto-cols-fr grid-flow-col gap-2 pb-7 pt-1.5 md:flex md:flex-wrap md:justify-center md:gap-2.5 md:pb-7 md:pt-6">
       <button
         type="button"
         onClick={mediasoup.toggleAudio}
-        disabled={mediasoup.isAudioToggling}
+        disabled={micDisabled}
         aria-label={micLabel}
-        className={`${controlButton} ${mediasoup.isAudioMuted ? controlOff : controlNeutral} disabled:opacity-50`}
+        className={`${controlButton} ${
+          micDisabled ? controlBlocked : mediasoup.isAudioMuted ? controlOff : controlNeutral
+        }`}
       >
         {mediasoup.isAudioMuted ? <MicOffIcon /> : <MicIcon />}
         <ControlLabel
@@ -75,8 +81,11 @@ export function MeetingControlBar({
       <button
         type="button"
         onClick={mediasoup.toggleVideo}
+        disabled={!mediaReady}
         aria-label={camLabel}
-        className={`${controlButton} ${mediasoup.isVideoMuted ? controlOff : controlNeutral}`}
+        className={`${controlButton} ${
+          !mediaReady ? controlBlocked : mediasoup.isVideoMuted ? controlOff : controlNeutral
+        }`}
       >
         {mediasoup.isVideoMuted ? <VideoOffIcon /> : <VideoIcon />}
         <ControlLabel
@@ -101,8 +110,8 @@ export function MeetingControlBar({
             type="button"
             onClick={() => void mediasoup.startScreenShare()}
             // 화면 공유는 동시 1인. 다른 참가자가 공유 중이면 비활성화.
-            disabled={mediasoup.isRemoteSharingScreen}
-            className={`${controlButton} ${mediasoup.isRemoteSharingScreen ? controlBlocked : controlNeutral}`}
+            disabled={shareDisabled}
+            className={`${controlButton} ${shareDisabled ? controlBlocked : controlNeutral}`}
           >
             <ScreenShareIcon />
             <span className="whitespace-nowrap">화면 공유 시작</span>

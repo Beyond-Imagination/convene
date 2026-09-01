@@ -22,9 +22,9 @@ test.describe('home page', () => {
     await expect(page).toHaveURL(/\/$/);
   });
 
-  test('회의록 보기 링크를 누르면 /reports로 이동한다', async ({ page }) => {
+  test('상단 회의록 링크를 누르면 /reports로 이동한다', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('link', { name: '회의록 보기' }).click();
+    await page.getByRole('link', { name: '회의록' }).click();
     await expect(page).toHaveURL(/\/reports\/?$/);
   });
 });
