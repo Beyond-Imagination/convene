@@ -3,60 +3,100 @@
 @tailwind utilities;
 
 /**
- * Convene v1 의미 컬러 토큰.
- * :root = 라이트(메인·입장·reports). .theme-dark = 회의 화면 컨테이너.
- * Tailwind 의 bg-surface / text-muted 등이 이 변수를 읽는다.
+ * Convene 의미 컬러 토큰. Tailwind 의 bg-surface / text-muted 등이 이 변수를 읽는다.
+ * 알파 유틸리티(bg-accent/20)를 쓰려면 값이 공백 구분 RGB 채널이어야 한다.
+ * 라이트가 기본이고 다크는 시스템 설정(prefers-color-scheme)을 따른다.
  */
 :root {
-  --bg: #ffffff;
-  --surface: #f5f5f5;
-  --border: #e5e5e5;
-  --text: #171717;
-  --muted: #737373;
+  color-scheme: light dark;
+
+  --bg: 247 244 238;
+  --paper: 247 244 238;
+  --surface: 255 253 250;
+  --border: 222 215 203;
+  --text: 31 28 23;
+  --muted: 114 106 94;
+  --tile-off: 231 225 214;
+  --screen-bg: 240 236 228;
+  --accent-on: 28 113 86;
+  --danger-on: 201 56 43;
+
+  /* 라이트·다크 공통 */
+  --accent: 28 113 86;
+  --accent-hover: 21 87 67;
+  --accent-active: 16 64 47;
+  --accent-fg: 241 250 245;
+  --danger: 201 56 43;
+  --danger-hover: 171 44 33;
+  --danger-fg: 255 244 242;
+  --positive: 63 168 118;
+  --pending: 162 152 137;
+}
+
+/* --accent-on / --danger-on 은 어두운 바탕 위에서 읽히도록 밝은 쪽으로 옮긴다. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: 34 31 27;
+    --paper: 38 34 32;
+    --surface: 51 45 40;
+    --border: 59 53 47;
+    --text: 244 239 231;
+    --muted: 164 154 142;
+    --tile-off: 44 38 34;
+    --accent-on: 127 201 164;
+    --danger-on: 240 160 154;
+  }
 }
 
 .theme-dark {
-  --bg: #0a0a0a;
-  --surface: #171717;
-  --border: #262626;
-  --text: #fafafa;
-  --muted: #a3a3a3;
+  --bg: 34 31 27;
+  --paper: 38 34 32;
+  --surface: 51 45 40;
+  --border: 59 53 47;
+  --text: 244 239 231;
+  --muted: 164 154 142;
+  --tile-off: 44 38 34;
+  --accent-on: 127 201 164;
+  --danger-on: 240 160 154;
 }
 
 html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
-  color: var(--text);
+  background: rgb(var(--paper));
+  color: rgb(var(--text));
   font-family:
+    var(--font-sans),
     system-ui,
     -apple-system,
     Segoe UI,
-    Roboto,
     sans-serif;
 }
 
 @layer components {
+  .cap {
+    @apply text-muted font-mono text-[11px] font-semibold uppercase tracking-[0.1em];
+  }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-base font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn bg-accent text-white hover:bg-accent-hover active:bg-accent-active;
+    @apply btn bg-accent text-accent-fg hover:bg-accent-hover active:bg-accent-active;
   }
   .btn-ghost {
-    @apply btn border border-border bg-transparent text-text hover:bg-surface;
+    @apply btn border-border text-text hover:bg-text/5 border bg-transparent;
   }
   .btn-danger {
-    @apply btn bg-danger text-white hover:bg-danger-hover;
+    @apply btn bg-danger text-danger-fg hover:bg-danger-hover;
   }
   .field-label {
-    @apply mb-1.5 block text-sm font-medium text-muted;
+    @apply cap mb-2 block;
   }
   .field-input {
-    @apply w-full rounded-lg border border-border bg-bg px-3.5 py-2.5 text-sm text-text outline-none transition placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent/30 aria-[invalid=true]:border-danger;
+    @apply border-border text-text placeholder:text-muted/60 focus:border-accent aria-[invalid=true]:border-danger w-full border-x-0 border-b-[1.5px] border-t-0 bg-transparent px-0.5 py-2.5 text-base outline-none transition-colors;
   }
   .field-error {
-    @apply mt-1.5 text-sm text-danger;
+    @apply text-danger-on mt-2 text-sm;
   }
 }
