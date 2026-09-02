@@ -3,9 +3,9 @@
 import type { MeetingDetailResponse } from '@convene/shared-interfaces';
 import { useEffect, useState } from 'react';
 
-import { getMeeting } from '@/shared/api/meeting.api';
+import { getMeeting, MeetingApiError } from '@/shared/api/meeting.api';
 
-export type MeetingCardStatus = 'loading' | 'ready' | 'error';
+export type MeetingCardStatus = 'loading' | 'ready' | 'not-found' | 'error';
 
 export interface UseMeetingCardViewModel {
   readonly status: MeetingCardStatus;
@@ -25,9 +25,9 @@ export function useMeetingCardViewModel(code: string): UseMeetingCardViewModel {
       try {
         const meeting = await getMeeting(code);
         if (!cancelled) setState({ status: 'ready', meeting });
-      } catch {
-        // 없는 회의(404)와 네트워크 실패를 구분하지 않는다. 어느 쪽이든 입장시킬 수 없다.
-        if (!cancelled) setState({ status: 'error', meeting: null });
+      } catch (e) {
+        const notFound = e instanceof MeetingApiError && (e.status === 404 || e.status === 400);
+        if (!cancelled) setState({ status: notFound ? 'not-found' : 'error', meeting: null });
       }
     })();
     return () => {

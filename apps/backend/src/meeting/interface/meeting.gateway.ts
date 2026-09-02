@@ -1,6 +1,7 @@
 import {
   type ChatPostedBroadcast,
-  type JoinMeetingAck,
+  type JoinMeetingRejectReason,
+  type JoinMeetingResponse,
   MEETING_EVENTS,
   MEETING_WS_EVENTS,
   type MeetingEndedBroadcast,
@@ -23,12 +24,19 @@ import {
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import type { Server, Socket } from 'socket.io';
 
-import { MeetingService } from '@/meeting/application/meeting.service';
+import { MeetingClosedError, MeetingNotFoundError } from '@/meeting/application/meeting.errors';
+import { JoinMeetingResult, MeetingService } from '@/meeting/application/meeting.service';
 import { ChatDto, JoinMeetingDto, LeaveMeetingDto } from '@/meeting/interface/meeting.dto';
 import { MeetingEndedPayload } from '@/shared-kernel/domain/domain-event.payloads';
 import { wsValidationPipe } from '@/shared-kernel/interface/ws-validation.pipe';
 
 const roomOf = (code: string): string => `meeting:${code}`;
+
+const rejectReasonOf = (error: unknown): JoinMeetingRejectReason | null => {
+  if (error instanceof MeetingNotFoundError) return 'not-found';
+  if (error instanceof MeetingClosedError) return 'closed';
+  return null;
+};
 
 interface ParticipantJoinedPayload {
   code: string;
@@ -74,15 +82,24 @@ export class MeetingGateway implements OnGatewayDisconnect {
   async handleJoin(
     @MessageBody() dto: JoinMeetingDto,
     @ConnectedSocket() client: Socket,
-  ): Promise<JoinMeetingAck> {
+  ): Promise<JoinMeetingResponse> {
     // Promise<void> 는 NestJS socket.io가 ack 미호출 → emitWithAck 영원 대기.
     const participantId = dto.participantId ?? client.id;
-    const { meeting, participant, hostToken, reconnected, chat } = await this.service.joinMeeting({
-      code: dto.code,
-      participantId,
-      connectionId: client.id,
-      nickname: dto.nickname,
-    });
+    let joined: JoinMeetingResult;
+    try {
+      joined = await this.service.joinMeeting({
+        code: dto.code,
+        participantId,
+        connectionId: client.id,
+        nickname: dto.nickname,
+      });
+    } catch (error) {
+      const reason = rejectReasonOf(error);
+      if (reason === null) throw error;
+      this.logger.info({ meetingCode: dto.code, participantId, reason }, 'join rejected');
+      return { ok: false, reason };
+    }
+    const { meeting, participant, hostToken, reconnected, chat } = joined;
     await client.join(roomOf(dto.code));
     // socket.id가 바뀌어도 이 참가자를 지목·제외할 수 있게 하는 room.
     await client.join(participantId);

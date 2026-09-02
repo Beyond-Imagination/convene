@@ -3,7 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { MEETING_EVENTS } from '@convene/shared-interfaces';
 import { Inject, Injectable } from '@nestjs/common';
 
-import { MeetingNotFoundError, NotHostError } from '@/meeting/application/meeting.errors';
+import {
+  MeetingClosedError,
+  MeetingNotFoundError,
+  NotHostError,
+} from '@/meeting/application/meeting.errors';
 import { Meeting, RECONNECT_GRACE_MS } from '@/meeting/domain/meeting';
 import { Participant } from '@/meeting/domain/participant';
 import { CHAT_REPOSITORY, ChatRepository } from '@/meeting/domain/ports/chat.repository';
@@ -52,7 +56,7 @@ interface JoinMeetingCommand {
   nickname: string;
 }
 
-interface JoinMeetingResult {
+export interface JoinMeetingResult {
   meeting: Meeting;
   participant: Participant;
   /** host 권한을 가져간 참가자에게만 준다. 아니면 null. */
@@ -167,6 +171,9 @@ export class MeetingService {
 
   async joinMeeting(command: JoinMeetingCommand): Promise<JoinMeetingResult> {
     const meeting = await this.requireMeeting(command.code);
+    if (meeting.status === 'closed') {
+      throw new MeetingClosedError(command.code);
+    }
     const now = this.clock.now();
     const connectionId = command.connectionId ?? command.participantId;
     const existing = meeting.findParticipant(command.participantId);

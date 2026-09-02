@@ -128,6 +128,15 @@ export interface JoinMeetingAck {
   chat: ChatPostedBroadcast[];
 }
 
+export type JoinMeetingRejectReason = 'not-found' | 'closed';
+
+export interface JoinMeetingRejectAck {
+  ok: false;
+  reason: JoinMeetingRejectReason;
+}
+
+export type JoinMeetingResponse = JoinMeetingAck | JoinMeetingRejectAck;
+
 // ---------- server → client (broadcast) ----------
 
 export interface ParticipantJoinedBroadcast {

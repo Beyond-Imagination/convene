@@ -14,7 +14,7 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 import { stub } from '@/shared-kernel/testing/stub';
 
-import { MeetingNotFoundError, NotHostError } from './meeting.errors';
+import { MeetingClosedError, MeetingNotFoundError, NotHostError } from './meeting.errors';
 import { MeetingService } from './meeting.service';
 
 interface CapturedEvent {
@@ -224,13 +224,13 @@ describe('MeetingService.joinMeeting', () => {
     ).rejects.toBeInstanceOf(MeetingNotFoundError);
   });
 
-  it('이미 종료된 Meeting이면 Aggregate 에러가 그대로 전파된다', async () => {
+  it('이미 종료된 Meeting이면 MeetingClosedError를 던진다', async () => {
     const meeting = makeMeeting(t0);
     meeting.close(t0);
     const { service } = makeService(meeting);
     await expect(
       service.joinMeeting({ code: 'abc12xyz', participantId: 's1', nickname: 'alice' }),
-    ).rejects.toThrow(/already closed/);
+    ).rejects.toBeInstanceOf(MeetingClosedError);
   });
 
   it('성공 시 meeting.participant.joined 도메인 이벤트를 발행한다', async () => {

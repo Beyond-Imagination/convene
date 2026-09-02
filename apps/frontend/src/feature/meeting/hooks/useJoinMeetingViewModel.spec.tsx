@@ -1,5 +1,7 @@
+import type { MeetingDetailResponse } from '@convene/shared-interfaces';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
+import { MeetingApiError } from '@/shared/api/meeting.api';
 import { useSessionStore } from '@/shared/stores/session.store';
 
 import { useJoinMeetingViewModel } from './useJoinMeetingViewModel';
@@ -8,6 +10,24 @@ const pushMock = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock }),
 }));
+
+const { getMeetingMock } = vi.hoisted(() => ({ getMeetingMock: vi.fn() }));
+vi.mock('@/shared/api/meeting.api', async (original) => {
+  const actual = (await original()) as typeof import('@/shared/api/meeting.api');
+  return {
+    ...actual,
+    getMeeting: (...args: Parameters<typeof actual.getMeeting>) => getMeetingMock(...args),
+  };
+});
+
+const openMeeting: MeetingDetailResponse = {
+  code: 'abc12xyz',
+  title: '스프린트 회고',
+  status: 'open',
+  participantCount: 1,
+  startedAt: '2026-01-01T00:00:00.000Z',
+  endedAt: null,
+};
 
 function Harness() {
   const vm = useJoinMeetingViewModel();
@@ -32,6 +52,7 @@ function Harness() {
       </label>
       {vm.errors.code && <span data-testid="code-error">{vm.errors.code.message}</span>}
       {vm.errors.nickname && <span data-testid="nickname-error">{vm.errors.nickname.message}</span>}
+      {vm.errorMessage !== null && <span data-testid="submit-error">{vm.errorMessage}</span>}
       <button type="submit">입장</button>
     </form>
   );
@@ -48,6 +69,8 @@ const setInput = (testId: string, value: string): void => {
 describe('useJoinMeetingViewModel', () => {
   beforeEach(() => {
     pushMock.mockReset();
+    getMeetingMock.mockReset();
+    getMeetingMock.mockResolvedValue(openMeeting);
     useSessionStore.setState({ nickname: null });
     // 폼 기본값이 보관 닉네임에서 채워지므로, 빈 입력 검증에는 비워 둔 상태가 필요하다.
     window.localStorage.clear();
@@ -103,6 +126,49 @@ describe('useJoinMeetingViewModel', () => {
     setInput('nickname', '   ');
     submit();
     await waitFor(() => expect(screen.getByTestId('nickname-error')).toBeInTheDocument());
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('입장 전에 회의가 실재하는지 확인한다', async () => {
+    render(<Harness />);
+    setInput('code', 'abc12xyz');
+    setInput('nickname', '준');
+    submit();
+    await waitFor(() => expect(pushMock).toHaveBeenCalled());
+    expect(getMeetingMock).toHaveBeenCalledWith('abc12xyz');
+  });
+
+  it('없는 회의 코드면 이동하지 않고 폼에서 알린다', async () => {
+    getMeetingMock.mockRejectedValueOnce(new MeetingApiError(404, 'not found'));
+    render(<Harness />);
+    setInput('code', 'abc12xyz');
+    setInput('nickname', '준');
+    submit();
+    await waitFor(() => expect(screen.getByTestId('submit-error')).toBeInTheDocument());
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('종료된 회의도 이동하지 않는다', async () => {
+    getMeetingMock.mockResolvedValueOnce({
+      ...openMeeting,
+      status: 'closed',
+      endedAt: '2026-01-01T01:00:00.000Z',
+    });
+    render(<Harness />);
+    setInput('code', 'abc12xyz');
+    setInput('nickname', '준');
+    submit();
+    await waitFor(() => expect(screen.getByTestId('submit-error')).toBeInTheDocument());
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('조회 자체가 실패해도 입장을 보내지 않는다', async () => {
+    getMeetingMock.mockRejectedValueOnce(new MeetingApiError(500, 'boom'));
+    render(<Harness />);
+    setInput('code', 'abc12xyz');
+    setInput('nickname', '준');
+    submit();
+    await waitFor(() => expect(screen.getByTestId('submit-error')).toBeInTheDocument());
     expect(pushMock).not.toHaveBeenCalled();
   });
 

@@ -64,8 +64,8 @@ describe('EmbedGate', () => {
   });
 
   it('없는 회의면 참가 링크 대신 오류 상태를 보여준다', () => {
-    renderGate({ status: 'error', meeting: null });
-    expect(cardStatus()).toBe('error');
+    renderGate({ status: 'not-found', meeting: null });
+    expect(cardStatus()).toBe('not-found');
     expect(screen.queryByRole('link')).toBeNull();
   });
 
