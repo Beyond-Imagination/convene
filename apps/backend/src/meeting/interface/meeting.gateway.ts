@@ -1,5 +1,6 @@
 import {
   type ChatPostedBroadcast,
+  type JoinMeetingRejectReason,
   type JoinMeetingResponse,
   MEETING_EVENTS,
   MEETING_WS_EVENTS,
@@ -23,13 +24,20 @@ import {
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import type { Server, Socket } from 'socket.io';
 
-import { MeetingNotFoundError } from '@/meeting/application/meeting.errors';
+import { MeetingClosedError, MeetingNotFoundError } from '@/meeting/application/meeting.errors';
 import { JoinMeetingResult, MeetingService } from '@/meeting/application/meeting.service';
 import { ChatDto, JoinMeetingDto, LeaveMeetingDto } from '@/meeting/interface/meeting.dto';
 import { MeetingEndedPayload } from '@/shared-kernel/domain/domain-event.payloads';
 import { wsValidationPipe } from '@/shared-kernel/interface/ws-validation.pipe';
 
 const roomOf = (code: string): string => `meeting:${code}`;
+
+/** 입장을 막아야 하는 에러만 ack 거부 사유로 옮긴다. 나머지는 예외로 남겨 500이 되게 둔다. */
+const rejectReasonOf = (error: unknown): JoinMeetingRejectReason | null => {
+  if (error instanceof MeetingNotFoundError) return 'not-found';
+  if (error instanceof MeetingClosedError) return 'closed';
+  return null;
+};
 
 interface ParticipantJoinedPayload {
   code: string;
@@ -78,19 +86,20 @@ export class MeetingGateway implements OnGatewayDisconnect {
   ): Promise<JoinMeetingResponse> {
     // Promise<void> 는 NestJS socket.io가 ack 미호출 → emitWithAck 영원 대기.
     const participantId = dto.participantId ?? client.id;
-    const joined = await this.joinOrNull({
-      code: dto.code,
-      participantId,
-      connectionId: client.id,
-      nickname: dto.nickname,
-    });
-    // 없는 회의는 room에 넣지 않고 거부를 그대로 돌려준다 — 클라이언트가 회의 화면을 열지 않는다.
-    if (joined === null) {
-      this.logger.info(
-        { meetingCode: dto.code, participantId },
-        'join rejected: meeting not found',
-      );
-      return { ok: false, reason: 'not-found' };
+    let joined: JoinMeetingResult;
+    try {
+      joined = await this.service.joinMeeting({
+        code: dto.code,
+        participantId,
+        connectionId: client.id,
+        nickname: dto.nickname,
+      });
+    } catch (error) {
+      const reason = rejectReasonOf(error);
+      if (reason === null) throw error;
+      // 거부된 참가자는 room에 넣지 않는다 — 클라이언트가 회의 화면 자체를 열지 않는다.
+      this.logger.info({ meetingCode: dto.code, participantId, reason }, 'join rejected');
+      return { ok: false, reason };
     }
     const { meeting, participant, hostToken, reconnected, chat } = joined;
     await client.join(roomOf(dto.code));
@@ -248,21 +257,6 @@ export class MeetingGateway implements OnGatewayDisconnect {
     // 자신도 자기 메시지를 받아야 하므로 except 없이 room 전체에 보낸다.
     this.server.to(roomOf(dto.code)).emit(MEETING_WS_EVENTS.CHAT_POSTED, broadcast);
     return { ok: true };
-  }
-
-  /** 없는 회의는 예외 대신 null. 거부 사유를 ack에 실어야 클라이언트가 입장을 막을 수 있다. */
-  private async joinOrNull(command: {
-    code: string;
-    participantId: string;
-    connectionId: string;
-    nickname: string;
-  }): Promise<JoinMeetingResult | null> {
-    try {
-      return await this.service.joinMeeting(command);
-    } catch (error) {
-      if (error instanceof MeetingNotFoundError) return null;
-      throw error;
-    }
   }
 
   /** join 이전 요청이나 구버전 클라이언트는 socket.id를 신원으로 쓴다. */

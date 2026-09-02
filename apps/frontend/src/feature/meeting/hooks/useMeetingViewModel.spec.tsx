@@ -305,6 +305,18 @@ describe('useMeetingViewModel', () => {
       expect(result.current.errorMessage).not.toBeNull();
     });
 
+    it('종료된 회의는 status="closed"로 구분해 입장을 막는다', () => {
+      const { result } = setup('준');
+      act(() => {
+        fakeSocket.connected = true;
+        fakeSocket.trigger('connect');
+      });
+      ackJoin({ ok: false, reason: 'closed' });
+      expect(result.current.status).toBe('closed');
+      expect(result.current.entryBlocked).toBe(true);
+      expect(fakeSocket.disconnect).toHaveBeenCalled();
+    });
+
     it('없는 회의는 재시도해도 달라지지 않으므로 socket을 끊는다', () => {
       setup('준');
       rejectJoin();

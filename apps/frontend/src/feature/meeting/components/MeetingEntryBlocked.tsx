@@ -4,19 +4,39 @@ import Link from 'next/link';
 
 import type { MeetingConnectionStatus } from '@/feature/meeting/hooks/useMeetingViewModel';
 
-/** 없는 회의는 재시도해도 달라지지 않고, 그 외 실패는 다시 시도해 볼 여지가 있다. */
-type EntryBlock = 'not-found' | 'failed';
+/** 서버가 거부한 두 사유와, 원인을 모르는 실패(다시 시도해 볼 여지가 있다). */
+type EntryBlock = 'not-found' | 'closed' | 'failed';
 
-const COPY: Record<EntryBlock, { readonly heading: string; readonly detail: string }> = {
+interface BlockCopy {
+  readonly heading: string;
+  readonly detail: string;
+  readonly linkHref: string;
+  readonly linkLabel: string;
+}
+
+const COPY: Record<EntryBlock, BlockCopy> = {
   'not-found': {
     heading: '회의를 찾을 수 없습니다',
     detail: '회의 코드가 잘못됐거나 이미 사라진 회의입니다.',
+    linkHref: '/',
+    linkLabel: '홈으로 돌아가기',
+  },
+  closed: {
+    heading: '이미 종료된 회의입니다',
+    detail: '종료된 회의에는 다시 입장할 수 없습니다. 회의록에서 내용을 확인하세요.',
+    linkHref: '/reports',
+    linkLabel: '회의록 보러 가기',
   },
   failed: {
     heading: '회의에 입장하지 못했습니다',
     detail: '잠시 후 링크로 다시 시도해 주세요.',
+    linkHref: '/',
+    linkLabel: '홈으로 돌아가기',
   },
 };
+
+const blockOf = (status: MeetingConnectionStatus): EntryBlock =>
+  status === 'not-found' || status === 'closed' ? status : 'failed';
 
 export interface MeetingEntryBlockedProps {
   readonly code: string;
@@ -32,8 +52,10 @@ export interface MeetingEntryBlockedProps {
  * "가짜 회의"에 들어간 것처럼 보인다. 입장 전 실패는 회의 화면 자체를 열지 않는다.
  */
 export function MeetingEntryBlocked({ code, status, message = null }: MeetingEntryBlockedProps) {
-  const block: EntryBlock = status === 'not-found' ? 'not-found' : 'failed';
+  const block = blockOf(status);
   const copy = COPY[block];
+  // 아는 거부 사유는 화면이 문구를 갖는다. 원인을 모르는 실패만 ViewModel이 준 메시지를 쓴다.
+  const detail = block === 'failed' ? (message ?? copy.detail) : copy.detail;
 
   return (
     <div
@@ -63,12 +85,12 @@ export function MeetingEntryBlocked({ code, status, message = null }: MeetingEnt
           {copy.heading}
         </h1>
         <p className="text-muted text-meta mt-1.5 font-mono tracking-wider">{code}</p>
-        <p className="text-muted text-lead mt-4">{message ?? copy.detail}</p>
+        <p className="text-muted text-lead mt-4">{detail}</p>
         <Link
-          href="/"
+          href={copy.linkHref}
           className="btn-primary mt-6 block w-full text-center"
         >
-          홈으로 돌아가기
+          {copy.linkLabel}
         </Link>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import { MEETING_WS_EVENTS } from '@convene/shared-interfaces';
 import type { Socket } from 'socket.io';
 
-import { MeetingNotFoundError } from '@/meeting/application/meeting.errors';
+import { MeetingClosedError, MeetingNotFoundError } from '@/meeting/application/meeting.errors';
 import { Meeting } from '@/meeting/domain/meeting';
 import { IdleTimeout } from '@/meeting/domain/value-objects/idle-timeout';
 import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
@@ -258,7 +258,18 @@ describe('MeetingGateway.handleJoin 거부', () => {
     expect(selfEmits).toEqual([]);
   });
 
-  it('없는 회의가 아닌 오류는 그대로 던진다', async () => {
+  it('종료된 회의도 같은 경로로 거부하되 사유를 구분한다', async () => {
+    const { gateway } = makeGateway(new MeetingClosedError('abc12xyz'));
+    const { socket, joined } = makeSocket('s1');
+    const ack = await gateway.handleJoin(
+      dtoOf({ participantId: 'p-1' }),
+      socket as unknown as Socket,
+    );
+    expect(ack).toEqual({ ok: false, reason: 'closed' });
+    expect(joined.size).toBe(0);
+  });
+
+  it('입장을 막는 도메인 에러가 아니면 그대로 던진다', async () => {
     const { gateway } = makeGateway(new Error('redis down'));
     const { socket } = makeSocket('s1');
     await expect(

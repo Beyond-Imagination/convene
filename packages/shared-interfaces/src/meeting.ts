@@ -128,8 +128,8 @@ export interface JoinMeetingAck {
   chat: ChatPostedBroadcast[];
 }
 
-/** 입장이 거부된 이유. 클라이언트는 이 값으로 "없는 회의"를 일시적 실패와 구분한다. */
-export type JoinMeetingRejectReason = 'not-found';
+/** 입장이 거부된 이유. 클라이언트는 이 값으로 사유별 안내를 고르고 일시적 실패와 구분한다. */
+export type JoinMeetingRejectReason = 'not-found' | 'closed';
 
 /**
  * 입장 거부 응답.

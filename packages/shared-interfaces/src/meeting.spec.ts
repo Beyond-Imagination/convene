@@ -142,10 +142,12 @@ describe('meeting wire format', () => {
     expect(ack.chat).toHaveLength(1);
   });
 
-  it('없는 회의 입장은 ok=false와 거부 사유로 돌아온다 (ok로 좁힌다)', () => {
-    const response: JoinMeetingResponse = { ok: false, reason: 'not-found' };
-    if (response.ok) throw new Error('거부 응답이어야 한다');
-    expect(response.reason).toBe('not-found');
+  it('입장 거부는 ok=false와 사유를 함께 싣는다 (ok로 좁힌다)', () => {
+    const responses: JoinMeetingResponse[] = [
+      { ok: false, reason: 'not-found' },
+      { ok: false, reason: 'closed' },
+    ];
+    expect(responses.map((r) => (r.ok ? null : r.reason))).toEqual(['not-found', 'closed']);
   });
 
   it('참가자 broadcast는 socket.id가 아닌 안정 participantId로 참가자를 지목한다', () => {

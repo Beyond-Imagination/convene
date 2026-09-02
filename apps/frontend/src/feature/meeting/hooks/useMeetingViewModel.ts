@@ -2,6 +2,7 @@
 
 import {
   type ChatPostedBroadcast,
+  type JoinMeetingRejectReason,
   type JoinMeetingResponse,
   MEETING_WS_EVENTS,
   type MeetingEndedBroadcast,
@@ -31,11 +32,23 @@ export type MeetingConnectionStatus =
   | 'joined'
   | 'reconnecting'
   | 'error'
-  /** 서버가 없는 회의라고 응답했다. 재시도해도 달라지지 않는다. */
-  | 'not-found';
+  /** 서버가 입장을 거부했다. 재시도해도 달라지지 않는다. */
+  | 'not-found'
+  | 'closed';
 
 // 응답이 오지 않으면 화면이 '연결 중'에 멈추므로 상한을 둔다.
 const JOIN_ACK_TIMEOUT_MS = 10_000;
+
+/** 서버가 준 거부 사유별 화면 상태와 안내. 모르는 사유는 일반 입장 실패로 떨어진다. */
+const REJECTIONS: Partial<
+  Record<JoinMeetingRejectReason, { status: MeetingConnectionStatus; message: string }>
+> = {
+  'not-found': {
+    status: 'not-found',
+    message: '존재하지 않는 회의입니다. 회의 코드나 링크를 확인해 주세요.',
+  },
+  closed: { status: 'closed', message: '이미 종료된 회의입니다.' },
+};
 
 export interface RemoteParticipant {
   readonly participantId: string;
@@ -183,12 +196,13 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
               return;
             }
             if (!ack.ok) {
-              // 없는 회의다. 재연결·재입장을 계속해도 달라지지 않으므로 연결을 끊는다.
+              // 입장 거부다. 재연결·재입장을 계속해도 달라지지 않으므로 연결을 끊는다.
+              const rejection = REJECTIONS[ack.reason];
               joinRejectedRef.current = true;
               skipLeaveOnCleanupRef.current = true;
               socket.disconnect();
-              setErrorMessage('존재하지 않는 회의입니다. 회의 코드나 링크를 확인해 주세요.');
-              setStatus('not-found');
+              setErrorMessage(rejection?.message ?? '회의에 입장할 수 없습니다.');
+              setStatus(rejection?.status ?? 'error');
               return;
             }
             setStatus('joined');
@@ -349,7 +363,10 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
     nickname,
     remoteParticipants,
     errorMessage,
-    entryBlocked: status === 'not-found' || (status === 'error' && !joinedOnceRef.current),
+    entryBlocked:
+      status === 'not-found' ||
+      status === 'closed' ||
+      (status === 'error' && !joinedOnceRef.current),
     socket,
     rejoinGen,
     rejoinPreservedMedia,

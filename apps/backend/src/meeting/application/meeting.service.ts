@@ -3,7 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { MEETING_EVENTS } from '@convene/shared-interfaces';
 import { Inject, Injectable } from '@nestjs/common';
 
-import { MeetingNotFoundError, NotHostError } from '@/meeting/application/meeting.errors';
+import {
+  MeetingClosedError,
+  MeetingNotFoundError,
+  NotHostError,
+} from '@/meeting/application/meeting.errors';
 import { Meeting, RECONNECT_GRACE_MS } from '@/meeting/domain/meeting';
 import { Participant } from '@/meeting/domain/participant';
 import { CHAT_REPOSITORY, ChatRepository } from '@/meeting/domain/ports/chat.repository';
@@ -167,6 +171,11 @@ export class MeetingService {
 
   async joinMeeting(command: JoinMeetingCommand): Promise<JoinMeetingResult> {
     const meeting = await this.requireMeeting(command.code);
+    // Aggregate도 종료된 회의를 막지만 raw Error라 원인을 구분할 수 없다.
+    // 입장 거부는 클라이언트에 사유를 돌려줘야 하므로 도메인 에러로 먼저 거른다.
+    if (meeting.status === 'closed') {
+      throw new MeetingClosedError(command.code);
+    }
     const now = this.clock.now();
     const connectionId = command.connectionId ?? command.participantId;
     const existing = meeting.findParticipant(command.participantId);

@@ -102,6 +102,27 @@ describe('Meeting e2e', () => {
     }
   });
 
+  it('종료된 회의에 입장하면 closed 사유가 담긴 거부 ack이 돌아온다', async () => {
+    const created = await request(httpServer).post('/meetings').send({ source: 'web' }).expect(201);
+    const { code, hostToken } = created.body as CreateMeetingResponse;
+    await request(httpServer)
+      .delete(`/meetings/${code}`)
+      .set('x-host-token', hostToken)
+      .expect(200);
+
+    const client = await connectClient(baseUrl);
+    try {
+      const ack = (await client.emitWithAck(MEETING_WS_EVENTS.JOIN, {
+        code,
+        nickname: 'alice',
+        participantId: 'p-alice',
+      })) as JoinMeetingResponse;
+      expect(ack).toEqual({ ok: false, reason: 'closed' });
+    } finally {
+      client.disconnect();
+    }
+  });
+
   it('HTTP create → WS join/chat/leave → HTTP close 전 흐름', async () => {
     // 1) 회의 생성.
     const created = await request(httpServer).post('/meetings').send({ source: 'web' }).expect(201);

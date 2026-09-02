@@ -33,6 +33,21 @@ describe('MeetingEntryBlocked', () => {
     );
   });
 
+  it('종료된 회의는 closed로 표시하고 회의록으로 보낸다', () => {
+    render(
+      <MeetingEntryBlocked
+        code="abc12xyz"
+        status="closed"
+        message={null}
+      />,
+    );
+    expect(screen.getByTestId('meeting-entry-blocked')).toHaveAttribute(
+      'data-entry-block',
+      'closed',
+    );
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/reports');
+  });
+
   it('회의 화면 대신 홈으로 나가는 길을 준다', () => {
     render(
       <MeetingEntryBlocked
