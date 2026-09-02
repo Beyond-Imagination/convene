@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import type {
   RemoteMediaEntry,
@@ -117,6 +117,24 @@ describe('MeetingScreen View', () => {
   it('status="connecting" 이면 role="status" 로 안내 메시지', () => {
     renderScreen({ status: 'connecting' });
     expect(screen.getByRole('status')).toHaveTextContent('연결 중');
+  });
+
+  it('헤더 제목은 회의 링크를 복사하는 버튼이다', () => {
+    renderScreen();
+    expect(screen.getByRole('button', { name: /회의 링크 복사/ })).toBeInTheDocument();
+  });
+
+  it('제목을 누르면 회의 링크가 클립보드에 들어가고 복사됨을 알린다', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    renderScreen();
+
+    fireEvent.click(screen.getByRole('button', { name: /회의 링크 복사/ }));
+
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(expect.stringContaining('/meetings/abc12xyz')),
+    );
+    expect(await screen.findByText('링크 복사됨')).toBeInTheDocument();
   });
 
   it('status="error" + errorMessage가 있으면 alert로 노출', () => {
