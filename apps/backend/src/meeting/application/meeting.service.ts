@@ -171,8 +171,7 @@ export class MeetingService {
 
   async joinMeeting(command: JoinMeetingCommand): Promise<JoinMeetingResult> {
     const meeting = await this.requireMeeting(command.code);
-    // Aggregate도 종료된 회의를 막지만 raw Error라 원인을 구분할 수 없다.
-    // 입장 거부는 클라이언트에 사유를 돌려줘야 하므로 도메인 에러로 먼저 거른다.
+    // Aggregate도 막지만 raw Error라 사유를 구분할 수 없다 — 거부 사유를 돌려주려면 여기서 걸러야 한다.
     if (meeting.status === 'closed') {
       throw new MeetingClosedError(command.code);
     }

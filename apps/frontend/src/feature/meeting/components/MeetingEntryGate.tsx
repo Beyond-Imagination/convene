@@ -4,14 +4,12 @@ import Link from 'next/link';
 
 import type { MeetingEntryBlock } from '@/feature/meeting/hooks/useMeetingViewModel';
 
-/** 판정 중이거나, 판정이 입장을 막았거나. 입장이 확정되면 이 화면은 사라진다. */
 export type MeetingEntryState = 'checking' | MeetingEntryBlock;
 
 interface StateCopy {
   readonly chip: string;
   readonly heading: string;
   readonly detail: string;
-  /** 나가는 길. 판정 중에는 없다. */
   readonly link: { readonly href: string; readonly label: string } | null;
 }
 
@@ -45,16 +43,12 @@ const COPY: Record<MeetingEntryState, StateCopy> = {
 export interface MeetingEntryGateProps {
   readonly code: string;
   readonly state: MeetingEntryState;
-  /** ViewModel이 준 실패 사유. 원인을 모르는 실패에서만 기본 안내를 대신한다. */
   readonly message?: string | null;
 }
 
 /**
- * 회의 화면에 들어가기 전 단계를 보여주는 View.
- *
- * 없는 회의 코드로도 회의 화면이 열리면 참가자 수·채팅·미디어가 모두 비어 있는
- * "가짜 회의"에 들어간 것처럼 보인다. 판정이 끝날 때까지, 그리고 판정이 막았다면 계속
- * 이 화면이 회의 화면을 대신한다.
+ * 회의 화면 대신 그리는 진입 화면. 판정 중과 차단을 같은 카드에서 다룬다.
+ * 없는 회의로도 회의 화면이 열리면 참가자도 채팅도 없는 "가짜 회의"에 들어간 것처럼 보인다.
  */
 export function MeetingEntryGate({ code, state, message = null }: MeetingEntryGateProps) {
   const copy = COPY[state];

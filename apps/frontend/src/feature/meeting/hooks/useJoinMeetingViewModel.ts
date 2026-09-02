@@ -25,7 +25,7 @@ export interface JoinMeetingFormValues {
 
 export interface UseJoinMeetingViewModel {
   readonly status: JoinMeetingStatus;
-  /** 입장 전 회의 확인이 막은 이유. 폼이 그대로 노출한다. */
+  /** 입장 전 회의 확인이 막은 이유. */
   readonly errorMessage: string | null;
   /**
    * View가 input에 spread 하는 register helper.
@@ -50,8 +50,8 @@ async function lookupBlockReason(code: string): Promise<string | null> {
 /**
  * 홈 페이지 "회의 입장" 폼의 ViewModel.
  *
- * 폼 입력 2종(code, nickname)을 react-hook-form으로 검증하고, 회의가 실재하며 아직 열려 있는지 확인한 뒤에야
- * 닉네임을 session store에 저장하고 `/meetings/[code]`로 이동한다. 없는 회의·종료된 회의는 이동 자체를 막는다.
+ * 폼 입력 2종(code, nickname)을 검증하고 회의가 실재하며 열려 있는지 확인한 뒤에야
+ * 닉네임을 session store에 저장하고 `/meetings/[code]`로 이동한다 — 없는 회의는 이동 자체를 막는다.
  * View는 본 hook의 반환만으로 input/submit/error 표시를 수행한다.
  */
 export function useJoinMeetingViewModel(): UseJoinMeetingViewModel {

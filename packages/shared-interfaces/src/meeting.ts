@@ -128,21 +128,15 @@ export interface JoinMeetingAck {
   chat: ChatPostedBroadcast[];
 }
 
-/** 입장이 거부된 이유. 클라이언트는 이 값으로 사유별 안내를 고르고 일시적 실패와 구분한다. */
+/** 클라이언트가 일시적 실패와 구분해 사유별 안내를 고르는 값. */
 export type JoinMeetingRejectReason = 'not-found' | 'closed';
 
-/**
- * 입장 거부 응답.
- *
- * 예외로 연결을 끊으면 클라이언트는 ack을 영원히 기다리다 타임아웃만 보고 이유를 모른다.
- * 거부도 ack으로 돌려줘야 클라이언트가 회의 화면을 아예 열지 않을 수 있다.
- */
+/** 예외로 끊으면 ack이 없어 클라이언트는 타임아웃만 보고 이유를 모른다. 거부도 ack으로 돌려준다. */
 export interface JoinMeetingRejectAck {
   ok: false;
   reason: JoinMeetingRejectReason;
 }
 
-/** `meeting:join` ack의 전체 형태. `ok`로 좁힌다. */
 export type JoinMeetingResponse = JoinMeetingAck | JoinMeetingRejectAck;
 
 // ---------- server → client (broadcast) ----------

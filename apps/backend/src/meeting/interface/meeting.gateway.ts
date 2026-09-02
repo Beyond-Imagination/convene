@@ -97,7 +97,6 @@ export class MeetingGateway implements OnGatewayDisconnect {
     } catch (error) {
       const reason = rejectReasonOf(error);
       if (reason === null) throw error;
-      // 거부된 참가자는 room에 넣지 않는다 — 클라이언트가 회의 화면 자체를 열지 않는다.
       this.logger.info({ meetingCode: dto.code, participantId, reason }, 'join rejected');
       return { ok: false, reason };
     }

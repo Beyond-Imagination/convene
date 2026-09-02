@@ -39,10 +39,9 @@ export type MeetingConnectionStatus =
 // 응답이 오지 않으면 화면이 '연결 중'에 멈추므로 상한을 둔다.
 const JOIN_ACK_TIMEOUT_MS = 10_000;
 
-/** 입장이 막힌 이유. 회의 화면 대신 이 사유의 안내 화면을 그린다. */
 export type MeetingEntryBlock = 'not-found' | 'closed' | 'failed';
 
-/** 서버가 준 거부 사유별 화면 상태와 안내. 모르는 사유는 일반 입장 실패로 떨어진다. */
+/** 모르는 사유(신버전 서버)는 일반 입장 실패로 떨어뜨린다. */
 const REJECTIONS: Partial<
   Record<JoinMeetingRejectReason, { status: MeetingConnectionStatus; message: string }>
 > = {
@@ -75,10 +74,7 @@ export interface UseMeetingViewModel {
   readonly nickname: string | null;
   readonly remoteParticipants: ReadonlyArray<RemoteParticipant>;
   readonly errorMessage: string | null;
-  /**
-   * 입장이 확정되기 전에 실패해 회의에 들어가지 못한 이유. 들어갔으면 null.
-   * View는 이 값이 있으면 회의 화면 대신 진입 화면을 그린다.
-   */
+  /** 입장이 확정되기 전에 실패한 이유. 들어갔으면 null. */
   readonly entryBlock: MeetingEntryBlock | null;
   /**
    * mount 된 socket 인스턴스. 채팅/미디어 등 후속 ViewModel이 같은 socket으로 emit/listen 하도록 노출한다.
@@ -173,7 +169,7 @@ export function useMeetingViewModel(code: string, enabled = true): UseMeetingVie
   }, [clearNickname, code]);
 
   useEffect(() => {
-    // enabled=false는 "이 회의에 들어가도 되는지" 판정이 끝나기 전이다. 판정 전에 join을 보내지 않는다.
+    // 판정이 끝나기 전(enabled=false)에는 join을 보내지 않는다.
     if (!enabled || nickname === null) {
       // 닉네임이 없으면 socket을 만들지 않는다. 두 경우가 있다. 하지만 어느 경우든 여기서 홈으로 redirect 하지 않는다.
       return;
@@ -209,7 +205,7 @@ export function useMeetingViewModel(code: string, enabled = true): UseMeetingVie
               return;
             }
             if (!ack.ok) {
-              // 입장 거부다. 재연결·재입장을 계속해도 달라지지 않으므로 연결을 끊는다.
+              // 재연결·재입장을 계속해도 달라지지 않으므로 연결을 끊는다.
               const rejection = REJECTIONS[ack.reason];
               joinRejectedRef.current = true;
               skipLeaveOnCleanupRef.current = true;

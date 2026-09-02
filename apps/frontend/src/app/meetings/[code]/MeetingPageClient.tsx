@@ -55,9 +55,9 @@ function ChatSection({
  * 채팅은 `ChatSection` 이 자기 ViewModel 을 직접 들고 있다(위 주석 참조).
  */
 function MeetingSession({ code }: { readonly code: string }) {
-  // 제목·시작 시각도 이 조회에서 함께 온다. 회의 화면이 따로 읽지 않는다.
+  // 제목·시작 시각도 이 조회에서 함께 온다.
   const entry = useMeetingEntryViewModel(code);
-  // 판정이 끝나기 전에는 socket을 만들지 않는다 — 입장 요청 자체를 보내지 않아야 한다.
+  // 판정 전에는 입장 요청 자체를 보내지 않는다.
   const meetingVm = useMeetingViewModel(code, entry.state === 'ready');
   // 예약 회의는 join이 처리되는 순간 방이 열린다. 입장이 확인되기 전에는 socket을 넘기지 않아
   // 미디어 협상이 방보다 먼저 도착하는 것을 막는다.
@@ -73,7 +73,6 @@ function MeetingSession({ code }: { readonly code: string }) {
   const layout = useMeetingLayoutViewModel(totalTiles);
   const gateVm = useNicknameGateViewModel(code);
 
-  // 판정이 끝나기 전에도, 판정이 막았을 때도 회의 화면 대신 진입 화면을 그린다.
   if (entry.state !== 'ready') {
     return (
       <MeetingEntryGate
