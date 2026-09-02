@@ -24,7 +24,11 @@ import {
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import type { Server, Socket } from 'socket.io';
 
-import { MeetingClosedError, MeetingNotFoundError } from '@/meeting/application/meeting.errors';
+import {
+  MeetingClosedError,
+  MeetingNotFoundError,
+  NicknameTakenError,
+} from '@/meeting/application/meeting.errors';
 import { JoinMeetingResult, MeetingService } from '@/meeting/application/meeting.service';
 import { ChatDto, JoinMeetingDto, LeaveMeetingDto } from '@/meeting/interface/meeting.dto';
 import { MeetingEndedPayload } from '@/shared-kernel/domain/domain-event.payloads';
@@ -35,6 +39,7 @@ const roomOf = (code: string): string => `meeting:${code}`;
 const rejectReasonOf = (error: unknown): JoinMeetingRejectReason | null => {
   if (error instanceof MeetingNotFoundError) return 'not-found';
   if (error instanceof MeetingClosedError) return 'closed';
+  if (error instanceof NicknameTakenError) return 'nickname-taken';
   return null;
 };
 

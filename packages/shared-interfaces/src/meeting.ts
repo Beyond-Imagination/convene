@@ -111,6 +111,11 @@ export interface ChatMessage {
   text: string;
 }
 
+export interface NicknameAvailabilityResponse {
+  nickname: string;
+  available: boolean;
+}
+
 // ---------- server → client (ack) ----------
 
 /**
@@ -128,7 +133,7 @@ export interface JoinMeetingAck {
   chat: ChatPostedBroadcast[];
 }
 
-export type JoinMeetingRejectReason = 'not-found' | 'closed';
+export type JoinMeetingRejectReason = 'not-found' | 'closed' | 'nickname-taken';
 
 export interface JoinMeetingRejectAck {
   ok: false;

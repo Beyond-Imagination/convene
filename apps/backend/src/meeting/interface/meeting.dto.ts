@@ -76,6 +76,17 @@ export class JoinMeetingDto extends MeetingScopedDto implements JoinMeetingMessa
   participantId?: string;
 }
 
+export class NicknameAvailabilityQueryDto {
+  @IsString()
+  @Length(1, NICKNAME_MAX)
+  nickname!: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, PARTICIPANT_ID_MAX)
+  participantId?: string;
+}
+
 export class LeaveMeetingDto extends MeetingScopedDto implements LeaveMeetingMessage {}
 
 export class ChatDto extends MeetingScopedDto implements ChatMessage {

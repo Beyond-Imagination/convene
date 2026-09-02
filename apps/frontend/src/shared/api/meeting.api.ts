@@ -3,6 +3,7 @@ import type {
   CreateMeetingRequest,
   CreateMeetingResponse,
   MeetingDetailResponse,
+  NicknameAvailabilityResponse,
 } from '@convene/shared-interfaces';
 
 import { API_BASE_URL } from './config';
@@ -35,6 +36,24 @@ export async function getMeeting(code: string): Promise<MeetingDetailResponse> {
     throw new MeetingApiError(res.status, text || `GET /meetings/${code} failed (${res.status})`);
   }
   return (await res.json()) as MeetingDetailResponse;
+}
+
+export async function checkNicknameAvailability(
+  code: string,
+  nickname: string,
+  participantId?: string,
+): Promise<NicknameAvailabilityResponse> {
+  const params = new URLSearchParams({ nickname });
+  if (participantId !== undefined) params.set('participantId', participantId);
+  const res = await fetch(
+    `${API_BASE_URL}/meetings/${encodeURIComponent(code)}/nickname-availability?${params}`,
+    { method: 'GET' },
+  );
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new MeetingApiError(res.status, text || `닉네임 확인 실패 (${res.status})`);
+  }
+  return (await res.json()) as NicknameAvailabilityResponse;
 }
 
 export async function closeMeeting(

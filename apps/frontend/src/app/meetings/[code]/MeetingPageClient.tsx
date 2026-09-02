@@ -69,7 +69,7 @@ function MeetingSession({ code }: { readonly code: string }) {
   // self 타일(항상 1) + 원격 참가자 수 = 전체 비디오 타일 수.
   const totalTiles = 1 + meetingVm.remoteParticipants.length;
   const layout = useMeetingLayoutViewModel(totalTiles);
-  const gateVm = useNicknameGateViewModel(code);
+  const gateVm = useNicknameGateViewModel(code, meetingVm.nicknameError);
 
   if (entry.state !== 'ready') {
     return (

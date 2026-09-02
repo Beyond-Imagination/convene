@@ -2,6 +2,7 @@ import type {
   CloseMeetingResponse,
   CreateMeetingResponse,
   MeetingDetailResponse,
+  NicknameAvailabilityResponse,
 } from '@convene/shared-interfaces';
 import {
   BadRequestException,
@@ -14,11 +15,12 @@ import {
   HttpStatus,
   Param,
   Post,
+  Query,
 } from '@nestjs/common';
 
 import { MeetingService } from '@/meeting/application/meeting.service';
 import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
-import { CreateMeetingDto } from '@/meeting/interface/meeting.dto';
+import { CreateMeetingDto, NicknameAvailabilityQueryDto } from '@/meeting/interface/meeting.dto';
 import { externalReference } from '@/shared-kernel/domain/value-objects/external-reference';
 
 /**
@@ -59,6 +61,20 @@ export class MeetingController {
       startedAt: meeting.status === 'scheduled' ? null : meeting.startedAt.toISOString(),
       endedAt: meeting.endedAt?.toISOString() ?? null,
     };
+  }
+
+  @Get(':code/nickname-availability')
+  async checkNickname(
+    @Param('code') code: string,
+    @Query() query: NicknameAvailabilityQueryDto,
+  ): Promise<NicknameAvailabilityResponse> {
+    this.assertCodeFormat(code);
+    const available = await this.service.isNicknameAvailable(
+      code,
+      query.nickname,
+      query.participantId,
+    );
+    return { nickname: query.nickname, available };
   }
 
   @Delete(':code')

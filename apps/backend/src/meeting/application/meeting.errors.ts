@@ -12,6 +12,15 @@ export class MeetingClosedError extends ConflictError {
   }
 }
 
+export class NicknameTakenError extends ConflictError {
+  constructor(
+    public readonly code: string,
+    public readonly nickname: string,
+  ) {
+    super(`Nickname is already taken in meeting "${code}"`);
+  }
+}
+
 export class NotHostError extends ForbiddenError {
   constructor(public readonly code: string) {
     super(`Only the host can close meeting "${code}"`);

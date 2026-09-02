@@ -14,6 +14,9 @@ const noopRegister = (name: string): UseFormRegisterReturn =>
 const baseProps: NicknameGateProps = {
   code: 'abc12xyz',
   status: 'idle',
+  availability: 'unknown',
+  canSubmit: false,
+  errorMessage: null,
   register: noopRegister,
   errors: {},
   handleSubmit: async () => {},
@@ -39,6 +42,54 @@ describe('NicknameGate', () => {
       />,
     );
     expect(screen.getByText('주간 스프린트 회의')).toBeInTheDocument();
+  });
+
+  it('확인되기 전에는 입장 버튼이 비활성이다', () => {
+    render(<NicknameGate {...baseProps} />);
+    expect(screen.getByRole('button', { name: /입장/ })).toBeDisabled();
+  });
+
+  it('확인 중에는 버튼이 확인 중임을 알린다', () => {
+    render(
+      <NicknameGate
+        {...baseProps}
+        availability="checking"
+      />,
+    );
+    expect(screen.getByRole('button', { name: '확인 중…' })).toBeDisabled();
+  });
+
+  it('쓸 수 있는 닉네임으로 확인되면 입장할 수 있다', () => {
+    render(
+      <NicknameGate
+        {...baseProps}
+        availability="available"
+        canSubmit
+      />,
+    );
+    expect(screen.getByRole('button', { name: '입장하기' })).toBeEnabled();
+  });
+
+  it('중복 닉네임이면 입장 버튼을 비활성화한다', () => {
+    render(
+      <NicknameGate
+        {...baseProps}
+        availability="taken"
+        errorMessage="이미 사용 중인 닉네임입니다."
+      />,
+    );
+    expect(screen.getByRole('button', { name: /입장/ })).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent('이미 사용 중인 닉네임입니다.');
+  });
+
+  it('서버가 준 오류(닉네임 중복)를 빨간 메시지로 노출한다', () => {
+    render(
+      <NicknameGate
+        {...baseProps}
+        errorMessage="이미 사용 중인 닉네임입니다."
+      />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('이미 사용 중인 닉네임입니다.');
   });
 
   it('errors.nickname이 있으면 에러 메시지를 노출한다', () => {

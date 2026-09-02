@@ -14,7 +14,12 @@ import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 import { stub } from '@/shared-kernel/testing/stub';
 
-import { MeetingClosedError, MeetingNotFoundError, NotHostError } from './meeting.errors';
+import {
+  MeetingClosedError,
+  MeetingNotFoundError,
+  NicknameTakenError,
+  NotHostError,
+} from './meeting.errors';
 import { MeetingService } from './meeting.service';
 
 interface CapturedEvent {
@@ -224,6 +229,27 @@ describe('MeetingService.joinMeeting', () => {
     ).rejects.toBeInstanceOf(MeetingNotFoundError);
   });
 
+  it('같은 방에 이미 있는 닉네임이면 NicknameTakenError를 던진다', async () => {
+    const meeting = makeMeeting(t0);
+    meeting.addParticipant('s1', 'alice', t0);
+    const { service } = makeService(meeting);
+    await expect(
+      service.joinMeeting({ code: 'abc12xyz', participantId: 's2', nickname: 'alice' }),
+    ).rejects.toBeInstanceOf(NicknameTakenError);
+  });
+
+  it('같은 참가자가 다시 들어오는 경우는 중복이 아니다', async () => {
+    const meeting = makeMeeting(t0);
+    meeting.addParticipant('s1', 'alice', t0);
+    const { service } = makeService(meeting);
+    const result = await service.joinMeeting({
+      code: 'abc12xyz',
+      participantId: 's1',
+      nickname: 'alice',
+    });
+    expect(result.participant.id).toBe('s1');
+  });
+
   it('이미 종료된 Meeting이면 MeetingClosedError를 던진다', async () => {
     const meeting = makeMeeting(t0);
     meeting.close(t0);
@@ -279,6 +305,52 @@ describe('MeetingService.joinMeeting', () => {
       nickname: 'bob',
     });
     expect(result.hostToken).toBe('host-token-1');
+  });
+});
+
+describe('MeetingService.isNicknameAvailable', () => {
+  const t0 = new Date('2026-01-01T00:00:00Z');
+
+  const makeService = (meeting: Meeting | null) => {
+    const { publisher } = makeEventPublisher();
+    return new MeetingService(
+      {
+        findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
+        listOpenCodes: async () => [],
+        save: async () => {},
+      },
+      noopChatRepository(),
+      { next: () => code },
+      { now: () => t0 },
+      publisher,
+      noopLogger(),
+    );
+  };
+
+  it('아무도 안 쓰는 닉네임은 사용할 수 있다', async () => {
+    const service = makeService(makeMeeting(t0));
+    await expect(service.isNicknameAvailable('abc12xyz', '준')).resolves.toBe(true);
+  });
+
+  it('활성 참가자가 쓰는 닉네임은 사용할 수 없다', async () => {
+    const meeting = makeMeeting(t0);
+    meeting.addParticipant('s1', '준', t0);
+    const service = makeService(meeting);
+    await expect(service.isNicknameAvailable('abc12xyz', '준')).resolves.toBe(false);
+  });
+
+  it('본인 것이면 사용할 수 있다 (같은 participantId)', async () => {
+    const meeting = makeMeeting(t0);
+    meeting.addParticipant('s1', '준', t0);
+    const service = makeService(meeting);
+    await expect(service.isNicknameAvailable('abc12xyz', '준', 's1')).resolves.toBe(true);
+  });
+
+  it('없는 회의면 MeetingNotFoundError를 던진다', async () => {
+    const service = makeService(null);
+    await expect(service.isNicknameAvailable('abc12xyz', '준')).rejects.toBeInstanceOf(
+      MeetingNotFoundError,
+    );
   });
 });
 

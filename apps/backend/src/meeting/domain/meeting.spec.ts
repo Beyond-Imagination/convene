@@ -110,6 +110,42 @@ describe('Meeting (Aggregate Root)', () => {
     });
   });
 
+  describe('isNicknameTaken', () => {
+    it('활성 참가자가 쓰는 닉네임은 이미 사용 중이다', () => {
+      const m = newMeeting();
+      m.addParticipant('p-1', '준', T_0);
+      expect(m.isNicknameTaken('준')).toBe(true);
+      expect(m.isNicknameTaken('다른사람')).toBe(false);
+    });
+
+    it('앞뒤 공백만 다른 닉네임도 같은 것으로 본다', () => {
+      const m = newMeeting();
+      m.addParticipant('p-1', '준', T_0);
+      expect(m.isNicknameTaken('  준  ')).toBe(true);
+    });
+
+    it('퇴장한 참가자의 닉네임은 다시 쓸 수 있다', () => {
+      const m = newMeeting();
+      m.addParticipant('p-1', '준', T_0);
+      m.removeParticipant('p-1', T_30s);
+      expect(m.isNicknameTaken('준')).toBe(false);
+    });
+
+    it('끊겨서 유예 대기 중인 참가자의 닉네임은 아직 사용 중이다', () => {
+      const m = newMeeting();
+      m.addParticipant('p-1', '준', T_0, 's1');
+      m.disconnectParticipant('s1', T_30s);
+      expect(m.isNicknameTaken('준')).toBe(true);
+    });
+
+    it('본인은 중복으로 보지 않는다 (재접속·재입장)', () => {
+      const m = newMeeting();
+      m.addParticipant('p-1', '준', T_0);
+      expect(m.isNicknameTaken('준', 'p-1')).toBe(false);
+      expect(m.isNicknameTaken('준', 'p-2')).toBe(true);
+    });
+  });
+
   describe('findParticipant', () => {
     it('등록된 id면 해당 Participant를 반환한다', () => {
       const m = newMeeting();

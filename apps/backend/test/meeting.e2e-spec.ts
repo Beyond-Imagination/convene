@@ -8,6 +8,7 @@ import {
   type GetRtpCapabilitiesResponse,
   type JoinMeetingAck,
   type JoinMeetingResponse,
+  type NicknameAvailabilityResponse,
   MEDIASOUP_WS_EVENTS,
   MEETING_WS_EVENTS,
   type ParticipantDisconnectedBroadcast,
@@ -98,6 +99,56 @@ describe('Meeting e2e', () => {
       expect(ack).toEqual({ ok: false, reason: 'not-found' });
     } finally {
       client.disconnect();
+    }
+  });
+
+  it('입장 전에 닉네임 사용 여부를 조회할 수 있다', async () => {
+    const created = await request(httpServer).post('/meetings').send({ source: 'web' }).expect(201);
+    const { code } = created.body as CreateMeetingResponse;
+    const ask = (query: Record<string, string>) =>
+      request(httpServer).get(`/meetings/${code}/nickname-availability`).query(query).expect(200);
+
+    await ask({ nickname: 'alice' }).expect({ nickname: 'alice', available: true });
+
+    const alice = await connectClient(baseUrl);
+    try {
+      await alice.emitWithAck(MEETING_WS_EVENTS.JOIN, {
+        code,
+        nickname: 'alice',
+        participantId: 'p-alice',
+      });
+
+      const taken = await ask({ nickname: 'alice' });
+      expect((taken.body as NicknameAvailabilityResponse).available).toBe(false);
+
+      const mine = await ask({ nickname: 'alice', participantId: 'p-alice' });
+      expect((mine.body as NicknameAvailabilityResponse).available).toBe(true);
+    } finally {
+      alice.disconnect();
+    }
+  });
+
+  it('같은 방에 이미 있는 닉네임으로 입장하면 거부 ack이 돌아온다', async () => {
+    const created = await request(httpServer).post('/meetings').send({ source: 'web' }).expect(201);
+    const { code } = created.body as CreateMeetingResponse;
+
+    const alice = await connectClient(baseUrl);
+    const bob = await connectClient(baseUrl);
+    try {
+      await alice.emitWithAck(MEETING_WS_EVENTS.JOIN, {
+        code,
+        nickname: 'alice',
+        participantId: 'p-alice',
+      });
+      const ack = (await bob.emitWithAck(MEETING_WS_EVENTS.JOIN, {
+        code,
+        nickname: 'alice',
+        participantId: 'p-bob',
+      })) as JoinMeetingResponse;
+      expect(ack).toEqual({ ok: false, reason: 'nickname-taken' });
+    } finally {
+      alice.disconnect();
+      bob.disconnect();
     }
   });
 

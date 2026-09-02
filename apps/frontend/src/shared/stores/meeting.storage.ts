@@ -42,6 +42,8 @@ export const saveNickname = (code: string, nickname: string): void =>
 
 export const getNickname = (code: string): string | null => readSession(nicknameKey(code));
 
+export const forgetNickname = (code: string): void => removeSession(nicknameKey(code));
+
 /**
  * 이 회의에 대한 클라이언트 상태를 전부 버린다. 정상 퇴장·종료 전용이다.
  * 비정상 종료에서 부르면 안 된다 — 남아 있어야 같은 신원으로 재접속한다.

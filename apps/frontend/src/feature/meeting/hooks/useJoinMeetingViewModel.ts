@@ -4,8 +4,13 @@ import { useRouter } from 'next/navigation';
 import { type BaseSyntheticEvent, useState } from 'react';
 import { type FieldErrors, useForm, type UseFormRegisterReturn } from 'react-hook-form';
 
-import { getMeeting, MeetingApiError } from '@/shared/api/meeting.api';
-import { getLastNickname, saveLastNickname, saveNickname } from '@/shared/stores/meeting.storage';
+import { checkNicknameAvailability, getMeeting, MeetingApiError } from '@/shared/api/meeting.api';
+import {
+  getLastNickname,
+  getParticipantId,
+  saveLastNickname,
+  saveNickname,
+} from '@/shared/stores/meeting.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
 export const MEETING_CODE_PATTERN = /^[a-z0-9]{8}$/;
@@ -16,6 +21,7 @@ export type JoinMeetingStatus = 'idle' | 'submitting' | 'error';
 
 const NOT_FOUND_MESSAGE = '존재하지 않는 회의 코드입니다.';
 const CLOSED_MESSAGE = '이미 종료된 회의입니다.';
+const NICKNAME_TAKEN_MESSAGE = '이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해 주세요.';
 const LOOKUP_FAILED_MESSAGE = '회의 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 
 export interface JoinMeetingFormValues {
@@ -34,14 +40,20 @@ export interface UseJoinMeetingViewModel {
   readonly handleSubmit: (e?: BaseSyntheticEvent) => Promise<void>;
 }
 
-async function lookupBlockReason(code: string): Promise<string | null> {
+async function lookupBlockReason(code: string, nickname: string): Promise<string | null> {
   try {
     const meeting = await getMeeting(code);
-    return meeting.status === 'closed' ? CLOSED_MESSAGE : null;
+    if (meeting.status === 'closed') return CLOSED_MESSAGE;
   } catch (e) {
     return e instanceof MeetingApiError && e.status === 404
       ? NOT_FOUND_MESSAGE
       : LOOKUP_FAILED_MESSAGE;
+  }
+  try {
+    const { available } = await checkNicknameAvailability(code, nickname, getParticipantId(code));
+    return available ? null : NICKNAME_TAKEN_MESSAGE;
+  } catch {
+    return LOOKUP_FAILED_MESSAGE;
   }
 }
 
@@ -70,17 +82,17 @@ export function useJoinMeetingViewModel(): UseJoinMeetingViewModel {
   const handleSubmit = rhfHandleSubmit(async (values) => {
     setStatus('submitting');
     setErrorMessage(null);
-    const blocked = await lookupBlockReason(values.code);
+    const trimmedNickname = values.nickname.trim();
+    const blocked = await lookupBlockReason(values.code, trimmedNickname);
     if (blocked !== null) {
       setErrorMessage(blocked);
       setStatus('error');
       return;
     }
-    const trimmed = values.nickname.trim();
     // 닉네임을 code 별로 보관(리로드 생존) + reactive store에도 set.
-    saveNickname(values.code, trimmed);
-    saveLastNickname(trimmed);
-    setNickname(trimmed);
+    saveNickname(values.code, trimmedNickname);
+    saveLastNickname(trimmedNickname);
+    setNickname(trimmedNickname);
     router.push(`/meetings/${values.code}`);
   });
 
