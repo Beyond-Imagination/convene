@@ -7,6 +7,7 @@ import {
   type CreateTransportResponse,
   type GetRtpCapabilitiesResponse,
   type JoinMeetingAck,
+  type JoinMeetingResponse,
   MEDIASOUP_WS_EVENTS,
   MEETING_WS_EVENTS,
   type ParticipantDisconnectedBroadcast,
@@ -84,6 +85,21 @@ describe('Meeting e2e', () => {
 
   afterAll(async () => {
     await app.close();
+  });
+
+  it('없는 회의 코드로 입장하면 예외가 아니라 거부 ack이 돌아온다', async () => {
+    const client = await connectClient(baseUrl);
+    try {
+      // ack 없이 예외로 끊기면 emitWithAck이 영원히 대기해 이 테스트가 타임아웃으로 죽는다.
+      const ack = (await client.emitWithAck(MEETING_WS_EVENTS.JOIN, {
+        code: 'zzzz9999',
+        nickname: 'alice',
+        participantId: 'p-alice',
+      })) as JoinMeetingResponse;
+      expect(ack).toEqual({ ok: false, reason: 'not-found' });
+    } finally {
+      client.disconnect();
+    }
   });
 
   it('HTTP create → WS join/chat/leave → HTTP close 전 흐름', async () => {

@@ -5,6 +5,7 @@ import type { Socket } from 'socket.io-client';
 
 import { ChatPanel } from '@/feature/meeting/components/ChatPanel';
 import { EmbedGate } from '@/feature/meeting/components/EmbedGate';
+import { MeetingEntryBlocked } from '@/feature/meeting/components/MeetingEntryBlocked';
 import { MeetingScreen } from '@/feature/meeting/components/MeetingScreen';
 import { NicknameGate } from '@/feature/meeting/components/NicknameGate';
 import { useChatViewModel } from '@/feature/meeting/hooks/useChatViewModel';
@@ -79,6 +80,18 @@ function MeetingSession({ code }: { readonly code: string }) {
         code={code}
         title={card.meeting?.title ?? null}
         {...gateVm}
+      />
+    );
+  }
+
+  // 입장이 확정되기 전에 실패했다면 회의 화면 자체를 열지 않는다.
+  // 없는 회의 코드로도 화면이 열리면 아무도 없는 "가짜 회의"에 들어간 것처럼 보인다.
+  if (meetingVm.entryBlocked) {
+    return (
+      <MeetingEntryBlocked
+        code={code}
+        status={meetingVm.status}
+        message={meetingVm.errorMessage}
       />
     );
   }

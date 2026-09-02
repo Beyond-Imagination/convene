@@ -1,6 +1,7 @@
 import { MEETING_WS_EVENTS } from '@convene/shared-interfaces';
 import type { Socket } from 'socket.io';
 
+import { MeetingNotFoundError } from '@/meeting/application/meeting.errors';
 import { Meeting } from '@/meeting/domain/meeting';
 import { IdleTimeout } from '@/meeting/domain/value-objects/idle-timeout';
 import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
@@ -222,6 +223,47 @@ describe('MeetingGateway.handleJoin', () => {
     await gateway.handleJoin(dtoOf({ participantId: 'p-1' }), socket as unknown as Socket);
     expect(broadcasts).toEqual([]);
     expect(clientBroadcasts).toEqual([]);
+  });
+});
+
+describe('MeetingGateway.handleJoin 거부', () => {
+  const makeGateway = (error: unknown) => {
+    const service = {
+      joinMeeting: jest.fn(async () => {
+        throw error;
+      }),
+    };
+    const gateway = new MeetingGateway(service as never, fakeLogger as never);
+    const { server } = makeServer();
+    gateway.server = server as never;
+    return { gateway };
+  };
+
+  it('없는 회의면 예외로 끊지 않고 거부 사유를 ack으로 돌려준다', async () => {
+    const { gateway } = makeGateway(new MeetingNotFoundError('abc12xyz'));
+    const { socket } = makeSocket('s1');
+    const ack = await gateway.handleJoin(
+      dtoOf({ participantId: 'p-1' }),
+      socket as unknown as Socket,
+    );
+    expect(ack).toEqual({ ok: false, reason: 'not-found' });
+  });
+
+  it('거부된 참가자는 어떤 room에도 넣지 않고 socket.data도 남기지 않는다', async () => {
+    const { gateway } = makeGateway(new MeetingNotFoundError('abc12xyz'));
+    const { socket, joined, data, selfEmits } = makeSocket('s1');
+    await gateway.handleJoin(dtoOf({ participantId: 'p-1' }), socket as unknown as Socket);
+    expect(joined.size).toBe(0);
+    expect(data).toEqual({});
+    expect(selfEmits).toEqual([]);
+  });
+
+  it('없는 회의가 아닌 오류는 그대로 던진다', async () => {
+    const { gateway } = makeGateway(new Error('redis down'));
+    const { socket } = makeSocket('s1');
+    await expect(
+      gateway.handleJoin(dtoOf({ participantId: 'p-1' }), socket as unknown as Socket),
+    ).rejects.toBeInstanceOf(Error);
   });
 });
 

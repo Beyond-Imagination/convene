@@ -2,7 +2,7 @@
 
 import {
   type ChatPostedBroadcast,
-  type JoinMeetingAck,
+  type JoinMeetingResponse,
   MEETING_WS_EVENTS,
   type MeetingEndedBroadcast,
   type MeetingParticipantsBroadcast,
@@ -26,7 +26,13 @@ import {
 } from '@/shared/stores/meeting.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
-export type MeetingConnectionStatus = 'connecting' | 'joined' | 'reconnecting' | 'error';
+export type MeetingConnectionStatus =
+  | 'connecting'
+  | 'joined'
+  | 'reconnecting'
+  | 'error'
+  /** 서버가 없는 회의라고 응답했다. 재시도해도 달라지지 않는다. */
+  | 'not-found';
 
 // 응답이 오지 않으면 화면이 '연결 중'에 멈추므로 상한을 둔다.
 const JOIN_ACK_TIMEOUT_MS = 10_000;
@@ -44,6 +50,11 @@ export interface UseMeetingViewModel {
   readonly nickname: string | null;
   readonly remoteParticipants: ReadonlyArray<RemoteParticipant>;
   readonly errorMessage: string | null;
+  /**
+   * 입장이 확정되기 전에 실패해 회의에 들어가지 못한 상태.
+   * View는 이때 회의 화면 대신 차단 화면을 그린다. 입장한 뒤의 오류(재입장 실패)는 해당하지 않는다.
+   */
+  readonly entryBlocked: boolean;
   /**
    * mount 된 socket 인스턴스. 채팅/미디어 등 후속 ViewModel이 같은 socket으로 emit/listen 하도록 노출한다.
    * mount 직후 또는 nickname 없는 redirect 상태에서는 null.
@@ -125,6 +136,8 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
    * 퇴장 중이면 이미 목적지로 push/redirect 했으므로 홈으로의 replace('/')를 막는다(/reports로의 이동과 경쟁 방지).
    */
   const isNavigatingAwayRef = useRef(false);
+  /** 서버가 입장을 거부해 우리가 소켓을 끊은 경우. 뒤따르는 disconnect를 재연결로 오인하지 않는다. */
+  const joinRejectedRef = useRef(false);
 
   // 정상 퇴장·종료 경로에서만 부른다. 닉네임뿐 아니라 participantId·hostToken·미디어 의도까지
   // 버려야 같은 링크로 다시 들어갈 때 이전 참가자로 되살아나거나 마이크가 저절로 켜지지 않는다.
@@ -141,6 +154,7 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
     }
 
     skipLeaveOnCleanupRef.current = false;
+    joinRejectedRef.current = false;
     const participantId = getParticipantId(code);
     const next = connectMeetingSocket();
     socketRef.current = next;
@@ -162,10 +176,19 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
         .emit(
           MEETING_WS_EVENTS.JOIN,
           { code, nickname, participantId },
-          (err: Error | null, ack?: JoinMeetingAck) => {
+          (err: Error | null, ack?: JoinMeetingResponse) => {
             if (err !== null || ack === undefined) {
               setErrorMessage('회의에 입장하지 못했습니다. 링크가 유효한지 확인해 주세요.');
               setStatus('error');
+              return;
+            }
+            if (!ack.ok) {
+              // 없는 회의다. 재연결·재입장을 계속해도 달라지지 않으므로 연결을 끊는다.
+              joinRejectedRef.current = true;
+              skipLeaveOnCleanupRef.current = true;
+              socket.disconnect();
+              setErrorMessage('존재하지 않는 회의입니다. 회의 코드나 링크를 확인해 주세요.');
+              setStatus('not-found');
               return;
             }
             setStatus('joined');
@@ -184,7 +207,7 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
         );
     };
     const onDisconnect = (): void => {
-      if (!joinedOnceRef.current) return;
+      if (joinRejectedRef.current || !joinedOnceRef.current) return;
       setStatus('reconnecting');
     };
     const onConnectError = (err: Error): void => {
@@ -326,6 +349,7 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
     nickname,
     remoteParticipants,
     errorMessage,
+    entryBlocked: status === 'not-found' || (status === 'error' && !joinedOnceRef.current),
     socket,
     rejoinGen,
     rejoinPreservedMedia,

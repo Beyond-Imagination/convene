@@ -7,6 +7,7 @@ import {
   type ExternalReferencePayload,
   type JoinMeetingAck,
   type JoinMeetingMessage,
+  type JoinMeetingResponse,
   MEETING_STATUSES,
   MEETING_TYPES,
   MEETING_WS_EVENTS,
@@ -139,6 +140,12 @@ describe('meeting wire format', () => {
     };
     expect(ack.reconnected).toBe(true);
     expect(ack.chat).toHaveLength(1);
+  });
+
+  it('없는 회의 입장은 ok=false와 거부 사유로 돌아온다 (ok로 좁힌다)', () => {
+    const response: JoinMeetingResponse = { ok: false, reason: 'not-found' };
+    if (response.ok) throw new Error('거부 응답이어야 한다');
+    expect(response.reason).toBe('not-found');
   });
 
   it('참가자 broadcast는 socket.id가 아닌 안정 participantId로 참가자를 지목한다', () => {

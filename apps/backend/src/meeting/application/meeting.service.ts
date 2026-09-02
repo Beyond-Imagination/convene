@@ -52,7 +52,7 @@ interface JoinMeetingCommand {
   nickname: string;
 }
 
-interface JoinMeetingResult {
+export interface JoinMeetingResult {
   meeting: Meeting;
   participant: Participant;
   /** host 권한을 가져간 참가자에게만 준다. 아니면 null. */

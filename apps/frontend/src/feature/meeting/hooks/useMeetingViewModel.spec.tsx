@@ -1,4 +1,8 @@
-import { type JoinMeetingAck, MEETING_WS_EVENTS } from '@convene/shared-interfaces';
+import {
+  type JoinMeetingAck,
+  type JoinMeetingResponse,
+  MEETING_WS_EVENTS,
+} from '@convene/shared-interfaces';
 import { act, renderHook, waitFor } from '@testing-library/react';
 
 import { getHostToken, saveHostToken } from '@/shared/stores/meeting.storage';
@@ -81,10 +85,10 @@ const setup = (nickname: string | null = '준') => {
 };
 
 /** join emit에 실린 ack 콜백을 꺼내 서버 응답을 흉내낸다. */
-const ackJoin = (ack: JoinMeetingAck | null, err: Error | null = null): void => {
+const ackJoin = (ack: JoinMeetingResponse | null, err: Error | null = null): void => {
   const call = fakeSocket.emit.mock.calls.find((c) => c[0] === MEETING_WS_EVENTS.JOIN);
   act(() => {
-    (call?.[2] as (e: Error | null, payload?: JoinMeetingAck) => void)(err, ack ?? undefined);
+    (call?.[2] as (e: Error | null, payload?: JoinMeetingResponse) => void)(err, ack ?? undefined);
   });
 };
 
@@ -281,6 +285,63 @@ describe('useMeetingViewModel', () => {
 
       expect(result.current.status).toBe('error');
       expect(result.current.errorMessage).not.toBeNull();
+    });
+  });
+
+  describe('입장 거부', () => {
+    const rejectJoin = (): void => {
+      act(() => {
+        fakeSocket.connected = true;
+        fakeSocket.trigger('connect');
+      });
+      ackJoin({ ok: false, reason: 'not-found' });
+    };
+
+    it('없는 회의라는 응답을 받으면 status="not-found"가 되고 입장이 막힌다', () => {
+      const { result } = setup('준');
+      rejectJoin();
+      expect(result.current.status).toBe('not-found');
+      expect(result.current.entryBlocked).toBe(true);
+      expect(result.current.errorMessage).not.toBeNull();
+    });
+
+    it('없는 회의는 재시도해도 달라지지 않으므로 socket을 끊는다', () => {
+      setup('준');
+      rejectJoin();
+      expect(fakeSocket.disconnect).toHaveBeenCalled();
+    });
+
+    it('거부로 끊긴 소켓은 재연결 중으로 표시하지 않는다', () => {
+      const { result } = setup('준');
+      rejectJoin();
+      act(() => {
+        fakeSocket.trigger('disconnect');
+      });
+      expect(result.current.status).toBe('not-found');
+    });
+
+    it('한 번도 입장하지 못한 채 실패하면 회의 화면을 열지 않는다', () => {
+      const { result } = setup('준');
+      act(() => {
+        fakeSocket.connected = true;
+        fakeSocket.trigger('connect');
+      });
+      ackJoin(null, new Error('operation has timed out'));
+      expect(result.current.entryBlocked).toBe(true);
+    });
+
+    it('입장한 뒤의 재입장 실패는 회의 화면을 닫지 않는다', () => {
+      const { result } = setup('준');
+      connect();
+      act(() => {
+        fakeSocket.connected = false;
+        fakeSocket.trigger('disconnect');
+        fakeSocket.connected = true;
+        fakeSocket.trigger('connect');
+      });
+      ackJoin(null, new Error('operation has timed out'));
+      expect(result.current.status).toBe('error');
+      expect(result.current.entryBlocked).toBe(false);
     });
   });
 
