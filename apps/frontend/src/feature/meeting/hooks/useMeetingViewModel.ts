@@ -32,7 +32,6 @@ export type MeetingConnectionStatus =
   | 'joined'
   | 'reconnecting'
   | 'error'
-  /** 서버가 입장을 거부했다. 재시도해도 달라지지 않는다. */
   | 'not-found'
   | 'closed';
 
@@ -41,7 +40,6 @@ const JOIN_ACK_TIMEOUT_MS = 10_000;
 
 export type MeetingEntryBlock = 'not-found' | 'closed' | 'failed';
 
-/** 모르는 사유(신버전 서버)는 일반 입장 실패로 떨어뜨린다. */
 const REJECTIONS: Partial<
   Record<JoinMeetingRejectReason, { status: MeetingConnectionStatus; message: string }>
 > = {
@@ -57,7 +55,6 @@ const entryBlockOf = (
   joinedOnce: boolean,
 ): MeetingEntryBlock | null => {
   if (status === 'not-found' || status === 'closed') return status;
-  // 입장한 뒤의 오류(재입장 실패)는 이미 참여 중이므로 회의 화면을 닫지 않는다.
   return status === 'error' && !joinedOnce ? 'failed' : null;
 };
 
@@ -74,7 +71,6 @@ export interface UseMeetingViewModel {
   readonly nickname: string | null;
   readonly remoteParticipants: ReadonlyArray<RemoteParticipant>;
   readonly errorMessage: string | null;
-  /** 입장이 확정되기 전에 실패한 이유. 들어갔으면 null. */
   readonly entryBlock: MeetingEntryBlock | null;
   /**
    * mount 된 socket 인스턴스. 채팅/미디어 등 후속 ViewModel이 같은 socket으로 emit/listen 하도록 노출한다.
@@ -157,7 +153,6 @@ export function useMeetingViewModel(code: string, enabled = true): UseMeetingVie
    * 퇴장 중이면 이미 목적지로 push/redirect 했으므로 홈으로의 replace('/')를 막는다(/reports로의 이동과 경쟁 방지).
    */
   const isNavigatingAwayRef = useRef(false);
-  /** 서버가 입장을 거부해 우리가 소켓을 끊은 경우. 뒤따르는 disconnect를 재연결로 오인하지 않는다. */
   const joinRejectedRef = useRef(false);
 
   // 정상 퇴장·종료 경로에서만 부른다. 닉네임뿐 아니라 participantId·hostToken·미디어 의도까지
@@ -169,7 +164,6 @@ export function useMeetingViewModel(code: string, enabled = true): UseMeetingVie
   }, [clearNickname, code]);
 
   useEffect(() => {
-    // 판정이 끝나기 전(enabled=false)에는 join을 보내지 않는다.
     if (!enabled || nickname === null) {
       // 닉네임이 없으면 socket을 만들지 않는다. 두 경우가 있다. 하지만 어느 경우든 여기서 홈으로 redirect 하지 않는다.
       return;
@@ -205,7 +199,6 @@ export function useMeetingViewModel(code: string, enabled = true): UseMeetingVie
               return;
             }
             if (!ack.ok) {
-              // 재연결·재입장을 계속해도 달라지지 않으므로 연결을 끊는다.
               const rejection = REJECTIONS[ack.reason];
               joinRejectedRef.current = true;
               skipLeaveOnCleanupRef.current = true;

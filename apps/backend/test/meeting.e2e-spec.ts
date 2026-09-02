@@ -90,7 +90,6 @@ describe('Meeting e2e', () => {
   it('없는 회의 코드로 입장하면 예외가 아니라 거부 ack이 돌아온다', async () => {
     const client = await connectClient(baseUrl);
     try {
-      // ack 없이 예외로 끊기면 emitWithAck이 영원히 대기해 이 테스트가 타임아웃으로 죽는다.
       const ack = (await client.emitWithAck(MEETING_WS_EVENTS.JOIN, {
         code: 'zzzz9999',
         nickname: 'alice',

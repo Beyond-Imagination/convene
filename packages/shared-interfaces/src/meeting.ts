@@ -128,10 +128,8 @@ export interface JoinMeetingAck {
   chat: ChatPostedBroadcast[];
 }
 
-/** 클라이언트가 일시적 실패와 구분해 사유별 안내를 고르는 값. */
 export type JoinMeetingRejectReason = 'not-found' | 'closed';
 
-/** 예외로 끊으면 ack이 없어 클라이언트는 타임아웃만 보고 이유를 모른다. 거부도 ack으로 돌려준다. */
 export interface JoinMeetingRejectAck {
   ok: false;
   reason: JoinMeetingRejectReason;

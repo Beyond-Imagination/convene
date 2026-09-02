@@ -32,7 +32,6 @@ import { wsValidationPipe } from '@/shared-kernel/interface/ws-validation.pipe';
 
 const roomOf = (code: string): string => `meeting:${code}`;
 
-/** 입장을 막아야 하는 에러만 ack 거부 사유로 옮긴다. 나머지는 예외로 남겨 500이 되게 둔다. */
 const rejectReasonOf = (error: unknown): JoinMeetingRejectReason | null => {
   if (error instanceof MeetingNotFoundError) return 'not-found';
   if (error instanceof MeetingClosedError) return 'closed';

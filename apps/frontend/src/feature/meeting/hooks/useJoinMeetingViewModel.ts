@@ -25,7 +25,6 @@ export interface JoinMeetingFormValues {
 
 export interface UseJoinMeetingViewModel {
   readonly status: JoinMeetingStatus;
-  /** 입장 전 회의 확인이 막은 이유. */
   readonly errorMessage: string | null;
   /**
    * View가 input에 spread 하는 register helper.
@@ -35,7 +34,6 @@ export interface UseJoinMeetingViewModel {
   readonly handleSubmit: (e?: BaseSyntheticEvent) => Promise<void>;
 }
 
-/** 입장을 막아야 하는 이유. 들어갈 수 있으면 null. */
 async function lookupBlockReason(code: string): Promise<string | null> {
   try {
     const meeting = await getMeeting(code);

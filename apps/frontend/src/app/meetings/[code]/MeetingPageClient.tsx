@@ -48,16 +48,14 @@ function ChatSection({
 
 /**
  * 실제 회의 세션. 세 ViewModel hook을 합성한다:
- *   - `useMeetingEntryViewModel` — 입장해도 되는 회의인지 먼저 판정
+ *   - `useMeetingEntryViewModel`
  *   - `useMeetingViewModel`
  *   - `useMediasoupViewModel`
  *
  * 채팅은 `ChatSection` 이 자기 ViewModel 을 직접 들고 있다(위 주석 참조).
  */
 function MeetingSession({ code }: { readonly code: string }) {
-  // 제목·시작 시각도 이 조회에서 함께 온다.
   const entry = useMeetingEntryViewModel(code);
-  // 판정 전에는 입장 요청 자체를 보내지 않는다.
   const meetingVm = useMeetingViewModel(code, entry.state === 'ready');
   // 예약 회의는 join이 처리되는 순간 방이 열린다. 입장이 확인되기 전에는 socket을 넘기지 않아
   // 미디어 협상이 방보다 먼저 도착하는 것을 막는다.
@@ -96,7 +94,6 @@ function MeetingSession({ code }: { readonly code: string }) {
     );
   }
 
-  // 판정을 통과했어도 입장이 확정되기 전에 실패할 수 있다(그 사이 종료, 연결 실패).
   if (meetingVm.entryBlock !== null) {
     return (
       <MeetingEntryGate

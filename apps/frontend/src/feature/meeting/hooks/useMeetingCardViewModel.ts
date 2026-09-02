@@ -26,7 +26,6 @@ export function useMeetingCardViewModel(code: string): UseMeetingCardViewModel {
         const meeting = await getMeeting(code);
         if (!cancelled) setState({ status: 'ready', meeting });
       } catch (e) {
-        // 404(없음)·400(존재할 수 없는 코드)만 회의가 없다고 단정한다. 나머지는 조회가 안 됐을 뿐이다.
         const notFound = e instanceof MeetingApiError && (e.status === 404 || e.status === 400);
         if (!cancelled) setState({ status: notFound ? 'not-found' : 'error', meeting: null });
       }

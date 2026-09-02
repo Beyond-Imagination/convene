@@ -46,14 +46,9 @@ export interface MeetingEntryGateProps {
   readonly message?: string | null;
 }
 
-/**
- * 회의 화면 대신 그리는 진입 화면. 판정 중과 차단을 같은 카드에서 다룬다.
- * 없는 회의로도 회의 화면이 열리면 참가자도 채팅도 없는 "가짜 회의"에 들어간 것처럼 보인다.
- */
 export function MeetingEntryGate({ code, state, message = null }: MeetingEntryGateProps) {
   const copy = COPY[state];
   const checking = state === 'checking';
-  // 아는 사유는 화면이 문구를 갖는다. 원인을 모르는 실패만 ViewModel이 준 메시지를 쓴다.
   const detail = state === 'failed' ? (message ?? copy.detail) : copy.detail;
 
   return (
