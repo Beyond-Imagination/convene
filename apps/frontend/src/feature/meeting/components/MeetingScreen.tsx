@@ -1,11 +1,16 @@
 'use client';
 
+import { LinkIcon } from '@/feature/meeting/components/icons';
 import { MeetingControlBar } from '@/feature/meeting/components/MeetingControlBar';
 import { RemoteAudioPlayer } from '@/feature/meeting/components/MeetingMedia';
 import { VideoStage } from '@/feature/meeting/components/VideoStage';
 import type { UseMediasoupViewModel } from '@/feature/meeting/hooks/useMediasoupViewModel';
 import { useMeetingElapsedViewModel } from '@/feature/meeting/hooks/useMeetingElapsedViewModel';
 import type { MeetingLayoutVariant } from '@/feature/meeting/hooks/useMeetingLayoutViewModel';
+import {
+  type CopyLinkStatus,
+  useMeetingLinkViewModel,
+} from '@/feature/meeting/hooks/useMeetingLinkViewModel';
 import type {
   MeetingConnectionStatus,
   UseMeetingViewModel,
@@ -21,6 +26,46 @@ const STATUS_TONE_DEFAULT = { text: 'text-muted', dot: 'bg-pending' } as const;
 
 const statusLabel = (status: MeetingConnectionStatus): string =>
   status === 'joined' ? '연결됨' : status === 'reconnecting' ? '재접속 중…' : status;
+
+const COPY_FEEDBACK: Record<Exclude<CopyLinkStatus, 'idle'>, string> = {
+  copied: '링크 복사됨',
+  error: '복사하지 못했습니다',
+};
+
+function MeetingTitle({ code, title }: { readonly code: string; readonly title: string | null }) {
+  const { url, status, copy } = useMeetingLinkViewModel(code);
+  const label = title ?? `회의 ${code}`;
+  return (
+    <h1 className="text-title flex min-w-0 items-center gap-2.5 font-bold tracking-[-0.025em]">
+      <button
+        type="button"
+        onClick={copy}
+        title={url}
+        aria-label={`${label} — 회의 링크 복사`}
+        className="text-text hover:text-accent-on group flex min-w-0 items-center gap-2 transition-colors"
+      >
+        <span className="truncate">
+          {title ?? (
+            <>
+              회의 <span className="text-code font-mono font-medium">{code}</span>
+            </>
+          )}
+        </span>
+        <LinkIcon className="text-muted group-hover:text-accent-on h-4 w-4 shrink-0 transition-colors" />
+      </button>
+      {status !== 'idle' && (
+        <span
+          role="status"
+          className={`text-meta shrink-0 font-semibold ${
+            status === 'copied' ? 'text-positive' : 'text-danger-on'
+          }`}
+        >
+          {COPY_FEEDBACK[status]}
+        </span>
+      )}
+    </h1>
+  );
+}
 
 /**
  * 경과 시간은 1초마다 바뀐다. 헤더에 인라인으로 두면 그 틱이 회의 화면 전체를 —
@@ -92,13 +137,10 @@ export function MeetingScreen({
     <section className="flex h-full min-w-0 flex-1 flex-col">
       <header className="border-border px-gutter py-gutter-sm flex items-center justify-between gap-3 border-b">
         <div className="min-w-0">
-          <h1 className="text-text text-title truncate font-bold tracking-[-0.025em]">
-            {title ?? (
-              <>
-                회의 <span className="text-code font-mono font-medium">{code}</span>
-              </>
-            )}
-          </h1>
+          <MeetingTitle
+            code={code}
+            title={title}
+          />
           <p className="text-muted text-meta mt-1 truncate font-medium">
             {title !== null && <span className="font-mono">{code} · </span>}내 닉네임:{' '}
             {nickname ?? '(미인증)'} · 참가자 {participantCount}명
