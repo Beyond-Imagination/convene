@@ -264,6 +264,15 @@ export class Meeting {
     return undefined;
   }
 
+  isNicknameTaken(nickname: string, exceptParticipantId?: string): boolean {
+    const target = nickname.trim();
+    for (const p of this.participants.values()) {
+      if (!p.isActive || p.id === exceptParticipantId) continue;
+      if (p.nickname.trim() === target) return true;
+    }
+    return false;
+  }
+
   /** 아직 leave 하지 않은 참가자 수. */
   get activeParticipantCount(): number {
     let n = 0;

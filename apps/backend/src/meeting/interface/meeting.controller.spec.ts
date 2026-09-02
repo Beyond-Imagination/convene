@@ -4,7 +4,11 @@ import { MeetingNotFoundError, NotHostError } from '@/meeting/application/meetin
 import { Meeting } from '@/meeting/domain/meeting';
 import { IdleTimeout } from '@/meeting/domain/value-objects/idle-timeout';
 import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
-import { CreateMeetingDto, ExternalReferenceDto } from '@/meeting/interface/meeting.dto';
+import {
+  CreateMeetingDto,
+  ExternalReferenceDto,
+  NicknameAvailabilityQueryDto,
+} from '@/meeting/interface/meeting.dto';
 import { externalReference } from '@/shared-kernel/domain/value-objects/external-reference';
 
 import { MeetingController } from './meeting.controller';
@@ -238,5 +242,40 @@ describe('MeetingController.closeMeeting', () => {
 
     const controller = new MeetingController(service as any);
     await expect(controller.closeMeeting('abc12xyz')).rejects.toThrow(/already closed/);
+  });
+});
+
+describe('MeetingController.checkNickname', () => {
+  const makeController = (available: boolean) => {
+    const service = { isNicknameAvailable: jest.fn(async () => available) };
+    return { controller: new MeetingController(service as never), service };
+  };
+
+  const queryOf = (nickname: string, participantId?: string): NicknameAvailabilityQueryDto => {
+    const dto = new NicknameAvailabilityQueryDto();
+    dto.nickname = nickname;
+    if (participantId !== undefined) dto.participantId = participantId;
+    return dto;
+  };
+
+  it('사용 가능 여부를 닉네임과 함께 돌려준다', async () => {
+    const { controller } = makeController(false);
+    await expect(controller.checkNickname('abc12xyz', queryOf('준'))).resolves.toEqual({
+      nickname: '준',
+      available: false,
+    });
+  });
+
+  it('본인 신원을 함께 넘겨 자기 닉네임이 중복으로 잡히지 않게 한다', async () => {
+    const { controller, service } = makeController(true);
+    await controller.checkNickname('abc12xyz', queryOf('준', 'p-1'));
+    expect(service.isNicknameAvailable).toHaveBeenCalledWith('abc12xyz', '준', 'p-1');
+  });
+
+  it('회의 코드 형식이 틀리면 400', async () => {
+    const { controller } = makeController(true);
+    await expect(controller.checkNickname('short', queryOf('준'))).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 });

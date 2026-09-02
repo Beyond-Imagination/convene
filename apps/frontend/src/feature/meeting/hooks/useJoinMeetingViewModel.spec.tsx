@@ -11,12 +11,17 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock }),
 }));
 
-const { getMeetingMock } = vi.hoisted(() => ({ getMeetingMock: vi.fn() }));
+const { getMeetingMock, checkNicknameMock } = vi.hoisted(() => ({
+  getMeetingMock: vi.fn(),
+  checkNicknameMock: vi.fn(),
+}));
 vi.mock('@/shared/api/meeting.api', async (original) => {
   const actual = (await original()) as typeof import('@/shared/api/meeting.api');
   return {
     ...actual,
     getMeeting: (...args: Parameters<typeof actual.getMeeting>) => getMeetingMock(...args),
+    checkNicknameAvailability: (...args: Parameters<typeof actual.checkNicknameAvailability>) =>
+      checkNicknameMock(...args),
   };
 });
 
@@ -71,6 +76,8 @@ describe('useJoinMeetingViewModel', () => {
     pushMock.mockReset();
     getMeetingMock.mockReset();
     getMeetingMock.mockResolvedValue(openMeeting);
+    checkNicknameMock.mockReset();
+    checkNicknameMock.mockResolvedValue({ nickname: '준', available: true });
     useSessionStore.setState({ nickname: null });
     // 폼 기본값이 보관 닉네임에서 채워지므로, 빈 입력 검증에는 비워 둔 상태가 필요하다.
     window.localStorage.clear();
@@ -146,6 +153,24 @@ describe('useJoinMeetingViewModel', () => {
     submit();
     await waitFor(() => expect(screen.getByTestId('submit-error')).toBeInTheDocument());
     expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('중복 닉네임이면 이동하지 않고 폼에서 알린다', async () => {
+    checkNicknameMock.mockResolvedValueOnce({ nickname: '준', available: false });
+    render(<Harness />);
+    setInput('code', 'abc12xyz');
+    setInput('nickname', '준');
+    submit();
+    await waitFor(() => expect(screen.getByTestId('submit-error')).toBeInTheDocument());
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('닉네임 확인은 제출할 때만 한다 (입력 중에는 조회하지 않는다)', async () => {
+    render(<Harness />);
+    setInput('code', 'abc12xyz');
+    setInput('nickname', '준');
+    await waitFor(() => expect(screen.getByTestId('nickname')).toHaveValue('준'));
+    expect(checkNicknameMock).not.toHaveBeenCalled();
   });
 
   it('종료된 회의도 이동하지 않는다', async () => {

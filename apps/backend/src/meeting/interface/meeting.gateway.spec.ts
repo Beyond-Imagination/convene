@@ -1,7 +1,11 @@
 import { MEETING_WS_EVENTS } from '@convene/shared-interfaces';
 import type { Socket } from 'socket.io';
 
-import { MeetingClosedError, MeetingNotFoundError } from '@/meeting/application/meeting.errors';
+import {
+  MeetingClosedError,
+  MeetingNotFoundError,
+  NicknameTakenError,
+} from '@/meeting/application/meeting.errors';
 import { Meeting } from '@/meeting/domain/meeting';
 import { IdleTimeout } from '@/meeting/domain/value-objects/idle-timeout';
 import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
@@ -266,6 +270,17 @@ describe('MeetingGateway.handleJoin 거부', () => {
       socket as unknown as Socket,
     );
     expect(ack).toEqual({ ok: false, reason: 'closed' });
+    expect(joined.size).toBe(0);
+  });
+
+  it('닉네임 중복도 거부 사유로 돌려준다', async () => {
+    const { gateway } = makeGateway(new NicknameTakenError('abc12xyz', 'alice'));
+    const { socket, joined } = makeSocket('s1');
+    const ack = await gateway.handleJoin(
+      dtoOf({ participantId: 'p-1' }),
+      socket as unknown as Socket,
+    );
+    expect(ack).toEqual({ ok: false, reason: 'nickname-taken' });
     expect(joined.size).toBe(0);
   });
 

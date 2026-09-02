@@ -6,6 +6,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   MeetingClosedError,
   MeetingNotFoundError,
+  NicknameTakenError,
   NotHostError,
 } from '@/meeting/application/meeting.errors';
 import { Meeting, RECONNECT_GRACE_MS } from '@/meeting/domain/meeting';
@@ -169,10 +170,22 @@ export class MeetingService {
     return this.requireMeeting(code);
   }
 
+  async isNicknameAvailable(
+    code: string,
+    nickname: string,
+    exceptParticipantId?: string,
+  ): Promise<boolean> {
+    const meeting = await this.requireMeeting(code);
+    return !meeting.isNicknameTaken(nickname, exceptParticipantId);
+  }
+
   async joinMeeting(command: JoinMeetingCommand): Promise<JoinMeetingResult> {
     const meeting = await this.requireMeeting(command.code);
     if (meeting.status === 'closed') {
       throw new MeetingClosedError(command.code);
+    }
+    if (meeting.isNicknameTaken(command.nickname, command.participantId)) {
+      throw new NicknameTakenError(command.code, command.nickname);
     }
     const now = this.clock.now();
     const connectionId = command.connectionId ?? command.participantId;

@@ -15,6 +15,9 @@ export function NicknameGate({
   code,
   title = null,
   status,
+  availability,
+  canSubmit,
+  errorMessage,
   register,
   errors,
   handleSubmit,
@@ -58,7 +61,7 @@ export function NicknameGate({
             aria-invalid={errors.nickname !== undefined}
             {...register('nickname')}
           />
-          {errors.nickname !== undefined && (
+          {errors.nickname !== undefined ? (
             <p
               role="alert"
               data-field="nickname"
@@ -66,13 +69,23 @@ export function NicknameGate({
             >
               {errors.nickname.message}
             </p>
+          ) : (
+            errorMessage !== null && (
+              <p
+                role="alert"
+                data-field="nickname"
+                className="field-error"
+              >
+                {errorMessage}
+              </p>
+            )
           )}
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || !canSubmit}
             className="btn-primary mt-6 w-full"
           >
-            {submitting ? '입장 중…' : '입장하기'}
+            {submitting ? '입장 중…' : availability === 'checking' ? '확인 중…' : '입장하기'}
           </button>
         </form>
       </div>

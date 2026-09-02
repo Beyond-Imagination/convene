@@ -20,6 +20,7 @@ import { closeMeeting } from '@/shared/api/meeting.api';
 import { connectMeetingSocket } from '@/shared/socket/meeting.socket';
 import {
   clearMeetingState,
+  forgetNickname,
   getHostToken,
   getNickname,
   getParticipantId,
@@ -50,6 +51,8 @@ const REJECTIONS: Partial<
   closed: { status: 'closed', message: '이미 종료된 회의입니다.' },
 };
 
+const NICKNAME_TAKEN_MESSAGE = '이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해 주세요.';
+
 const entryBlockOf = (
   status: MeetingConnectionStatus,
   joinedOnce: boolean,
@@ -72,6 +75,7 @@ export interface UseMeetingViewModel {
   readonly remoteParticipants: ReadonlyArray<RemoteParticipant>;
   readonly errorMessage: string | null;
   readonly entryBlock: MeetingEntryBlock | null;
+  readonly nicknameError: string | null;
   /**
    * mount 된 socket 인스턴스. 채팅/미디어 등 후속 ViewModel이 같은 socket으로 emit/listen 하도록 노출한다.
    * mount 직후 또는 nickname 없는 redirect 상태에서는 null.
@@ -131,6 +135,7 @@ export function useMeetingViewModel(code: string, enabled = true): UseMeetingVie
   const [status, setStatus] = useState<MeetingConnectionStatus>('connecting');
   const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [rejoinGen, setRejoinGen] = useState(0);
   const [rejoinPreservedMedia, setRejoinPreservedMedia] = useState(false);
@@ -171,6 +176,7 @@ export function useMeetingViewModel(code: string, enabled = true): UseMeetingVie
 
     skipLeaveOnCleanupRef.current = false;
     joinRejectedRef.current = false;
+    setNicknameError(null);
     const participantId = getParticipantId(code);
     const next = connectMeetingSocket();
     socketRef.current = next;
@@ -199,10 +205,17 @@ export function useMeetingViewModel(code: string, enabled = true): UseMeetingVie
               return;
             }
             if (!ack.ok) {
-              const rejection = REJECTIONS[ack.reason];
               joinRejectedRef.current = true;
               skipLeaveOnCleanupRef.current = true;
               socket.disconnect();
+              if (ack.reason === 'nickname-taken') {
+                forgetNickname(code);
+                setPersistedNickname(null);
+                clearNickname();
+                setNicknameError(NICKNAME_TAKEN_MESSAGE);
+                return;
+              }
+              const rejection = REJECTIONS[ack.reason];
               setErrorMessage(rejection?.message ?? '회의에 입장할 수 없습니다.');
               setStatus(rejection?.status ?? 'error');
               return;
@@ -321,7 +334,7 @@ export function useMeetingViewModel(code: string, enabled = true): UseMeetingVie
       socketRef.current = null;
       setSocket(null);
     };
-  }, [code, enabled, nickname, router, clearIdentity]);
+  }, [code, enabled, nickname, router, clearIdentity, clearNickname]);
 
   const leave = useCallback(() => {
     isNavigatingAwayRef.current = true;
@@ -366,6 +379,7 @@ export function useMeetingViewModel(code: string, enabled = true): UseMeetingVie
     remoteParticipants,
     errorMessage,
     entryBlock: entryBlockOf(status, joinedOnceRef.current),
+    nicknameError,
     socket,
     rejoinGen,
     rejoinPreservedMedia,

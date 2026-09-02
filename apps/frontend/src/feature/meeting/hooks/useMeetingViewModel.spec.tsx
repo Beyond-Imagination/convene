@@ -317,6 +317,31 @@ describe('useMeetingViewModel', () => {
       expect(fakeSocket.disconnect).toHaveBeenCalled();
     });
 
+    it('닉네임 중복은 차단 화면 대신 닉네임을 비워 다시 입력받는다', () => {
+      const { result } = setup('준');
+      act(() => {
+        fakeSocket.connected = true;
+        fakeSocket.trigger('connect');
+      });
+      ackJoin({ ok: false, reason: 'nickname-taken' });
+      expect(result.current.nickname).toBeNull();
+      expect(result.current.nicknameError).not.toBeNull();
+      expect(result.current.entryBlock).toBeNull();
+      expect(fakeSocket.disconnect).toHaveBeenCalled();
+    });
+
+    it('닉네임 중복이어도 participantId·hostToken은 지우지 않는다', () => {
+      saveHostToken(code, 'host-1');
+      const { result } = setup('준');
+      act(() => {
+        fakeSocket.connected = true;
+        fakeSocket.trigger('connect');
+      });
+      ackJoin({ ok: false, reason: 'nickname-taken' });
+      expect(getHostToken(code)).toBe('host-1');
+      expect(result.current.nickname).toBeNull();
+    });
+
     it('없는 회의는 재시도해도 달라지지 않으므로 socket을 끊는다', () => {
       setup('준');
       rejectJoin();
