@@ -5,13 +5,14 @@ import type { Socket } from 'socket.io-client';
 
 import { ChatPanel } from '@/feature/meeting/components/ChatPanel';
 import { EmbedGate } from '@/feature/meeting/components/EmbedGate';
-import { MeetingEntryBlocked } from '@/feature/meeting/components/MeetingEntryBlocked';
+import { MeetingEntryGate } from '@/feature/meeting/components/MeetingEntryGate';
 import { MeetingScreen } from '@/feature/meeting/components/MeetingScreen';
 import { NicknameGate } from '@/feature/meeting/components/NicknameGate';
 import { useChatViewModel } from '@/feature/meeting/hooks/useChatViewModel';
 import { useEmbedGateViewModel } from '@/feature/meeting/hooks/useEmbedGateViewModel';
 import { useMediasoupViewModel } from '@/feature/meeting/hooks/useMediasoupViewModel';
 import { useMeetingCardViewModel } from '@/feature/meeting/hooks/useMeetingCardViewModel';
+import { useMeetingEntryViewModel } from '@/feature/meeting/hooks/useMeetingEntryViewModel';
 import { useMeetingLayoutViewModel } from '@/feature/meeting/hooks/useMeetingLayoutViewModel';
 import { useMeetingViewModel } from '@/feature/meeting/hooks/useMeetingViewModel';
 import { useNicknameGateViewModel } from '@/feature/meeting/hooks/useNicknameGateViewModel';
@@ -46,14 +47,18 @@ function ChatSection({
 }
 
 /**
- * 실제 회의 세션. 두 ViewModel hook을 합성한다:
+ * 실제 회의 세션. 세 ViewModel hook을 합성한다:
+ *   - `useMeetingEntryViewModel` — 입장해도 되는 회의인지 먼저 판정
  *   - `useMeetingViewModel`
  *   - `useMediasoupViewModel`
  *
  * 채팅은 `ChatSection` 이 자기 ViewModel 을 직접 들고 있다(위 주석 참조).
  */
 function MeetingSession({ code }: { readonly code: string }) {
-  const meetingVm = useMeetingViewModel(code);
+  // 제목·시작 시각도 이 조회에서 함께 온다. 회의 화면이 따로 읽지 않는다.
+  const entry = useMeetingEntryViewModel(code);
+  // 판정이 끝나기 전에는 socket을 만들지 않는다 — 입장 요청 자체를 보내지 않아야 한다.
+  const meetingVm = useMeetingViewModel(code, entry.state === 'ready');
   // 예약 회의는 join이 처리되는 순간 방이 열린다. 입장이 확인되기 전에는 socket을 넘기지 않아
   // 미디어 협상이 방보다 먼저 도착하는 것을 막는다.
   // 재연결 중에도 socket을 유지해야 살아 있는 transport를 버리지 않고 복귀할 수 있다.
@@ -66,9 +71,17 @@ function MeetingSession({ code }: { readonly code: string }) {
   // self 타일(항상 1) + 원격 참가자 수 = 전체 비디오 타일 수.
   const totalTiles = 1 + meetingVm.remoteParticipants.length;
   const layout = useMeetingLayoutViewModel(totalTiles);
-  // 제목과 방이 열린 시각은 소켓 ack에 실려 오지 않아 회의 정보를 따로 읽는다.
-  const card = useMeetingCardViewModel(code);
   const gateVm = useNicknameGateViewModel(code);
+
+  // 판정이 끝나기 전에도, 판정이 막았을 때도 회의 화면 대신 진입 화면을 그린다.
+  if (entry.state !== 'ready') {
+    return (
+      <MeetingEntryGate
+        code={code}
+        state={entry.state}
+      />
+    );
+  }
 
   // 닉네임이 없는 두 경우를 구분한다:
   //  - 회의 종료 후 이동 중(isNavigatingAway): 화면을 그리지 않아 "(미인증)" 깜박임 방지.
@@ -78,19 +91,18 @@ function MeetingSession({ code }: { readonly code: string }) {
     return (
       <NicknameGate
         code={code}
-        title={card.meeting?.title ?? null}
+        title={entry.meeting?.title ?? null}
         {...gateVm}
       />
     );
   }
 
-  // 입장이 확정되기 전에 실패했다면 회의 화면 자체를 열지 않는다.
-  // 없는 회의 코드로도 화면이 열리면 아무도 없는 "가짜 회의"에 들어간 것처럼 보인다.
-  if (meetingVm.entryBlocked) {
+  // 판정을 통과했어도 입장이 확정되기 전에 실패할 수 있다(그 사이 종료, 연결 실패).
+  if (meetingVm.entryBlock !== null) {
     return (
-      <MeetingEntryBlocked
+      <MeetingEntryGate
         code={code}
-        status={meetingVm.status}
+        state={meetingVm.entryBlock}
         message={meetingVm.errorMessage}
       />
     );
@@ -101,8 +113,8 @@ function MeetingSession({ code }: { readonly code: string }) {
       <MeetingScreen
         {...meetingVm}
         mediasoup={mediasoupVm}
-        title={card.meeting?.title ?? null}
-        startedAt={card.meeting?.startedAt ?? null}
+        title={entry.meeting?.title ?? null}
+        startedAt={entry.meeting?.startedAt ?? null}
         isChatOpen={layout.isChatOpen}
         onToggleChat={layout.toggleChat}
         variant={layout.variant}

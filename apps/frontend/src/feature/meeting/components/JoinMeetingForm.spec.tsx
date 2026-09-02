@@ -13,6 +13,7 @@ const noopRegister = (() => ({
 
 const baseVm = (overrides: Partial<UseJoinMeetingViewModel> = {}): UseJoinMeetingViewModel => ({
   status: 'idle',
+  errorMessage: null,
   register: noopRegister,
   errors: {},
   handleSubmit: vi.fn(),
@@ -30,6 +31,15 @@ describe('JoinMeetingForm View', () => {
   it('status="submitting" 이면 버튼은 "입장 중…" 으로 바뀌고 비활성화된다', () => {
     render(<JoinMeetingForm {...baseVm({ status: 'submitting' })} />);
     expect(screen.getByRole('button', { name: '입장 중…' })).toBeDisabled();
+  });
+
+  it('status="error" + errorMessage가 있으면 role="alert" 로 노출된다', () => {
+    render(
+      <JoinMeetingForm
+        {...baseVm({ status: 'error', errorMessage: '존재하지 않는 회의 코드입니다.' })}
+      />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('존재하지 않는 회의 코드입니다.');
   });
 
   it('errors.code가 있으면 role="alert" 로 메시지를 노출한다', () => {

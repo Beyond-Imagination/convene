@@ -52,8 +52,21 @@ describe('useMeetingCardViewModel', () => {
     expect(getMeetingMock).toHaveBeenCalledWith('abc12xyz');
   });
 
-  it('없는 회의면 error로 두고 회의 정보는 비운다', async () => {
+  it('없는 회의(404)는 not-found로 구분하고 회의 정보는 비운다', async () => {
     getMeetingMock.mockRejectedValueOnce(new MeetingApiError(404, 'not found'));
+    const { result } = renderHook(() => useMeetingCardViewModel('abc12xyz'));
+    await waitFor(() => expect(result.current.status).toBe('not-found'));
+    expect(result.current.meeting).toBeNull();
+  });
+
+  it('코드 형식이 틀리면(400) 존재할 수 없는 회의이므로 not-found', async () => {
+    getMeetingMock.mockRejectedValueOnce(new MeetingApiError(400, 'bad code'));
+    const { result } = renderHook(() => useMeetingCardViewModel('short'));
+    await waitFor(() => expect(result.current.status).toBe('not-found'));
+  });
+
+  it('조회 자체가 실패하면 error — 없는 회의로 단정하지 않는다', async () => {
+    getMeetingMock.mockRejectedValueOnce(new MeetingApiError(500, 'boom'));
     const { result } = renderHook(() => useMeetingCardViewModel('abc12xyz'));
     await waitFor(() => expect(result.current.status).toBe('error'));
     expect(result.current.meeting).toBeNull();

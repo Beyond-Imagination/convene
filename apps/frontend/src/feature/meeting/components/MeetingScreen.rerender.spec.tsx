@@ -184,6 +184,7 @@ const meetingVm: UseMeetingViewModel = {
   nickname: '지현',
   remoteParticipants: participants,
   errorMessage: null,
+  entryBlock: null,
   socket: fakeSocket,
   rejoinGen: 0,
   isHost: true,

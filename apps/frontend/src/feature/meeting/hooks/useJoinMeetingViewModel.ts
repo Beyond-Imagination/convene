@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { type BaseSyntheticEvent, useState } from 'react';
 import { type FieldErrors, useForm, type UseFormRegisterReturn } from 'react-hook-form';
 
+import { getMeeting, MeetingApiError } from '@/shared/api/meeting.api';
 import { getLastNickname, saveLastNickname, saveNickname } from '@/shared/stores/meeting.storage';
 import { useSessionStore } from '@/shared/stores/session.store';
 
@@ -11,7 +12,11 @@ export const MEETING_CODE_PATTERN = /^[a-z0-9]{8}$/;
 export const NICKNAME_MIN = 1;
 export const NICKNAME_MAX = 30;
 
-export type JoinMeetingStatus = 'idle' | 'submitting';
+export type JoinMeetingStatus = 'idle' | 'submitting' | 'error';
+
+const NOT_FOUND_MESSAGE = '존재하지 않는 회의 코드입니다.';
+const CLOSED_MESSAGE = '이미 종료된 회의입니다.';
+const LOOKUP_FAILED_MESSAGE = '회의 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 
 export interface JoinMeetingFormValues {
   code: string;
@@ -20,6 +25,8 @@ export interface JoinMeetingFormValues {
 
 export interface UseJoinMeetingViewModel {
   readonly status: JoinMeetingStatus;
+  /** 입장 전 회의 확인이 막은 이유. 폼이 그대로 노출한다. */
+  readonly errorMessage: string | null;
   /**
    * View가 input에 spread 하는 register helper.
    */
@@ -28,16 +35,30 @@ export interface UseJoinMeetingViewModel {
   readonly handleSubmit: (e?: BaseSyntheticEvent) => Promise<void>;
 }
 
+/** 입장을 막아야 하는 이유. 들어갈 수 있으면 null. */
+async function lookupBlockReason(code: string): Promise<string | null> {
+  try {
+    const meeting = await getMeeting(code);
+    return meeting.status === 'closed' ? CLOSED_MESSAGE : null;
+  } catch (e) {
+    return e instanceof MeetingApiError && e.status === 404
+      ? NOT_FOUND_MESSAGE
+      : LOOKUP_FAILED_MESSAGE;
+  }
+}
+
 /**
  * 홈 페이지 "회의 입장" 폼의 ViewModel.
  *
- * 폼 입력 2종(code, nickname)을 react-hook-form으로 검증하고, 통과 시 닉네임을 ession store에 저장한 뒤 `/meetings/[code]`로 이동한다.
+ * 폼 입력 2종(code, nickname)을 react-hook-form으로 검증하고, 회의가 실재하며 아직 열려 있는지 확인한 뒤에야
+ * 닉네임을 session store에 저장하고 `/meetings/[code]`로 이동한다. 없는 회의·종료된 회의는 이동 자체를 막는다.
  * View는 본 hook의 반환만으로 input/submit/error 표시를 수행한다.
  */
 export function useJoinMeetingViewModel(): UseJoinMeetingViewModel {
   const router = useRouter();
   const setNickname = useSessionStore((s) => s.setNickname);
   const [status, setStatus] = useState<JoinMeetingStatus>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const {
     register,
@@ -48,8 +69,15 @@ export function useJoinMeetingViewModel(): UseJoinMeetingViewModel {
     mode: 'onSubmit',
   });
 
-  const handleSubmit = rhfHandleSubmit((values) => {
+  const handleSubmit = rhfHandleSubmit(async (values) => {
     setStatus('submitting');
+    setErrorMessage(null);
+    const blocked = await lookupBlockReason(values.code);
+    if (blocked !== null) {
+      setErrorMessage(blocked);
+      setStatus('error');
+      return;
+    }
     const trimmed = values.nickname.trim();
     // 닉네임을 code 별로 보관(리로드 생존) + reactive store에도 set.
     saveNickname(values.code, trimmed);
@@ -81,5 +109,5 @@ export function useJoinMeetingViewModel(): UseJoinMeetingViewModel {
     });
   };
 
-  return { status, register: registerField, errors, handleSubmit };
+  return { status, errorMessage, register: registerField, errors, handleSubmit };
 }

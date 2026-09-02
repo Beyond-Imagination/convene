@@ -4,7 +4,13 @@ import type { UseJoinMeetingViewModel } from '@/feature/meeting/hooks/useJoinMee
 
 export type JoinMeetingFormProps = UseJoinMeetingViewModel;
 
-export function JoinMeetingForm({ status, register, errors, handleSubmit }: JoinMeetingFormProps) {
+export function JoinMeetingForm({
+  status,
+  errorMessage,
+  register,
+  errors,
+  handleSubmit,
+}: JoinMeetingFormProps) {
   const submitting = status === 'submitting';
   return (
     <form
@@ -79,6 +85,14 @@ export function JoinMeetingForm({ status, register, errors, handleSubmit }: Join
         >
           {submitting ? '입장 중…' : '입장'}
         </button>
+        {errorMessage !== null && status === 'error' && (
+          <p
+            role="alert"
+            className="field-error"
+          >
+            {errorMessage}
+          </p>
+        )}
       </div>
     </form>
   );

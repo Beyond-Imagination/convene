@@ -16,7 +16,8 @@ type CardStatus = Exclude<MeetingCardStatus, 'ready'> | MeetingStatus;
 
 const STATUS_LABEL: Record<CardStatus, string> = {
   loading: '회의 정보를 불러오는 중',
-  error: '회의를 찾을 수 없습니다',
+  'not-found': '회의를 찾을 수 없습니다',
+  error: '회의 정보를 불러오지 못했습니다',
   scheduled: '시작 전',
   open: '진행 중',
   closed: '종료된 회의',
@@ -24,6 +25,7 @@ const STATUS_LABEL: Record<CardStatus, string> = {
 
 const STATUS_TONE: Record<CardStatus, { readonly text: string; readonly dot: string }> = {
   loading: { text: 'text-muted', dot: 'bg-pending' },
+  'not-found': { text: 'text-danger-on', dot: 'bg-danger' },
   error: { text: 'text-danger-on', dot: 'bg-danger' },
   scheduled: { text: 'text-text', dot: 'bg-pending' },
   open: { text: 'text-accent-on', dot: 'bg-positive' },
@@ -67,7 +69,9 @@ export function EmbedGate({ code, pageUrl, status, meeting }: EmbedGateProps) {
         <p className="text-muted text-lead mt-4 max-w-[46ch]">
           {cardStatus === 'closed'
             ? '이미 종료된 회의입니다.'
-            : '삽입된 화면에서는 마이크와 카메라를 사용할 수 없어 새 탭에서 참가합니다.'}
+            : cardStatus === 'not-found'
+              ? '회의 코드가 잘못됐거나 이미 사라진 회의입니다.'
+              : '삽입된 화면에서는 마이크와 카메라를 사용할 수 없어 새 탭에서 참가합니다.'}
         </p>
 
         {joinable && (

@@ -75,13 +75,13 @@ vi.mock('@/shared/api/meeting.api', () => ({
 
 const code = 'abc12xyz';
 
-const setup = (nickname: string | null = '준') => {
+const setup = (nickname: string | null = '준', enabled = true) => {
   useSessionStore.setState({ nickname });
   fakeSocket = new FakeSocket();
   pushMock.mockReset();
   replaceMock.mockReset();
   closeMeetingMock.mockReset();
-  return renderHook(() => useMeetingViewModel(code));
+  return renderHook(() => useMeetingViewModel(code, enabled));
 };
 
 /** join emit에 실린 ack 콜백을 꺼내 서버 응답을 흉내낸다. */
@@ -301,7 +301,7 @@ describe('useMeetingViewModel', () => {
       const { result } = setup('준');
       rejectJoin();
       expect(result.current.status).toBe('not-found');
-      expect(result.current.entryBlocked).toBe(true);
+      expect(result.current.entryBlock).toBe('not-found');
       expect(result.current.errorMessage).not.toBeNull();
     });
 
@@ -313,7 +313,7 @@ describe('useMeetingViewModel', () => {
       });
       ackJoin({ ok: false, reason: 'closed' });
       expect(result.current.status).toBe('closed');
-      expect(result.current.entryBlocked).toBe(true);
+      expect(result.current.entryBlock).toBe('closed');
       expect(fakeSocket.disconnect).toHaveBeenCalled();
     });
 
@@ -339,7 +339,13 @@ describe('useMeetingViewModel', () => {
         fakeSocket.trigger('connect');
       });
       ackJoin(null, new Error('operation has timed out'));
-      expect(result.current.entryBlocked).toBe(true);
+      expect(result.current.entryBlock).toBe('failed');
+    });
+
+    it('입장해도 되는지 확인되기 전(enabled=false)에는 socket을 만들지 않는다', () => {
+      const { result } = setup('준', false);
+      expect(result.current.socket).toBeNull();
+      expect(fakeSocket.emit).not.toHaveBeenCalled();
     });
 
     it('입장한 뒤의 재입장 실패는 회의 화면을 닫지 않는다', () => {
@@ -353,7 +359,7 @@ describe('useMeetingViewModel', () => {
       });
       ackJoin(null, new Error('operation has timed out'));
       expect(result.current.status).toBe('error');
-      expect(result.current.entryBlocked).toBe(false);
+      expect(result.current.entryBlock).toBeNull();
     });
   });
 

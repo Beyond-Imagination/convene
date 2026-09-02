@@ -39,6 +39,9 @@ export type MeetingConnectionStatus =
 // 응답이 오지 않으면 화면이 '연결 중'에 멈추므로 상한을 둔다.
 const JOIN_ACK_TIMEOUT_MS = 10_000;
 
+/** 입장이 막힌 이유. 회의 화면 대신 이 사유의 안내 화면을 그린다. */
+export type MeetingEntryBlock = 'not-found' | 'closed' | 'failed';
+
 /** 서버가 준 거부 사유별 화면 상태와 안내. 모르는 사유는 일반 입장 실패로 떨어진다. */
 const REJECTIONS: Partial<
   Record<JoinMeetingRejectReason, { status: MeetingConnectionStatus; message: string }>
@@ -48,6 +51,15 @@ const REJECTIONS: Partial<
     message: '존재하지 않는 회의입니다. 회의 코드나 링크를 확인해 주세요.',
   },
   closed: { status: 'closed', message: '이미 종료된 회의입니다.' },
+};
+
+const entryBlockOf = (
+  status: MeetingConnectionStatus,
+  joinedOnce: boolean,
+): MeetingEntryBlock | null => {
+  if (status === 'not-found' || status === 'closed') return status;
+  // 입장한 뒤의 오류(재입장 실패)는 이미 참여 중이므로 회의 화면을 닫지 않는다.
+  return status === 'error' && !joinedOnce ? 'failed' : null;
 };
 
 export interface RemoteParticipant {
@@ -64,10 +76,10 @@ export interface UseMeetingViewModel {
   readonly remoteParticipants: ReadonlyArray<RemoteParticipant>;
   readonly errorMessage: string | null;
   /**
-   * 입장이 확정되기 전에 실패해 회의에 들어가지 못한 상태.
-   * View는 이때 회의 화면 대신 차단 화면을 그린다. 입장한 뒤의 오류(재입장 실패)는 해당하지 않는다.
+   * 입장이 확정되기 전에 실패해 회의에 들어가지 못한 이유. 들어갔으면 null.
+   * View는 이 값이 있으면 회의 화면 대신 진입 화면을 그린다.
    */
-  readonly entryBlocked: boolean;
+  readonly entryBlock: MeetingEntryBlock | null;
   /**
    * mount 된 socket 인스턴스. 채팅/미디어 등 후속 ViewModel이 같은 socket으로 emit/listen 하도록 노출한다.
    * mount 직후 또는 nickname 없는 redirect 상태에서는 null.
@@ -106,14 +118,14 @@ export interface UseMeetingViewModel {
  * `/meetings/[code]` 회의 화면의 ViewModel.
  *
  * 책임:
- *   - mount 시 닉네임 보유 여부 확인 (없으면 홈으로 redirect)
+ *   - mount 시 닉네임 보유 여부 확인 (없으면 socket을 만들지 않는다)
  *   - WS 연결 + `meeting:join` emit (회의별 안정 participantId 지참)
  *   - participantJoined / Left / Disconnected / Reconnected 수신 → 참가자 목록 갱신
  *   - unmount 시 `meeting:leave` emit + socket 종료. 리로드·탭 닫기는 leave를 보내지 않는다.
  *
  * 채팅(useChatViewModel)·mediasoup(useMediasoupViewModel) ViewModel이 본 hook의 socket 인스턴스를 공유해 같은 연결 위에서 동작한다.
  */
-export function useMeetingViewModel(code: string): UseMeetingViewModel {
+export function useMeetingViewModel(code: string, enabled = true): UseMeetingViewModel {
   const router = useRouter();
   const storeNickname = useSessionStore((s) => s.nickname);
   const clearNickname = useSessionStore((s) => s.clearNickname);
@@ -161,7 +173,8 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
   }, [clearNickname, code]);
 
   useEffect(() => {
-    if (nickname === null) {
+    // enabled=false는 "이 회의에 들어가도 되는지" 판정이 끝나기 전이다. 판정 전에 join을 보내지 않는다.
+    if (!enabled || nickname === null) {
       // 닉네임이 없으면 socket을 만들지 않는다. 두 경우가 있다. 하지만 어느 경우든 여기서 홈으로 redirect 하지 않는다.
       return;
     }
@@ -319,7 +332,7 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
       socketRef.current = null;
       setSocket(null);
     };
-  }, [code, nickname, router, clearIdentity]);
+  }, [code, enabled, nickname, router, clearIdentity]);
 
   const leave = useCallback(() => {
     isNavigatingAwayRef.current = true;
@@ -363,10 +376,7 @@ export function useMeetingViewModel(code: string): UseMeetingViewModel {
     nickname,
     remoteParticipants,
     errorMessage,
-    entryBlocked:
-      status === 'not-found' ||
-      status === 'closed' ||
-      (status === 'error' && !joinedOnceRef.current),
+    entryBlock: entryBlockOf(status, joinedOnceRef.current),
     socket,
     rejoinGen,
     rejoinPreservedMedia,
