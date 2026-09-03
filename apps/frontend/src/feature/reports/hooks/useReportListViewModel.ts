@@ -56,11 +56,11 @@ export function useReportListViewModel(): UseReportListViewModel {
   const [page, setPage] = useState<PageMetaWire>(EMPTY_PAGE);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const load = useCallback(async (target: number) => {
+  const load = useCallback(async (target: number, refresh = false) => {
     setStatus('loading');
     setErrorMessage(null);
     try {
-      const response = await listReports({ page: target });
+      const response = await listReports({ page: target }, { refresh });
       setItems(response.items);
       setPage(response.page);
       setStatus('loaded');
@@ -71,8 +71,9 @@ export function useReportListViewModel(): UseReportListViewModel {
     }
   }, []);
 
+  // 다시 시도는 캐시를 건너뛴다. 캐시된 목록을 그대로 돌려주면 재시도가 아무 의미가 없다.
   const refresh = useCallback(async () => {
-    await load(pageNumber);
+    await load(pageNumber, true);
   }, [load, pageNumber]);
 
   const goToPage = useCallback(
