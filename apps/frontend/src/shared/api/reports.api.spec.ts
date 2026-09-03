@@ -23,24 +23,34 @@ describe('listReports', () => {
     vi.unstubAllGlobals();
   });
 
-  it('limit 인자가 없으면 /reports로 GET 하고 items를 반환한다', async () => {
-    fetchMock.mockResolvedValueOnce(okResponse({ items: [] }));
+  const emptyPage = { number: 1, size: 20, totalItems: 0, totalPages: 0 };
+
+  it('파라미터가 없으면 /reports로 GET 하고 응답을 그대로 반환한다', async () => {
+    const body = { items: [], page: emptyPage };
+    fetchMock.mockResolvedValueOnce(okResponse(body));
     const result = await listReports();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe(`${API_BASE_URL}/reports`);
     expect(init).toMatchObject({ method: 'GET' });
-    expect(result).toEqual([]);
+    expect(result).toEqual(body);
   });
 
-  it('limit 인자가 있으면 ?limit= 쿼리를 붙여 GET 한다', async () => {
-    fetchMock.mockResolvedValueOnce(okResponse({ items: [] }));
-    await listReports({ limit: 10 });
+  it('page/size/sort는 쿼리스트링으로 붙는다', async () => {
+    fetchMock.mockResolvedValueOnce(okResponse({ items: [], page: emptyPage }));
+    await listReports({ page: 2, size: 10, sort: 'latest' });
     const [url] = fetchMock.mock.calls[0];
-    expect(url).toBe(`${API_BASE_URL}/reports?limit=10`);
+    expect(url).toBe(`${API_BASE_URL}/reports?page=2&size=10&sort=latest`);
   });
 
-  it('items 배열을 그대로 풀어 ReportListItem[]으로 반환한다', async () => {
+  it('지정한 파라미터만 쿼리에 붙는다', async () => {
+    fetchMock.mockResolvedValueOnce(okResponse({ items: [], page: emptyPage }));
+    await listReports({ page: 3 });
+    const [url] = fetchMock.mock.calls[0];
+    expect(url).toBe(`${API_BASE_URL}/reports?page=3`);
+  });
+
+  it('items와 페이지 메타를 그대로 돌려준다', async () => {
     const item = {
       id: 'r1',
       code: 'abc12xyz',
@@ -52,9 +62,11 @@ describe('listReports', () => {
       title: '주간 미팅',
       notionSynced: true,
     };
-    fetchMock.mockResolvedValueOnce(okResponse({ items: [item] }));
-    const result = await listReports();
-    expect(result).toEqual([item]);
+    const page = { number: 2, size: 20, totalItems: 43, totalPages: 3 };
+    fetchMock.mockResolvedValueOnce(okResponse({ items: [item], page }));
+    const result = await listReports({ page: 2 });
+    expect(result.items).toEqual([item]);
+    expect(result.page).toEqual(page);
   });
 
   it('비-2xx 응답이면 ReportsApiError를 status와 함께 던진다', async () => {

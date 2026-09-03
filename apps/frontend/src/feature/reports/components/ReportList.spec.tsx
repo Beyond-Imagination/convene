@@ -21,8 +21,10 @@ const item = (overrides: Partial<ReportListItem> = {}): ReportListItem => ({
 const baseVm = (overrides: Partial<UseReportListViewModel> = {}): UseReportListViewModel => ({
   status: 'loaded',
   items: [],
+  page: { number: 1, size: 20, totalItems: 0, totalPages: 0 },
   errorMessage: null,
   refresh: vi.fn(async () => {}),
+  goToPage: vi.fn(),
   ...overrides,
 });
 
@@ -66,6 +68,78 @@ describe('ReportList View', () => {
     expect(links[0]).toHaveTextContent('3');
     expect(links[1]).toHaveAttribute('href', '/reports/r2');
     expect(links[1]).toHaveTextContent('xyz99aaa');
+  });
+
+  it('페이지가 하나뿐이면 페이저를 그리지 않는다', () => {
+    render(
+      <ReportList
+        {...baseVm({
+          items: [item()],
+          page: { number: 1, size: 20, totalItems: 3, totalPages: 1 },
+        })}
+      />,
+    );
+    expect(screen.queryByRole('navigation', { name: '회의록 페이지' })).toBeNull();
+  });
+
+  it('페이지가 여러 개면 번호와 이전/다음을 그리고, 번호를 누르면 goToPage를 호출한다', () => {
+    const goToPage = vi.fn();
+    render(
+      <ReportList
+        {...baseVm({
+          items: [item()],
+          page: { number: 1, size: 20, totalItems: 43, totalPages: 3 },
+          goToPage,
+        })}
+      />,
+    );
+    expect(screen.getByRole('navigation', { name: '회의록 페이지' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '3' }));
+    expect(goToPage).toHaveBeenCalledWith(3);
+    fireEvent.click(screen.getByTestId('report-page-next'));
+    expect(goToPage).toHaveBeenLastCalledWith(2);
+  });
+
+  it('첫 페이지에서는 이전이, 마지막 페이지에서는 다음이 비활성이다', () => {
+    const { unmount } = render(
+      <ReportList
+        {...baseVm({
+          items: [item()],
+          page: { number: 1, size: 20, totalItems: 43, totalPages: 3 },
+        })}
+      />,
+    );
+    expect(screen.getByTestId('report-page-prev')).toBeDisabled();
+    expect(screen.getByTestId('report-page-next')).toBeEnabled();
+    unmount();
+
+    render(
+      <ReportList
+        {...baseVm({
+          items: [item()],
+          page: { number: 3, size: 20, totalItems: 43, totalPages: 3 },
+        })}
+      />,
+    );
+    expect(screen.getByTestId('report-page-prev')).toBeEnabled();
+    expect(screen.getByTestId('report-page-next')).toBeDisabled();
+  });
+
+  it('페이지가 많아도 번호는 현재 페이지 주변 5개만 그린다', () => {
+    render(
+      <ReportList
+        {...baseVm({
+          items: [item()],
+          page: { number: 10, size: 20, totalItems: 400, totalPages: 20 },
+        })}
+      />,
+    );
+    const numbered = screen
+      .getAllByRole('button')
+      .map((b) => b.textContent)
+      .filter((text) => text !== null && /^\d+$/.test(text));
+    expect(numbered).toEqual(['8', '9', '10', '11', '12']);
+    expect(screen.getByRole('button', { name: '10' })).toHaveAttribute('aria-current', 'page');
   });
 
   it('노션에 동기화된 항목만 배지를 단다', () => {

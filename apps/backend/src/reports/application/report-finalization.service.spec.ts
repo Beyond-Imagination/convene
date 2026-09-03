@@ -7,6 +7,11 @@ import { REPORT_EVENTS } from '@convene/shared-interfaces';
 
 import { participantEntry } from '@/reports/domain/entries/participant-entry';
 import { transcriptSegment } from '@/reports/domain/entries/transcript-segment';
+import {
+  Page,
+  ReportListCriteria,
+  reportListCriteria,
+} from '@/reports/domain/value-objects/report-list-query';
 import { chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
 import { externalReference, NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects/external-reference';
 import { ReportSummary, reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
@@ -62,7 +67,7 @@ describe('ReportFinalizationService.createDraft', () => {
         },
         findById: async () => null,
         findByMeetingId: async () => null,
-        listRecent: async () => [],
+        findPage: async () => ({ items: [], totalItems: 0 }),
       },
       summarizer,
       { now: () => endedAt },
@@ -212,7 +217,7 @@ describe('ReportFinalizationService.completeTranscription', () => {
         },
         findById: async (id) => store.get(id) ?? null,
         findByMeetingId: async () => null,
-        listRecent: async () => [],
+        findPage: async () => ({ items: [], totalItems: 0 }),
       },
       summarizer,
       { now: () => failedAt },
@@ -349,7 +354,7 @@ describe('ReportFinalizationService.resummarize', () => {
         },
         findById: async (id) => store.get(id) ?? null,
         findByMeetingId: async () => null,
-        listRecent: async () => [],
+        findPage: async () => ({ items: [], totalItems: 0 }),
       },
       summarizer,
       { now: () => now },
@@ -464,7 +469,7 @@ describe('ReportFinalizationService.resummarize', () => {
   });
 });
 
-describe('ReportFinalizationService.listRecent', () => {
+describe('ReportFinalizationService.listPage', () => {
   const startedAt = new Date('2026-01-01T00:00:00Z');
 
   const makeReport = (id: string, mid: string, durationMs: number) =>
@@ -482,37 +487,40 @@ describe('ReportFinalizationService.listRecent', () => {
     });
 
   const makeService = () => {
-    const repoListMock = jest.fn<Promise<MeetingReport[]>, [number]>(async () => []);
+    const repoPageMock = jest.fn<Promise<Page<MeetingReport>>, [ReportListCriteria]>(async () => ({
+      items: [],
+      totalItems: 0,
+    }));
     const { publisher } = makeEventPublisher();
     const service = new ReportFinalizationService(
       {
         save: async () => {},
         findById: async () => null,
         findByMeetingId: async () => null,
-        listRecent: repoListMock,
+        findPage: repoPageMock,
       },
       noopSummarizer(),
       { now: () => startedAt },
       publisher,
       noopLogger(),
     );
-    return { service, repoListMock };
+    return { service, repoPageMock };
   };
 
-  it('Repository.listRecent에 인자로 받은 limit을 그대로 위임한다', async () => {
-    const { service, repoListMock } = makeService();
-    repoListMock.mockResolvedValueOnce([]);
-    await service.listRecent(7);
-    expect(repoListMock).toHaveBeenCalledWith(7);
+  it('Repository.findPage에 criteria를 그대로 위임한다', async () => {
+    const { service, repoPageMock } = makeService();
+    const criteria = reportListCriteria({ page: 2, size: 7, sort: 'latest' });
+    await service.listPage(criteria);
+    expect(repoPageMock).toHaveBeenCalledWith(criteria);
   });
 
-  it('Repository가 돌려준 MeetingReport 배열을 그대로 반환한다', async () => {
-    const { service, repoListMock } = makeService();
+  it('Repository가 돌려준 페이지를 그대로 반환한다', async () => {
+    const { service, repoPageMock } = makeService();
     const a = makeReport('r1', 'mtg-1', 10 * 60_000);
     const b = makeReport('r2', 'mtg-2', 20 * 60_000);
-    repoListMock.mockResolvedValueOnce([b, a]);
-    const result = await service.listRecent(5);
-    expect(result).toEqual([b, a]);
+    repoPageMock.mockResolvedValueOnce({ items: [b, a], totalItems: 2 });
+    const result = await service.listPage(reportListCriteria({ page: 1, size: 5, sort: 'latest' }));
+    expect(result).toEqual({ items: [b, a], totalItems: 2 });
   });
 });
 
@@ -541,7 +549,7 @@ describe('ReportFinalizationService.getById', () => {
         save: async () => {},
         findById: async (id) => (stored && stored.id === id ? stored : null),
         findByMeetingId: async () => null,
-        listRecent: async () => [],
+        findPage: async () => ({ items: [], totalItems: 0 }),
       },
       noopSummarizer(),
       { now: () => endedAt },
@@ -595,7 +603,7 @@ describe('ReportFinalizationService.failTranscription', () => {
         },
         findById: async (id) => store.get(id) ?? null,
         findByMeetingId: async () => null,
-        listRecent: async () => [],
+        findPage: async () => ({ items: [], totalItems: 0 }),
       },
       summarizer,
       { now: () => failedAt },
@@ -682,7 +690,7 @@ describe('ReportFinalizationService.recordNotionPush', () => {
         },
         findById: async (id) => store.get(id) ?? null,
         findByMeetingId: async () => null,
-        listRecent: async () => [],
+        findPage: async () => ({ items: [], totalItems: 0 }),
       },
       noopSummarizer(),
       { now: () => endedAt },

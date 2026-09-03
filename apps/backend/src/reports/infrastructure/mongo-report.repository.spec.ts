@@ -5,6 +5,7 @@ import { participantEntry } from '@/reports/domain/entries/participant-entry';
 import { transcriptSegment } from '@/reports/domain/entries/transcript-segment';
 import { MeetingReport } from '@/reports/domain/meeting-report';
 import { notionPushResult } from '@/reports/domain/value-objects/notion-push-result';
+import { reportListCriteria } from '@/reports/domain/value-objects/report-list-query';
 import { externalReference, NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects/external-reference';
 import { reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
 
@@ -90,22 +91,28 @@ describe('MongoReportRepository', () => {
     expect(found!.pipeline.sttStatus).toBe('done');
   });
 
-  it('listRecent는 endedAt 내림차순으로 limit 만큼 반환한다', async () => {
+  it('findPage는 latest 정렬로 페이지를 잘라 전체 개수와 함께 반환한다', async () => {
     const r1 = makeReport('r1', 'mtg-1', 10 * 60_000);
     const r2 = makeReport('r2', 'mtg-2', 30 * 60_000);
     const r3 = makeReport('r3', 'mtg-3', 20 * 60_000);
     await repo.save(r1);
     await repo.save(r2);
     await repo.save(r3);
-    const top2 = await repo.listRecent(2);
-    expect(top2.map((r) => r.id)).toEqual(['r2', 'r3']);
-    const all = await repo.listRecent(10);
-    expect(all.map((r) => r.id)).toEqual(['r2', 'r3', 'r1']);
-    expect(await repo.listRecent(0)).toEqual([]);
+
+    const first = await repo.findPage(reportListCriteria({ page: 1, size: 2, sort: 'latest' }));
+    expect(first.items.map((r) => r.id)).toEqual(['r2', 'r3']);
+    expect(first.totalItems).toBe(3);
+
+    const second = await repo.findPage(reportListCriteria({ page: 2, size: 2, sort: 'latest' }));
+    expect(second.items.map((r) => r.id)).toEqual(['r1']);
+    expect(second.totalItems).toBe(3);
   });
 
-  it('limit이 음수면 throw', async () => {
-    await expect(repo.listRecent(-1)).rejects.toThrow(/non-negative/);
+  it('범위를 벗어난 page는 빈 목록이지만 전체 개수는 그대로다', async () => {
+    await repo.save(makeReport('r1', 'mtg-1'));
+    const page = await repo.findPage(reportListCriteria({ page: 5, size: 20, sort: 'latest' }));
+    expect(page.items).toEqual([]);
+    expect(page.totalItems).toBe(1);
   });
 
   it('완료 상태(transcript + summary + notion push)가 round-trip 된다', async () => {

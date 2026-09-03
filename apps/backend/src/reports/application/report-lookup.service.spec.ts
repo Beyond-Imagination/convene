@@ -45,7 +45,7 @@ const makeAdapter = (report: MeetingReport | null) => {
     save: async () => {},
     findById: async (id) => (report !== null && report.id === id ? report : null),
     findByMeetingId: async () => null,
-    listRecent: async () => [],
+    findPage: async () => ({ items: [], totalItems: 0 }),
   };
   return new ReportLookupService(repository);
 };
