@@ -1,31 +1,34 @@
-'use client';
+import { Suspense } from 'react';
 
-import { ReportList } from '@/feature/reports/components/ReportList';
-import { useReportListViewModel } from '@/feature/reports/hooks/useReportListViewModel';
 import { AppHeader } from '@/shared/AppHeader';
+
+import { ReportListPageClient } from './ReportListPageClient';
 
 /**
  * `/reports` 회의록 목록 페이지.
  *
- * 정적 export 빌드에서도 client mount 시점에 GET /reports로 데이터를 가져온다.
- * server component의 데이터 fetch/route handler/middleware는 사용하지 않는다.
+ * 목록 본문은 `?page=` 쿼리를 읽으므로 `useSearchParams`가 요구하는 Suspense 경계 안에 둔다.
+ * 정적 export 빌드에서 데이터는 client mount 시점에 GET /reports로 가져온다.
  */
 export default function ReportListPage() {
-  const vm = useReportListViewModel();
   return (
     <div className="bg-paper flex min-h-screen flex-col">
       <AppHeader current="reports" />
 
       <main className="px-gutter py-panel-y flex flex-1 flex-col">
-        <div className="border-border flex items-baseline justify-between gap-4 border-b pb-4 md:pb-[22px]">
-          <h1 className="text-text text-display font-extrabold tracking-[-0.035em]">회의록</h1>
-          {vm.status === 'loaded' && vm.page.totalItems > 0 && (
-            <span className="text-muted text-meta shrink-0 font-mono font-medium">
-              {vm.page.totalItems}건
-            </span>
-          )}
-        </div>
-        <ReportList {...vm} />
+        <Suspense
+          fallback={
+            <p
+              role="status"
+              aria-live="polite"
+              className="text-muted text-body py-16 text-center"
+            >
+              불러오는 중…
+            </p>
+          }
+        >
+          <ReportListPageClient />
+        </Suspense>
       </main>
     </div>
   );
