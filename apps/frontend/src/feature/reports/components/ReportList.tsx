@@ -140,7 +140,11 @@ export function ReportList({
     <>
       <ul className="flex flex-col">
         {items.map((report) => (
-          <li key={report.id}>
+          // 구분선을 li에 둬서 hover 배경이 선을 덮지 않는다.
+          <li
+            key={report.id}
+            className="border-border border-b"
+          >
             <Link
               href={`/reports/${report.id}`}
               data-testid="report-list-item"
