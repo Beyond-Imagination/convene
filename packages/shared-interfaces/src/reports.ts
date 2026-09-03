@@ -86,8 +86,25 @@ export interface ReportListItem {
   notionSynced: boolean;
 }
 
+/**
+ * 정렬 프리셋. 화면의 정렬 선택지와 1:1이며, 필드·방향 해석은 backend가 갖는다.
+ * 정렬 축이 늘어나면 여기에 이름을 추가한다.
+ */
+export const REPORT_SORT_OPTIONS = ['latest'] as const;
+export type ReportSortOption = (typeof REPORT_SORT_OPTIONS)[number];
+export const DEFAULT_REPORT_SORT: ReportSortOption = 'latest';
+
+/** 전통적 페이지네이션 메타. `number`는 1-based. */
+export interface PageMetaWire {
+  number: number;
+  size: number;
+  totalItems: number;
+  totalPages: number;
+}
+
 export interface ReportListResponse {
   items: ReportListItem[];
+  page: PageMetaWire;
 }
 
 /**
@@ -112,5 +129,5 @@ export interface ReportDetailResponse {
   pushedToNotion: ReportNotionPushWire | null;
 }
 
-export const DEFAULT_REPORT_LIST_LIMIT = 20;
-export const MAX_REPORT_LIST_LIMIT = 100;
+export const DEFAULT_REPORT_PAGE_SIZE = 20;
+export const MAX_REPORT_PAGE_SIZE = 100;

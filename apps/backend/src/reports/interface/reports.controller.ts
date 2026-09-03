@@ -1,5 +1,6 @@
 import {
-  DEFAULT_REPORT_LIST_LIMIT,
+  DEFAULT_REPORT_PAGE_SIZE,
+  DEFAULT_REPORT_SORT,
   type ReportDetailResponse,
   type ReportListResponse,
 } from '@convene/shared-interfaces';
@@ -15,10 +16,11 @@ import {
 } from '@nestjs/common';
 
 import { ReportFinalizationService } from '@/reports/application/report-finalization.service';
+import { reportListCriteria } from '@/reports/domain/value-objects/report-list-query';
 import { AdminGuard } from '@/reports/interface/admin.guard';
 import { ListReportsQueryDto } from '@/reports/interface/list-reports-query.dto';
 
-import { toReportDetailResponse, toReportListItem } from './report-serialize';
+import { toReportDetailResponse, toReportListResponse } from './report-serialize';
 
 /**
  * 책임: query/path 검증, 서비스 호출, wire format 직렬화.
@@ -31,9 +33,12 @@ export class ReportsController {
   @Get()
   @HttpCode(HttpStatus.OK)
   async listReports(@Query() query: ListReportsQueryDto): Promise<ReportListResponse> {
-    const limit = query.limit ?? DEFAULT_REPORT_LIST_LIMIT;
-    const reports = await this.service.listRecent(limit);
-    return { items: reports.map(toReportListItem) };
+    const criteria = reportListCriteria({
+      page: query.page ?? 1,
+      size: query.size ?? DEFAULT_REPORT_PAGE_SIZE,
+      sort: query.sort ?? DEFAULT_REPORT_SORT,
+    });
+    return toReportListResponse(await this.service.listPage(criteria), criteria);
   }
 
   @Get(':id')

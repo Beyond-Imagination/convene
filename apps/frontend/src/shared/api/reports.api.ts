@@ -1,7 +1,7 @@
 import type {
   ReportDetailResponse,
-  ReportListItem,
   ReportListResponse,
+  ReportSortOption,
 } from '@convene/shared-interfaces';
 
 import { API_BASE_URL } from './config';
@@ -13,21 +13,25 @@ export class ReportsApiError extends ApiError {
 }
 
 export interface ListReportsParams {
-  readonly limit?: number;
+  readonly page?: number;
+  readonly size?: number;
+  readonly sort?: ReportSortOption;
 }
 
-export async function listReports(params?: ListReportsParams): Promise<ReportListItem[]> {
-  const url =
-    params?.limit !== undefined
-      ? `${API_BASE_URL}/reports?limit=${encodeURIComponent(String(params.limit))}`
-      : `${API_BASE_URL}/reports`;
+/** 미지정 파라미터는 보내지 않고 backend 기본값에 맡긴다. */
+export async function listReports(params?: ListReportsParams): Promise<ReportListResponse> {
+  const query = new URLSearchParams();
+  if (params?.page !== undefined) query.set('page', String(params.page));
+  if (params?.size !== undefined) query.set('size', String(params.size));
+  if (params?.sort !== undefined) query.set('sort', params.sort);
+  const queryString = query.toString();
+  const url = `${API_BASE_URL}/reports${queryString === '' ? '' : `?${queryString}`}`;
   const res = await fetch(url, { method: 'GET' });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new ReportsApiError(res.status, text || `GET /reports failed (${res.status})`);
   }
-  const body = (await res.json()) as ReportListResponse;
-  return body.items;
+  return (await res.json()) as ReportListResponse;
 }
 
 export async function getReport(id: string): Promise<ReportDetailResponse> {

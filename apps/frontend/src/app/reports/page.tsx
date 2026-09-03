@@ -19,9 +19,9 @@ export default function ReportListPage() {
       <main className="px-gutter py-panel-y flex flex-1 flex-col">
         <div className="border-border flex items-baseline justify-between gap-4 border-b pb-4 md:pb-[22px]">
           <h1 className="text-text text-display font-extrabold tracking-[-0.035em]">회의록</h1>
-          {vm.status === 'loaded' && vm.items.length > 0 && (
+          {vm.status === 'loaded' && vm.page.totalItems > 0 && (
             <span className="text-muted text-meta shrink-0 font-mono font-medium">
-              {vm.items.length}건
+              {vm.page.totalItems}건
             </span>
           )}
         </div>
