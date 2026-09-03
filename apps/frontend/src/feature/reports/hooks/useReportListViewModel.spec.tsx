@@ -58,7 +58,9 @@ describe('useReportListViewModel', () => {
   it('page 쿼리가 없으면 첫 페이지를 요청한다', async () => {
     listReportsMock.mockResolvedValueOnce(response([item()]));
     renderHook(() => useReportListViewModel());
-    await waitFor(() => expect(listReportsMock).toHaveBeenCalledWith({ page: 1 }));
+    await waitFor(() =>
+      expect(listReportsMock).toHaveBeenCalledWith({ page: 1 }, { refresh: false }),
+    );
   });
 
   it('page 쿼리가 있으면 그 페이지를 요청한다', async () => {
@@ -66,7 +68,7 @@ describe('useReportListViewModel', () => {
     listReportsMock.mockResolvedValueOnce(response([item()], { number: 3, totalPages: 5 }));
     const { result } = renderHook(() => useReportListViewModel());
     await waitFor(() => expect(result.current.status).toBe('loaded'));
-    expect(listReportsMock).toHaveBeenCalledWith({ page: 3 });
+    expect(listReportsMock).toHaveBeenCalledWith({ page: 3 }, { refresh: false });
     expect(result.current.page.number).toBe(3);
   });
 
@@ -76,7 +78,9 @@ describe('useReportListViewModel', () => {
       search.current = new URLSearchParams(`page=${raw}`);
       listReportsMock.mockResolvedValueOnce(response([item()]));
       renderHook(() => useReportListViewModel());
-      await waitFor(() => expect(listReportsMock).toHaveBeenCalledWith({ page: 1 }));
+      await waitFor(() =>
+        expect(listReportsMock).toHaveBeenCalledWith({ page: 1 }, { refresh: false }),
+      );
     }
   });
 
@@ -139,7 +143,7 @@ describe('useReportListViewModel', () => {
     rerender();
 
     await waitFor(() => expect(result.current.items.map((i) => i.id)).toEqual(['r21']));
-    expect(listReportsMock).toHaveBeenLastCalledWith({ page: 2 });
+    expect(listReportsMock).toHaveBeenLastCalledWith({ page: 2 }, { refresh: false });
   });
 
   it('refresh()는 현재 페이지를 다시 불러온다', async () => {
@@ -154,5 +158,7 @@ describe('useReportListViewModel', () => {
 
     await waitFor(() => expect(result.current.items.map((i) => i.id)).toEqual(['r2']));
     expect(listReportsMock).toHaveBeenCalledTimes(2);
+    // 캐시된 목록을 그대로 돌려주면 "다시 시도"가 의미가 없으므로 우회 옵션을 넘긴다.
+    expect(listReportsMock).toHaveBeenLastCalledWith({ page: 1 }, { refresh: true });
   });
 });

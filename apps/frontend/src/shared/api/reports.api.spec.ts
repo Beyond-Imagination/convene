@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { API_BASE_URL } from './config';
-import { getReport, listReports } from './reports.api';
+import { getReport, invalidateReportListCache, listReports } from './reports.api';
 
 const okResponse = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), {
@@ -16,6 +16,8 @@ describe('listReports', () => {
 
   beforeEach(() => {
     fetchMock.mockReset();
+    // 캐시가 모듈 수준이라 테스트마다 비우지 않으면 앞 테스트의 응답이 넘어온다.
+    invalidateReportListCache();
     vi.stubGlobal('fetch', fetchMock);
   });
 
@@ -75,6 +77,46 @@ describe('listReports', () => {
       name: 'ReportsApiError',
       status: 500,
     });
+  });
+
+  it('같은 조건의 재요청은 캐시가 흡수해 네트워크를 타지 않는다', async () => {
+    fetchMock.mockResolvedValueOnce(okResponse({ items: [], page: emptyPage }));
+
+    const first = await listReports({ page: 2 });
+    const second = await listReports({ page: 2 });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(second).toBe(first);
+  });
+
+  it('조건이 다르면 따로 요청한다', async () => {
+    // Response body는 한 번만 읽을 수 있으므로 호출마다 새로 만든다.
+    fetchMock.mockImplementation(() => Promise.resolve(okResponse({ items: [], page: emptyPage })));
+
+    await listReports({ page: 1 });
+    await listReports({ page: 2 });
+    await listReports({ page: 2, size: 10 });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('refresh 옵션은 캐시를 버리고 다시 요청한다', async () => {
+    fetchMock.mockImplementation(() => Promise.resolve(okResponse({ items: [], page: emptyPage })));
+
+    await listReports({ page: 1 });
+    await listReports({ page: 1 }, { refresh: true });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('실패한 응답은 캐시하지 않는다', async () => {
+    fetchMock.mockResolvedValueOnce(errorResponse(500, 'mongo down'));
+    fetchMock.mockResolvedValueOnce(okResponse({ items: [], page: emptyPage }));
+
+    await expect(listReports({ page: 1 })).rejects.toMatchObject({ status: 500 });
+    await expect(listReports({ page: 1 })).resolves.toMatchObject({ items: [] });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
 
