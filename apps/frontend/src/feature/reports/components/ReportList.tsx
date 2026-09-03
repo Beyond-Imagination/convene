@@ -85,6 +85,11 @@ export function ReportList({ status, items, errorMessage, refresh }: ReportListP
                 코드 {report.code} · 참가자 {report.participantCount}명
               </div>
             </div>
+            {report.notionSynced && (
+              <span className="text-accent-on text-cap shrink-0 font-mono font-semibold tracking-[0.08em]">
+                NOTION 동기화됨
+              </span>
+            )}
             <span className="text-muted text-meta shrink-0 font-mono font-medium md:min-w-[230px] md:text-right">
               {formatDate(report.endedAt)}
             </span>

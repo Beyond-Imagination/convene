@@ -8,6 +8,7 @@ import { TranscriptSegment } from '@/reports/domain/entries/transcript-segment';
 import { MeetingReport } from '@/reports/domain/meeting-report';
 import { REPORT_REPOSITORY, ReportRepository } from '@/reports/domain/ports/report.repository';
 import { SUMMARIZER, SummarizerPort } from '@/reports/domain/ports/summarizer.port';
+import { notionPushResult } from '@/reports/domain/value-objects/notion-push-result';
 import { ChatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
 import { ExternalReference } from '@/shared-kernel/domain/value-objects/external-reference';
 import { MeetingType } from '@/shared-kernel/domain/value-objects/meeting-type';
@@ -40,6 +41,12 @@ export interface CompleteTranscriptionCommand {
 export interface FailTranscriptionCommand {
   reportId: string;
   error: string;
+}
+
+export interface RecordNotionPushCommand {
+  reportId: string;
+  pageId: string;
+  at: Date;
 }
 
 /**
@@ -206,6 +213,15 @@ export class ReportFinalizationService {
       });
       this.logger.info({ reportId: report.id }, 'report finalized');
     }
+  }
+
+  async recordNotionPush(command: RecordNotionPushCommand): Promise<void> {
+    const report = await this.requireReport(command.reportId);
+    report.attachNotionPushResult(
+      notionPushResult({ pageId: command.pageId, at: command.at }),
+    );
+    await this.repository.save(report);
+    this.logger.info({ reportId: command.reportId }, 'report notion push recorded');
   }
 
   private async requireReport(reportId: string): Promise<MeetingReport> {

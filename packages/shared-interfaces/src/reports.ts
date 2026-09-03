@@ -83,6 +83,7 @@ export interface ReportListItem {
   participantCount: number;
   pipeline: Pick<ReportPipelineWire, 'sttStatus' | 'summaryStatus'>;
   title: string | null;
+  notionSynced: boolean;
 }
 
 export interface ReportListResponse {
