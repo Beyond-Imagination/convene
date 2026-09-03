@@ -29,14 +29,14 @@ describe('도메인 이벤트 이름', () => {
     }
   });
 
-  it('meeting 9 + report 5 + mediasoup 3 = 17개, 모두 서로 다르다', () => {
+  it('meeting 9 + report 6 + mediasoup 3 = 18개, 모두 서로 다르다', () => {
     const meeting = Object.values(MEETING_EVENTS);
     const report = Object.values(REPORT_EVENTS);
     const mediasoup = Object.values(MEDIASOUP_EVENTS);
     expect(meeting).toHaveLength(9);
-    expect(report).toHaveLength(5);
+    expect(report).toHaveLength(6);
     expect(mediasoup).toHaveLength(3);
-    expect(new Set([...meeting, ...report, ...mediasoup]).size).toBe(17);
+    expect(new Set([...meeting, ...report, ...mediasoup]).size).toBe(18);
   });
 
   it('연결 끊김과 재접속은 leave와 구분되는 별도 이벤트다', () => {
@@ -47,6 +47,10 @@ describe('도메인 이벤트 이름', () => {
 
   it('report.transcription.failed가 노출되어 Recording BC가 STT 실패를 보고할 수 있다', () => {
     expect(REPORT_EVENTS.TRANSCRIPTION_FAILED).toBe('report.transcription.failed');
+  });
+
+  it('report.notion.pushed가 노출되어 notion BC가 동기화 완료를 보고할 수 있다', () => {
+    expect(REPORT_EVENTS.NOTION_PUSHED).toBe('report.notion.pushed');
   });
 
   it('DomainEventName은 Meeting/Report/Mediasoup EventName의 union이다', () => {

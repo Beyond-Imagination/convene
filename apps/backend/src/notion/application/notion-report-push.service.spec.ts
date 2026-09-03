@@ -1,10 +1,15 @@
+import { DomainEventName, REPORT_EVENTS } from '@convene/shared-interfaces';
+
 import { NotionReportPort } from '@/notion/domain/ports/notion-report.port';
 import { FinalizedReport, ReportLookupService } from '@/reports/application/report-lookup.service';
 import { reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
+import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 import { stub } from '@/shared-kernel/testing/stub';
 
 import { NotionReportPushService } from './notion-report-push.service';
+
+const pushedAt = new Date('2026-01-01T01:00:00Z');
 
 const finalizedReport = (issueId: string | null): FinalizedReport => ({
   reportId: 'rep_001',
@@ -44,12 +49,20 @@ const makeService = (options: {
       pushed.push({ issueId, report });
     }),
   };
+  const events: { name: DomainEventName; payload: unknown }[] = [];
+  const eventPublisher = stub<NestEventBusDomainEventPublisher>({
+    publish: jest.fn(async (name: DomainEventName, payload: unknown) => {
+      events.push({ name, payload });
+    }),
+  });
   const service = new NotionReportPushService(
       reportLookup,
       notionReport,
+      { now: () => pushedAt },
+      eventPublisher,
       silentLogger(),
     );
-  return { service, pushed, reportLookup, notionReport };
+  return { service, pushed, events, reportLookup, notionReport };
 };
 
 describe('NotionReportPushService.pushFinalizedReport', () => {
@@ -92,5 +105,29 @@ describe('NotionReportPushService.pushFinalizedReport', () => {
 
     await expect(service.pushFinalizedReport('rep_001')).resolves.toBeUndefined();
     expect(notionReport.pushReport).not.toHaveBeenCalled();
+  });
+
+  it('삽입에 성공하면 push 영수증을 report.notion.pushed로 돌려보낸다', async () => {
+    const { service, events } = makeService({ found: finalizedReport('issue_1') });
+
+    await service.pushFinalizedReport('rep_001');
+
+    expect(events).toEqual([
+      {
+        name: REPORT_EVENTS.NOTION_PUSHED,
+        payload: { reportId: 'rep_001', pageId: 'issue_1', at: pushedAt },
+      },
+    ]);
+  });
+
+  it('삽입이 실패하면 영수증을 돌려보내지 않는다', async () => {
+    const { service, events } = makeService({
+      found: finalizedReport('issue_1'),
+      pushError: new Error('notion 500'),
+    });
+
+    await service.pushFinalizedReport('rep_001');
+
+    expect(events).toEqual([]);
   });
 });

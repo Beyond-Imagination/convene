@@ -191,14 +191,14 @@ describe('MeetingReport (Aggregate Root)', () => {
       expect(r.pushedToNotion).toBe(receipt);
     });
 
-    it('중복 부착은 거부', () => {
+    it('재요약 후 다시 push되면 최신 영수증으로 갱신한다', () => {
       const r = MeetingReport.fromEndedMeeting(baseInput());
       r.applyTranscript([]);
       r.applySummary(validSummary());
       r.attachNotionPushResult(notionPushResult({ pageId: 'p1', at: failAt }));
-      expect(() =>
-        r.attachNotionPushResult(notionPushResult({ pageId: 'p2', at: failAt })),
-      ).toThrow(/already been attached/);
+      const latest = notionPushResult({ pageId: 'p2', at: new Date(failAt.getTime() + 1000) });
+      r.attachNotionPushResult(latest);
+      expect(r.pushedToNotion).toBe(latest);
     });
   });
 

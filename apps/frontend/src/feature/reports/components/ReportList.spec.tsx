@@ -14,6 +14,7 @@ const item = (overrides: Partial<ReportListItem> = {}): ReportListItem => ({
   participantCount: 2,
   pipeline: { sttStatus: 'done', summaryStatus: 'done' },
   title: '주간 미팅',
+  notionSynced: false,
   ...overrides,
 });
 
@@ -65,5 +66,19 @@ describe('ReportList View', () => {
     expect(links[0]).toHaveTextContent('3');
     expect(links[1]).toHaveAttribute('href', '/reports/r2');
     expect(links[1]).toHaveTextContent('xyz99aaa');
+  });
+
+  it('노션에 동기화된 항목만 배지를 단다', () => {
+    render(
+      <ReportList
+        {...baseVm({
+          status: 'loaded',
+          items: [item({ id: 'r1', notionSynced: true }), item({ id: 'r2', notionSynced: false })],
+        })}
+      />,
+    );
+    const links = screen.getAllByTestId('report-list-item');
+    expect(links[0]).toHaveTextContent('NOTION 동기화됨');
+    expect(links[1]).not.toHaveTextContent('NOTION');
   });
 });

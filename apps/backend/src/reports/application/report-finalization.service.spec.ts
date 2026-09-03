@@ -636,3 +636,81 @@ describe('ReportFinalizationService.failTranscription', () => {
     expect(events[0].payload).toEqual({ reportId });
   });
 });
+
+describe('ReportFinalizationService.recordNotionPush', () => {
+  const startedAt = new Date('2026-01-01T00:00:00Z');
+  const endedAt = new Date('2026-01-01T00:30:00Z');
+  const pushedAt = new Date('2026-01-01T01:00:00Z');
+  const reportId = 'rep_notion';
+
+  /** 노션 이슈에서 만들어져 파이프라인이 확정된 회의록. */
+  const makeFinalized = (): MeetingReport => {
+    const report = MeetingReport.fromEndedMeeting({
+      id: reportId,
+      meetingId: 'mtg_n',
+      code: 'code-n',
+      source: 'notion-issue',
+      meetingType: 'general',
+      externalReference: externalReference({ issueId: 'issue_1' }),
+      startedAt,
+      endedAt,
+      participants: [],
+      chat: [],
+    });
+    report.applyTranscript([]);
+    report.applySummary(
+      reportSummary({
+        title: '요약',
+        overview: '개요',
+        decisions: [],
+        actionItems: [],
+        keyTopics: [],
+      }),
+    );
+    return report;
+  };
+
+  const makeService = () => {
+    const store = new Map<string, MeetingReport>([[reportId, makeFinalized()]]);
+    const saved: MeetingReport[] = [];
+    const { publisher } = makeEventPublisher();
+    const service = new ReportFinalizationService(
+      {
+        save: async (r) => {
+          saved.push(r);
+          store.set(r.id, r);
+        },
+        findById: async (id) => store.get(id) ?? null,
+        findByMeetingId: async () => null,
+        listRecent: async () => [],
+      },
+      noopSummarizer(),
+      { now: () => endedAt },
+      publisher,
+      noopLogger(),
+    );
+    return { service, store, saved };
+  };
+
+  it('push 영수증을 회의록에 부착하고 저장한다', async () => {
+    const { service, store, saved } = makeService();
+    await service.recordNotionPush({ reportId, pageId: 'issue_1', at: pushedAt });
+    expect(store.get(reportId)!.pushedToNotion).toEqual({ pageId: 'issue_1', at: pushedAt });
+    expect(saved).toHaveLength(1);
+  });
+
+  it('재푸시하면 최신 영수증으로 갱신한다', async () => {
+    const { service, store } = makeService();
+    await service.recordNotionPush({ reportId, pageId: 'issue_1', at: pushedAt });
+    const later = new Date(pushedAt.getTime() + 60_000);
+    await service.recordNotionPush({ reportId, pageId: 'issue_1', at: later });
+    expect(store.get(reportId)!.pushedToNotion).toEqual({ pageId: 'issue_1', at: later });
+  });
+
+  it('존재하지 않는 reportId면 ReportNotFoundError를 던진다', async () => {
+    const { service } = makeService();
+    await expect(
+      service.recordNotionPush({ reportId: 'unknown', pageId: 'issue_1', at: pushedAt }),
+    ).rejects.toThrow(ReportNotFoundError);
+  });
+});
