@@ -144,7 +144,7 @@ export function ReportList({
             <Link
               href={`/reports/${report.id}`}
               data-testid="report-list-item"
-              className="border-border hover:bg-text/[0.04] flex flex-col gap-2 border-b py-5 transition-colors md:flex-row md:items-center md:gap-7 md:py-[26px]"
+              className="hover:bg-text/[0.04] flex flex-col gap-2 rounded-lg px-4 py-5 transition-colors md:flex-row md:items-center md:gap-7 md:px-5 md:py-[26px]"
             >
               <div className="min-w-0 flex-1">
                 <div
