@@ -7,7 +7,7 @@ import { Schema } from 'mongoose';
  *
  * `_id`는 ObjectId가 아니라 `MeetingReport.id`를 그대로 저장한다(UUID string).
  * `meetingId`는 회의 1건당 회의록 1건 보장을 위해 unique index를 둔다.
- * `endedAt`은 `listRecent`의 정렬 키이므로 descending 인덱스를 함께 둔다.
+ * `endedAt`은 기본 정렬(latest)의 키이므로 descending 인덱스를 함께 둔다.
  */
 
 export const MEETING_REPORT_COLLECTION = 'meeting_reports';

@@ -9,6 +9,7 @@ import { MeetingReport } from '@/reports/domain/meeting-report';
 import { REPORT_REPOSITORY, ReportRepository } from '@/reports/domain/ports/report.repository';
 import { SUMMARIZER, SummarizerPort } from '@/reports/domain/ports/summarizer.port';
 import { notionPushResult } from '@/reports/domain/value-objects/notion-push-result';
+import { Page, ReportListCriteria } from '@/reports/domain/value-objects/report-list-query';
 import { ChatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
 import { ExternalReference } from '@/shared-kernel/domain/value-objects/external-reference';
 import { MeetingType } from '@/shared-kernel/domain/value-objects/meeting-type';
@@ -187,8 +188,8 @@ export class ReportFinalizationService {
     return report;
   }
 
-  async listRecent(limit: number): Promise<MeetingReport[]> {
-    return this.repository.listRecent(limit);
+  async listPage(criteria: ReportListCriteria): Promise<Page<MeetingReport>> {
+    return this.repository.findPage(criteria);
   }
 
   async getById(reportId: string): Promise<MeetingReport> {

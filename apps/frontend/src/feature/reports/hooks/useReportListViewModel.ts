@@ -1,36 +1,68 @@
 'use client';
 
-import type { ReportListItem } from '@convene/shared-interfaces';
+import {
+  DEFAULT_REPORT_PAGE_SIZE,
+  type PageMetaWire,
+  type ReportListItem,
+} from '@convene/shared-interfaces';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
 import { listReports } from '@/shared/api/reports.api';
 
 type ReportListStatus = 'loading' | 'loaded' | 'error';
 
+const PAGE_QUERY_KEY = 'page';
+
+const EMPTY_PAGE: PageMetaWire = {
+  number: 1,
+  size: DEFAULT_REPORT_PAGE_SIZE,
+  totalItems: 0,
+  totalPages: 0,
+};
+
+/** 쿼리스트링은 사용자가 손댈 수 있으므로 1 이상의 정수가 아니면 첫 페이지로 본다. */
+function parsePageParam(raw: string | null): number {
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed >= 1 ? parsed : 1;
+}
+
+function pageHref(page: number): string {
+  return page === 1 ? '/reports' : `/reports?${PAGE_QUERY_KEY}=${page}`;
+}
+
 export interface UseReportListViewModel {
   readonly status: ReportListStatus;
   readonly items: ReadonlyArray<ReportListItem>;
+  readonly page: PageMetaWire;
   readonly errorMessage: string | null;
   readonly refresh: () => Promise<void>;
+  readonly goToPage: (page: number) => void;
 }
 
 /**
  * /reports 회의록 목록 페이지의 ViewModel.
  *
- * 책임: mount 시 GET /reports, 상태 머신(loading/loaded/error), refresh() 노출.
- * 정적 export 빌드에서 server 쪽 fetch가 없으므로 모든 데이터는 client mount 시 가져온다.
+ * 현재 페이지는 `?page=` 쿼리가 원본이라 새로고침·뒤로가기·링크 공유가 그대로 살아난다.
+ * 페이지 이동은 URL을 바꾸고, 그 변화를 받아 다시 조회한다.
  */
 export function useReportListViewModel(): UseReportListViewModel {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pageNumber = parsePageParam(searchParams.get(PAGE_QUERY_KEY));
+
   const [status, setStatus] = useState<ReportListStatus>('loading');
   const [items, setItems] = useState<ReportListItem[]>([]);
+  const [page, setPage] = useState<PageMetaWire>(EMPTY_PAGE);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const load = useCallback(async (target: number, refresh = false) => {
     setStatus('loading');
     setErrorMessage(null);
     try {
-      const next = await listReports();
-      setItems(next);
+      const response = await listReports({ page: target }, { refresh });
+      setItems(response.items);
+      setPage(response.page);
       setStatus('loaded');
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
@@ -39,9 +71,21 @@ export function useReportListViewModel(): UseReportListViewModel {
     }
   }, []);
 
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+  // 다시 시도는 캐시를 건너뛴다. 캐시된 목록을 그대로 돌려주면 재시도가 아무 의미가 없다.
+  const refresh = useCallback(async () => {
+    await load(pageNumber, true);
+  }, [load, pageNumber]);
 
-  return { status, items, errorMessage, refresh };
+  const goToPage = useCallback(
+    (next: number) => {
+      router.push(pageHref(Math.max(1, next)));
+    },
+    [router],
+  );
+
+  useEffect(() => {
+    void load(pageNumber);
+  }, [load, pageNumber]);
+
+  return { status, items, page, errorMessage, refresh, goToPage };
 }

@@ -4,6 +4,11 @@ import { Connection, Model } from 'mongoose';
 import { MeetingReport, MeetingReportSnapshot } from '@/reports/domain/meeting-report';
 import { ReportRepository } from '@/reports/domain/ports/report.repository';
 import { PipelineState } from '@/reports/domain/value-objects/pipeline-state';
+import {
+  Page,
+  REPORT_SORT_SPECS,
+  ReportListCriteria,
+} from '@/reports/domain/value-objects/report-list-query';
 
 import { MEETING_REPORT_COLLECTION, meetingReportSchema } from './meeting-report.schema';
 
@@ -40,7 +45,7 @@ interface MeetingReportDoc {
  *
  * - `_id` = `MeetingReport.id` (UUID string), `meetingId`는 unique index.
  * - `save`는 `replaceOne(upsert)`으로 멱등 처리.
- * - `listRecent`는 `endedAt -1` 인덱스를 활용.
+ * - `findPage`는 정렬 spec이 가리키는 인덱스(latest = `endedAt -1`)를 활용한다.
  */
 @Injectable()
 export class MongoReportRepository implements ReportRepository {
@@ -75,17 +80,24 @@ export class MongoReportRepository implements ReportRepository {
     return MeetingReport.fromSnapshot(this.fromWire(doc));
   }
 
-  async listRecent(limit: number): Promise<MeetingReport[]> {
-    if (!Number.isInteger(limit) || limit < 0) {
-      throw new Error(`listRecent.limit must be a non-negative integer, got ${limit}`);
-    }
-    if (limit === 0) return [];
-    const docs = await this.model
-      .find()
-      .sort({ endedAt: -1 })
-      .limit(limit)
-      .lean<MeetingReportDoc[]>();
-    return docs.map((d) => MeetingReport.fromSnapshot(this.fromWire(d)));
+  async findPage(criteria: ReportListCriteria): Promise<Page<MeetingReport>> {
+    const spec = REPORT_SORT_SPECS[criteria.sort];
+    const sort: Record<string, 1 | -1> = { [spec.field]: spec.direction === 'desc' ? -1 : 1 };
+    // 검색이 붙으면 criteria로 filter를 만들어 find/countDocuments에 함께 넘긴다.
+    const filter = {};
+    const [docs, totalItems] = await Promise.all([
+      this.model
+        .find(filter)
+        .sort(sort)
+        .skip(criteria.offset)
+        .limit(criteria.size)
+        .lean<MeetingReportDoc[]>(),
+      this.model.countDocuments(filter),
+    ]);
+    return {
+      items: docs.map((d) => MeetingReport.fromSnapshot(this.fromWire(d))),
+      totalItems,
+    };
   }
 
   private toWire(snapshot: MeetingReportSnapshot): MeetingReportDoc {

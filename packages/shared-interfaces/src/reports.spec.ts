@@ -1,20 +1,29 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  DEFAULT_REPORT_LIST_LIMIT,
-  MAX_REPORT_LIST_LIMIT,
+  DEFAULT_REPORT_PAGE_SIZE,
+  DEFAULT_REPORT_SORT,
+  MAX_REPORT_PAGE_SIZE,
+  REPORT_SORT_OPTIONS,
   type ReportDetailResponse,
   type ReportListItem,
   type ReportListResponse,
   type ReportPipelineStage,
   type ReportPipelineStatus,
+  type ReportSortOption,
 } from './reports.js';
 
 describe('Reports wire format constants', () => {
-  it('listRecent 기본/최대 limit 상수를 노출한다', () => {
-    expect(DEFAULT_REPORT_LIST_LIMIT).toBe(20);
-    expect(MAX_REPORT_LIST_LIMIT).toBe(100);
-    expect(DEFAULT_REPORT_LIST_LIMIT).toBeLessThanOrEqual(MAX_REPORT_LIST_LIMIT);
+  it('목록의 기본/최대 페이지 크기 상수를 노출한다', () => {
+    expect(DEFAULT_REPORT_PAGE_SIZE).toBe(20);
+    expect(MAX_REPORT_PAGE_SIZE).toBe(100);
+    expect(DEFAULT_REPORT_PAGE_SIZE).toBeLessThanOrEqual(MAX_REPORT_PAGE_SIZE);
+  });
+
+  it('정렬은 이름 있는 프리셋 목록이고 기본값은 latest다', () => {
+    const option: ReportSortOption = DEFAULT_REPORT_SORT;
+    expect(REPORT_SORT_OPTIONS).toContain(option);
+    expect(DEFAULT_REPORT_SORT).toBe('latest');
   });
 });
 
@@ -38,9 +47,13 @@ describe('Reports wire format type-compile checks', () => {
       title: '회의 요약',
       notionSynced: true,
     };
-    const response: ReportListResponse = { items: [item] };
+    const response: ReportListResponse = {
+      items: [item],
+      page: { number: 2, size: 20, totalItems: 43, totalPages: 3 },
+    };
     expect(response.items[0].id).toBe('r1');
     expect(response.items[0].notionSynced).toBe(true);
+    expect(response.page.totalPages).toBe(3);
   });
 
   it('ReportDetailResponse는 도메인 Aggregate를 wire format으로 평면화한다', () => {

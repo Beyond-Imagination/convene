@@ -2,11 +2,16 @@ import { participantEntry } from '@/reports/domain/entries/participant-entry';
 import { transcriptSegment } from '@/reports/domain/entries/transcript-segment';
 import { MeetingReport } from '@/reports/domain/meeting-report';
 import { notionPushResult } from '@/reports/domain/value-objects/notion-push-result';
+import { reportListCriteria } from '@/reports/domain/value-objects/report-list-query';
 import { chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
 import { externalReference, NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects/external-reference';
 import { reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
 
-import { toReportDetailResponse, toReportListItem } from './report-serialize';
+import {
+  toReportDetailResponse,
+  toReportListItem,
+  toReportListResponse,
+} from './report-serialize';
 
 const startedAt = new Date('2026-01-01T00:00:00Z');
 const tJoin = new Date('2026-01-01T00:01:00Z');
@@ -181,5 +186,26 @@ describe('toReportDetailResponse', () => {
       error: 'skip',
       at: '2026-01-01T00:30:00.000Z',
     });
+  });
+});
+
+describe('toReportListResponse', () => {
+  const criteria = (page: number, size: number) => reportListCriteria({ page, size, sort: 'latest' });
+
+  it('items를 직렬화하고 페이지 메타를 criteria + 전체 개수로 구성한다', () => {
+    const response = toReportListResponse({ items: [makeDraft()], totalItems: 43 }, criteria(2, 20));
+    expect(response.items).toHaveLength(1);
+    expect(response.items[0].id).toBe('r1');
+    expect(response.page).toEqual({ number: 2, size: 20, totalItems: 43, totalPages: 3 });
+  });
+
+  it('마지막 페이지가 딱 나누어떨어지면 totalPages는 그대로다', () => {
+    expect(toReportListResponse({ items: [], totalItems: 40 }, criteria(1, 20)).page.totalPages).toBe(2);
+  });
+
+  it('결과가 없으면 totalPages는 0이다', () => {
+    const response = toReportListResponse({ items: [], totalItems: 0 }, criteria(1, 20));
+    expect(response.items).toEqual([]);
+    expect(response.page.totalPages).toBe(0);
   });
 });

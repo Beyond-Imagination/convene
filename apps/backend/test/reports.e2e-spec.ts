@@ -199,10 +199,28 @@ describe('Reports e2e', () => {
     await request(httpServer).get('/reports/unknown-id').expect(404);
   });
 
-  it('GET /reports?limit이 허용 범위를 벗어나면 400', async () => {
-    await request(httpServer).get('/reports?limit=0').expect(400);
-    await request(httpServer).get('/reports?limit=999').expect(400);
-    await request(httpServer).get('/reports?limit=abc').expect(400);
+  it('GET /reports의 페이지·정렬 파라미터가 허용 범위를 벗어나면 400', async () => {
+    await request(httpServer).get('/reports?page=0').expect(400);
+    await request(httpServer).get('/reports?size=0').expect(400);
+    await request(httpServer).get('/reports?size=999').expect(400);
+    await request(httpServer).get('/reports?size=abc').expect(400);
+    await request(httpServer).get('/reports?sort=oldest').expect(400);
+  });
+
+  it('GET /reports는 items와 함께 페이지 메타를 돌려준다', async () => {
+    const res = await request(httpServer).get('/reports?page=1&size=1&sort=latest').expect(200);
+    const body = res.body as ReportListResponse;
+    expect(body.page.number).toBe(1);
+    expect(body.page.size).toBe(1);
+    expect(body.items.length).toBeLessThanOrEqual(1);
+    expect(body.page.totalPages).toBe(body.page.totalItems);
+  });
+
+  it('범위를 벗어난 page는 빈 목록으로 200을 준다', async () => {
+    const res = await request(httpServer).get('/reports?page=9999').expect(200);
+    const body = res.body as ReportListResponse;
+    expect(body.items).toEqual([]);
+    expect(body.page.number).toBe(9999);
   });
 
   describe('POST /reports/:id/resummarize (관리자 재요약)', () => {

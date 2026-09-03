@@ -1,10 +1,12 @@
 import {
   ReportDetailResponse,
   ReportListItem,
+  ReportListResponse,
   ReportPipelineWire,
 } from '@convene/shared-interfaces';
 
 import { MeetingReport } from '@/reports/domain/meeting-report';
+import { Page, ReportListCriteria } from '@/reports/domain/value-objects/report-list-query';
 
 /**
  * 도메인 → wire format 직렬화 helper.
@@ -26,6 +28,21 @@ export function toReportListItem(report: MeetingReport): ReportListItem {
     // 사용자가 지정한 회의 제목 우선, 없으면 LLM 요약 제목.
     title: snapshot.title ?? snapshot.summary?.title ?? null,
     notionSynced: snapshot.pushedToNotion !== null,
+  };
+}
+
+export function toReportListResponse(
+  page: Page<MeetingReport>,
+  criteria: ReportListCriteria,
+): ReportListResponse {
+  return {
+    items: page.items.map(toReportListItem),
+    page: {
+      number: criteria.page,
+      size: criteria.size,
+      totalItems: page.totalItems,
+      totalPages: Math.ceil(page.totalItems / criteria.size),
+    },
   };
 }
 
