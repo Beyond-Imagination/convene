@@ -14,7 +14,7 @@ function anchorText(block: Record<string, unknown>): string {
     .join('');
 }
 
-export function isReportAnchor(block: Record<string, unknown>, reportId: string): boolean {
+function isReportAnchor(block: Record<string, unknown>, reportId: string): boolean {
   return block.type === 'toggle' && anchorText(block).includes(reportId);
 }
 
