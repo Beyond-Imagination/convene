@@ -3,12 +3,12 @@ import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 
 import { transcriptSegment } from '@/reports/domain/entries/transcript-segment';
-import { ReportTranscriptionCompletedPayload, ReportTranscriptionFailedPayload } from '@/shared-kernel/domain/domain-event.payloads';
+import { ReportNotionPushedPayload, ReportTranscriptionCompletedPayload, ReportTranscriptionFailedPayload } from '@/shared-kernel/domain/domain-event.payloads';
 
 import { ReportFinalizationService } from './report-finalization.service';
 
 /**
- * Recording BC가 발행하는 STT 결과 이벤트를 구독해 회의록 파이프라인을 한 단계 진행시키는 Reports BC application listener.
+ * 다른 BC가 발행하는 이벤트(Recording의 STT 결과, notion의 push 결과)를 받아 회의록을 진행시키는 Reports BC application listener.
  */
 @Injectable()
 export class ReportPipelineListener {
@@ -28,6 +28,15 @@ export class ReportPipelineListener {
     await this.service.failTranscription({
       reportId: payload.reportId,
       error: payload.error,
+    });
+  }
+
+  @OnEvent(REPORT_EVENTS.NOTION_PUSHED)
+  async onNotionPushed(payload: ReportNotionPushedPayload): Promise<void> {
+    await this.service.recordNotionPush({
+      reportId: payload.reportId,
+      pageId: payload.pageId,
+      at: payload.at,
     });
   }
 }

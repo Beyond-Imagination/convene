@@ -25,6 +25,7 @@ export function toReportListItem(report: MeetingReport): ReportListItem {
     },
     // 사용자가 지정한 회의 제목 우선, 없으면 LLM 요약 제목.
     title: snapshot.title ?? snapshot.summary?.title ?? null,
+    notionSynced: snapshot.pushedToNotion !== null,
   };
 }
 

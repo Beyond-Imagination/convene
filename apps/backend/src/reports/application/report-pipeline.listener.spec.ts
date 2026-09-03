@@ -1,9 +1,10 @@
-import { ReportTranscriptionCompletedPayload, ReportTranscriptionFailedPayload } from '@/shared-kernel/domain/domain-event.payloads';
+import { ReportNotionPushedPayload, ReportTranscriptionCompletedPayload, ReportTranscriptionFailedPayload } from '@/shared-kernel/domain/domain-event.payloads';
 import { stub } from '@/shared-kernel/testing/stub';
 
 import {
   CompleteTranscriptionCommand,
   FailTranscriptionCommand,
+  RecordNotionPushCommand,
   ReportFinalizationService,
 } from './report-finalization.service';
 import { ReportPipelineListener } from './report-pipeline.listener';
@@ -11,6 +12,7 @@ import { ReportPipelineListener } from './report-pipeline.listener';
 const makeListener = () => {
   const completed: CompleteTranscriptionCommand[] = [];
   const failed: FailTranscriptionCommand[] = [];
+  const notionPushes: RecordNotionPushCommand[] = [];
   const service = {
     completeTranscription: jest.fn(async (cmd: CompleteTranscriptionCommand) => {
       completed.push(cmd);
@@ -18,9 +20,12 @@ const makeListener = () => {
     failTranscription: jest.fn(async (cmd: FailTranscriptionCommand) => {
       failed.push(cmd);
     }),
+    recordNotionPush: jest.fn(async (cmd: RecordNotionPushCommand) => {
+      notionPushes.push(cmd);
+    }),
   };
   const listener = new ReportPipelineListener(stub<ReportFinalizationService>(service));
-  return { listener, completed, failed, service };
+  return { listener, completed, failed, notionPushes, service };
 };
 
 describe('ReportPipelineListener.onTranscriptionCompleted', () => {
@@ -61,5 +66,18 @@ describe('ReportPipelineListener.onTranscriptionFailed', () => {
     };
     await listener.onTranscriptionFailed(payload);
     expect(failed).toEqual([{ reportId: 'r1', error: 'ai-worker 503' }]);
+  });
+});
+
+describe('ReportPipelineListener.onNotionPushed', () => {
+  it('payload의 push 영수증을 그대로 recordNotionPush에 위임한다', async () => {
+    const { listener, notionPushes } = makeListener();
+    const payload: ReportNotionPushedPayload = {
+      reportId: 'r1',
+      pageId: 'issue_1',
+      at: new Date('2026-01-01T01:00:00Z'),
+    };
+    await listener.onNotionPushed(payload);
+    expect(notionPushes).toEqual([payload]);
   });
 });

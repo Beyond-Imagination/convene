@@ -22,6 +22,7 @@ const item = (overrides: Partial<ReportListItem> = {}): ReportListItem => ({
   participantCount: 2,
   pipeline: { sttStatus: 'done', summaryStatus: 'done' },
   title: '주간 미팅',
+  notionSynced: false,
   ...overrides,
 });
 

@@ -36,9 +36,11 @@ describe('Reports wire format type-compile checks', () => {
       participantCount: 1,
       pipeline: { sttStatus: 'done', summaryStatus: 'done' },
       title: '회의 요약',
+      notionSynced: true,
     };
     const response: ReportListResponse = { items: [item] };
     expect(response.items[0].id).toBe('r1');
+    expect(response.items[0].notionSynced).toBe(true);
   });
 
   it('ReportDetailResponse는 도메인 Aggregate를 wire format으로 평면화한다', () => {

@@ -33,6 +33,7 @@ export const REPORT_EVENTS = {
   TRANSCRIPTION_FAILED: 'report.transcription.failed',
   SUMMARY_COMPLETED: 'report.summary.completed',
   FINALIZED: 'report.finalized',
+  NOTION_PUSHED: 'report.notion.pushed',
 } as const;
 
 export const MEDIASOUP_EVENTS = {

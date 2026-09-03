@@ -30,7 +30,7 @@ export interface CreateMeetingReportInput {
  * 책임:
  *   - 회의 종료 시점의 영속 가능한 draft 생성 + 입력 검증
  *   - 후처리 stage 결과 반영(`applyTranscript`/`applySummary` + `mark*Failed`)
- *   - 노션 push 결과 1회 부착(`attachNotionPushResult`, v2)
+ *   - 노션 push 결과 부착(`attachNotionPushResult`, v2)
  *
  * 도메인 이벤트는 직접 발행하지 않는다(Application Service가 메서드 결과를 보고 발행).
  */
@@ -166,12 +166,10 @@ export class MeetingReport {
     this._pipeline = next;
   }
 
+  /** 재요약 후 재푸시가 있으므로 최신 영수증으로 덮어쓴다. */
   attachNotionPushResult(result: NotionPushResult): void {
     if (!this._pipeline.isFinal) {
       throw new Error('Cannot attach Notion push result before pipeline is final');
-    }
-    if (this._pushedToNotion !== null) {
-      throw new Error('Notion push result has already been attached');
     }
     this._pushedToNotion = result;
   }

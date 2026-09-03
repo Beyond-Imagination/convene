@@ -42,7 +42,26 @@ describe('toReportListItem', () => {
       participantCount: 2,
       pipeline: { sttStatus: 'pending', summaryStatus: 'pending' },
       title: null,
+      notionSynced: false,
     });
+  });
+
+  it('NotionPushResult가 부착되면 notionSynced가 true가 된다', () => {
+    const report = makeDraft();
+    report.applyTranscript([]);
+    report.applySummary(
+      reportSummary({
+        title: '회의 요약',
+        overview: '핵심',
+        decisions: [],
+        actionItems: [],
+        keyTopics: [],
+      }),
+    );
+    report.attachNotionPushResult(
+      notionPushResult({ pageId: 'PG-1', at: new Date('2026-01-01T01:00:00Z') }),
+    );
+    expect(toReportListItem(report).notionSynced).toBe(true);
   });
 
   it('요약이 적용되면 ReportListItem.title은 summary.title을 노출한다', () => {

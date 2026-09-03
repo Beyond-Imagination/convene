@@ -56,3 +56,10 @@ export interface ReportTranscriptionFailedPayload {
 export interface ReportFinalizedPayload {
   readonly reportId: string;
 }
+
+/** notion BC → reports BC. push 영수증. */
+export interface ReportNotionPushedPayload {
+  readonly reportId: string;
+  readonly pageId: string;
+  readonly at: Date;
+}

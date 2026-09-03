@@ -50,6 +50,7 @@ describe('listReports', () => {
       participantCount: 3,
       pipeline: { sttStatus: 'done', summaryStatus: 'pending' },
       title: '주간 미팅',
+      notionSynced: true,
     };
     fetchMock.mockResolvedValueOnce(okResponse({ items: [item] }));
     const result = await listReports();
