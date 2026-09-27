@@ -9,7 +9,7 @@ This file is for Claude Code. Read it before editing anything in this repo.
 ## Source-of-truth docs
 
 - **Notion (external)** — architecture patterns, domain model, layer mapping, sequence + state diagrams (formerly `ARCHITECTURE.md`). Korean, written for the human user. **Ask the user for the link** when you need it; it is not in the repo.
-- `CODEBASE_GUIDE.md` (in-repo) — maps the running code to those patterns.
+- `DEVELOPMENT.md` (in-repo) — requirements, run, test, contribute. `README.md` is product-facing only.
 
 This file (CLAUDE.md) is the English index for fast context recovery.
 
@@ -22,7 +22,7 @@ This file (CLAUDE.md) is the English index for fast context recovery.
 
 ## Patterns
 
-- **Backend**: Layered MVC + DDD 4-layer. Dependency direction: Interface → Application → Domain ← Infrastructure. Domain layer has **zero framework imports**. Application talks to Infrastructure only through Ports, and is wired by Nest DI (`@Injectable` + `@Inject(TOKEN)`) — see `CODEBASE_GUIDE.md` §3.4.
+- **Backend**: Layered MVC + DDD 4-layer. Dependency direction: Interface → Application → Domain ← Infrastructure. Domain layer has **zero framework imports**. Application talks to Infrastructure only through Ports, and is wired by Nest DI (`@Injectable` + `@Inject(TOKEN)`) — see `DEVELOPMENT.md` "코드 규칙".
 - **Frontend**: MVVM. View = `'use client'` component, props only. ViewModel = `useXxxViewModel` hook. Model = zustand store + api service + socket client. **View components do not call `fetch`, `useEffect`, `useState`, socket APIs, or zustand setters directly.**
 - **File member order** (deps-first, bottom-up): imports → module constants → supporting types/interfaces/helpers → the file's main class/aggregate/function **last**. Class-internal order (`field → constructor → method`) is enforced by `@typescript-eslint/member-ordering`. Multi-export files with no single namesake (e.g. sibling `*.errors.ts`, wire-type modules) are exempt.
 
@@ -50,6 +50,10 @@ This file (CLAUDE.md) is the English index for fast context recovery.
 7. **Cross-context coupling via Domain Events (`@nestjs/event-emitter`), or by injecting the other context's Application Service.** Prefer events for notifications (fire-and-forget); inject the service when you need a return value (e.g. `notion/` → `MeetingService.create`). The owning module `exports` that service; **Aggregates and Repositories still never cross a context boundary.** Read-only Value Objects shared by multiple contexts live in `apps/backend/src/shared-kernel/domain/` — this is the DDD **Shared Kernel** pattern. Changes to the shared kernel require alignment from every consumer.
 8. **Validation pipe is global** with `whitelist: true, forbidNonWhitelisted: true, transform: true`. Every inbound HTTP/WS payload must be a DTO class.
 9. **Comments say only what the code cannot.** One or two lines; delete a block that restates the type, the folder, or the next line rather than rewording it. **Never put measurement numbers, experiment conclusions, or design history in code, specs, or `.env.template`** — a tuned constant gets "what it is", not "why this value and what we tried". Those belong in the experiment report artifact (ask the user for the link). Same rule for memory files: they carry the decision and where to look, not the data behind it.
+10. **`useFactory` only when wiring needs a runtime value** (env config, conditional fallback); static bindings use `useClass`/`useExisting`.
+11. **Test doubles for concrete classes use `stub<T>()`** (`shared-kernel/testing/stub.ts`), never `as unknown as T`.
+12. **Renaming a DI token silently disables e2e `.overrideProvider()`** (real external API calls) — move the overrides in `apps/backend/test/*.e2e-spec.ts` with it.
+13. **WS gateways validate with `wsValidationPipe()` only** — never `new ValidationPipe(...)` directly.
 
 ## TDD cycle (per non-trivial unit)
 
@@ -83,7 +87,7 @@ After each step, summarize in Korean to the user and wait for confirmation.
 
 ```
 convene/
-├── CLAUDE.md, README.md, CODEBASE_GUIDE.md   (scope·architecture → Notion)
+├── CLAUDE.md, README.md, DEVELOPMENT.md   (scope·architecture → Notion)
 ├── package.json, pnpm-workspace.yaml, turbo.json, tsconfig.base.json
 ├── eslint.config.mjs, .prettierrc, .editorconfig, .gitignore
 ├── apps/
@@ -118,12 +122,12 @@ feature/<name>/
 Model (zustand stores, api fetch, socket clients) is shared across features and lives in
 `src/shared/{stores,api,socket}`, not per-feature.
 
-**File granularity**: split by "what you edit together", not by count — see `CODEBASE_GUIDE.md`
-섹션#1. Long files are fine; hopping between files is not. Subfolders only when they hold 2+ files.
+**File granularity**: split by "what you edit together", not by count — see `DEVELOPMENT.md`
+"코드 규칙". Long files are fine; hopping between files is not. Subfolders only when they hold 2+ files.
 
 ## When you (Claude) come back to this repo cold
 
-1. Read `CLAUDE.md` (this file) → `CODEBASE_GUIDE.md`. Scope/architecture detail lives in Notion (ask the user for the link).
+1. Read `CLAUDE.md` (this file) → `DEVELOPMENT.md`. Scope/architecture detail lives in Notion (ask the user for the link).
 2. Check `git log -10 --oneline` for recent progress.
 3. Locate the current task: failing specs, TODO comments, or ask the user.
 4. **Speak Korean to the user.** Code identifiers (class/function/variable/event names, file paths) stay English. **All code comments, JSDoc bodies, and test (`it`/`describe`) labels are written in Korean** so non-Claude collaborators can read them. The Notion docs stay Korean. This file (CLAUDE.md) stays English because it is for future Claude sessions.
