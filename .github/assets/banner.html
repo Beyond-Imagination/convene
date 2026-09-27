@@ -1,0 +1,91 @@
+<!doctype html>
+<!-- README 배너 원본. 렌더: .github/assets/render-banner.sh -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Manrope:wght@600;800&family=Noto+Sans+KR:wght@500;700&display=block" rel="stylesheet">
+<style>
+  :root {
+    --paper: 247 244 238; --surface: 255 253 250; --border: 222 215 203;
+    --text: 31 28 23; --muted: 114 106 94; --tile-off: 231 225 214;
+    --accent: 28 113 86; --accent-on: 28 113 86; --positive: 63 168 118;
+    --logo-bg: transparent;
+  }
+  html.dark {
+    --paper: 38 34 32; --surface: 51 45 40; --border: 59 53 47;
+    --text: 244 239 231; --muted: 164 154 142; --tile-off: 44 38 34;
+    --accent-on: 127 201 164;
+    --logo-bg: rgb(247 244 238);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1280px; height: 400px; background: rgb(var(--paper)); overflow: hidden; }
+  body {
+    font-family: Manrope, 'Noto Sans KR', sans-serif;
+    color: rgb(var(--text));
+    display: grid; grid-template-columns: 1fr 470px;
+  }
+  .brand { padding: 0 0 0 88px; display: flex; flex-direction: column; justify-content: center; }
+  .mark { display: flex; align-items: center; gap: 22px; }
+  .mark img { width: 76px; height: 76px; border-radius: 50%; background: var(--logo-bg); }
+  .wordmark { font-size: 76px; font-weight: 800; letter-spacing: -0.038em; line-height: 1; }
+  .sub {
+    margin: 14px 0 0 98px; font-family: 'IBM Plex Mono', monospace; font-weight: 500;
+    font-size: 17px; letter-spacing: .03em; color: rgb(var(--muted));
+  }
+  .tagline {
+    margin-top: 40px; font-size: 27px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.45;
+  }
+  .tagline em { font-style: normal; color: rgb(var(--accent-on)); }
+
+  .art { position: relative; border-left: 1px solid rgb(var(--border)); }
+  .tiles {
+    position: absolute; left: 56px; top: 64px; display: grid; gap: 8px;
+    grid-template-columns: repeat(2, 132px); grid-auto-rows: 86px;
+  }
+  .tile { background: rgb(var(--tile-off)); border-radius: 10px; position: relative; }
+  .tile::after {
+    content: ''; position: absolute; left: 50%; top: 50%; width: 30px; height: 30px;
+    transform: translate(-50%, -50%); border-radius: 50%; background: rgb(var(--muted) / .28);
+  }
+  .tile.speaking { box-shadow: 0 0 0 3px rgb(var(--positive)); }
+  .report {
+    position: absolute; right: 48px; bottom: 52px; width: 250px;
+    background: rgb(var(--surface)); border: 1px solid rgb(var(--border)); border-radius: 12px;
+    padding: 20px 22px; box-shadow: 0 18px 40px -18px rgb(0 0 0 / .28);
+  }
+  .cap {
+    font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 12px;
+    letter-spacing: .08em; color: rgb(var(--accent-on));
+  }
+  .row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+  .row b { font-size: 14px; font-weight: 700; white-space: nowrap; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: rgb(var(--positive)); flex: none; }
+  .bar { height: 7px; border-radius: 4px; background: rgb(var(--border)); flex: 1; }
+  html.dark .tile { background: rgb(var(--surface)); }
+</style>
+</head>
+<body>
+  <section class="brand">
+    <div class="mark">
+      <img src="../../apps/frontend/public/logo.svg" alt="">
+      <span class="wordmark">Convene</span>
+    </div>
+    <p class="sub">for Beyond_Imagination</p>
+    <p class="tagline">링크 하나로 시작하는 화상회의,<br><em>끝나면 회의록까지.</em></p>
+  </section>
+  <section class="art">
+    <div class="tiles">
+      <div class="tile speaking"></div><div class="tile"></div>
+      <div class="tile"></div><div class="tile"></div>
+    </div>
+    <div class="report">
+      <p class="cap">MEETING REPORT</p>
+      <div class="row"><span class="dot"></span><b>요약</b><span class="bar"></span></div>
+      <div class="row"><span class="dot"></span><b>결정사항</b><span class="bar"></span></div>
+      <div class="row"><span class="dot"></span><b>액션아이템</b><span class="bar"></span></div>
+    </div>
+  </section>
+  <script>if (location.hash === '#dark') document.documentElement.classList.add('dark');</script>
+</body>
+</html>
