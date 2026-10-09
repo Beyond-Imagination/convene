@@ -8,7 +8,7 @@ import { EmbedGate } from '@/feature/meeting/components/EmbedGate';
 import { MeetingEntryGate } from '@/feature/meeting/components/MeetingEntryGate';
 import { MeetingScreen } from '@/feature/meeting/components/MeetingScreen';
 import { NicknameGate } from '@/feature/meeting/components/NicknameGate';
-import { useChatViewModel } from '@/feature/meeting/hooks/useChatViewModel';
+import { useChatScrollViewModel, useChatViewModel } from '@/feature/meeting/hooks/useChatViewModel';
 import { useEmbedGateViewModel } from '@/feature/meeting/hooks/useEmbedGateViewModel';
 import { useMediasoupViewModel } from '@/feature/meeting/hooks/useMediasoupViewModel';
 import { useMeetingCardViewModel } from '@/feature/meeting/hooks/useMeetingCardViewModel';
@@ -28,20 +28,35 @@ function ChatSection({
   code,
   myNickname,
   history,
+  isOpen,
   onClose,
+  onUnreadChange,
 }: {
   readonly socket: Socket | null;
   readonly code: string;
   readonly myNickname: string | null;
   readonly history: ReadonlyArray<ChatPostedBroadcast>;
+  readonly isOpen: boolean;
   readonly onClose: () => void;
+  readonly onUnreadChange: (hasUnread: boolean) => void;
 }) {
   const chatVm = useChatViewModel(socket, code, history);
+  const scrollVm = useChatScrollViewModel({
+    messages: chatVm.messages,
+    arrivals: chatVm.arrivals,
+    isOpen,
+    myNickname,
+    onUnreadChange,
+  });
   return (
     <ChatPanel
       {...chatVm}
       myNickname={myNickname}
       onClose={onClose}
+      listRef={scrollVm.listRef}
+      onListScroll={scrollVm.onListScroll}
+      hasUnread={scrollVm.hasUnread}
+      onJumpToLatest={scrollVm.jumpToLatest}
     />
   );
 }
@@ -113,6 +128,7 @@ function MeetingSession({ code }: { readonly code: string }) {
         startedAt={entry.meeting?.startedAt ?? null}
         isChatOpen={layout.isChatOpen}
         onToggleChat={layout.toggleChat}
+        hasUnreadChat={layout.hasUnreadChat}
         variant={layout.variant}
         isStripOpen={layout.isStripOpen}
         onToggleStrip={layout.toggleStrip}
@@ -135,7 +151,9 @@ function MeetingSession({ code }: { readonly code: string }) {
           code={code}
           myNickname={meetingVm.nickname}
           history={meetingVm.chatHistory}
+          isOpen={layout.isChatOpen}
           onClose={layout.toggleChat}
+          onUnreadChange={layout.setHasUnreadChat}
         />
       </aside>
     </div>

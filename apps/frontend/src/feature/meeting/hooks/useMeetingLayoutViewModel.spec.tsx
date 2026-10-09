@@ -27,6 +27,13 @@ describe('useMeetingLayoutViewModel', () => {
     act(() => result.current.toggleChat());
     expect(result.current.isChatOpen).toBe(true);
   });
+
+  it('채팅 미읽음은 없음으로 시작하고 setHasUnreadChat으로 바뀐다', () => {
+    const { result } = renderHook(() => useMeetingLayoutViewModel());
+    expect(result.current.hasUnreadChat).toBe(false);
+    act(() => result.current.setHasUnreadChat(true));
+    expect(result.current.hasUnreadChat).toBe(true);
+  });
 });
 
 describe('useMeetingLayoutViewModel - 비디오 페이지네이션', () => {

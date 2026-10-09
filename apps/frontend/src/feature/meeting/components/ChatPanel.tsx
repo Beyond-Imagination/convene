@@ -1,6 +1,6 @@
 'use client';
 
-import type { FormEvent } from 'react';
+import type { FormEvent, Ref } from 'react';
 
 import type { UseChatViewModel } from '@/feature/meeting/hooks/useChatViewModel';
 
@@ -8,11 +8,15 @@ import type { UseChatViewModel } from '@/feature/meeting/hooks/useChatViewModel'
  * 회의 채팅 패널 dumb View.
  * draft input + 메시지 목록만 렌더.
  */
-export type ChatPanelProps = UseChatViewModel & {
+export type ChatPanelProps = Omit<UseChatViewModel, 'arrivals'> & {
   /** 내 닉네임. 일치하는 메시지는 카톡식으로 우측(내 메시지)에 표시한다. */
   readonly myNickname?: string | null;
   /** 모바일에서 패널이 화면을 덮으므로 닫는 길을 헤더에 둔다. */
   readonly onClose?: () => void;
+  readonly listRef?: Ref<HTMLUListElement>;
+  readonly onListScroll?: () => void;
+  readonly hasUnread?: boolean;
+  readonly onJumpToLatest?: () => void;
 };
 
 export function ChatPanel({
@@ -23,6 +27,10 @@ export function ChatPanel({
   submit,
   myNickname,
   onClose,
+  listRef,
+  onListScroll,
+  hasUnread = false,
+  onJumpToLatest,
 }: ChatPanelProps) {
   const onSubmit = (e: FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
@@ -51,36 +59,49 @@ export function ChatPanel({
         )}
       </div>
 
-      <ul
-        aria-label="chat-messages"
-        className="m-0 flex flex-1 list-none flex-col gap-4 overflow-auto py-5"
-      >
-        {messages.length === 0 && <li className="text-muted text-sm">아직 메시지가 없습니다.</li>}
-        {messages.map((m, idx) => {
-          const isMine = myNickname != null && m.nickname === myNickname;
-          return (
-            <li
-              key={`${m.sentAt}-${idx}`}
-              data-testid="chat-message"
-              data-mine={isMine}
-              className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
-            >
-              {!isMine && (
-                <span className="text-muted text-meta mb-1.5 font-semibold">{m.nickname}</span>
-              )}
-              <span
-                className={`text-body inline-block max-w-[86%] break-words px-4 py-3 ${
-                  isMine
-                    ? 'bg-accent text-accent-fg rounded-[16px_16px_5px_16px]'
-                    : 'bg-surface text-text rounded-[16px_16px_16px_5px]'
-                }`}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <ul
+          ref={listRef}
+          onScroll={onListScroll}
+          aria-label="chat-messages"
+          className="m-0 flex flex-1 list-none flex-col gap-4 overflow-auto py-5"
+        >
+          {messages.length === 0 && <li className="text-muted text-sm">아직 메시지가 없습니다.</li>}
+          {messages.map((m, idx) => {
+            const isMine = myNickname != null && m.nickname === myNickname;
+            return (
+              <li
+                key={`${m.sentAt}-${idx}`}
+                data-testid="chat-message"
+                data-mine={isMine}
+                className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
               >
-                {m.text}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
+                {!isMine && (
+                  <span className="text-muted text-meta mb-1.5 font-semibold">{m.nickname}</span>
+                )}
+                <span
+                  className={`text-body inline-block max-w-[86%] break-words px-4 py-3 ${
+                    isMine
+                      ? 'bg-accent text-accent-fg rounded-[16px_16px_5px_16px]'
+                      : 'bg-surface text-text rounded-[16px_16px_16px_5px]'
+                  }`}
+                >
+                  {m.text}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+        {hasUnread && (
+          <button
+            type="button"
+            onClick={onJumpToLatest}
+            className="bg-accent text-accent-fg text-meta absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-3.5 py-1.5 font-semibold shadow-md"
+          >
+            새 메시지 <span aria-hidden="true">↓</span>
+          </button>
+        )}
+      </div>
 
       <form
         aria-label="chat-form"
