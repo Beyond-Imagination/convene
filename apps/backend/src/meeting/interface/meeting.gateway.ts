@@ -1,5 +1,6 @@
 import {
   type ChatPostedBroadcast,
+  type HandChangedBroadcast,
   type JoinMeetingRejectReason,
   type JoinMeetingResponse,
   MEETING_EVENTS,
@@ -10,6 +11,7 @@ import {
   type ParticipantJoinedBroadcast,
   type ParticipantLeftBroadcast,
   type ParticipantReconnectedBroadcast,
+  type ReactionBroadcast,
 } from '@convene/shared-interfaces';
 import { UsePipes } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
@@ -30,11 +32,20 @@ import {
   NicknameTakenError,
 } from '@/meeting/application/meeting.errors';
 import { JoinMeetingResult, MeetingService } from '@/meeting/application/meeting.service';
-import { ChatDto, JoinMeetingDto, LeaveMeetingDto } from '@/meeting/interface/meeting.dto';
+import {
+  ChatDto,
+  HandDto,
+  JoinMeetingDto,
+  LeaveMeetingDto,
+  ReactDto,
+} from '@/meeting/interface/meeting.dto';
 import { MeetingEndedPayload } from '@/shared-kernel/domain/domain-event.payloads';
 import { wsValidationPipe } from '@/shared-kernel/interface/ws-validation.pipe';
 
 const roomOf = (code: string): string => `meeting:${code}`;
+
+/** 연결 하나가 리액션을 보낼 수 있는 최소 간격. 클라이언트 쿨다운보다 약간 느슨하다. */
+export const REACT_MIN_INTERVAL_MS = 250;
 
 const rejectReasonOf = (error: unknown): JoinMeetingRejectReason | null => {
   if (error instanceof MeetingNotFoundError) return 'not-found';
@@ -123,6 +134,7 @@ export class MeetingGateway implements OnGatewayDisconnect {
           nickname: p.nickname,
           joinedAt: p.joinedAt.toISOString(),
           disconnected: p.disconnectedAt != null,
+          handRaisedAt: p.handRaisedAt?.toISOString() ?? null,
         })),
     };
     client.emit(MEETING_WS_EVENTS.PARTICIPANTS, existing);
@@ -136,6 +148,7 @@ export class MeetingGateway implements OnGatewayDisconnect {
         text: entry.text,
         sentAt: entry.sentAt.toISOString(),
       })),
+      handRaisedAt: participant.handRaisedAt?.toISOString() ?? null,
     };
   }
 
@@ -259,6 +272,50 @@ export class MeetingGateway implements OnGatewayDisconnect {
     };
     // 자신도 자기 메시지를 받아야 하므로 except 없이 room 전체에 보낸다.
     this.server.to(roomOf(dto.code)).emit(MEETING_WS_EVENTS.CHAT_POSTED, broadcast);
+    return { ok: true };
+  }
+
+  @SubscribeMessage(MEETING_WS_EVENTS.REACT)
+  async handleReact(
+    @MessageBody() dto: ReactDto,
+    @ConnectedSocket() client: Socket,
+  ): Promise<{ ok: boolean }> {
+    // 클라이언트 쿨다운을 우회한 연타가 room 전체로 증폭되지 않게 연결 단위로 거른다.
+    const now = Date.now();
+    const lastAt = client.data.lastReactAt as number | undefined;
+    if (lastAt !== undefined && now - lastAt < REACT_MIN_INTERVAL_MS) return { ok: false };
+    client.data.lastReactAt = now;
+    const reaction = await this.service.react({
+      code: dto.code,
+      participantId: this.participantIdOf(client),
+      kind: dto.kind,
+    });
+    const broadcast: ReactionBroadcast = {
+      participantId: reaction.participantId,
+      nickname: reaction.nickname,
+      kind: reaction.kind,
+      sentAt: reaction.sentAt.toISOString(),
+    };
+    this.server.to(roomOf(dto.code)).emit(MEETING_WS_EVENTS.REACTION, broadcast);
+    return { ok: true };
+  }
+
+  @SubscribeMessage(MEETING_WS_EVENTS.HAND)
+  async handleHand(
+    @MessageBody() dto: HandDto,
+    @ConnectedSocket() client: Socket,
+  ): Promise<{ ok: true }> {
+    const change = await this.service.setHand({
+      code: dto.code,
+      participantId: this.participantIdOf(client),
+      raised: dto.raised,
+    });
+    const broadcast: HandChangedBroadcast = {
+      participantId: change.participantId,
+      handRaisedAt: change.handRaisedAt?.toISOString() ?? null,
+    };
+    // 본인 버튼 상태도 이 broadcast로 맞춘다.
+    this.server.to(roomOf(dto.code)).emit(MEETING_WS_EVENTS.HAND_CHANGED, broadcast);
     return { ok: true };
   }
 

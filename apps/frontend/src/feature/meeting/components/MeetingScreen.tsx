@@ -15,6 +15,7 @@ import type {
   MeetingConnectionStatus,
   UseMeetingViewModel,
 } from '@/feature/meeting/hooks/useMeetingViewModel';
+import type { UseReactionViewModel } from '@/feature/meeting/hooks/useReactionViewModel';
 
 const STATUS_TONE: Partial<
   Record<MeetingConnectionStatus, { readonly text: string; readonly dot: string }>
@@ -81,6 +82,7 @@ function MeetingElapsed({ startedAt }: { readonly startedAt: string | null }) {
 
 export interface MeetingScreenProps extends UseMeetingViewModel {
   readonly mediasoup: UseMediasoupViewModel;
+  readonly reaction?: UseReactionViewModel;
   readonly title?: string | null;
   /** ISO 문자열. 경과 시간의 기준이다. */
   readonly startedAt?: string | null;
@@ -111,9 +113,13 @@ export function MeetingScreen({
   remoteParticipants,
   errorMessage,
   isHost,
+  isHandRaised,
+  raisedHands,
+  toggleHand,
   leave,
   endMeeting,
   mediasoup,
+  reaction,
   title = null,
   startedAt = null,
   isChatOpen,
@@ -242,6 +248,9 @@ export function MeetingScreen({
         nickname={nickname}
         remoteParticipants={remoteParticipants}
         mediasoup={mediasoup}
+        isHandRaised={isHandRaised}
+        raisedHands={raisedHands}
+        reactionBubbles={reaction?.bubbles}
         variant={variant}
         isStripOpen={isStripOpen}
         onToggleStrip={onToggleStrip}
@@ -263,6 +272,9 @@ export function MeetingScreen({
         isChatOpen={isChatOpen}
         onToggleChat={onToggleChat}
         hasUnreadChat={hasUnreadChat}
+        reaction={reaction}
+        isHandRaised={isHandRaised}
+        onToggleHand={toggleHand}
         leave={leave}
         endMeeting={endMeeting}
       />

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { MEETING_EVENTS } from '@convene/shared-interfaces';
+import { MEETING_EVENTS, ReactionKind } from '@convene/shared-interfaces';
 import { Inject, Injectable } from '@nestjs/common';
 
 import {
@@ -85,6 +85,30 @@ interface PostChatCommand {
   code: string;
   participantId: string;
   text: string;
+}
+
+interface ReactCommand {
+  code: string;
+  participantId: string;
+  kind: ReactionKind;
+}
+
+export interface Reaction {
+  participantId: string;
+  nickname: string;
+  kind: ReactionKind;
+  sentAt: Date;
+}
+
+interface SetHandCommand {
+  code: string;
+  participantId: string;
+  raised: boolean;
+}
+
+export interface HandChange {
+  participantId: string;
+  handRaisedAt: Date | null;
 }
 
 type CloseMeetingReason = 'manual' | 'idle';
@@ -303,6 +327,31 @@ export class MeetingService {
     return entry;
   }
 
+  /** 흘려보내는 신호라 저장하지 않는다. */
+  async react(command: ReactCommand): Promise<Reaction> {
+    const meeting = await this.requireMeeting(command.code);
+    const participant = meeting.findParticipant(command.participantId);
+    if (!participant?.isActive) {
+      throw new Error(
+        `Participant "${command.participantId}" not active in meeting "${command.code}"`,
+      );
+    }
+    return {
+      participantId: participant.id,
+      nickname: participant.nickname,
+      kind: command.kind,
+      sentAt: this.clock.now(),
+    };
+  }
+
+  async setHand(command: SetHandCommand): Promise<HandChange> {
+    const meeting = await this.requireMeeting(command.code);
+    const now = this.clock.now();
+    const participant = meeting.setHand(command.participantId, command.raised, now);
+    await this.repository.save(meeting);
+    return { participantId: participant.id, handRaisedAt: participant.handRaisedAt };
+  }
+
   async closeMeeting(command: CloseMeetingCommand): Promise<Meeting> {
     const meeting = await this.requireMeeting(command.code);
     // 수동 종료는 host 토큰을 제시한 요청자만 가능하다. idle 자동 종료는 별도 경로로 처리하므로 본 검증을 거치지 않는다.
@@ -393,7 +442,7 @@ export class MeetingService {
       startedAt: snapshot.startedAt,
       endedAt,
       reason,
-      // 연결 정보(connectionId·disconnectedAt)는 회의 진행용이라 회의록으로 넘기지 않는다.
+      // 연결 정보(connectionId·disconnectedAt)와 손들기는 회의 진행용이라 회의록으로 넘기지 않는다.
       participants: snapshot.participants.map((p) => ({
         id: p.id,
         nickname: p.nickname,

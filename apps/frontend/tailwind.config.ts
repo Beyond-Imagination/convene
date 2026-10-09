@@ -68,6 +68,24 @@ const config: Config = {
         sans: ['var(--font-sans)', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
         mono: ['var(--font-mono)', 'ui-monospace', 'Menlo', 'monospace'],
       },
+      keyframes: {
+        'reaction-float': {
+          '0%': { opacity: '0', transform: 'translateY(0) scale(0.5)' },
+          '8%': { opacity: '1', transform: 'translateY(-8%) scale(1.1)' },
+          '14%': { transform: 'translateY(-14%) scale(1)' },
+          '75%': { opacity: '1' },
+          '100%': { opacity: '0', transform: 'translateY(-100cqh)' },
+        },
+        'reaction-sway': {
+          '0%': { transform: 'translateX(-6px)' },
+          '100%': { transform: 'translateX(6px)' },
+        },
+      },
+      animation: {
+        // 길이는 useReactionViewModel 의 REACTION_DISPLAY_MS 와 맞춘다.
+        'reaction-float': 'reaction-float 4s ease-out forwards',
+        'reaction-sway': 'reaction-sway 1.2s ease-in-out infinite alternate',
+      },
     },
   },
   plugins: [],

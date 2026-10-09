@@ -14,6 +14,20 @@ export type MeetingType = (typeof MEETING_TYPES)[number];
 export const MEETING_STATUSES = ['scheduled', 'open', 'closed'] as const;
 export type MeetingStatus = (typeof MEETING_STATUSES)[number];
 
+export const REACTION_KINDS = [
+  'thumbsUp',
+  'thumbsDown',
+  'clap',
+  'party',
+  'heart',
+  'laugh',
+  'surprised',
+  'thinking',
+  'sad',
+  'nod',
+] as const;
+export type ReactionKind = (typeof REACTION_KINDS)[number];
+
 /**
  * 회의를 만들어낸 외부 시스템의 식별자.
  *   - v1.0.0: 항상 비어 있거나 미전송.
@@ -72,6 +86,8 @@ export const MEETING_WS_EVENTS = {
   JOIN: 'meeting:join',
   LEAVE: 'meeting:leave',
   CHAT: 'meeting:chat',
+  REACT: 'meeting:react',
+  HAND: 'meeting:hand',
   PARTICIPANT_JOINED: 'meeting:participantJoined',
   PARTICIPANT_LEFT: 'meeting:participantLeft',
   /** 유예 안에 돌아오면 RECONNECTED, 넘기면 LEFT가 이어진다. 수신 측은 타일을 지우지 않는다. */
@@ -83,6 +99,10 @@ export const MEETING_WS_EVENTS = {
    */
   PARTICIPANTS: 'meeting:participants',
   CHAT_POSTED: 'meeting:chatPosted',
+  /** 일회성 리액션. 보낸 본인도 받는다. */
+  REACTION: 'meeting:reaction',
+  /** 손들기 상태 변경. 보낸 본인도 받는다. */
+  HAND_CHANGED: 'meeting:handChanged',
   /**
    * 회의가 종료(수동 / idle 자동)됐음을 같은 room의 모든 참가자에게 알린다.
    * 수신 측 frontend는 회의 화면을 떠나 회의록 페이지로 이동한다.
@@ -111,6 +131,16 @@ export interface ChatMessage {
   text: string;
 }
 
+export interface ReactMessage {
+  code: string;
+  kind: ReactionKind;
+}
+
+export interface HandMessage {
+  code: string;
+  raised: boolean;
+}
+
 export interface NicknameAvailabilityResponse {
   nickname: string;
   available: boolean;
@@ -131,6 +161,8 @@ export interface JoinMeetingAck {
   reconnected: boolean;
   /** 끊긴 동안 오간 대화를 복원하는 경로. 새로고침·늦은 입장도 이걸로 채워진다. */
   chat: ChatPostedBroadcast[];
+  /** 유예 안에 돌아온 경우 들고 있던 손을 복원한다. 내린 상태면 null. */
+  handRaisedAt: string | null;
 }
 
 export type JoinMeetingRejectReason = 'not-found' | 'closed' | 'nickname-taken';
@@ -171,11 +203,25 @@ export interface ChatPostedBroadcast {
   sentAt: string;
 }
 
+export interface ReactionBroadcast {
+  participantId: string;
+  nickname: string;
+  kind: ReactionKind;
+  sentAt: string;
+}
+
+/** 손든 순서를 가리기 위해 변경 시각이 아닌 처음 든 시각을 싣는다. 내리면 null. */
+export interface HandChangedBroadcast {
+  participantId: string;
+  handRaisedAt: string | null;
+}
+
 export interface MeetingParticipantEntry {
   participantId: string;
   nickname: string;
   joinedAt: string;
   disconnected: boolean;
+  handRaisedAt: string | null;
 }
 
 /**

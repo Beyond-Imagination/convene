@@ -3,6 +3,24 @@
  * 버튼의 접근성 이름은 별도 텍스트 라벨이 담당하므로 아이콘 자체는 aria-hidden으로 둔다.
  */
 
+import type { ReactionKind } from '@convene/shared-interfaces';
+
+/** 리액션 종류별 이모지와 접근성 이름. 컨트롤 바 picker와 타일이 같이 쓴다. */
+export const REACTION_EMOJI: Readonly<
+  Record<ReactionKind, { readonly glyph: string; readonly label: string }>
+> = {
+  thumbsUp: { glyph: '👍', label: '좋아요' },
+  thumbsDown: { glyph: '👎', label: '별로예요' },
+  clap: { glyph: '👏', label: '박수' },
+  party: { glyph: '🎉', label: '빵빠레' },
+  heart: { glyph: '❤️', label: '하트' },
+  laugh: { glyph: '😂', label: '웃음' },
+  surprised: { glyph: '😮', label: '놀람' },
+  thinking: { glyph: '🤔', label: '고민 중' },
+  sad: { glyph: '😢', label: '슬픔' },
+  nod: { glyph: '🙆', label: '끄덕' },
+};
+
 type IconProps = { readonly className?: string };
 
 const base = (className?: string) => ({
@@ -110,6 +128,19 @@ export function LinkIcon({ className }: IconProps) {
     <svg {...base(className)}>
       <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
       <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+  );
+}
+
+export function ReactionIcon({ className }: IconProps) {
+  return (
+    <svg {...base(className)}>
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+      />
+      <path d="M8.5 14a4 4 0 0 0 7 0M9 9.5h.01M15 9.5h.01" />
     </svg>
   );
 }

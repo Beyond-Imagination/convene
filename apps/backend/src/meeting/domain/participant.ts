@@ -6,6 +6,7 @@ export interface ParticipantSnapshot {
   /** 구버전 snapshot에는 없으므로 복원 시 id로 대체한다. */
   readonly connectionId?: string;
   readonly disconnectedAt?: Date | null;
+  readonly handRaisedAt?: Date | null;
 }
 
 const NICKNAME_MIN = 1;
@@ -25,6 +26,7 @@ export class Participant {
     private _connectionId: string,
     private _leftAt: Date | null = null,
     private _disconnectedAt: Date | null = null,
+    private _handRaisedAt: Date | null = null,
   ) {}
 
   static join(id: string, nickname: string, at: Date, connectionId?: string): Participant {
@@ -54,6 +56,7 @@ export class Participant {
       snapshot.connectionId ?? snapshot.id,
       snapshot.leftAt,
       snapshot.disconnectedAt ?? null,
+      snapshot.handRaisedAt ?? null,
     );
   }
 
@@ -88,6 +91,18 @@ export class Participant {
     this._connectionId = connectionId;
     this._leftAt = null;
     this._disconnectedAt = null;
+    this._handRaisedAt = null;
+  }
+
+  /** 중복 호출은 처음 시각을 유지한다 — 손든 순서가 뒤로 밀리면 안 된다. */
+  raiseHand(at: Date): void {
+    this.assertNotLeft('raiseHand');
+    if (this._handRaisedAt !== null) return;
+    this._handRaisedAt = at;
+  }
+
+  lowerHand(): void {
+    this._handRaisedAt = null;
   }
 
   get leftAt(): Date | null {
@@ -110,6 +125,14 @@ export class Participant {
     return this._disconnectedAt !== null;
   }
 
+  get handRaisedAt(): Date | null {
+    return this._handRaisedAt;
+  }
+
+  get isHandRaised(): boolean {
+    return this._handRaisedAt !== null;
+  }
+
   isDisconnectedLongerThan(graceMs: number, now: Date): boolean {
     if (this._disconnectedAt === null) return false;
     return now.getTime() - this._disconnectedAt.getTime() >= graceMs;
@@ -128,6 +151,7 @@ export class Participant {
       leftAt: this._leftAt,
       connectionId: this._connectionId,
       disconnectedAt: this._disconnectedAt,
+      handRaisedAt: this._handRaisedAt,
     };
   }
 

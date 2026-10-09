@@ -102,6 +102,7 @@ export class MongoMeetingRepository implements MeetingRepository {
           // 이 필드가 없던 도큐먼트는 Participant.fromSnapshot이 id로 대체한다.
           connectionId: p.connectionId,
           disconnectedAt: p.disconnectedAt ?? null,
+          handRaisedAt: p.handRaisedAt ?? null,
         }),
       ),
       hostToken: doc.hostToken,
