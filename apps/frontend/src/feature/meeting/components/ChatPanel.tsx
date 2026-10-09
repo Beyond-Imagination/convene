@@ -1,6 +1,6 @@
 'use client';
 
-import type { FormEvent } from 'react';
+import type { FormEvent, Ref } from 'react';
 
 import type { UseChatViewModel } from '@/feature/meeting/hooks/useChatViewModel';
 
@@ -8,11 +8,15 @@ import type { UseChatViewModel } from '@/feature/meeting/hooks/useChatViewModel'
  * 회의 채팅 패널 dumb View.
  * draft input + 메시지 목록만 렌더.
  */
-export type ChatPanelProps = UseChatViewModel & {
+export type ChatPanelProps = Omit<UseChatViewModel, 'arrivals'> & {
   /** 내 닉네임. 일치하는 메시지는 카톡식으로 우측(내 메시지)에 표시한다. */
   readonly myNickname?: string | null;
   /** 모바일에서 패널이 화면을 덮으므로 닫는 길을 헤더에 둔다. */
   readonly onClose?: () => void;
+  readonly listRef?: Ref<HTMLUListElement>;
+  readonly onListScroll?: () => void;
+  readonly hasUnread?: boolean;
+  readonly onJumpToLatest?: () => void;
 };
 
 export function ChatPanel({

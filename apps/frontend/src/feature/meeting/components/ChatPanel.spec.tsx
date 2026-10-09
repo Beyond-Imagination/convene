@@ -6,6 +6,7 @@ import { ChatPanel } from './ChatPanel';
 
 const baseVm = (overrides: Partial<UseChatViewModel> = {}): UseChatViewModel => ({
   messages: [],
+  arrivals: 0,
   canSend: true,
   draft: '',
   setDraft: vi.fn(),
@@ -48,6 +49,24 @@ describe('ChatPanel View', () => {
     const items = screen.getAllByTestId('chat-message');
     expect(items[0]).toHaveAttribute('data-mine', 'true');
     expect(items[1]).toHaveAttribute('data-mine', 'false');
+  });
+
+  it('hasUnread면 새 메시지 알림을 띄우고, 누르면 onJumpToLatest를 호출한다', () => {
+    const onJumpToLatest = vi.fn();
+    render(
+      <ChatPanel
+        {...baseVm()}
+        hasUnread
+        onJumpToLatest={onJumpToLatest}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /새 메시지/ }));
+    expect(onJumpToLatest).toHaveBeenCalledTimes(1);
+  });
+
+  it('hasUnread가 아니면 새 메시지 알림이 없다', () => {
+    render(<ChatPanel {...baseVm()} />);
+    expect(screen.queryByRole('button', { name: /새 메시지/ })).not.toBeInTheDocument();
   });
 
   it('canSend=false 면 input과 버튼이 모두 비활성화된다', () => {

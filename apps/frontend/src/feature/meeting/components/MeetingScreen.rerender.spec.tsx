@@ -275,6 +275,25 @@ describe('채팅 상태는 비디오 트리와 끊겨 있다', () => {
     }
     expect(videoTileRenders).not.toHaveBeenCalled();
   });
+
+  it('채팅 창이 닫힌 채 메시지가 와도 비디오 타일을 다시 그리지 않는다', () => {
+    renderPage();
+    act(() => {
+      screen.getByRole('button', { name: '채팅' }).click();
+    });
+    videoTileRenders.mockClear();
+    for (let i = 0; i < 3; i += 1) {
+      act(() => {
+        socketHandlers.get(MEETING_WS_EVENTS.CHAT_POSTED)?.({
+          nickname: '민준',
+          text: `메시지 ${i}`,
+          sentAt: `2026-08-07T00:00:0${i}.000Z`,
+        } satisfies ChatPostedBroadcast);
+      });
+    }
+    expect(screen.getByRole('button', { name: /채팅.*새 메시지/ })).toBeInTheDocument();
+    expect(videoTileRenders).not.toHaveBeenCalled();
+  });
 });
 
 /**

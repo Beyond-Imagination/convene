@@ -142,6 +142,29 @@ describe('MeetingScreen View', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('handshake 실패');
   });
 
+  it('hasUnreadChat이면 채팅 버튼에 새 메시지 표시가 붙는다', () => {
+    render(
+      <MeetingScreen
+        {...baseVm()}
+        mediasoup={baseMediasoup()}
+        onToggleChat={vi.fn()}
+        hasUnreadChat
+      />,
+    );
+    expect(screen.getByRole('button', { name: /채팅.*새 메시지/ })).toBeInTheDocument();
+  });
+
+  it('hasUnreadChat이 아니면 채팅 버튼에 새 메시지 표시가 없다', () => {
+    render(
+      <MeetingScreen
+        {...baseVm()}
+        mediasoup={baseMediasoup()}
+        onToggleChat={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: '채팅' })).toBeInTheDocument();
+  });
+
   it('나가기 버튼 클릭 시 vm.leave가 호출된다', () => {
     const leave = vi.fn();
     renderScreen({ leave });

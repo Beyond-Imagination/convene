@@ -1,13 +1,35 @@
 'use client';
 
 import { type ChatPostedBroadcast, MEETING_WS_EVENTS } from '@convene/shared-interfaces';
-import { useCallback, useEffect, useState } from 'react';
+import { type RefObject, useCallback, useEffect, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 
 export type ChatMessageView = ChatPostedBroadcast;
 
+export interface UseChatScrollViewModelParams {
+  readonly messages: ReadonlyArray<ChatMessageView>;
+  readonly arrivals: number;
+  readonly isOpen: boolean;
+  readonly myNickname: string | null;
+  readonly onUnreadChange?: (hasUnread: boolean) => void;
+}
+
+export interface UseChatScrollViewModel {
+  readonly listRef: RefObject<HTMLUListElement>;
+  readonly onListScroll: () => void;
+  readonly hasUnread: boolean;
+  readonly jumpToLatest: () => void;
+}
+
+export function useChatScrollViewModel(
+  _params: UseChatScrollViewModelParams,
+): UseChatScrollViewModel {
+  throw new Error('not implemented');
+}
+
 export interface UseChatViewModel {
   readonly messages: ReadonlyArray<ChatMessageView>;
+  readonly arrivals: number;
   readonly canSend: boolean;
   /** 입력 상태도 ViewModel이 보유 — View는 dumb 유지. */
   readonly draft: string;
@@ -55,5 +77,5 @@ export function useChatViewModel(
     setDraft('');
   }, [socket, code, draft]);
 
-  return { messages, canSend: socket !== null, draft, setDraft, submit };
+  return { messages, arrivals: 0, canSend: socket !== null, draft, setDraft, submit };
 }

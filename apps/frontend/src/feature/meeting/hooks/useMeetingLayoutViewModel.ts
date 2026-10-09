@@ -14,6 +14,8 @@ interface UseMeetingLayoutViewModel {
   /** 기본값은 웹 열림 / 모바일 닫힘. 모바일에서는 채팅이 화면을 덮기 때문이다. */
   readonly isChatOpen: boolean;
   readonly toggleChat: () => void;
+  readonly hasUnreadChat: boolean;
+  readonly setHasUnreadChat: (hasUnread: boolean) => void;
   /** 비디오 그리드의 배치 규칙. 타일 비율(16:9 / 4:3)과 span 테이블을 함께 가른다. */
   readonly variant: MeetingLayoutVariant;
   /** 화면 공유 중 하단 참가자 줄을 펼쳤는지. 기본값은 웹 펼침 / 모바일 접힘. */
@@ -76,6 +78,10 @@ export function useMeetingLayoutViewModel(totalTiles = 0): UseMeetingLayoutViewM
   return {
     isChatOpen,
     toggleChat,
+    hasUnreadChat: false,
+    setHasUnreadChat: () => {
+      throw new Error('not implemented');
+    },
     variant,
     isStripOpen,
     toggleStrip,
