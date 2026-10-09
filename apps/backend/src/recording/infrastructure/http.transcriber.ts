@@ -39,8 +39,8 @@ function isRetryable(error: unknown): boolean {
 export class HttpTranscriber implements TranscriberPort {
   constructor(
     private readonly options: HttpTranscriberOptions,
-    private readonly fetchFn: typeof fetch = globalThis.fetch,
-    private readonly logger: PinoLoggerAdapter | null = null,
+    private readonly fetchFn: typeof fetch,
+    private readonly logger: PinoLoggerAdapter,
   ) {}
 
   async transcribe(input: TranscriberInput): Promise<ReadonlyArray<TranscriptionSegmentPayload>> {
@@ -51,7 +51,7 @@ export class HttpTranscriber implements TranscriberPort {
         baseDelayMs: this.options.retryBaseDelayMs,
         isRetryable,
         onRetry: (attempt, delayMs, error) =>
-          this.logger?.warn(
+          this.logger.warn(
             { meetingCode: input.meetingCode, attempt, delayMs, err: error },
             'ai-worker transcribe retrying',
           ),

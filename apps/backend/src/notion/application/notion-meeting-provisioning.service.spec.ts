@@ -1,18 +1,13 @@
 import { CreatedMeeting, CreateMeetingInput, MeetingService } from '@/meeting/application/meeting.service';
 import { NotionMeetingProvisioningService } from '@/notion/application/notion-meeting-provisioning.service';
 import { NotionIssuePort, PendingIssue } from '@/notion/domain/ports/notion-issue.port';
-import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
-import { stub } from '@/shared-kernel/testing/stub';
+import { noopLogger } from '@/shared-kernel/testing/noop-logger';
 
 /**
  * private 필드를 가진 구체 서비스의 테스트 대역.
  * 인터페이스가 아니라 클래스를 주입받으므로, 이 테스트가 실제로 쓰는 메서드만 구현해 넘긴다.
  */
 const stubService = <T,>(impl: Partial<T>): T => impl as T;
-
-function silentLogger(): PinoLoggerAdapter {
-  return stub<PinoLoggerAdapter>({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() });
-}
 
 function fakeMeetingCreation(code: string): {
   port: MeetingService;
@@ -63,7 +58,7 @@ describe('NotionMeetingProvisioningService 회의 카드', () => {
       fakeMeetingCreation('ABC123').port,
       notionIssue,
       'https://convene.example.com',
-      silentLogger(),
+      noopLogger(),
     );
 
   it('이슈 페이지에 회의 링크와 같은 주소로 카드를 심는다', async () => {
@@ -98,7 +93,7 @@ describe('NotionMeetingProvisioningService.provisionForIssue', () => {
       meetingCreation.port,
       notionIssue.port,
       'https://convene.example.com',
-      silentLogger(),
+      noopLogger(),
     );
 
     const result = await service.provisionForIssue('issue-1', '스프린트 회고');
@@ -127,7 +122,7 @@ describe('NotionMeetingProvisioningService.provisionForIssue', () => {
       fakeMeetingCreation('ABC').port,
       throwingLinkWriter(),
       'https://x',
-      silentLogger(),
+      noopLogger(),
     );
 
     await expect(service.provisionForIssue('issue-1', null)).rejects.toThrow();
@@ -138,7 +133,7 @@ describe('NotionMeetingProvisioningService.provisionForIssue', () => {
       fakeMeetingCreation('ABC').port,
       throwingLinkWriter(),
       'https://x',
-      silentLogger(),
+      noopLogger(),
     );
 
     const result = await service.provisionForIssue('issue-1', null, { bestEffortLink: true });
@@ -158,7 +153,7 @@ describe('NotionMeetingProvisioningService.pollPendingIssues', () => {
       meetingCreation.port,
       notionIssue.port,
       'https://x',
-      silentLogger(),
+      noopLogger(),
     );
 
     const outcome = await service.pollPendingIssues(new Date());
@@ -184,7 +179,7 @@ describe('NotionMeetingProvisioningService.pollPendingIssues', () => {
       meetingCreation,
       notionIssue.port,
       'https://x',
-      silentLogger(),
+      noopLogger(),
     );
 
     const outcome = await service.pollPendingIssues(new Date());

@@ -1,13 +1,10 @@
 import { RtpCodecCapability, WorkerLogLevel, WorkerLogTag } from 'mediasoup/node/lib/types';
 
-import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
-import { stub } from '@/shared-kernel/testing/stub';
+import { noopLogger } from '@/shared-kernel/testing/noop-logger';
 
 import { MediasoupRouterAdapter } from './mediasoup-router.adapter';
 import { MediasoupTransportAdapter } from './mediasoup-transport.adapter';
 import { MediasoupWorkerPool } from './mediasoup-worker.pool';
-
-const noopLogger = stub<PinoLoggerAdapter>({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() });
 
 const mediaCodecs = [
   { kind: 'audio', mimeType: 'audio/opus', clockRate: 48000, channels: 2 },
@@ -25,7 +22,7 @@ const setup = async () => {
         logTags: ['info'] as WorkerLogTag[],
       },
     },
-    noopLogger,
+    noopLogger(),
   );
   await pool.onModuleInit();
   const routerAdapter = new MediasoupRouterAdapter(
@@ -34,7 +31,7 @@ const setup = async () => {
       participantsPerRouter: 5,
       mediaCodecs,
     },
-    noopLogger,
+    noopLogger(),
   );
   const transportAdapter = new MediasoupTransportAdapter(routerAdapter, {
     listenIps: [{ ip: '127.0.0.1', announcedIp: '127.0.0.1' }],

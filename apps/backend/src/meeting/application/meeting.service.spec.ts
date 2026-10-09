@@ -11,8 +11,7 @@ import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
 import { ChatEntry, chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
 import { externalReference, NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects/external-reference';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
-import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
-import { stub } from '@/shared-kernel/testing/stub';
+import { noopLogger } from '@/shared-kernel/testing/noop-logger';
 
 import {
   MeetingClosedError,
@@ -38,13 +37,6 @@ const makeEventPublisher = () => {
     } satisfies Pick<NestEventBusDomainEventPublisher, 'publish'> as NestEventBusDomainEventPublisher,
   };
 };
-
-const noopLogger = (): PinoLoggerAdapter => stub<PinoLoggerAdapter>({
-  debug: jest.fn(),
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-});
 
 const code = MeetingCode.from('abc12xyz');
 

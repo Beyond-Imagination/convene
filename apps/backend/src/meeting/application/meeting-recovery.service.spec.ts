@@ -7,8 +7,7 @@ import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
 import { ChatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
 import { externalReference } from '@/shared-kernel/domain/value-objects/external-reference';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
-import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
-import { stub } from '@/shared-kernel/testing/stub';
+import { noopLogger } from '@/shared-kernel/testing/noop-logger';
 
 import { MeetingService } from './meeting.service';
 import { MeetingRecoveryService } from './meeting-recovery.service';
@@ -17,13 +16,6 @@ interface CapturedEvent {
   name: string;
   payload: unknown;
 }
-
-const noopLogger = (): PinoLoggerAdapter => stub<PinoLoggerAdapter>({
-  debug: jest.fn(),
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-});
 
 const CRASHED_AT = new Date('2026-01-01T00:00:00Z');
 const BOOTED_AT = new Date('2026-01-01T00:05:00Z');

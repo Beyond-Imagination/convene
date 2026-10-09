@@ -3,15 +3,11 @@ import {
   buildPendingIssuesFilter,
   NotionIssueAdapter,
 } from '@/notion/infrastructure/notion-issue.adapter';
-import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
+import { noopLogger } from '@/shared-kernel/testing/noop-logger';
 import { stub } from '@/shared-kernel/testing/stub';
 
 const NOW = new Date('2026-07-20T12:00:00.000Z');
 const LINK_BASE = 'https://convene.example.com';
-
-function silentLogger(): PinoLoggerAdapter {
-  return stub<PinoLoggerAdapter>({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() });
-}
 
 function titleIssue(id: string, title: string): Record<string, unknown> {
   return { id, properties: { 이름: { type: 'title', title: [{ plain_text: title }] } } };
@@ -73,7 +69,7 @@ describe('NotionIssueAdapter.findPendingIssues', () => {
     const adapter = new NotionIssueAdapter(
       client,
       ['team-db', 'proj-db'],
-      silentLogger(),
+      noopLogger(),
       LINK_BASE,
     );
     const result = await adapter.findPendingIssues(NOW);
@@ -100,7 +96,7 @@ describe('NotionIssueAdapter.findPendingIssues', () => {
       },
     });
 
-    await new NotionIssueAdapter(client, ['db'], silentLogger(), LINK_BASE).findPendingIssues(NOW);
+    await new NotionIssueAdapter(client, ['db'], noopLogger(), LINK_BASE).findPendingIssues(NOW);
 
     expect(queried).toEqual(['ds-1', 'ds-2']);
   });
@@ -117,7 +113,7 @@ describe('NotionIssueAdapter.findPendingIssues', () => {
     const result = await new NotionIssueAdapter(
       client,
       ['bad-db', 'good-db'],
-      silentLogger(),
+      noopLogger(),
       LINK_BASE,
     ).findPendingIssues(NOW);
 
@@ -133,7 +129,7 @@ describe('NotionIssueAdapter.findPendingIssues', () => {
     const result = await new NotionIssueAdapter(
       client,
       ['db'],
-      silentLogger(),
+      noopLogger(),
       LINK_BASE,
     ).findPendingIssues(NOW);
 
@@ -166,7 +162,7 @@ describe('NotionIssueAdapter.embedMeetingCard', () => {
   }
 
   const adapterOf = (client: NotionHttpClient) =>
-    new NotionIssueAdapter(client, [], silentLogger(), LINK_BASE);
+    new NotionIssueAdapter(client, [], noopLogger(), LINK_BASE);
 
   it('회의 카드를 embed 블록으로 페이지 맨 앞에 넣는다', async () => {
     const { client, appended } = embedClient([]);
@@ -212,7 +208,7 @@ describe('NotionIssueAdapter.writeMeetingLink', () => {
       },
     });
 
-    await new NotionIssueAdapter(client, [], silentLogger(), LINK_BASE).writeMeetingLink(
+    await new NotionIssueAdapter(client, [], noopLogger(), LINK_BASE).writeMeetingLink(
       'page-1',
       'https://convene.example.com/meetings/ABC123',
     );
