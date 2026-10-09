@@ -1,4 +1,8 @@
-import { type ChatPostedBroadcast, MEETING_WS_EVENTS } from '@convene/shared-interfaces';
+import {
+  type ChatPostedBroadcast,
+  MEETING_WS_EVENTS,
+  type ReactionBroadcast,
+} from '@convene/shared-interfaces';
 import { act, render, screen } from '@testing-library/react';
 import { memo, type ReactNode, useEffect } from 'react';
 import type { Socket } from 'socket.io-client';
@@ -109,18 +113,21 @@ const participants: ReadonlyArray<RemoteParticipant> = [
     nickname: '민준',
     joinedAt: '2026-08-07T00:00:00.000Z',
     disconnected: false,
+    handRaisedAt: null,
   },
   {
     participantId: 's2',
     nickname: '서연',
     joinedAt: '2026-08-07T00:00:01.000Z',
     disconnected: false,
+    handRaisedAt: null,
   },
   {
     participantId: 's3',
     nickname: '도윤',
     joinedAt: '2026-08-07T00:00:02.000Z',
     disconnected: false,
+    handRaisedAt: null,
   },
 ];
 const TILE_COUNT = 1 + participants.length;
@@ -189,6 +196,9 @@ const meetingVm: UseMeetingViewModel = {
   rejoinGen: 0,
   isHost: true,
   isNavigatingAway: false,
+  selfParticipantId: 'me',
+  isHandRaised: false,
+  toggleHand: vi.fn(),
   leave: vi.fn(),
   endMeeting: vi.fn(async () => {}),
 };
@@ -292,6 +302,23 @@ describe('채팅 상태는 비디오 트리와 끊겨 있다', () => {
       });
     }
     expect(screen.getByRole('button', { name: /채팅.*새 메시지/ })).toBeInTheDocument();
+    expect(videoTileRenders).not.toHaveBeenCalled();
+  });
+});
+
+describe('리액션은 비디오 타일을 다시 그리지 않는다', () => {
+  it('리액션 말풍선이 떠도 타일은 그대로다', () => {
+    render(<MeetingPageClient />);
+    videoTileRenders.mockClear();
+    act(() => {
+      socketHandlers.get(MEETING_WS_EVENTS.REACTION)?.({
+        participantId: 's2',
+        nickname: '서연',
+        kind: 'clap',
+        sentAt: '2026-08-07T00:00:05.000Z',
+      } satisfies ReactionBroadcast);
+    });
+    expect(screen.getByRole('img', { name: '서연: 박수' })).toBeInTheDocument();
     expect(videoTileRenders).not.toHaveBeenCalled();
   });
 });

@@ -469,4 +469,23 @@ describe('Meeting (Aggregate Root)', () => {
       expect(restored.expireDisconnected(T_2m, GRACE).map((p) => p.id)).toEqual(['p-1']);
     });
   });
+
+  describe('setHand', () => {
+    it('참가자의 손을 들고 내리며 활동으로 친다', () => {
+      const m = newMeeting();
+      m.addParticipant('p-1', 'alice', T_0);
+      const raised = m.setHand('p-1', true, T_30s);
+      expect(raised.isHandRaised).toBe(true);
+      expect(m.lastActiveAt).toBe(T_30s);
+      expect(m.setHand('p-1', false, T_1m).isHandRaised).toBe(false);
+    });
+
+    it('없는 참가자나 종료된 회의에서는 거부한다', () => {
+      const m = newMeeting();
+      expect(() => m.setHand('unknown', true, T_30s)).toThrow();
+      m.addParticipant('p-1', 'alice', T_0);
+      m.close(T_1m);
+      expect(() => m.setHand('p-1', true, T_1m)).toThrow();
+    });
+  });
 });

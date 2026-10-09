@@ -1,6 +1,14 @@
 import { ValidationPipe } from '@nestjs/common';
 
-import { ChatDto, CreateMeetingDto, ExternalReferenceDto, JoinMeetingDto, LeaveMeetingDto } from './meeting.dto';
+import {
+  ChatDto,
+  CreateMeetingDto,
+  ExternalReferenceDto,
+  HandDto,
+  JoinMeetingDto,
+  LeaveMeetingDto,
+  ReactDto,
+} from './meeting.dto';
 
 const makePipe = () =>
   new ValidationPipe({
@@ -128,5 +136,37 @@ describe('ChatDto + ValidationPipe', () => {
 
   it('whitelist 위반(허용되지 않은 키)은 거부', async () => {
     await expect(run(ChatDto, { code: 'abc12xyz', text: 'hi', evil: 1 })).rejects.toThrow(/evil/);
+  });
+});
+
+describe('ReactDto + ValidationPipe', () => {
+  it('정상 payload는 ReactDto 인스턴스로 변환된다', async () => {
+    const dto = await run<ReactDto>(ReactDto, { code: 'abc12xyz', kind: 'party' });
+    expect(dto).toBeInstanceOf(ReactDto);
+    expect(dto.kind).toBe('party');
+  });
+
+  it('목록에 없는 kind는 거부', async () => {
+    await expect(run(ReactDto, { code: 'abc12xyz', kind: 'poop' })).rejects.toThrow(/kind/);
+  });
+
+  it('kind 누락은 거부', async () => {
+    await expect(run(ReactDto, { code: 'abc12xyz' })).rejects.toThrow(/kind/);
+  });
+});
+
+describe('HandDto + ValidationPipe', () => {
+  it('정상 payload는 HandDto 인스턴스로 변환된다', async () => {
+    const dto = await run<HandDto>(HandDto, { code: 'abc12xyz', raised: false });
+    expect(dto).toBeInstanceOf(HandDto);
+    expect(dto.raised).toBe(false);
+  });
+
+  it('boolean이 아닌 raised는 거부', async () => {
+    await expect(run(HandDto, { code: 'abc12xyz', raised: 'yes' })).rejects.toThrow(/raised/);
+  });
+
+  it('raised 누락은 거부', async () => {
+    await expect(run(HandDto, { code: 'abc12xyz' })).rejects.toThrow(/raised/);
   });
 });

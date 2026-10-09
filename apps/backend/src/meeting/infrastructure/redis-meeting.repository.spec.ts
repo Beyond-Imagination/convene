@@ -112,6 +112,16 @@ describe('RedisMeetingRepository', () => {
     expect(found!.findParticipant('p-1')?.disconnectedAt?.getTime()).toBe(t1m.getTime());
   });
 
+  it('손들기 상태가 round-trip 된다 — 늦게 들어온 참가자에게도 보여야 한다', async () => {
+    const meeting = makeMeeting('abc12xyz');
+    meeting.addParticipant('p-1', 'alice', t30s, 'socket-a');
+    meeting.setHand('p-1', true, t1m);
+    await repo.save(meeting);
+
+    const found = await repo.findByCode('abc12xyz');
+    expect(found!.findParticipant('p-1')?.handRaisedAt?.getTime()).toBe(t1m.getTime());
+  });
+
   it('같은 code로 두 번 save 하면 마지막 상태로 덮어쓴다', async () => {
     const m1 = makeMeeting('abc12xyz');
     await repo.save(m1);

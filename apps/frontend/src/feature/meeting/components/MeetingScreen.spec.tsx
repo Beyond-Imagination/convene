@@ -8,6 +8,7 @@ import type {
   RemoteParticipant,
   UseMeetingViewModel,
 } from '@/feature/meeting/hooks/useMeetingViewModel';
+import type { UseReactionViewModel } from '@/feature/meeting/hooks/useReactionViewModel';
 
 import { MeetingScreen } from './MeetingScreen';
 
@@ -99,12 +100,14 @@ describe('MeetingScreen View', () => {
         nickname: '아',
         joinedAt: '2026-01-01T00:01:00.000Z',
         disconnected: false,
+        handRaisedAt: null,
       },
       {
         participantId: 's3',
         nickname: '벤',
         joinedAt: '2026-01-01T00:02:00.000Z',
         disconnected: false,
+        handRaisedAt: null,
       },
     ];
     renderScreen({ remoteParticipants });
@@ -227,12 +230,14 @@ describe('MeetingScreen View', () => {
         nickname: '아',
         joinedAt: '2026-01-01T00:01:00.000Z',
         disconnected: false,
+        handRaisedAt: null,
       },
       {
         participantId: 's3',
         nickname: '벤',
         joinedAt: '2026-01-01T00:02:00.000Z',
         disconnected: false,
+        handRaisedAt: null,
       },
     ];
     renderScreen(
@@ -253,6 +258,7 @@ describe('MeetingScreen View', () => {
         nickname: '아',
         joinedAt: '2026-01-01T00:01:00.000Z',
         disconnected: false,
+        handRaisedAt: null,
       },
     ];
     renderScreen(
@@ -278,6 +284,7 @@ describe('MeetingScreen View', () => {
         nickname: '아',
         joinedAt: '2026-01-01T00:01:00.000Z',
         disconnected: false,
+        handRaisedAt: null,
       },
     ];
     renderScreen(
@@ -355,6 +362,7 @@ describe('MeetingScreen View', () => {
         nickname: '아',
         joinedAt: '2026-01-01T00:01:00.000Z',
         disconnected: false,
+        handRaisedAt: null,
       },
     ];
     renderScreen(
@@ -373,5 +381,74 @@ describe('MeetingScreen View', () => {
     expect(tile).toHaveTextContent('아');
     const video = tile.querySelector('video') as HTMLVideoElement;
     expect((video.srcObject as MediaStream).getVideoTracks()).toContain(screenTrack);
+  });
+});
+
+describe('MeetingScreen 리액션 말풍선', () => {
+  const reactionVm = (bubbles: UseReactionViewModel['bubbles']): UseReactionViewModel => ({
+    bubbles,
+    canReact: true,
+    isPickerOpen: false,
+    togglePicker: vi.fn(),
+    closePicker: vi.fn(),
+    react: vi.fn(),
+  });
+
+  it('누가 어떤 리액션을 보냈는지 말풍선으로 보여 주고, 내 것은 "나"로 표시한다', () => {
+    render(
+      <MeetingScreen
+        {...baseVm()}
+        mediasoup={baseMediasoup()}
+        reaction={reactionVm([
+          { id: 1, kind: 'party', nickname: '앨리스', isSelf: false },
+          { id: 2, kind: 'clap', nickname: '준', isSelf: true },
+        ])}
+      />,
+    );
+    expect(screen.getByRole('img', { name: '앨리스: 빵빠레' })).toHaveTextContent('🎉');
+    expect(screen.getByRole('img', { name: '나: 박수' })).toHaveTextContent('👏');
+  });
+
+  it('화면 공유로 참가자 줄을 접어도 말풍선은 보인다', () => {
+    render(
+      <MeetingScreen
+        {...baseVm()}
+        mediasoup={baseMediasoup({ isSharingScreen: true, screenStream: fakeStream() })}
+        isStripOpen={false}
+        onToggleStrip={vi.fn()}
+        reaction={reactionVm([{ id: 1, kind: 'heart', nickname: '앨리스', isSelf: false }])}
+      />,
+    );
+    expect(screen.getByRole('img', { name: '앨리스: 하트' })).toBeVisible();
+  });
+});
+
+describe('MeetingScreen 손든 사람 목록', () => {
+  it('손 든 사람을 순서대로 보여 주고, 내 것은 "나"로 표시한다', () => {
+    renderScreen({
+      raisedHands: [
+        { participantId: 'p-3', nickname: '벤', isSelf: false },
+        { participantId: 'p-1', nickname: '준', isSelf: true },
+      ],
+    });
+    const list = screen.getByRole('list', { name: '손 든 사람' });
+    expect([...list.querySelectorAll('li')].map((li) => li.textContent)).toEqual(['벤', '나']);
+  });
+
+  it('손 든 사람이 없으면 목록을 그리지 않는다', () => {
+    renderScreen({ raisedHands: [] });
+    expect(screen.queryByRole('list', { name: '손 든 사람' })).not.toBeInTheDocument();
+  });
+
+  it('화면 공유로 참가자 줄을 접어도 손 든 사람 목록은 보인다', () => {
+    render(
+      <MeetingScreen
+        {...baseVm({ raisedHands: [{ participantId: 'p-2', nickname: '아', isSelf: false }] })}
+        mediasoup={baseMediasoup({ isSharingScreen: true, screenStream: fakeStream() })}
+        isStripOpen={false}
+        onToggleStrip={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('list', { name: '손 든 사람' })).toBeVisible();
   });
 });

@@ -85,6 +85,17 @@ describe('MongoMeetingRepository', () => {
     expect(found!.findParticipant('p-1')?.isDisconnected).toBe(true);
   });
 
+  it('손들기 상태가 round-trip 된다 — 재시작 후에도 들고 있던 손이 보여야 한다', async () => {
+    const meeting = makeMeeting('abc12xyz');
+    meeting.addParticipant('p-1', '가', t0, 'socket-a');
+    meeting.setHand('p-1', true, t0);
+    await repo.save(meeting);
+
+    const found = await repo.findByCode('abc12xyz');
+
+    expect(found!.findParticipant('p-1')?.isHandRaised).toBe(true);
+  });
+
   it('같은 code를 다시 save 하면 덮어쓴다', async () => {
     const meeting = makeMeeting('abc12xyz');
     await repo.save(meeting);
