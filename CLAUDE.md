@@ -125,6 +125,12 @@ Model (zustand stores, api fetch, socket clients) is shared across features and 
 **File granularity**: split by "what you edit together", not by count — see `DEVELOPMENT.md`
 "코드 규칙". Long files are fine; hopping between files is not. Subfolders only when they hold 2+ files.
 
+## Code graph & diagrams (optional)
+
+- **graphify** (`.claude/skills/graphify/`): if `graphify-out/graph.json` exists, try `graphify query "<question>"` before broad grep/read; after code edits run `graphify update .`.
+- **archify** (`.claude/skills/archify/`, v3.0.1 official bundle): architecture/sequence/workflow diagrams as HTML. Do not edit the bundle; replace it wholesale on upgrade.
+- Outputs `graphify-out/`, `.archify/` are gitignored. Setup: `DEVELOPMENT.md` "코드 그래프·다이어그램".
+
 ## When you (Claude) come back to this repo cold
 
 1. Read `CLAUDE.md` (this file) → `DEVELOPMENT.md`. Scope/architecture detail lives in Notion (ask the user for the link).

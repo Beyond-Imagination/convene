@@ -86,6 +86,28 @@ pnpm build:shared  # shared-interfaces만 빌드
 - `packages/shared-interfaces`를 고쳤으면 `pnpm build:shared`를 먼저 돌려야 backend·frontend가 새 타입을 본다.
 - 에러 문구나 로그 출력은 단언하지 않는다. 에러 타입과 동작으로 검증한다.
 
+## 코드 그래프·다이어그램 (선택)
+
+### graphify
+
+[graphify](https://github.com/Graphify-Labs/graphify)로 코드베이스를 지식 그래프로 만들어 Claude Code에서 탐색한다. 스킬은 `.claude/skills/graphify/`에 들어 있다(bash 기준, Windows는 Git Bash).
+
+```bash
+uv tool install graphifyy==0.9.82   # 스킬 버전(.claude/skills/graphify/.graphify_version)과 맞춘다
+```
+
+- Claude Code에서 `/graphify .`로 빌드한다. 결과물 `graphify-out/`은 커밋하지 않는다.
+- 코드를 고친 뒤 `graphify update .`로 갱신한다(AST만 다시 뽑아 API 비용이 없다).
+- 질문은 `/graphify query "..."`, 두 지점의 관계는 `graphify path "A" "B"`로 본다.
+
+### Archify
+
+[Archify](https://github.com/tt-a1i/archify)는 코드를 읽어 아키텍처·워크플로·시퀀스·데이터 흐름·라이프사이클 다이어그램을 인터랙티브 HTML로 만든다. 스킬은 `.claude/skills/archify/`(v3.0.1 공식 번들)에 들어 있고 Node만 있으면 된다.
+
+- Claude Code에서 "archify로 회의 입장 흐름을 시퀀스 다이어그램으로 그려줘"처럼 요청한다. 결과물 `.archify/`는 커밋하지 않는다.
+- 처음 쓸 때 `node .claude/skills/archify/bin/archify.mjs doctor`로 환경을 확인한다.
+- 다이어그램을 만들 때 업데이트 확인용 GET 요청을 한 번 보낸다. 끄려면 `ARCHIFY_UPDATE_CHECK_DISABLED=1`.
+
 ## 기여
 
 ### 작업 흐름
