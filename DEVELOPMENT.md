@@ -98,6 +98,7 @@ uv tool install graphifyy==0.9.82   # 스킬 버전(.claude/skills/graphify/.gra
 
 - Claude Code에서 `/graphify .`로 빌드한다. 결과물 `graphify-out/`은 커밋하지 않는다.
 - 코드를 고친 뒤 `graphify update .`로 갱신한다(AST만 다시 뽑아 API 비용이 없다).
+- 그래프에서 뺄 경로는 `.graphifyignore`(gitignore 문법)에 둔다. 제외를 늘려 노드가 줄면 `graphify update . --force`로 다시 만든다.
 - 질문은 `/graphify query "..."`, 두 지점의 관계는 `graphify path "A" "B"`로 본다.
 
 ### Archify
