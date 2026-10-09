@@ -2,8 +2,7 @@ import { REPORT_EVENTS } from '@convene/shared-interfaces';
 
 import { TranscriptionSegmentPayload } from '@/shared-kernel/domain/domain-event.payloads';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
-import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
-import { stub } from '@/shared-kernel/testing/stub';
+import { noopLogger } from '@/shared-kernel/testing/noop-logger';
 
 import {
   DEFAULT_CHUNK_MS,
@@ -35,13 +34,6 @@ const makeEventPublisher = () => {
     } satisfies Pick<NestEventBusDomainEventPublisher, 'publish'> as NestEventBusDomainEventPublisher,
   };
 };
-
-const noopLogger = (): PinoLoggerAdapter => stub<PinoLoggerAdapter>({
-  debug: jest.fn(),
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-});
 
 /** transcribe input.audio가 wav(RIFF)인지 가정하고, PCM body의 text 식별값을 돌려준다. */
 const wavBodyText = (audio: Buffer): string => audio.subarray(WAV_HEADER_BYTES).toString();

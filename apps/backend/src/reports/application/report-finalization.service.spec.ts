@@ -16,8 +16,7 @@ import { chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
 import { externalReference, NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects/external-reference';
 import { ReportSummary, reportSummary } from '@/shared-kernel/domain/value-objects/report-summary';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
-import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
-import { stub } from '@/shared-kernel/testing/stub';
+import { noopLogger } from '@/shared-kernel/testing/noop-logger';
 
 import { MeetingReport } from '../domain/meeting-report';
 import { ReportNotFoundError, ReportNotResummarizableError } from './report.errors';
@@ -42,13 +41,6 @@ const makeEventPublisher = () => {
 
 const noopSummarizer = () => ({
   summarize: jest.fn(),
-});
-
-const noopLogger = (): PinoLoggerAdapter => stub<PinoLoggerAdapter>({
-  debug: jest.fn(),
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
 });
 
 describe('ReportFinalizationService.createDraft', () => {

@@ -1,11 +1,8 @@
 import { WorkerLogLevel, WorkerLogTag } from 'mediasoup/node/lib/types';
 
-import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
-import { stub } from '@/shared-kernel/testing/stub';
+import { noopLogger } from '@/shared-kernel/testing/noop-logger';
 
 import { MediasoupWorkerPool } from './mediasoup-worker.pool';
-
-const noopLogger = stub<PinoLoggerAdapter>({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() });
 
 const baseOptions = (numWorkers: number) => ({
   numWorkers,
@@ -19,7 +16,7 @@ const baseOptions = (numWorkers: number) => ({
 
 describe('MediasoupWorkerPool', () => {
   it('onModuleInit 후 options.numWorkers 만큼의 살아있는 worker를 보유한다', async () => {
-    const pool = new MediasoupWorkerPool(baseOptions(1), noopLogger);
+    const pool = new MediasoupWorkerPool(baseOptions(1), noopLogger());
     try {
       await pool.onModuleInit();
       expect(pool.size).toBe(1);
@@ -32,7 +29,7 @@ describe('MediasoupWorkerPool', () => {
   });
 
   it('getNextWorker는 round-robin으로 순환한다', async () => {
-    const pool = new MediasoupWorkerPool(baseOptions(2), noopLogger);
+    const pool = new MediasoupWorkerPool(baseOptions(2), noopLogger());
     try {
       await pool.onModuleInit();
       const w1 = pool.getNextWorker();
@@ -46,7 +43,7 @@ describe('MediasoupWorkerPool', () => {
   });
 
   it('onModuleDestroy 후엔 모든 worker가 closed 상태가 된다', async () => {
-    const pool = new MediasoupWorkerPool(baseOptions(1), noopLogger);
+    const pool = new MediasoupWorkerPool(baseOptions(1), noopLogger());
     await pool.onModuleInit();
     const worker = pool.getNextWorker();
     await pool.onModuleDestroy();

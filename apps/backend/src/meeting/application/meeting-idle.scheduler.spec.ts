@@ -1,12 +1,8 @@
 import { IdleSweepOutcome, MeetingService } from '@/meeting/application/meeting.service';
-import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
+import { noopLogger } from '@/shared-kernel/testing/noop-logger';
 import { stub } from '@/shared-kernel/testing/stub';
 
 import { MeetingIdleScheduler } from './meeting-idle.scheduler';
-
-function silentLogger(): PinoLoggerAdapter {
-  return stub<PinoLoggerAdapter>({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() });
-}
 
 const NOTHING_CLOSED: IdleSweepOutcome = { scanned: 0, closed: 0 };
 
@@ -16,7 +12,7 @@ describe('MeetingIdleScheduler.sweep', () => {
       sweepIdleMeetings: jest.fn(async () => NOTHING_CLOSED),
     });
 
-    await new MeetingIdleScheduler(service, silentLogger()).sweep();
+    await new MeetingIdleScheduler(service, noopLogger()).sweep();
 
     expect(service.sweepIdleMeetings).toHaveBeenCalledTimes(1);
   });
@@ -34,7 +30,7 @@ describe('MeetingIdleScheduler.sweep', () => {
         return NOTHING_CLOSED;
       },
     });
-    const scheduler = new MeetingIdleScheduler(service, silentLogger());
+    const scheduler = new MeetingIdleScheduler(service, noopLogger());
 
     const first = scheduler.sweep();
     await scheduler.sweep();
@@ -52,7 +48,7 @@ describe('MeetingIdleScheduler.sweep', () => {
         throw new Error('redis down');
       },
     });
-    const scheduler = new MeetingIdleScheduler(service, silentLogger());
+    const scheduler = new MeetingIdleScheduler(service, noopLogger());
 
     await expect(scheduler.sweep()).resolves.toBeUndefined();
     await scheduler.sweep();

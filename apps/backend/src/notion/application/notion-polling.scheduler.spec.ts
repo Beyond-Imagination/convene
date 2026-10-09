@@ -3,13 +3,9 @@ import {
   PollOutcome,
 } from '@/notion/application/notion-meeting-provisioning.service';
 import { NotionPollingScheduler } from '@/notion/application/notion-polling.scheduler';
-import { PinoLoggerAdapter } from '@/shared-kernel/infrastructure/pino-logger.adapter';
 import { SystemClock } from '@/shared-kernel/infrastructure/system.clock';
+import { noopLogger } from '@/shared-kernel/testing/noop-logger';
 import { stub } from '@/shared-kernel/testing/stub';
-
-function silentLogger(): PinoLoggerAdapter {
-  return stub<PinoLoggerAdapter>({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() });
-}
 
 function fixedClock(now: Date): SystemClock {
   return { now: () => now };
@@ -28,7 +24,7 @@ describe('NotionPollingScheduler.poll', () => {
       },
     });
 
-    await new NotionPollingScheduler(provisioning, fixedClock(now), silentLogger()).poll();
+    await new NotionPollingScheduler(provisioning, fixedClock(now), noopLogger()).poll();
 
     expect(times).toEqual([now]);
   });
@@ -46,7 +42,7 @@ describe('NotionPollingScheduler.poll', () => {
         return NOTHING_FOUND;
       },
     });
-    const scheduler = new NotionPollingScheduler(provisioning, fixedClock(new Date()), silentLogger());
+    const scheduler = new NotionPollingScheduler(provisioning, fixedClock(new Date()), noopLogger());
 
     const first = scheduler.poll();
     await scheduler.poll();
@@ -64,7 +60,7 @@ describe('NotionPollingScheduler.poll', () => {
         throw new Error('notion down');
       },
     });
-    const scheduler = new NotionPollingScheduler(provisioning, fixedClock(new Date()), silentLogger());
+    const scheduler = new NotionPollingScheduler(provisioning, fixedClock(new Date()), noopLogger());
 
     await expect(scheduler.poll()).resolves.toBeUndefined();
     await scheduler.poll();

@@ -1,3 +1,5 @@
+import { noopLogger } from '@/shared-kernel/testing/noop-logger';
+
 import { HttpTranscriber, HttpTranscriberOptions } from './http.transcriber';
 
 describe('HttpTranscriber', () => {
@@ -16,7 +18,7 @@ describe('HttpTranscriber', () => {
 
   it('audio Buffer를 POST {baseUrl}/transcribe에 octet-stream으로 전송한다', async () => {
     const fetchMock = jest.fn().mockResolvedValueOnce(okResponse({ segments: [] }));
-    const transcriber = new HttpTranscriber(options, fetchMock as unknown as typeof fetch);
+    const transcriber = new HttpTranscriber(options, fetchMock as unknown as typeof fetch, noopLogger());
     const audio = Buffer.from([1, 2, 3, 4, 5]);
 
     await transcriber.transcribe({ meetingCode: 'abc12xyz', participantId: 's1', audio });
@@ -40,7 +42,7 @@ describe('HttpTranscriber', () => {
         ],
       }),
     );
-    const transcriber = new HttpTranscriber(options, fetchMock as unknown as typeof fetch);
+    const transcriber = new HttpTranscriber(options, fetchMock as unknown as typeof fetch, noopLogger());
 
     const result = await transcriber.transcribe({
       meetingCode: 'abc12xyz',
@@ -58,7 +60,7 @@ describe('HttpTranscriber', () => {
       .fn()
       .mockResolvedValueOnce(okResponse({ segments: [] }))
       .mockResolvedValueOnce(okResponse({}));
-    const transcriber = new HttpTranscriber(options, fetchMock as unknown as typeof fetch);
+    const transcriber = new HttpTranscriber(options, fetchMock as unknown as typeof fetch, noopLogger());
     expect(
       await transcriber.transcribe({
         meetingCode: 'a',
@@ -77,7 +79,7 @@ describe('HttpTranscriber', () => {
 
   it('응답이 non-2xx 면 status가 포함된 에러를 throw 한다', async () => {
     const fetchMock = jest.fn().mockResolvedValue(new Response('boom', { status: 500 }));
-    const transcriber = new HttpTranscriber(options, fetchMock as unknown as typeof fetch);
+    const transcriber = new HttpTranscriber(options, fetchMock as unknown as typeof fetch, noopLogger());
     await expect(
       transcriber.transcribe({
         meetingCode: 'abc12xyz',
@@ -89,7 +91,7 @@ describe('HttpTranscriber', () => {
 
   it('fetch 자체가 reject 하면(예: 네트워크 실패) 그 에러를 그대로 전파한다', async () => {
     const fetchMock = jest.fn().mockRejectedValue(new Error('ECONNREFUSED'));
-    const transcriber = new HttpTranscriber(options, fetchMock as unknown as typeof fetch);
+    const transcriber = new HttpTranscriber(options, fetchMock as unknown as typeof fetch, noopLogger());
     await expect(
       transcriber.transcribe({
         meetingCode: 'abc12xyz',
@@ -108,7 +110,7 @@ describe('HttpTranscriber', () => {
         .fn()
         .mockResolvedValueOnce(new Response('boom', { status: 503 }))
         .mockResolvedValueOnce(okResponse({ segments: [{ text: '네', startMs: 0, endMs: 300 }] }));
-      const transcriber = new HttpTranscriber(options, fetchMock as unknown as typeof fetch);
+      const transcriber = new HttpTranscriber(options, fetchMock as unknown as typeof fetch, noopLogger());
 
       const result = await transcriber.transcribe({
         meetingCode: 'abc12xyz',
@@ -124,7 +126,7 @@ describe('HttpTranscriber', () => {
         .fn()
         .mockRejectedValueOnce(new Error('ECONNREFUSED'))
         .mockResolvedValueOnce(okResponse({ segments: [] }));
-      const transcriber = new HttpTranscriber(options, fetchMock as unknown as typeof fetch);
+      const transcriber = new HttpTranscriber(options, fetchMock as unknown as typeof fetch, noopLogger());
 
       await transcriber.transcribe({ meetingCode: 'abc12xyz', participantId: 's1', audio });
       expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -135,7 +137,7 @@ describe('HttpTranscriber', () => {
         .fn()
         .mockResolvedValueOnce(new Response('boom', { status: 503 }))
         .mockResolvedValueOnce(okResponse({ segments: [] }));
-      const transcriber = new HttpTranscriber(options, fetchMock as unknown as typeof fetch);
+      const transcriber = new HttpTranscriber(options, fetchMock as unknown as typeof fetch, noopLogger());
 
       await transcriber.transcribe({ meetingCode: 'abc12xyz', participantId: 's1', audio });
 
@@ -145,7 +147,7 @@ describe('HttpTranscriber', () => {
 
     it('4xx(요청 문제)는 재시도하지 않고 즉시 실패한다', async () => {
       const fetchMock = jest.fn().mockResolvedValue(new Response('bad request', { status: 400 }));
-      const transcriber = new HttpTranscriber(options, fetchMock as unknown as typeof fetch);
+      const transcriber = new HttpTranscriber(options, fetchMock as unknown as typeof fetch, noopLogger());
 
       await expect(
         transcriber.transcribe({ meetingCode: 'abc12xyz', participantId: 's1', audio }),
@@ -155,7 +157,7 @@ describe('HttpTranscriber', () => {
 
     it('maxAttempts 만큼만 시도하고 마지막 에러를 전파한다', async () => {
       const fetchMock = jest.fn().mockResolvedValue(new Response('boom', { status: 503 }));
-      const transcriber = new HttpTranscriber(options, fetchMock as unknown as typeof fetch);
+      const transcriber = new HttpTranscriber(options, fetchMock as unknown as typeof fetch, noopLogger());
 
       await expect(
         transcriber.transcribe({ meetingCode: 'abc12xyz', participantId: 's1', audio }),
@@ -168,6 +170,7 @@ describe('HttpTranscriber', () => {
       const transcriber = new HttpTranscriber(
         { ...options, maxAttempts: 1 },
         fetchMock as unknown as typeof fetch,
+        noopLogger(),
       );
 
       await expect(
