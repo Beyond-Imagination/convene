@@ -118,6 +118,7 @@ export function MeetingScreen({
   startedAt = null,
   isChatOpen,
   onToggleChat,
+  hasUnreadChat,
   variant,
   isStripOpen,
   onToggleStrip,
@@ -261,6 +262,7 @@ export function MeetingScreen({
         isHost={isHost}
         isChatOpen={isChatOpen}
         onToggleChat={onToggleChat}
+        hasUnreadChat={hasUnreadChat}
         leave={leave}
         endMeeting={endMeeting}
       />

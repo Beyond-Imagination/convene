@@ -14,6 +14,7 @@ interface UseMeetingLayoutViewModel {
   /** 기본값은 웹 열림 / 모바일 닫힘. 모바일에서는 채팅이 화면을 덮기 때문이다. */
   readonly isChatOpen: boolean;
   readonly toggleChat: () => void;
+  /** 채팅 패널이 알려 준다. 회의 화면은 이 불리언이 바뀔 때만 다시 그려진다. */
   readonly hasUnreadChat: boolean;
   readonly setHasUnreadChat: (hasUnread: boolean) => void;
   /** 비디오 그리드의 배치 규칙. 타일 비율(16:9 / 4:3)과 span 테이블을 함께 가른다. */
@@ -46,6 +47,7 @@ export function useMeetingLayoutViewModel(totalTiles = 0): UseMeetingLayoutViewM
   // null이면 variant 기본값을 따른다. 사용자가 한 번 누르면 그 선택이 유지된다.
   const [chatOverride, setChatOverride] = useState<boolean | null>(null);
   const [stripOverride, setStripOverride] = useState<boolean | null>(null);
+  const [hasUnreadChat, setHasUnreadChat] = useState(false);
 
   // 뷰포트 너비 변화에 따라 배치를 갱신한다(정적 export 안전 — effect 안에서만 window 접근).
   useEffect(() => {
@@ -78,10 +80,8 @@ export function useMeetingLayoutViewModel(totalTiles = 0): UseMeetingLayoutViewM
   return {
     isChatOpen,
     toggleChat,
-    hasUnreadChat: false,
-    setHasUnreadChat: () => {
-      throw new Error('not implemented');
-    },
+    hasUnreadChat,
+    setHasUnreadChat,
     variant,
     isStripOpen,
     toggleStrip,

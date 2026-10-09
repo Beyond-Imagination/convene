@@ -37,6 +37,7 @@ export interface MeetingControlBarProps {
   readonly isHost: boolean;
   readonly isChatOpen?: boolean;
   readonly onToggleChat?: () => void;
+  readonly hasUnreadChat?: boolean;
   readonly leave: () => void;
   readonly endMeeting: () => Promise<void>;
 }
@@ -47,6 +48,7 @@ export function MeetingControlBar({
   isHost,
   isChatOpen,
   onToggleChat,
+  hasUnreadChat = false,
   leave,
   endMeeting,
 }: MeetingControlBarProps) {
@@ -123,8 +125,17 @@ export function MeetingControlBar({
           aria-pressed={isChatOpen}
           className={`${controlButton} ${isChatOpen === true ? controlActive : controlNeutral}`}
         >
-          <ChatIcon />
+          <span className="relative inline-flex">
+            <ChatIcon />
+            {hasUnreadChat && (
+              <span
+                aria-hidden="true"
+                className="bg-danger absolute -right-1 -top-1 h-2 w-2 rounded-full"
+              />
+            )}
+          </span>
           채팅
+          {hasUnreadChat && <span className="sr-only">, 새 메시지 있음</span>}
         </button>
       )}
 
