@@ -125,6 +125,10 @@ Model (zustand stores, api fetch, socket clients) is shared across features and 
 **File granularity**: split by "what you edit together", not by count — see `DEVELOPMENT.md`
 "코드 규칙". Long files are fine; hopping between files is not. Subfolders only when they hold 2+ files.
 
+## Code graph (graphify, optional)
+
+Project skill at `.claude/skills/graphify/`. If `graphify-out/graph.json` exists, try `graphify query "<question>"` before broad grep/read; after code edits run `graphify update .`. `graphify-out/` is gitignored. Setup: `DEVELOPMENT.md` "코드 그래프".
+
 ## When you (Claude) come back to this repo cold
 
 1. Read `CLAUDE.md` (this file) → `DEVELOPMENT.md`. Scope/architecture detail lives in Notion (ask the user for the link).
