@@ -16,6 +16,7 @@ import { useMeetingEntryViewModel } from '@/feature/meeting/hooks/useMeetingEntr
 import { useMeetingLayoutViewModel } from '@/feature/meeting/hooks/useMeetingLayoutViewModel';
 import { useMeetingViewModel } from '@/feature/meeting/hooks/useMeetingViewModel';
 import { useNicknameGateViewModel } from '@/feature/meeting/hooks/useNicknameGateViewModel';
+import { useReactionViewModel } from '@/feature/meeting/hooks/useReactionViewModel';
 import { useRouteSegment } from '@/shared/hooks/useRouteSegment';
 
 /**
@@ -62,10 +63,11 @@ function ChatSection({
 }
 
 /**
- * 실제 회의 세션. 세 ViewModel hook을 합성한다:
+ * 실제 회의 세션. 네 ViewModel hook을 합성한다:
  *   - `useMeetingEntryViewModel`
  *   - `useMeetingViewModel`
  *   - `useMediasoupViewModel`
+ *   - `useReactionViewModel`
  *
  * 채팅은 `ChatSection` 이 자기 ViewModel 을 직접 들고 있다(위 주석 참조).
  */
@@ -75,12 +77,15 @@ function MeetingSession({ code }: { readonly code: string }) {
   // 예약 회의는 join이 처리되는 순간 방이 열린다. 입장이 확인되기 전에는 socket을 넘기지 않아
   // 미디어 협상이 방보다 먼저 도착하는 것을 막는다.
   // 재연결 중에도 socket을 유지해야 살아 있는 transport를 버리지 않고 복귀할 수 있다.
+  const joinedSocket =
+    meetingVm.status === 'joined' || meetingVm.status === 'reconnecting' ? meetingVm.socket : null;
   const mediasoupVm = useMediasoupViewModel(
-    meetingVm.status === 'joined' || meetingVm.status === 'reconnecting' ? meetingVm.socket : null,
+    joinedSocket,
     code,
     meetingVm.rejoinGen,
     meetingVm.rejoinPreservedMedia,
   );
+  const reactionVm = useReactionViewModel(joinedSocket, code, meetingVm.selfParticipantId);
   // self 타일(항상 1) + 원격 참가자 수 = 전체 비디오 타일 수.
   const totalTiles = 1 + meetingVm.remoteParticipants.length;
   const layout = useMeetingLayoutViewModel(totalTiles);
@@ -124,6 +129,7 @@ function MeetingSession({ code }: { readonly code: string }) {
       <MeetingScreen
         {...meetingVm}
         mediasoup={mediasoupVm}
+        reaction={reactionVm}
         title={entry.meeting?.title ?? null}
         startedAt={entry.meeting?.startedAt ?? null}
         isChatOpen={layout.isChatOpen}

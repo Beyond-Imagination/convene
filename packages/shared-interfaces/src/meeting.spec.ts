@@ -5,6 +5,8 @@ import {
   type CreateMeetingRequest,
   type CreateMeetingResponse,
   type ExternalReferencePayload,
+  type HandChangedBroadcast,
+  type HandMessage,
   type JoinMeetingAck,
   type JoinMeetingMessage,
   type JoinMeetingResponse,
@@ -13,6 +15,7 @@ import {
   MEETING_WS_EVENTS,
   type MeetingDetailResponse,
   type MeetingEndedBroadcast,
+  type MeetingParticipantEntry,
   type MeetingStatus,
   type MeetingType,
   type MeetingWsEventName,
@@ -20,6 +23,10 @@ import {
   type ParticipantJoinedBroadcast,
   type ParticipantLeftBroadcast,
   type ParticipantReconnectedBroadcast,
+  REACTION_KINDS,
+  type ReactionBroadcast,
+  type ReactionKind,
+  type ReactMessage,
   type Source,
   SOURCES,
 } from './meeting.js';
@@ -116,9 +123,9 @@ describe('meeting wire format', () => {
     }
   });
 
-  it('MEETING_WS_EVENTS는 client→server 3개 + server→client 7개 = 총 10개', () => {
-    expect(Object.values(MEETING_WS_EVENTS)).toHaveLength(10);
-    expect(new Set(Object.values(MEETING_WS_EVENTS)).size).toBe(10);
+  it('MEETING_WS_EVENTS는 client→server 5개 + server→client 9개 = 총 14개', () => {
+    expect(Object.values(MEETING_WS_EVENTS)).toHaveLength(14);
+    expect(new Set(Object.values(MEETING_WS_EVENTS)).size).toBe(14);
   });
 
   it('JoinMeetingMessage는 재접속 판정을 위해 안정 participantId를 싣는다', () => {
@@ -137,6 +144,7 @@ describe('meeting wire format', () => {
       participantId: 'p-ab12',
       reconnected: true,
       chat: [{ nickname: 'bob', text: '먼저 시작할게요', sentAt: '2026-01-01T00:00:10.000Z' }],
+      handRaisedAt: null,
     };
     expect(ack.reconnected).toBe(true);
     expect(ack.chat).toHaveLength(1);
@@ -194,5 +202,59 @@ describe('meeting wire format', () => {
     const a: MeetingWsEventName = MEETING_WS_EVENTS.JOIN;
     const b: MeetingWsEventName = MEETING_WS_EVENTS.CHAT_POSTED;
     expect([a, b]).toEqual(['meeting:join', 'meeting:chatPosted']);
+  });
+
+  it('REACTION_KINDS는 중복 없는 리액션 종류 목록이다', () => {
+    expect(REACTION_KINDS).toEqual([
+      'thumbsUp',
+      'thumbsDown',
+      'clap',
+      'party',
+      'heart',
+      'laugh',
+      'surprised',
+      'thinking',
+      'sad',
+      'nod',
+    ]);
+    expect(new Set(REACTION_KINDS).size).toBe(REACTION_KINDS.length);
+  });
+
+  it('리액션 broadcast는 보낸 사람의 participantId와 표시용 nickname을 함께 싣는다', () => {
+    expect(MEETING_WS_EVENTS.REACT).toBe('meeting:react');
+    expect(MEETING_WS_EVENTS.REACTION).toBe('meeting:reaction');
+    const kind: ReactionKind = 'party';
+    const m: ReactMessage = { code: 'abc12xyz', kind };
+    const b: ReactionBroadcast = {
+      participantId: 'p-ab12',
+      nickname: 'alice',
+      kind,
+      sentAt: '2026-01-01T00:00:00.000Z',
+    };
+    expect([m.kind, b.kind, b.nickname]).toEqual(['party', 'party', 'alice']);
+  });
+
+  it('손들기는 손 든 시각(내리면 null)으로 오가며 참가자 목록에도 실려 순서를 복원할 수 있다', () => {
+    expect(MEETING_WS_EVENTS.HAND).toBe('meeting:hand');
+    expect(MEETING_WS_EVENTS.HAND_CHANGED).toBe('meeting:handChanged');
+    const m: HandMessage = { code: 'abc12xyz', raised: true };
+    const raised: HandChangedBroadcast = {
+      participantId: 'p-ab12',
+      handRaisedAt: '2026-01-01T00:00:00.000Z',
+    };
+    const lowered: HandChangedBroadcast = { participantId: 'p-ab12', handRaisedAt: null };
+    const entry: MeetingParticipantEntry = {
+      participantId: 'p-ab12',
+      nickname: 'alice',
+      joinedAt: '2026-01-01T00:00:00.000Z',
+      disconnected: false,
+      handRaisedAt: '2026-01-01T00:00:00.000Z',
+    };
+    expect([m.raised, raised.handRaisedAt, lowered.handRaisedAt, entry.handRaisedAt]).toEqual([
+      true,
+      '2026-01-01T00:00:00.000Z',
+      null,
+      '2026-01-01T00:00:00.000Z',
+    ]);
   });
 });

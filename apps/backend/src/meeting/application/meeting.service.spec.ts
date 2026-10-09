@@ -507,6 +507,92 @@ describe('MeetingService.postChat', () => {
   });
 });
 
+describe('MeetingService.react / setHand', () => {
+  const t0 = new Date('2026-01-01T00:00:00Z');
+  const t1 = new Date('2026-01-01T00:01:00Z');
+  const t2 = new Date('2026-01-01T00:02:00Z');
+
+  const makeService = (meeting: Meeting | null) => {
+    const saved: Meeting[] = [];
+    const { publisher } = makeEventPublisher();
+    const service = new MeetingService(
+      {
+        findByCode: async (c) => (meeting && c === meeting.code.value ? meeting : null),
+        listOpenCodes: async () => [],
+        save: async (m) => {
+          saved.push(m);
+        },
+      },
+      noopChatRepository(),
+      { next: () => code },
+      { now: () => t2 },
+      publisher,
+      noopLogger(),
+    );
+    return { service, saved };
+  };
+
+  const makeMeetingActive = () => {
+    const m = makeMeeting(t0);
+    m.addParticipant('s1', 'alice', t1);
+    return m;
+  };
+
+  it('react는 보낸 참가자·닉네임·종류·시각을 돌려주고 저장하지 않는다', async () => {
+    const { service, saved } = makeService(makeMeetingActive());
+    const reaction = await service.react({ code: 'abc12xyz', participantId: 's1', kind: 'party' });
+    expect(reaction).toEqual({ participantId: 's1', nickname: 'alice', kind: 'party', sentAt: t2 });
+    expect(saved).toHaveLength(0);
+  });
+
+  it('react는 회의에 없거나 이미 나간 참가자를 거부한다', async () => {
+    const meeting = makeMeetingActive();
+    meeting.addParticipant('s2', 'bob', t1);
+    meeting.removeParticipant('s2', t1);
+    const { service } = makeService(meeting);
+    await expect(
+      service.react({ code: 'abc12xyz', participantId: 'unknown', kind: 'clap' }),
+    ).rejects.toThrow();
+    await expect(
+      service.react({ code: 'abc12xyz', participantId: 's2', kind: 'clap' }),
+    ).rejects.toThrow();
+  });
+
+  it('react는 없는 회의면 MeetingNotFoundError', async () => {
+    const { service } = makeService(null);
+    await expect(
+      service.react({ code: 'abc12xyz', participantId: 's1', kind: 'clap' }),
+    ).rejects.toThrow(MeetingNotFoundError);
+  });
+
+  it('setHand는 손들기 상태를 바꿔 저장하고 손 든 시각(내리면 null)을 돌려준다', async () => {
+    const meeting = makeMeetingActive();
+    const { service, saved } = makeService(meeting);
+    const changed = await service.setHand({ code: 'abc12xyz', participantId: 's1', raised: true });
+    expect(changed).toEqual({ participantId: 's1', handRaisedAt: t2 });
+    expect(meeting.findParticipant('s1')?.isHandRaised).toBe(true);
+    expect(saved[0]).toBe(meeting);
+
+    const lowered = await service.setHand({
+      code: 'abc12xyz',
+      participantId: 's1',
+      raised: false,
+    });
+    expect(lowered).toEqual({ participantId: 's1', handRaisedAt: null });
+    expect(meeting.findParticipant('s1')?.isHandRaised).toBe(false);
+  });
+
+  it('setHand는 종료된 회의면 거부하고 저장하지 않는다', async () => {
+    const meeting = makeMeetingActive();
+    meeting.close(t1);
+    const { service, saved } = makeService(meeting);
+    await expect(
+      service.setHand({ code: 'abc12xyz', participantId: 's1', raised: true }),
+    ).rejects.toThrow();
+    expect(saved).toHaveLength(0);
+  });
+});
+
 describe('MeetingService.closeMeeting', () => {
   const t0 = new Date('2026-01-01T00:00:00Z');
   const t1 = new Date('2026-01-01T00:01:00Z');

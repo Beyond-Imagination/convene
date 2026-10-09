@@ -2,6 +2,7 @@
 
 import {
   type ChatPostedBroadcast,
+  type HandChangedBroadcast,
   type JoinMeetingRejectReason,
   type JoinMeetingResponse,
   MEETING_WS_EVENTS,
@@ -13,7 +14,7 @@ import {
   type ParticipantReconnectedBroadcast,
 } from '@convene/shared-interfaces';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 
 import { closeMeeting } from '@/shared/api/meeting.api';
@@ -66,6 +67,14 @@ export interface RemoteParticipant {
   readonly nickname: string;
   readonly joinedAt: string;
   readonly disconnected: boolean;
+  /** 손 든 시각(ISO). 내린 상태면 null. */
+  readonly handRaisedAt: string | null;
+}
+
+export interface RaisedHand {
+  readonly participantId: string;
+  readonly nickname: string;
+  readonly isSelf: boolean;
 }
 
 export interface UseMeetingViewModel {
@@ -102,6 +111,13 @@ export interface UseMeetingViewModel {
    * nickname이 null이 됐을 때 "직접 접속"과  "퇴장 이동 중"을 View가 구분하는 데 사용
    */
   readonly isNavigatingAway: boolean;
+  /** 서버가 확정한 본인 participantId. 입장 응답 전에는 null. */
+  readonly selfParticipantId: string | null;
+  readonly isHandRaised: boolean;
+  /** 본인을 포함해 손 든 순서대로. */
+  readonly raisedHands: ReadonlyArray<RaisedHand>;
+  /** 결과는 서버 broadcast로 반영된다 — 거부되면 버튼 상태도 그대로다. */
+  readonly toggleHand: () => void;
   readonly leave: () => void;
   /**
    * 명시적 회의 종료 액션. backend `DELETE /meetings/:code`를 호출해 도메인 이벤트와 회의록 생성 파이프라인을 트리거한다.
@@ -140,6 +156,8 @@ export function useMeetingViewModel(code: string, enabled = true): UseMeetingVie
   const [rejoinGen, setRejoinGen] = useState(0);
   const [rejoinPreservedMedia, setRejoinPreservedMedia] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatPostedBroadcast[]>([]);
+  const [selfParticipantId, setSelfParticipantId] = useState<string | null>(null);
+  const [selfHandRaisedAt, setSelfHandRaisedAt] = useState<string | null>(null);
   // 저장된 토큰(회의를 만든 본인)으로 시작하고, 빈 방에 처음 들어가 host를 넘겨받으면 갱신된다.
   const [isHost, setIsHost] = useState(() => getHostToken(code) !== null);
   const socketRef = useRef<Socket | null>(null);
@@ -184,6 +202,8 @@ export function useMeetingViewModel(code: string, enabled = true): UseMeetingVie
     connectCountRef.current = 0;
     setRejoinGen(0);
     const socket = next;
+    // broadcast 핸들러가 본인 것을 가려내는 기준. effect 안에서만 쓰므로 지역 변수로 충분하다.
+    let selfId: string | null = null;
 
     const onConnect = (): void => {
       connectCountRef.current += 1;
@@ -228,6 +248,9 @@ export function useMeetingViewModel(code: string, enabled = true): UseMeetingVie
               setRejoinGen(connectCountRef.current - 1);
             }
             setChatHistory(ack.chat);
+            selfId = ack.participantId;
+            setSelfParticipantId(ack.participantId);
+            setSelfHandRaisedAt(ack.handRaisedAt);
             // 빈 방에 처음 들어간 경우에만 토큰이 온다. null이면 기존 토큰을 그대로 둔다.
             if (ack.hostToken == null) return;
             saveHostToken(code, ack.hostToken);
@@ -253,6 +276,7 @@ export function useMeetingViewModel(code: string, enabled = true): UseMeetingVie
           nickname: p.nickname,
           joinedAt: p.joinedAt,
           disconnected: false,
+          handRaisedAt: null,
         },
       ]);
     };
@@ -277,7 +301,19 @@ export function useMeetingViewModel(code: string, enabled = true): UseMeetingVie
           nickname: p.nickname,
           joinedAt: p.joinedAt,
           disconnected: p.disconnected,
+          handRaisedAt: p.handRaisedAt,
         })),
+      );
+    };
+    const onHandChanged = (p: HandChangedBroadcast): void => {
+      if (p.participantId === selfId) {
+        setSelfHandRaisedAt(p.handRaisedAt);
+        return;
+      }
+      setRemoteParticipants((prev) =>
+        prev.map((x) =>
+          x.participantId === p.participantId ? { ...x, handRaisedAt: p.handRaisedAt } : x,
+        ),
       );
     };
     const onMeetingEnded = (_payload: MeetingEndedBroadcast): void => {
@@ -308,6 +344,7 @@ export function useMeetingViewModel(code: string, enabled = true): UseMeetingVie
     socket.on(MEETING_WS_EVENTS.PARTICIPANT_DISCONNECTED, onParticipantDisconnected);
     socket.on(MEETING_WS_EVENTS.PARTICIPANT_RECONNECTED, onParticipantReconnected);
     socket.on(MEETING_WS_EVENTS.PARTICIPANTS, onParticipants);
+    socket.on(MEETING_WS_EVENTS.HAND_CHANGED, onHandChanged);
     socket.on(MEETING_WS_EVENTS.ENDED, onMeetingEnded);
     window.addEventListener('pagehide', onPageHide);
 
@@ -328,6 +365,7 @@ export function useMeetingViewModel(code: string, enabled = true): UseMeetingVie
       socket.off(MEETING_WS_EVENTS.PARTICIPANT_DISCONNECTED, onParticipantDisconnected);
       socket.off(MEETING_WS_EVENTS.PARTICIPANT_RECONNECTED, onParticipantReconnected);
       socket.off(MEETING_WS_EVENTS.PARTICIPANTS, onParticipants);
+      socket.off(MEETING_WS_EVENTS.HAND_CHANGED, onHandChanged);
       socket.off(MEETING_WS_EVENTS.ENDED, onMeetingEnded);
       window.removeEventListener('pagehide', onPageHide);
       socket.disconnect();
@@ -348,6 +386,38 @@ export function useMeetingViewModel(code: string, enabled = true): UseMeetingVie
     router.push('/');
     clearIdentity();
   }, [code, clearIdentity, router]);
+
+  const isHandRaised = selfHandRaisedAt !== null;
+  const toggleHand = useCallback(() => {
+    socketRef.current?.emit(MEETING_WS_EVENTS.HAND, { code, raised: !isHandRaised });
+  }, [code, isHandRaised]);
+
+  const raisedHands = useMemo((): ReadonlyArray<RaisedHand> => {
+    const entries: Array<RaisedHand & { readonly at: string }> = remoteParticipants.flatMap((p) =>
+      p.handRaisedAt === null
+        ? []
+        : [
+            {
+              participantId: p.participantId,
+              nickname: p.nickname,
+              isSelf: false,
+              at: p.handRaisedAt,
+            },
+          ],
+    );
+    if (selfHandRaisedAt !== null && selfParticipantId !== null && nickname !== null) {
+      entries.push({
+        participantId: selfParticipantId,
+        nickname,
+        isSelf: true,
+        at: selfHandRaisedAt,
+      });
+    }
+    // ISO 문자열은 사전순이 곧 시간순이다.
+    return entries
+      .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
+      .map(({ at: _at, ...hand }) => hand);
+  }, [remoteParticipants, selfHandRaisedAt, selfParticipantId, nickname]);
 
   const endMeeting = useCallback(async (): Promise<void> => {
     try {
@@ -386,6 +456,10 @@ export function useMeetingViewModel(code: string, enabled = true): UseMeetingVie
     chatHistory,
     isHost,
     isNavigatingAway: isNavigatingAwayRef.current,
+    selfParticipantId,
+    isHandRaised,
+    raisedHands,
+    toggleHand,
     leave,
     endMeeting,
   };

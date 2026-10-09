@@ -68,6 +68,7 @@ export interface VideoTileProps {
   readonly isAudioOff?: boolean;
   /** 연결이 끊겨 복귀를 기다리는 중. 타일은 유지하고 상태만 덮어 보여준다. */
   readonly isDisconnected?: boolean;
+  readonly isHandRaised?: boolean;
 }
 
 /**
@@ -84,6 +85,7 @@ export const VideoTile = memo(function VideoTile({
   isVideoOff,
   isAudioOff,
   isDisconnected,
+  isHandRaised,
 }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   useMediaElementBinding({ ref: videoRef, stream: useTileStream(stream, track) });
@@ -107,6 +109,15 @@ export const VideoTile = memo(function VideoTile({
         >
           연결 끊김 · 재접속 대기 중
         </div>
+      )}
+      {isHandRaised === true && (
+        <span
+          role="img"
+          aria-label="손 듦"
+          className="bg-accent text-accent-fg absolute left-2 top-2 grid h-8 w-8 place-items-center rounded-full text-lg shadow-md md:left-[11px] md:top-[11px] md:h-10 md:w-10 md:text-xl"
+        >
+          ✋
+        </span>
       )}
       <figcaption className="bg-bg/70 text-text text-cap absolute bottom-2 left-2 max-w-[76%] truncate rounded-full px-2.5 py-1 font-bold md:bottom-[11px] md:left-[11px] md:px-[11px]">
         {label}

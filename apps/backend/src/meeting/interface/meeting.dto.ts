@@ -2,15 +2,20 @@ import {
   type ChatMessage,
   type CreateMeetingRequest,
   type ExternalReferencePayload,
+  type HandMessage,
   type JoinMeetingMessage,
   type LeaveMeetingMessage,
   MEETING_TYPES,
   type MeetingType,
+  REACTION_KINDS,
+  type ReactionKind,
+  type ReactMessage,
   type Source,
   SOURCES,
 } from '@convene/shared-interfaces';
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsIn,
   IsNotEmpty,
   IsOptional,
@@ -93,4 +98,14 @@ export class ChatDto extends MeetingScopedDto implements ChatMessage {
   @IsString()
   @Length(TEXT_MIN, TEXT_MAX)
   text!: string;
+}
+
+export class ReactDto extends MeetingScopedDto implements ReactMessage {
+  @IsIn(REACTION_KINDS as readonly string[])
+  kind!: ReactionKind;
+}
+
+export class HandDto extends MeetingScopedDto implements HandMessage {
+  @IsBoolean()
+  raised!: boolean;
 }

@@ -2,11 +2,13 @@
 
 import type { CSSProperties, ReactNode } from 'react';
 
+import { REACTION_EMOJI } from '@/feature/meeting/components/icons';
 import { ScreenTile, VideoTile } from '@/feature/meeting/components/MeetingMedia';
 import type { RemoteMediaEntry } from '@/feature/meeting/hooks/useMediasoupViewModel';
 import type { UseMediasoupViewModel } from '@/feature/meeting/hooks/useMediasoupViewModel';
 import type { MeetingLayoutVariant } from '@/feature/meeting/hooks/useMeetingLayoutViewModel';
-import type { RemoteParticipant } from '@/feature/meeting/hooks/useMeetingViewModel';
+import type { RaisedHand, RemoteParticipant } from '@/feature/meeting/hooks/useMeetingViewModel';
+import type { ReactionBubble } from '@/feature/meeting/hooks/useReactionViewModel';
 
 /** 같은 참가자의 카메라(screen 제외) 비디오 entry를 찾는다. */
 const pickVideoEntry = (
@@ -101,6 +103,85 @@ const spansFor = (variant: MeetingLayoutVariant, count: number): ReadonlyArray<s
  * 행이 남은 높이를 나눠 갖는다. 타일에 고정 비율을 주면 뷰포트가 낮을 때
  * 자연 높이가 영역을 넘어 아랫줄이 잘린다 — 비율은 video 의 object-fit 이 맡는다.
  */
+const NO_BUBBLES: ReadonlyArray<ReactionBubble> = [];
+const NO_HANDS: ReadonlyArray<RaisedHand> = [];
+
+/** 말풍선이 한 줄로 겹치지 않게 id로 가로 위치를 흩는다. */
+const BUBBLE_LANES = 6;
+const BUBBLE_LANE_PX = 14;
+
+/**
+ * 손 든 사람을 든 순서대로 — 비디오 영역 맨 위 한 줄.
+ * 타일 배지만으로는 화면 공유 중 참가자 줄을 접으면 아무도 보이지 않는다.
+ */
+function RaisedHands({ hands }: { readonly hands: ReadonlyArray<RaisedHand> }) {
+  if (hands.length === 0) return null;
+  return (
+    <div className="flex shrink-0 items-center gap-2">
+      <span
+        aria-hidden="true"
+        className="text-lg leading-none"
+      >
+        ✋
+      </span>
+      <ul
+        aria-label="손 든 사람"
+        className="flex min-w-0 flex-wrap items-center gap-1.5"
+      >
+        {hands.map((h) => (
+          <li
+            key={h.participantId}
+            className="bg-accent/30 text-accent-on text-cap max-w-[9rem] truncate rounded-full px-2.5 py-1 font-bold"
+          >
+            {h.isSelf ? '나' : h.nickname}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * 리액션 말풍선 — 비디오 영역 왼쪽 아래에서 떠올라 사라진다.
+ * 타일이 아니라 영역 위에 얹어 화면 공유로 참가자 줄을 접어도 보이게 한다.
+ */
+function ReactionBubbles({ bubbles }: { readonly bubbles: ReadonlyArray<ReactionBubble> }) {
+  if (bubbles.length === 0) return null;
+  return (
+    <div
+      // 떠오르는 높이(cqh)의 기준 컨테이너.
+      className="pointer-events-none absolute bottom-3 left-3 z-20 h-[min(70%,320px)] w-44 [container-type:size] md:bottom-5 md:left-5"
+    >
+      {bubbles.map((b) => (
+        <div
+          key={b.id}
+          className="animate-reaction-float absolute bottom-0"
+          style={{ left: (b.id % BUBBLE_LANES) * BUBBLE_LANE_PX }}
+        >
+          <div
+            role="img"
+            aria-label={`${b.isSelf ? '나' : b.nickname}: ${REACTION_EMOJI[b.kind].label}`}
+            className="animate-reaction-sway bg-bg/75 flex items-center gap-1.5 whitespace-nowrap rounded-full py-1 pl-1.5 pr-3 shadow-lg backdrop-blur-sm"
+          >
+            <span
+              aria-hidden="true"
+              className="text-2xl leading-none md:text-3xl"
+            >
+              {REACTION_EMOJI[b.kind].glyph}
+            </span>
+            <span
+              aria-hidden="true"
+              className="text-text text-cap max-w-[7rem] truncate font-bold"
+            >
+              {b.isSelf ? '나' : b.nickname}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const GRID_STYLE: CSSProperties = { gridAutoRows: 'minmax(0, 1fr)' };
 
 const pagerButton =
@@ -110,6 +191,9 @@ export interface VideoStageProps {
   readonly nickname: string | null;
   readonly remoteParticipants: ReadonlyArray<RemoteParticipant>;
   readonly mediasoup: UseMediasoupViewModel;
+  readonly isHandRaised?: boolean;
+  readonly raisedHands?: ReadonlyArray<RaisedHand>;
+  readonly reactionBubbles?: ReadonlyArray<ReactionBubble>;
   readonly variant?: MeetingLayoutVariant;
   /** 화면 공유 중 하단 참가자 줄 노출. */
   readonly isStripOpen?: boolean;
@@ -132,6 +216,9 @@ export function VideoStage({
   nickname,
   remoteParticipants,
   mediasoup,
+  isHandRaised = false,
+  raisedHands = NO_HANDS,
+  reactionBubbles = NO_BUBBLES,
   variant = 'desktop',
   isStripOpen = true,
   onToggleStrip,
@@ -162,6 +249,7 @@ export function VideoStage({
           stream={mediasoup.localStream}
           isVideoOff={mediasoup.isVideoMuted}
           isAudioOff={mediasoup.isAudioMuted}
+          isHandRaised={isHandRaised}
         />
       ),
     },
@@ -177,6 +265,7 @@ export function VideoStage({
             isVideoOff={entry === null || entry.paused}
             isAudioOff={audioEntry === null || audioEntry.paused}
             isDisconnected={p.disconnected}
+            isHandRaised={p.handRaisedAt !== null}
           />
         ),
       };
@@ -190,7 +279,9 @@ export function VideoStage({
 
   return (
     /* 중앙 비디오 영역 — 스크롤 차단(overflow-hidden) */
-    <div className="px-gutter-sm py-gutter-sm flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden md:gap-[18px]">
+    <div className="px-gutter-sm py-gutter-sm relative flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden md:gap-[18px]">
+      <RaisedHands hands={raisedHands} />
+
       {/* 화면 공유 stage. 공유가 없으면 자리만 비운다(타일 컨테이너의 형제 위치를 유지). */}
       {hasScreen && (
         <div className="bg-screen-bg relative min-h-0 flex-1 overflow-hidden rounded-2xl shadow-[0_14px_40px_rgba(0,0,0,0.4)] md:rounded-[20px]">
@@ -293,6 +384,8 @@ export function VideoStage({
           </div>
         </nav>
       )}
+
+      <ReactionBubbles bubbles={reactionBubbles} />
     </div>
   );
 }

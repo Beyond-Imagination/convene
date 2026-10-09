@@ -73,6 +73,7 @@ describe('Participant', () => {
         leftAt: null,
         connectionId: 'socket-1',
         disconnectedAt: null,
+        handRaisedAt: null,
       });
       p.leave(at1);
       expect(p.snapshot()).toEqual({
@@ -81,6 +82,7 @@ describe('Participant', () => {
         joinedAt: at0,
         connectionId: 'socket-1',
         disconnectedAt: null,
+        handRaisedAt: null,
         leftAt: at1,
       });
     });
@@ -215,6 +217,74 @@ describe('Participant', () => {
       expect(restored.connectionId).toBe('socket-a');
       expect(restored.disconnectedAt).toEqual(at1);
       expect(restored.snapshot()).toEqual(p.snapshot());
+    });
+  });
+
+  describe('손들기', () => {
+    const at2 = new Date('2026-01-01T00:02:00Z');
+
+    it('입장 직후에는 손을 내린 상태다', () => {
+      const p = Participant.join('p-1', 'alice', at0);
+      expect(p.isHandRaised).toBe(false);
+      expect(p.handRaisedAt).toBeNull();
+    });
+
+    it('raiseHand로 들고 lowerHand로 내린다', () => {
+      const p = Participant.join('p-1', 'alice', at0);
+      p.raiseHand(at1);
+      expect(p.isHandRaised).toBe(true);
+      expect(p.handRaisedAt).toBe(at1);
+      p.lowerHand();
+      expect(p.isHandRaised).toBe(false);
+      expect(p.handRaisedAt).toBeNull();
+    });
+
+    it('이미 든 손을 다시 들어도 처음 시각을 유지한다', () => {
+      const p = Participant.join('p-1', 'alice', at0);
+      p.raiseHand(at1);
+      p.raiseHand(at2);
+      expect(p.handRaisedAt).toBe(at1);
+    });
+
+    it('내린 손을 다시 내려도 거부하지 않는다', () => {
+      const p = Participant.join('p-1', 'alice', at0);
+      expect(() => p.lowerHand()).not.toThrow();
+    });
+
+    it('퇴장한 참가자는 손을 들 수 없다', () => {
+      const p = Participant.join('p-1', 'alice', at0);
+      p.leave(at1);
+      expect(() => p.raiseHand(at2)).toThrow();
+    });
+
+    it('유예 안의 reconnect는 손을 유지하고, 유예 만료 후 rejoin은 내린다', () => {
+      const kept = Participant.join('p-1', 'alice', at0, 'socket-a');
+      kept.raiseHand(at0);
+      kept.disconnect(at1);
+      kept.reconnect('socket-b', at2);
+      expect(kept.isHandRaised).toBe(true);
+
+      const reset = Participant.join('p-2', 'bob', at0, 'socket-c');
+      reset.raiseHand(at0);
+      reset.leave(at1);
+      reset.rejoin('socket-d', at2);
+      expect(reset.isHandRaised).toBe(false);
+    });
+
+    it('handRaisedAt은 snapshot round-trip에서 보존되고, 구버전 snapshot은 내린 상태로 복원한다', () => {
+      const p = Participant.join('p-1', 'alice', at0);
+      p.raiseHand(at1);
+      const restored = Participant.fromSnapshot(p.snapshot());
+      expect(restored.handRaisedAt).toEqual(at1);
+      expect(restored.snapshot()).toEqual(p.snapshot());
+
+      const legacy = Participant.fromSnapshot({
+        id: 'p-1',
+        nickname: 'alice',
+        joinedAt: at0,
+        leftAt: null,
+      });
+      expect(legacy.isHandRaised).toBe(false);
     });
   });
 });

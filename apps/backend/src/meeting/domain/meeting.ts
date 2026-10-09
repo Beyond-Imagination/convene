@@ -173,6 +173,14 @@ export class Meeting {
     return participant;
   }
 
+  setHand(id: string, raised: boolean, at: Date): Participant {
+    const participant = this.requireParticipant(id, 'setHand');
+    if (raised) participant.raiseHand(at);
+    else participant.lowerHand();
+    this.touchActive(at);
+    return participant;
+  }
+
   /** 퇴장 시각을 `now`로 잡아 idle 시계가 만료 시점부터 돌게 한다. */
   expireDisconnected(now: Date, graceMs: number): Participant[] {
     if (this._endedAt !== null) return [];

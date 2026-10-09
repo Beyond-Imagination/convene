@@ -9,11 +9,17 @@ import {
 import { Meeting } from '@/meeting/domain/meeting';
 import { IdleTimeout } from '@/meeting/domain/value-objects/idle-timeout';
 import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
-import { ChatDto, JoinMeetingDto, LeaveMeetingDto } from '@/meeting/interface/meeting.dto';
+import {
+  ChatDto,
+  HandDto,
+  JoinMeetingDto,
+  LeaveMeetingDto,
+  ReactDto,
+} from '@/meeting/interface/meeting.dto';
 import { chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
 import { externalReference } from '@/shared-kernel/domain/value-objects/external-reference';
 
-import { MeetingGateway } from './meeting.gateway';
+import { MeetingGateway, REACT_MIN_INTERVAL_MS } from './meeting.gateway';
 
 const fakeLogger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
 
@@ -186,7 +192,19 @@ describe('MeetingGateway.handleJoin', () => {
       participantId: 'p-1',
       reconnected: true,
       chat: [{ nickname: 'bob', text: '먼저 시작할게요', sentAt: t1.toISOString() }],
+      handRaisedAt: null,
     });
+  });
+
+  it('유예 안에 돌아온 참가자에게 들고 있던 손을 ack로 복원해 준다', async () => {
+    const { gateway, meeting } = makeGateway(true);
+    meeting.setHand('p-1', true, t1);
+    const { socket } = makeSocket('s1');
+    const ack = await gateway.handleJoin(
+      dtoOf({ participantId: 'p-1' }),
+      socket as unknown as Socket,
+    );
+    expect(ack.ok && ack.handRaisedAt).toBe(t1.toISOString());
   });
 
   it('본인에게만 기존 참가자 스냅숏을 보내며 자기 자신은 제외한다', async () => {
@@ -204,6 +222,7 @@ describe('MeetingGateway.handleJoin', () => {
               nickname: 'bob',
               joinedAt: t1.toISOString(),
               disconnected: false,
+              handRaisedAt: null,
             },
           ],
         },
@@ -219,6 +238,18 @@ describe('MeetingGateway.handleJoin', () => {
     await gateway.handleJoin(dtoOf({ participantId: 'p-1' }), socket as unknown as Socket);
     const payload = selfEmits[0].payload as { participants: Array<{ disconnected: boolean }> };
     expect(payload.participants[0].disconnected).toBe(true);
+  });
+
+  it('스냅숏은 손 든 시각을 싣는다 — 늦게 들어와도 손든 순서대로 보여야 한다', async () => {
+    const { gateway, meeting } = makeGateway();
+    meeting.addParticipant('p-2', 'bob', t1, 's2');
+    meeting.setHand('p-2', true, t1);
+    const { socket, selfEmits } = makeSocket('s1');
+    await gateway.handleJoin(dtoOf({ participantId: 'p-1' }), socket as unknown as Socket);
+    const payload = selfEmits[0].payload as {
+      participants: Array<{ handRaisedAt: string | null }>;
+    };
+    expect(payload.participants[0].handRaisedAt).toBe(t1.toISOString());
   });
 
   it('참가자 입장 broadcast는 handleJoin이 직접 보내지 않는다 (도메인 이벤트 구독이 담당)', async () => {
@@ -572,6 +603,141 @@ describe('MeetingGateway.handleChat', () => {
     await expect(gateway.handleChat(chatDtoOf(), socket as unknown as Socket)).rejects.toThrow(
       /not found/,
     );
+    expect(broadcasts).toEqual([]);
+  });
+});
+
+describe('MeetingGateway.handleReact / handleHand', () => {
+  const tNow = new Date('2026-01-01T00:03:00Z');
+
+  const makeGateway = () => {
+    const service = {
+      react: jest.fn(async (cmd: { participantId: string; kind: string }) => ({
+        participantId: cmd.participantId,
+        nickname: 'alice',
+        kind: cmd.kind,
+        sentAt: tNow,
+      })),
+      setHand: jest.fn(async (cmd: { participantId: string; raised: boolean }) => ({
+        participantId: cmd.participantId,
+        handRaisedAt: cmd.raised ? tNow : null,
+      })),
+    };
+    const gateway = new MeetingGateway(service as never, fakeLogger as never);
+    const { server, broadcasts } = makeServer();
+    gateway.server = server as never;
+    return { gateway, service, broadcasts };
+  };
+
+  const reactDtoOf = (): ReactDto => {
+    const dto = new ReactDto();
+    dto.code = 'abc12xyz';
+    dto.kind = 'party';
+    return dto;
+  };
+
+  const handDtoOf = (raised: boolean): HandDto => {
+    const dto = new HandDto();
+    dto.code = 'abc12xyz';
+    dto.raised = raised;
+    return dto;
+  };
+
+  it('리액션을 안정 participantId로 보내고 본인 포함 room 전체에 브로드캐스트한다', async () => {
+    const { gateway, service, broadcasts } = makeGateway();
+    const { socket, data } = makeSocket('s1');
+    data.participantId = 'p-1';
+    await expect(gateway.handleReact(reactDtoOf(), socket as unknown as Socket)).resolves.toEqual({
+      ok: true,
+    });
+    expect(service.react).toHaveBeenCalledWith({
+      code: 'abc12xyz',
+      participantId: 'p-1',
+      kind: 'party',
+    });
+    expect(broadcasts).toEqual([
+      {
+        room: 'meeting:abc12xyz',
+        event: MEETING_WS_EVENTS.REACTION,
+        payload: {
+          participantId: 'p-1',
+          nickname: 'alice',
+          kind: 'party',
+          sentAt: tNow.toISOString(),
+        },
+      },
+    ]);
+  });
+
+  it('손들기 변경을 본인 포함 room 전체에 브로드캐스트한다', async () => {
+    const { gateway, service, broadcasts } = makeGateway();
+    const { socket, data } = makeSocket('s1');
+    data.participantId = 'p-1';
+    await gateway.handleHand(handDtoOf(true), socket as unknown as Socket);
+    expect(service.setHand).toHaveBeenCalledWith({
+      code: 'abc12xyz',
+      participantId: 'p-1',
+      raised: true,
+    });
+    expect(broadcasts).toEqual([
+      {
+        room: 'meeting:abc12xyz',
+        event: MEETING_WS_EVENTS.HAND_CHANGED,
+        payload: { participantId: 'p-1', handRaisedAt: tNow.toISOString() },
+      },
+    ]);
+  });
+
+  describe('리액션 연타 제한', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.setSystemTime(tNow);
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('같은 연결이 간격 안에 다시 보내면 조용히 버린다 — 서비스 호출도 브로드캐스트도 없다', async () => {
+      const { gateway, service, broadcasts } = makeGateway();
+      const { socket } = makeSocket('s1');
+      await gateway.handleReact(reactDtoOf(), socket as unknown as Socket);
+      await expect(gateway.handleReact(reactDtoOf(), socket as unknown as Socket)).resolves.toEqual(
+        { ok: false },
+      );
+      expect(service.react).toHaveBeenCalledTimes(1);
+      expect(broadcasts).toHaveLength(1);
+    });
+
+    it('간격이 지나면 다시 받는다', async () => {
+      const { gateway, service } = makeGateway();
+      const { socket } = makeSocket('s1');
+      await gateway.handleReact(reactDtoOf(), socket as unknown as Socket);
+      jest.advanceTimersByTime(REACT_MIN_INTERVAL_MS);
+      await gateway.handleReact(reactDtoOf(), socket as unknown as Socket);
+      expect(service.react).toHaveBeenCalledTimes(2);
+    });
+
+    it('여러 사람이 동시에 보내는 것은 서로 막지 않는다', async () => {
+      const { gateway, service, broadcasts } = makeGateway();
+      for (const id of ['s1', 's2', 's3']) {
+        const { socket } = makeSocket(id);
+        await gateway.handleReact(reactDtoOf(), socket as unknown as Socket);
+      }
+      expect(service.react).toHaveBeenCalledTimes(3);
+      expect(broadcasts).toHaveLength(3);
+    });
+  });
+
+  it('서비스가 거부하면 브로드캐스트하지 않는다', async () => {
+    const { gateway, service, broadcasts } = makeGateway();
+    service.react.mockRejectedValueOnce(new Error('not active'));
+    service.setHand.mockRejectedValueOnce(new Error('closed'));
+    const { socket } = makeSocket('s1');
+    await expect(gateway.handleReact(reactDtoOf(), socket as unknown as Socket)).rejects.toThrow();
+    await expect(
+      gateway.handleHand(handDtoOf(true), socket as unknown as Socket),
+    ).rejects.toThrow();
     expect(broadcasts).toEqual([]);
   });
 });

@@ -1,8 +1,8 @@
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 
 import type { RemoteMediaEntry } from '@/feature/meeting/hooks/useMediasoupViewModel';
 
-import { RemoteAudioPlayer } from './MeetingMedia';
+import { RemoteAudioPlayer, VideoTile } from './MeetingMedia';
 
 const fakeAudioTrack = (id: string): MediaStreamTrack =>
   ({ kind: 'audio', id }) as unknown as MediaStreamTrack;
@@ -93,5 +93,19 @@ describe('RemoteAudioPlayer', () => {
     const player = container.querySelector('[data-testid="remote-audio-player"]');
     expect(player).not.toBeNull();
     expect(player!.getAttribute('aria-hidden')).toBe('true');
+  });
+});
+
+describe('VideoTile 손들기', () => {
+  it('손을 들면 손들기 배지를 보여 준다', () => {
+    const { rerender } = render(
+      <VideoTile
+        label="아"
+        isHandRaised
+      />,
+    );
+    expect(screen.getByRole('img', { name: '손 듦' })).toHaveTextContent('✋');
+    rerender(<VideoTile label="아" />);
+    expect(screen.queryByRole('img', { name: '손 듦' })).not.toBeInTheDocument();
   });
 });

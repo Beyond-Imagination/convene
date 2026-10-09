@@ -99,6 +99,7 @@ const defaultAck: JoinMeetingAck = {
   participantId: 'p-1',
   reconnected: false,
   chat: [],
+  handRaisedAt: null,
 };
 
 const connect = (ack: JoinMeetingAck = defaultAck): void => {
@@ -143,7 +144,7 @@ describe('useMeetingViewModel', () => {
       });
     });
     expect(result.current.remoteParticipants).toEqual([
-      { participantId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z', disconnected: false },
+      { participantId: 's2', nickname: '아', joinedAt: '2026-01-01T00:01:00.000Z', disconnected: false, handRaisedAt: null },
     ]);
   });
 
@@ -621,6 +622,7 @@ describe('useMeetingViewModel', () => {
           nickname: '아',
           joinedAt: '2026-01-01T00:01:00.000Z',
           disconnected: true,
+          handRaisedAt: null,
         },
       ]);
     });
@@ -657,6 +659,7 @@ describe('useMeetingViewModel', () => {
               nickname: '아',
               joinedAt: '2026-01-01T00:01:00.000Z',
               disconnected: true,
+              handRaisedAt: null,
             },
           ],
         });
@@ -725,6 +728,101 @@ describe('useMeetingViewModel', () => {
       connect();
       unmount();
       expect(fakeSocket.emit).toHaveBeenCalledWith(MEETING_WS_EVENTS.LEAVE, { code });
+    });
+  });
+
+  describe('손들기', () => {
+    const T1 = '2026-01-01T00:01:00.000Z';
+    const T2 = '2026-01-01T00:02:00.000Z';
+    const T3 = '2026-01-01T00:03:00.000Z';
+
+    const joinRemote = (participantId: string, nickname: string): void => {
+      fakeSocket.trigger(MEETING_WS_EVENTS.PARTICIPANT_JOINED, {
+        participantId,
+        nickname,
+        joinedAt: T1,
+      });
+    };
+
+    it('ack의 participantId와 손들기 상태를 노출한다 — 유예 안 복귀면 든 손이 유지된다', () => {
+      const { result } = setup('준');
+      connect({ ...defaultAck, participantId: 'p-1', handRaisedAt: T1 });
+      expect(result.current.selfParticipantId).toBe('p-1');
+      expect(result.current.isHandRaised).toBe(true);
+    });
+
+    it('toggleHand는 현재 상태의 반대를 서버에 요청하고, 상태는 broadcast로만 바뀐다', () => {
+      const { result } = setup('준');
+      connect();
+      act(() => {
+        result.current.toggleHand();
+      });
+      expect(fakeSocket.emit).toHaveBeenCalledWith(MEETING_WS_EVENTS.HAND, { code, raised: true });
+      expect(result.current.isHandRaised).toBe(false);
+
+      act(() => {
+        fakeSocket.trigger(MEETING_WS_EVENTS.HAND_CHANGED, { participantId: 'p-1', handRaisedAt: T1 });
+      });
+      expect(result.current.isHandRaised).toBe(true);
+      expect(result.current.remoteParticipants).toEqual([]);
+
+      act(() => {
+        fakeSocket.trigger(MEETING_WS_EVENTS.HAND_CHANGED, { participantId: 'p-1', handRaisedAt: null });
+      });
+      expect(result.current.isHandRaised).toBe(false);
+    });
+
+    it('다른 참가자의 손들기 broadcast는 그 참가자에게만 반영된다', () => {
+      const { result } = setup('준');
+      connect();
+      act(() => {
+        joinRemote('p-2', '아');
+        fakeSocket.trigger(MEETING_WS_EVENTS.HAND_CHANGED, { participantId: 'p-2', handRaisedAt: T2 });
+      });
+      expect(result.current.remoteParticipants[0].handRaisedAt).toBe(T2);
+      expect(result.current.isHandRaised).toBe(false);
+    });
+
+    it('참가자 스냅숏의 손든 시각을 반영하고, 새로 들어온 참가자는 손을 내린 상태다', () => {
+      const { result } = setup('준');
+      connect();
+      act(() => {
+        fakeSocket.trigger(MEETING_WS_EVENTS.PARTICIPANTS, {
+          participants: [
+            {
+              participantId: 'p-2',
+              nickname: '아',
+              joinedAt: T1,
+              disconnected: false,
+              handRaisedAt: T2,
+            },
+          ],
+        });
+        joinRemote('p-3', '벤');
+      });
+      expect(result.current.remoteParticipants.map((p) => p.handRaisedAt)).toEqual([T2, null]);
+    });
+
+    it('raisedHands는 본인을 포함해 손 든 순서대로 나열한다', () => {
+      const { result } = setup('준');
+      connect();
+      act(() => {
+        joinRemote('p-2', '아');
+        joinRemote('p-3', '벤');
+        fakeSocket.trigger(MEETING_WS_EVENTS.HAND_CHANGED, { participantId: 'p-3', handRaisedAt: T1 });
+        fakeSocket.trigger(MEETING_WS_EVENTS.HAND_CHANGED, { participantId: 'p-1', handRaisedAt: T2 });
+        fakeSocket.trigger(MEETING_WS_EVENTS.HAND_CHANGED, { participantId: 'p-2', handRaisedAt: T3 });
+      });
+      expect(result.current.raisedHands).toEqual([
+        { participantId: 'p-3', nickname: '벤', isSelf: false },
+        { participantId: 'p-1', nickname: '준', isSelf: true },
+        { participantId: 'p-2', nickname: '아', isSelf: false },
+      ]);
+
+      act(() => {
+        fakeSocket.trigger(MEETING_WS_EVENTS.HAND_CHANGED, { participantId: 'p-3', handRaisedAt: null });
+      });
+      expect(result.current.raisedHands.map((h) => h.nickname)).toEqual(['준', '아']);
     });
   });
 });

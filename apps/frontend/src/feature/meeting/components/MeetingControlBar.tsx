@@ -1,16 +1,21 @@
 'use client';
 
+import { REACTION_KINDS } from '@convene/shared-interfaces';
+
 import {
   ChatIcon,
   EndCallIcon,
   LeaveIcon,
   MicIcon,
   MicOffIcon,
+  REACTION_EMOJI,
+  ReactionIcon,
   ScreenShareIcon,
   VideoIcon,
   VideoOffIcon,
 } from '@/feature/meeting/components/icons';
 import type { UseMediasoupViewModel } from '@/feature/meeting/hooks/useMediasoupViewModel';
+import type { UseReactionViewModel } from '@/feature/meeting/hooks/useReactionViewModel';
 
 /** 여섯 개가 한 줄에 다 못 들어가는 폭에서는 잘리는 대신 다음 줄로 넘긴다. */
 const controlButton =
@@ -38,17 +43,27 @@ export interface MeetingControlBarProps {
   readonly isChatOpen?: boolean;
   readonly onToggleChat?: () => void;
   readonly hasUnreadChat?: boolean;
+  /** 주어지지 않으면 반응 버튼을 그리지 않는다. */
+  readonly reaction?: Pick<
+    UseReactionViewModel,
+    'canReact' | 'isPickerOpen' | 'togglePicker' | 'closePicker' | 'react'
+  >;
+  readonly isHandRaised?: boolean;
+  readonly onToggleHand?: () => void;
   readonly leave: () => void;
   readonly endMeeting: () => Promise<void>;
 }
 
-/** 회의 하단 컨트롤 바 — 마이크/카메라/화면공유/채팅/나가기/종료. */
+/** 회의 하단 컨트롤 바 — 마이크/카메라/화면공유/반응/채팅/나가기/종료. */
 export function MeetingControlBar({
   mediasoup,
   isHost,
   isChatOpen,
   onToggleChat,
   hasUnreadChat = false,
+  reaction,
+  isHandRaised = false,
+  onToggleHand,
   leave,
   endMeeting,
 }: MeetingControlBarProps) {
@@ -60,7 +75,7 @@ export function MeetingControlBar({
   const shareDisabled = !mediaReady || mediasoup.isRemoteSharingScreen;
 
   return (
-    <footer className="px-gutter-sm grid shrink-0 auto-cols-fr grid-flow-col gap-2 pb-7 pt-1.5 md:flex md:flex-wrap md:justify-center md:gap-2.5 md:pb-7 md:pt-6">
+    <footer className="px-gutter-sm relative grid shrink-0 auto-cols-fr grid-flow-col gap-2 pb-7 pt-1.5 md:flex md:flex-wrap md:justify-center md:gap-2.5 md:pb-7 md:pt-6">
       <button
         type="button"
         onClick={mediasoup.toggleAudio}
@@ -117,6 +132,81 @@ export function MeetingControlBar({
           </button>
         )}
       </div>
+
+      {reaction !== undefined && (
+        <button
+          type="button"
+          onClick={reaction.togglePicker}
+          aria-expanded={reaction.isPickerOpen}
+          aria-label={isHandRaised ? '반응, 손 든 상태' : '반응'}
+          className={`${controlButton} ${
+            reaction.isPickerOpen || isHandRaised ? controlActive : controlNeutral
+          }`}
+        >
+          {isHandRaised ? (
+            <span
+              aria-hidden="true"
+              className="text-lg leading-5"
+            >
+              ✋
+            </span>
+          ) : (
+            <ReactionIcon />
+          )}
+          반응
+        </button>
+      )}
+
+      {reaction?.isPickerOpen === true && (
+        <>
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-hidden="true"
+            data-testid="reaction-backdrop"
+            onClick={reaction.closePicker}
+            className="fixed inset-0 z-30 cursor-default"
+          />
+          <div
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') reaction.closePicker();
+            }}
+            className="border-border bg-paper absolute bottom-full left-1/2 z-40 mb-2 w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-2xl border p-2.5 shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
+          >
+            <div
+              role="group"
+              aria-label="리액션"
+              className="grid grid-cols-5 gap-1"
+            >
+              {REACTION_KINDS.map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  onClick={() => reaction.react(kind)}
+                  disabled={!reaction.canReact}
+                  aria-label={REACTION_EMOJI[kind].label}
+                  title={REACTION_EMOJI[kind].label}
+                  className="hover:bg-text/10 grid h-11 w-11 place-items-center rounded-xl text-2xl transition-transform hover:scale-110 disabled:opacity-40 md:h-12 md:w-12"
+                >
+                  {REACTION_EMOJI[kind].glyph}
+                </button>
+              ))}
+            </div>
+            {onToggleHand !== undefined && (
+              <button
+                type="button"
+                onClick={onToggleHand}
+                className={`text-action mt-2 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 font-semibold transition-colors ${
+                  isHandRaised ? controlActive : controlNeutral
+                }`}
+              >
+                <span aria-hidden="true">✋</span>
+                {isHandRaised ? '손 내리기' : '손들기'}
+              </button>
+            )}
+          </div>
+        </>
+      )}
 
       {onToggleChat !== undefined && (
         <button
