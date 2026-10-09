@@ -47,3 +47,6 @@ apps/ai-worker/bench/flow_check.py
 
 # graphify
 graphify-out/
+
+# archify
+.archify/
