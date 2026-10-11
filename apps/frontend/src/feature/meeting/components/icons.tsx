@@ -107,6 +107,14 @@ export function ChatIcon({ className }: IconProps) {
   );
 }
 
+export function CloseIcon({ className }: IconProps) {
+  return (
+    <svg {...base(className)}>
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  );
+}
+
 export function LeaveIcon({ className }: IconProps) {
   return (
     <svg {...base(className)}>
