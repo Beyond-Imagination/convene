@@ -143,6 +143,10 @@ export interface ScreenTileProps {
   readonly nickname?: string;
   readonly stream?: MediaStream | null;
   readonly track?: MediaStreamTrack | null;
+  /** 확대 배율과 이동량(px). 이름표는 확대하지 않는다. */
+  readonly zoom?: number;
+  readonly panX?: number;
+  readonly panY?: number;
 }
 
 /**
@@ -154,6 +158,9 @@ export const ScreenTile = memo(function ScreenTile({
   nickname,
   stream,
   track,
+  zoom = 1,
+  panX = 0,
+  panY = 0,
 }: ScreenTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   useMediaElementBinding({ ref: videoRef, stream: useTileStream(stream, track) });
@@ -168,6 +175,9 @@ export const ScreenTile = memo(function ScreenTile({
         muted
         playsInline
         className="h-full w-full object-contain"
+        style={
+          zoom === 1 ? undefined : { transform: `translate(${panX}px, ${panY}px) scale(${zoom})` }
+        }
       />
       <figcaption className="text-action absolute left-3 top-3 rounded-full bg-white/75 px-3 py-1.5 font-bold text-[#5b5349] md:left-[22px] md:top-5 md:px-4 md:py-2">
         {isSelf === true ? '내 화면 (공유 중)' : `${nickname ?? ''}의 화면`}

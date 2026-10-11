@@ -144,3 +144,45 @@ export function ReactionIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+export function ZoomInIcon({ className }: IconProps) {
+  return (
+    <svg {...base(className)}>
+      <circle
+        cx="11"
+        cy="11"
+        r="7"
+      />
+      <path d="M21 21l-4.35-4.35M11 8v6M8 11h6" />
+    </svg>
+  );
+}
+
+export function ZoomOutIcon({ className }: IconProps) {
+  return (
+    <svg {...base(className)}>
+      <circle
+        cx="11"
+        cy="11"
+        r="7"
+      />
+      <path d="M21 21l-4.35-4.35M8 11h6" />
+    </svg>
+  );
+}
+
+export function FullscreenIcon({ className }: IconProps) {
+  return (
+    <svg {...base(className)}>
+      <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
+    </svg>
+  );
+}
+
+export function FullscreenExitIcon({ className }: IconProps) {
+  return (
+    <svg {...base(className)}>
+      <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3" />
+    </svg>
+  );
+}
