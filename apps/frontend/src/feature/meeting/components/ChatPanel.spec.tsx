@@ -69,6 +69,18 @@ describe('ChatPanel View', () => {
     expect(screen.queryByRole('button', { name: /새 메시지/ })).not.toBeInTheDocument();
   });
 
+  it('헤더의 접기 버튼을 누르면 onClose를 호출한다', () => {
+    const onClose = vi.fn();
+    render(
+      <ChatPanel
+        {...baseVm()}
+        onClose={onClose}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '채팅 접기' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('canSend=false 면 input과 버튼이 모두 비활성화된다', () => {
     render(<ChatPanel {...baseVm({ canSend: false })} />);
     expect(screen.getByLabelText('메시지')).toBeDisabled();
