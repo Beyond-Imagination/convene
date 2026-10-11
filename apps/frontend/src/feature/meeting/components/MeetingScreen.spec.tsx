@@ -452,3 +452,110 @@ describe('MeetingScreen 손든 사람 목록', () => {
     expect(screen.getByRole('list', { name: '손 든 사람' })).toBeVisible();
   });
 });
+
+describe('MeetingScreen 화면 공유 보기 옵션·전체화면', () => {
+  const setFullscreenSupport = (enabled: boolean): void => {
+    Object.defineProperty(document, 'fullscreenEnabled', { value: enabled, configurable: true });
+  };
+  const renderSharing = () =>
+    render(
+      <MeetingScreen
+        {...baseVm()}
+        mediasoup={baseMediasoup({ isSharingScreen: true, screenStream: fakeStream() })}
+        isStripOpen
+        onToggleStrip={vi.fn()}
+      />,
+    );
+
+  afterEach(() => {
+    Object.defineProperty(document, 'fullscreenElement', { value: null, configurable: true });
+  });
+
+  it('공유가 없으면 보기 옵션·전체화면 컨트롤이 없다', () => {
+    setFullscreenSupport(true);
+    renderScreen();
+    expect(screen.queryByRole('button', { name: /보기 옵션/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '전체화면' })).not.toBeInTheDocument();
+  });
+
+  it('보기 옵션을 열면 Zoom 처럼 맞춤·채우기·원본 기준 배율이 나오고 지금 배율이 체크돼 있다', () => {
+    renderSharing();
+    fireEvent.click(screen.getByRole('button', { name: /보기 옵션/ }));
+    const labels = [
+      '창에 맞춤',
+      '화면 채우기',
+      '50%',
+      '100% (원본 크기)',
+      '150%',
+      '200%',
+      '300%',
+    ];
+    expect(screen.getAllByRole('menuitemradio')).toEqual(
+      labels.map((name) => screen.getByRole('menuitemradio', { name })),
+    );
+    expect(screen.getByRole('menuitemradio', { name: '창에 맞춤' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+  });
+
+  it('배율을 고르면 메뉴가 닫히고 버튼에 고른 배율이 보인다', () => {
+    renderSharing();
+    fireEvent.click(screen.getByRole('button', { name: /보기 옵션/ }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: '150%' }));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /보기 옵션/ })).toHaveTextContent('150%');
+  });
+
+  it('Esc 를 누르면 고르지 않고 메뉴만 닫힌다', () => {
+    renderSharing();
+    fireEvent.click(screen.getByRole('button', { name: /보기 옵션/ }));
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /보기 옵션/ })).toHaveTextContent('창에 맞춤');
+  });
+
+  it('확대 버튼을 누르면 원본 기준 배율로 커지고 버튼에 %가 보인다', () => {
+    renderSharing();
+    const stage = screen.getByTestId('screen-stage');
+    vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 960,
+      bottom: 540,
+      width: 960,
+      height: 540,
+      toJSON: () => ({}),
+    });
+    const video = screen.getByTestId('local-screen-tile').querySelector('video') as HTMLVideoElement;
+    Object.defineProperty(video, 'videoWidth', { value: 1920, configurable: true });
+    Object.defineProperty(video, 'videoHeight', { value: 1080, configurable: true });
+    fireEvent(video, new Event('loadedmetadata'));
+    fireEvent.click(screen.getByRole('button', { name: '화면 확대' }));
+    expect(screen.getByRole('button', { name: /보기 옵션/ })).toHaveTextContent('100%');
+    expect(video.style.transform).toContain('scale(2)');
+    fireEvent.click(screen.getByRole('button', { name: '화면 축소' }));
+    expect(screen.getByRole('button', { name: /보기 옵션/ })).toHaveTextContent('50%');
+  });
+
+  it('요소 전체화면을 지원하지 않는 브라우저에는 전체화면 버튼이 없다', () => {
+    setFullscreenSupport(false);
+    renderSharing();
+    expect(screen.queryByRole('button', { name: '전체화면' })).not.toBeInTheDocument();
+  });
+
+  it('전체화면 중에는 버튼이 "전체화면 종료"로 바뀌고 참가자 줄 토글을 숨긴다', () => {
+    setFullscreenSupport(true);
+    renderSharing();
+    const stage = screen.getByTestId('screen-stage');
+    stage.requestFullscreen = vi.fn(async () => {
+      Object.defineProperty(document, 'fullscreenElement', { value: stage, configurable: true });
+      document.dispatchEvent(new Event('fullscreenchange'));
+    });
+    fireEvent.click(screen.getByRole('button', { name: '전체화면' }));
+    expect(screen.getByRole('button', { name: '전체화면 종료' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /참가자 화면/ })).not.toBeInTheDocument();
+  });
+});
