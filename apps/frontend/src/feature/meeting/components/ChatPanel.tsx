@@ -2,6 +2,7 @@
 
 import type { FormEvent, Ref } from 'react';
 
+import { CloseIcon } from '@/feature/meeting/components/icons';
 import type { UseChatViewModel } from '@/feature/meeting/hooks/useChatViewModel';
 
 /**
@@ -11,7 +12,7 @@ import type { UseChatViewModel } from '@/feature/meeting/hooks/useChatViewModel'
 export type ChatPanelProps = Omit<UseChatViewModel, 'arrivals'> & {
   /** 내 닉네임. 일치하는 메시지는 카톡식으로 우측(내 메시지)에 표시한다. */
   readonly myNickname?: string | null;
-  /** 모바일에서 패널이 화면을 덮으므로 닫는 길을 헤더에 둔다. */
+  /** 헤더의 닫기 버튼. 하단 바 채팅 버튼과 같은 토글이다. */
   readonly onClose?: () => void;
   readonly listRef?: Ref<HTMLUListElement>;
   readonly onListScroll?: () => void;
@@ -52,9 +53,12 @@ export function ChatPanel({
           <button
             type="button"
             onClick={onClose}
-            className="text-muted text-xs font-semibold md:hidden"
+            aria-label="채팅 닫기"
+            title="채팅 닫기"
+            className="text-muted hover:text-text flex items-center gap-1 text-xs font-semibold transition-colors"
           >
             닫기
+            <CloseIcon className="h-4 w-4" />
           </button>
         )}
       </div>
