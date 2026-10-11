@@ -2,13 +2,24 @@
 
 import type { CSSProperties, ReactNode } from 'react';
 
-import { REACTION_EMOJI } from '@/feature/meeting/components/icons';
+import {
+  FullscreenExitIcon,
+  FullscreenIcon,
+  REACTION_EMOJI,
+  ZoomInIcon,
+  ZoomOutIcon,
+} from '@/feature/meeting/components/icons';
 import { ScreenTile, VideoTile } from '@/feature/meeting/components/MeetingMedia';
 import type { RemoteMediaEntry } from '@/feature/meeting/hooks/useMediasoupViewModel';
 import type { UseMediasoupViewModel } from '@/feature/meeting/hooks/useMediasoupViewModel';
 import type { MeetingLayoutVariant } from '@/feature/meeting/hooks/useMeetingLayoutViewModel';
 import type { RaisedHand, RemoteParticipant } from '@/feature/meeting/hooks/useMeetingViewModel';
 import type { ReactionBubble } from '@/feature/meeting/hooks/useReactionViewModel';
+import {
+  SCREEN_SCALES,
+  type ScreenScale,
+  useScreenViewerViewModel,
+} from '@/feature/meeting/hooks/useScreenViewerViewModel';
 
 /** 같은 참가자의 카메라(screen 제외) 비디오 entry를 찾는다. */
 const pickVideoEntry = (
@@ -182,6 +193,186 @@ function ReactionBubbles({ bubbles }: { readonly bubbles: ReadonlyArray<Reaction
   );
 }
 
+const scaleLabel = (scale: ScreenScale): string => {
+  if (scale === 'fit') return '창에 맞춤';
+  if (scale === 'fill') return '화면 채우기';
+  return `${scale * 100}%${scale === 1 ? ' (원본 크기)' : ''}`;
+};
+
+/** 버튼에 보일 지금 배율. 휠로 맞춘 임의 배율은 반올림한 %로. */
+const currentScaleLabel = (scale: ScreenScale | number): string =>
+  typeof scale === 'number' ? `${Math.round(scale * 100)}%` : scaleLabel(scale);
+
+const viewerButton =
+  'flex h-9 items-center gap-1.5 rounded-full px-3 font-semibold transition-colors hover:bg-white/20';
+
+const viewerIconButton =
+  'grid h-9 w-9 place-items-center rounded-full transition-colors hover:bg-white/20 disabled:cursor-not-allowed disabled:text-white/35 disabled:hover:bg-transparent';
+
+/**
+ * 화면 공유 stage — 배율·이동과 전체화면을 직접 들고 있다.
+ * 드래그마다 바뀌는 상태를 이 경계 안에 가둬 참가자 타일까지 다시 그리지 않는다.
+ */
+function ScreenStage({
+  mediasoup,
+  remoteParticipants,
+  isStripOpen,
+  onToggleStrip,
+}: {
+  readonly mediasoup: UseMediasoupViewModel;
+  readonly remoteParticipants: ReadonlyArray<RemoteParticipant>;
+  readonly isStripOpen: boolean;
+  readonly onToggleStrip?: () => void;
+}) {
+  const viewer = useScreenViewerViewModel();
+  const cursor = viewer.canPan ? (viewer.isPanning ? 'cursor-grabbing' : 'cursor-grab') : '';
+
+  return (
+    <div
+      ref={viewer.stageRef}
+      data-testid="screen-stage"
+      className="bg-screen-bg relative min-h-0 flex-1 overflow-hidden rounded-2xl shadow-[0_14px_40px_rgba(0,0,0,0.4)] md:rounded-[20px]"
+    >
+      {/* 드래그는 이 층에서만 받는다. 컨트롤까지 덮으면 pointer capture 가 버튼 클릭을 삼킨다. */}
+      <div
+        className={`absolute inset-0 ${cursor} ${viewer.canPan ? 'touch-none' : ''}`}
+        onPointerDown={viewer.onPointerDown}
+        onPointerMove={viewer.onPointerMove}
+        onPointerUp={viewer.onPointerUp}
+        onPointerCancel={viewer.onPointerUp}
+      >
+        {mediasoup.isSharingScreen && mediasoup.screenStream !== null && (
+          <ScreenTile
+            isSelf
+            stream={mediasoup.screenStream}
+            zoom={viewer.zoom}
+            panX={viewer.panX}
+            panY={viewer.panY}
+          />
+        )}
+        {remoteParticipants.map((p) => {
+          const track = pickScreenTrack(mediasoup.remoteMedia, p.participantId);
+          if (track === null) return null;
+          return (
+            <ScreenTile
+              key={`screen-${p.participantId}`}
+              nickname={p.nickname}
+              track={track}
+              zoom={viewer.zoom}
+              panX={viewer.panX}
+              panY={viewer.panY}
+            />
+          );
+        })}
+      </div>
+
+      {viewer.isMenuOpen && (
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-hidden="true"
+          onClick={viewer.closeMenu}
+          className="absolute inset-0 z-10 cursor-default"
+        />
+      )}
+
+      {/* 공유 화면(대개 밝다) 위에 얹히므로 이름표처럼 고정 색을 쓴다. */}
+      <div className="text-cap absolute right-3 top-3 z-20 flex items-center gap-0.5 rounded-full bg-black/60 p-1 text-white backdrop-blur-sm md:right-5 md:top-5">
+        <button
+          type="button"
+          onClick={viewer.zoomOut}
+          disabled={!viewer.canZoomOut}
+          aria-label="화면 축소"
+          className={viewerIconButton}
+        >
+          <ZoomOutIcon className="h-[18px] w-[18px]" />
+        </button>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={viewer.toggleMenu}
+            aria-haspopup="menu"
+            aria-expanded={viewer.isMenuOpen}
+            aria-label={`보기 옵션: ${currentScaleLabel(viewer.scale)}`}
+            className={viewerButton}
+          >
+            {currentScaleLabel(viewer.scale)}
+            <span aria-hidden="true">▾</span>
+          </button>
+          {viewer.isMenuOpen && (
+            <ul
+              role="menu"
+              aria-label="보기 옵션"
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') viewer.closeMenu();
+              }}
+              className="absolute right-0 top-full mt-2 w-max min-w-[10rem] rounded-xl bg-black/80 p-1 shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-sm"
+            >
+              {SCREEN_SCALES.map((s) => (
+                <li
+                  key={s}
+                  role="none"
+                >
+                  <button
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={viewer.scale === s}
+                    onClick={() => viewer.setScale(s)}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors hover:bg-white/15"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="w-3"
+                    >
+                      {viewer.scale === s ? '✓' : ''}
+                    </span>
+                    {scaleLabel(s)}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={viewer.zoomIn}
+          disabled={!viewer.canZoomIn}
+          aria-label="화면 확대"
+          className={viewerIconButton}
+        >
+          <ZoomInIcon className="h-[18px] w-[18px]" />
+        </button>
+        {viewer.canFullscreen && (
+          <button
+            type="button"
+            onClick={viewer.toggleFullscreen}
+            aria-label={viewer.isFullscreen ? '전체화면 종료' : '전체화면'}
+            className={viewerIconButton}
+          >
+            {viewer.isFullscreen ? (
+              <FullscreenExitIcon className="h-[18px] w-[18px]" />
+            ) : (
+              <FullscreenIcon className="h-[18px] w-[18px]" />
+            )}
+          </button>
+        )}
+      </div>
+
+      {onToggleStrip !== undefined && !viewer.isFullscreen && (
+        <button
+          type="button"
+          onClick={onToggleStrip}
+          aria-expanded={isStripOpen}
+          className="absolute bottom-0 left-1/2 z-10 hidden h-[26px] w-[360px] -translate-x-1/2 place-items-center rounded-t-xl bg-white/75 text-sm font-semibold text-[#5b5349] md:grid"
+        >
+          <span aria-hidden>{isStripOpen ? '˅' : '˄'}</span>
+          <span className="sr-only">참가자 화면 {isStripOpen ? '접기' : '펼치기'}</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
 const GRID_STYLE: CSSProperties = { gridAutoRows: 'minmax(0, 1fr)' };
 
 const pagerButton =
@@ -284,36 +475,12 @@ export function VideoStage({
 
       {/* 화면 공유 stage. 공유가 없으면 자리만 비운다(타일 컨테이너의 형제 위치를 유지). */}
       {hasScreen && (
-        <div className="bg-screen-bg relative min-h-0 flex-1 overflow-hidden rounded-2xl shadow-[0_14px_40px_rgba(0,0,0,0.4)] md:rounded-[20px]">
-          {mediasoup.isSharingScreen && mediasoup.screenStream !== null && (
-            <ScreenTile
-              isSelf
-              stream={mediasoup.screenStream}
-            />
-          )}
-          {remoteParticipants.map((p) => {
-            const track = pickScreenTrack(mediasoup.remoteMedia, p.participantId);
-            if (track === null) return null;
-            return (
-              <ScreenTile
-                key={`screen-${p.participantId}`}
-                nickname={p.nickname}
-                track={track}
-              />
-            );
-          })}
-          {onToggleStrip !== undefined && (
-            <button
-              type="button"
-              onClick={onToggleStrip}
-              aria-expanded={isStripOpen}
-              className="absolute bottom-0 left-1/2 hidden h-[26px] w-[360px] -translate-x-1/2 place-items-center rounded-t-xl bg-white/75 text-sm font-semibold text-[#5b5349] md:grid"
-            >
-              <span aria-hidden>{isStripOpen ? '˅' : '˄'}</span>
-              <span className="sr-only">참가자 화면 {isStripOpen ? '접기' : '펼치기'}</span>
-            </button>
-          )}
-        </div>
+        <ScreenStage
+          mediasoup={mediasoup}
+          remoteParticipants={remoteParticipants}
+          isStripOpen={isStripOpen}
+          onToggleStrip={onToggleStrip}
+        />
       )}
 
       {hasScreen && onToggleStrip !== undefined && (
