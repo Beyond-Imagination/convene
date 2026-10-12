@@ -13,6 +13,7 @@ const baseMediasoup = (): UseMediasoupViewModel => ({
   isSharingScreen: false,
   screenStream: null,
   isRemoteSharingScreen: false,
+  canShareScreen: true,
   isAudioMuted: false,
   isVideoMuted: false,
   isAudioToggling: false,
@@ -116,5 +117,17 @@ describe('MeetingControlBar 반응', () => {
     fireEvent.keyDown(screen.getByRole('group', { name: '리액션' }), { key: 'Escape' });
     fireEvent.click(screen.getByTestId('reaction-backdrop'));
     expect(reaction.closePicker).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('MeetingControlBar 화면 공유', () => {
+  it('화면 공유를 지원하는 브라우저면 시작 버튼을 그린다', () => {
+    renderBar();
+    expect(screen.getByRole('button', { name: '화면 공유 시작' })).toBeInTheDocument();
+  });
+
+  it('화면 공유를 지원하지 않는 브라우저면 버튼을 그리지 않는다', () => {
+    renderBar({ mediasoup: { ...baseMediasoup(), canShareScreen: false } });
+    expect(screen.queryByRole('button', { name: /화면 공유|공유 중지/ })).not.toBeInTheDocument();
   });
 });

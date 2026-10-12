@@ -162,6 +162,7 @@ const mediasoupVm = (overrides: Partial<UseMediasoupViewModel> = {}): UseMediaso
   isSharingScreen: false,
   screenStream: null,
   isRemoteSharingScreen: false,
+  canShareScreen: true,
   isAudioMuted: false,
   isVideoMuted: false,
   toggleAudio: () => {},

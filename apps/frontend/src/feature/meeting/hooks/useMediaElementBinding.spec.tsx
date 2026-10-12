@@ -159,4 +159,64 @@ describe('useMediaElementBinding', () => {
     });
     expect(playSpy).not.toHaveBeenCalled();
   });
+
+  describe('백그라운드 복귀', () => {
+    let visibility: DocumentVisibilityState = 'visible';
+
+    beforeEach(() => {
+      visibility = 'visible';
+      vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    const setVisibility = (next: DocumentVisibilityState): void => {
+      act(() => {
+        visibility = next;
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+    };
+
+    const renderPausedProbe = (stream: MediaStream | null) => {
+      let captured: HTMLVideoElement | null = null;
+      const view = render(
+        <VideoProbe
+          stream={stream}
+          exposeRef={(el) => (captured = el)}
+        />,
+      );
+      const el = captured!;
+      vi.spyOn(el, 'paused', 'get').mockReturnValue(true);
+      const playSpy = vi.spyOn(el, 'play').mockResolvedValue(undefined);
+      playSpy.mockClear();
+      return { ...view, playSpy };
+    };
+
+    it('화면으로 돌아왔을 때 OS가 멈춰 둔 요소를 다시 재생한다', () => {
+      const { playSpy } = renderPausedProbe(new MediaStream());
+      setVisibility('visible');
+      expect(playSpy).toHaveBeenCalled();
+    });
+
+    it('숨겨지는 시점에는 재생을 시도하지 않는다', () => {
+      const { playSpy } = renderPausedProbe(new MediaStream());
+      setVisibility('hidden');
+      expect(playSpy).not.toHaveBeenCalled();
+    });
+
+    it('붙은 stream이 없으면 재생을 시도하지 않는다', () => {
+      const { playSpy } = renderPausedProbe(null);
+      setVisibility('visible');
+      expect(playSpy).not.toHaveBeenCalled();
+    });
+
+    it('unmount 후에는 복귀해도 재생을 시도하지 않는다', () => {
+      const { playSpy, unmount } = renderPausedProbe(new MediaStream());
+      unmount();
+      setVisibility('visible');
+      expect(playSpy).not.toHaveBeenCalled();
+    });
+  });
 });

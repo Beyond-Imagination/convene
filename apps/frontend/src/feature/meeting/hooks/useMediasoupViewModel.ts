@@ -19,6 +19,7 @@ export interface UseMediasoupViewModel {
   readonly isSharingScreen: boolean;
   readonly screenStream: MediaStream | null;
   readonly isRemoteSharingScreen: boolean;
+  readonly canShareScreen: boolean;
   readonly isAudioMuted: boolean;
   readonly isAudioToggling: boolean;
   readonly isVideoMuted: boolean;
@@ -71,6 +72,7 @@ export function useMediasoupViewModel(
     isSharingScreen: local.isSharingScreen,
     screenStream: local.screenStream,
     isRemoteSharingScreen: remote.isRemoteSharingScreen,
+    canShareScreen: true,
     isAudioMuted: local.isAudioMuted,
     isAudioToggling: local.isAudioToggling,
     isVideoMuted: local.isVideoMuted,
