@@ -20,6 +20,7 @@ import {
   type ScreenScale,
   useScreenViewerViewModel,
 } from '@/feature/meeting/hooks/useScreenViewerViewModel';
+import { SELF_AUDIO_KEY } from '@/feature/meeting/hooks/useSpeakerViewModel';
 
 /** 같은 참가자의 카메라(screen 제외) 비디오 entry를 찾는다. */
 const pickVideoEntry = (
@@ -441,6 +442,7 @@ export function VideoStage({
           isVideoOff={mediasoup.isVideoMuted}
           isAudioOff={mediasoup.isAudioMuted}
           isHandRaised={isHandRaised}
+          audioLevelKey={SELF_AUDIO_KEY}
         />
       ),
     },
@@ -457,6 +459,7 @@ export function VideoStage({
             isAudioOff={audioEntry === null || audioEntry.paused}
             isDisconnected={p.disconnected}
             isHandRaised={p.handRaisedAt !== null}
+            audioLevelKey={p.participantId}
           />
         ),
       };

@@ -17,6 +17,10 @@ import { useMeetingLayoutViewModel } from '@/feature/meeting/hooks/useMeetingLay
 import { useMeetingViewModel } from '@/feature/meeting/hooks/useMeetingViewModel';
 import { useNicknameGateViewModel } from '@/feature/meeting/hooks/useNicknameGateViewModel';
 import { useReactionViewModel } from '@/feature/meeting/hooks/useReactionViewModel';
+import {
+  useSpeakerOrderViewModel,
+  useSpeakerViewModel,
+} from '@/feature/meeting/hooks/useSpeakerViewModel';
 import { useRouteSegment } from '@/shared/hooks/useRouteSegment';
 
 /**
@@ -63,11 +67,12 @@ function ChatSection({
 }
 
 /**
- * 실제 회의 세션. 네 ViewModel hook을 합성한다:
+ * 실제 회의 세션. 다섯 ViewModel hook을 합성한다:
  *   - `useMeetingEntryViewModel`
  *   - `useMeetingViewModel`
  *   - `useMediasoupViewModel`
  *   - `useReactionViewModel`
+ *   - `useSpeakerViewModel` (+ 발화자를 첫 페이지로 올리는 `useSpeakerOrderViewModel`)
  *
  * 채팅은 `ChatSection` 이 자기 ViewModel 을 직접 들고 있다(위 주석 참조).
  */
@@ -89,6 +94,13 @@ function MeetingSession({ code }: { readonly code: string }) {
   // self 타일(항상 1) + 원격 참가자 수 = 전체 비디오 타일 수.
   const totalTiles = 1 + meetingVm.remoteParticipants.length;
   const layout = useMeetingLayoutViewModel(totalTiles);
+  const speakerVm = useSpeakerViewModel(mediasoupVm.localAudioTrack, mediasoupVm.remoteMedia);
+  // 첫 페이지의 원격 칸 수 = 페이지 크기 - 내 타일.
+  const orderedParticipants = useSpeakerOrderViewModel(
+    meetingVm.remoteParticipants,
+    speakerVm.activeSpeaker,
+    layout.pageSize - 1,
+  );
   const gateVm = useNicknameGateViewModel(code, meetingVm.nicknameError);
 
   if (entry.state !== 'ready') {
@@ -128,6 +140,7 @@ function MeetingSession({ code }: { readonly code: string }) {
     <div className="bg-bg text-text flex h-screen overflow-hidden">
       <MeetingScreen
         {...meetingVm}
+        remoteParticipants={orderedParticipants}
         mediasoup={mediasoupVm}
         reaction={reactionVm}
         title={entry.meeting?.title ?? null}

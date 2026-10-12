@@ -69,7 +69,7 @@ export function useMediasoupViewModel(
     status: transport.status,
     errorMessage: transport.errorMessage,
     localStream: local.localStream,
-    localAudioTrack: null,
+    localAudioTrack: local.localAudioTrack,
     remoteMedia: remote.remoteMedia,
     isSharingScreen: local.isSharingScreen,
     screenStream: local.screenStream,
