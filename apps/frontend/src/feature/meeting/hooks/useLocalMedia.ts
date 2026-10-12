@@ -6,7 +6,14 @@ import {
   type MediaType,
 } from '@convene/shared-interfaces';
 import type { Producer, Transport } from 'mediasoup-client/types';
-import { type MutableRefObject, useCallback, useEffect, useRef, useState } from 'react';
+import {
+  type MutableRefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import type { Socket } from 'socket.io-client';
 
 import type { MediasoupConnectionStatus } from '@/feature/meeting/hooks/useMediasoupTransport';
@@ -14,6 +21,26 @@ import { getMediaIntent, saveMediaIntent } from '@/shared/stores/meeting.storage
 
 /** 마이크 토글 쿨다운. 서버 배선 재생성이 뒤따르므로 연타를 흘려보내지 않는다. */
 const AUDIO_TOGGLE_COOLDOWN_MS = 700;
+
+// 오디오는 노이즈 억제/에코 제거/자동 게인을 명시적으로 요청한다(기본값 의존 X).
+// voiceIsolation은 표준 외(Chrome/Edge 110+): 지원 시 ML 음성 격리 강화, 미지원 시 무시.
+const constraintsFor = (kind: 'audio' | 'video'): MediaStreamConstraints =>
+  kind === 'audio'
+    ? {
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          voiceIsolation: true,
+        } as MediaTrackConstraints,
+      }
+    : { video: true };
+
+// 모바일 브라우저에는 getDisplayMedia가 없다. 지원 여부는 바뀌지 않으므로 구독할 것이 없다.
+const subscribeNever = (): (() => void) => () => {};
+const supportsDisplayMedia = (): boolean =>
+  typeof navigator.mediaDevices?.getDisplayMedia === 'function';
+const supportsDisplayMediaOnServer = (): boolean => false;
 
 export interface LocalMediaDeps {
   readonly socket: Socket | null;
@@ -27,6 +54,8 @@ export interface UseLocalMedia {
   readonly localStream: MediaStream | null;
   readonly screenStream: MediaStream | null;
   readonly isSharingScreen: boolean;
+  /** 이 브라우저가 화면 공유를 지원하는지. */
+  readonly canShareScreen: boolean;
   /** 내 마이크가 mute(paused) 상태인지. */
   readonly isAudioMuted: boolean;
   /** 내 카메라가 mute(paused) 상태인지. */
@@ -65,6 +94,11 @@ export function useLocalMedia({
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [isSharingScreen, setIsSharingScreen] = useState(false);
+  const canShareScreen = useSyncExternalStore(
+    subscribeNever,
+    supportsDisplayMedia,
+    supportsDisplayMediaOnServer,
+  );
   // 미디어 기본 OFF — 입장 시엔 카메라/마이크를 잡지 않고(lazy), 사용자가 토글로 켤 때 비로소 getUserMedia로 취득한다. 따라서 초깃값은 muted=true.
   const [isAudioMuted, setIsAudioMuted] = useState(true);
   // 토글마다 서버가 PlainTransport·ffmpeg 배선을 새로 만든다. 연속 클릭을 막는다.
@@ -145,20 +179,7 @@ export function useLocalMedia({
       const sendTransport = sendTransportRef.current;
       if (sendTransport === null) return;
       try {
-        // 오디오는 노이즈 억제/에코 제거/자동 게인을 명시적으로 요청한다(기본값 의존 X).
-        // voiceIsolation은 표준 외(Chrome/Edge 110+): 지원 시 ML 음성 격리 강화, 미지원 시 무시.
-        const constraints: MediaStreamConstraints =
-          kind === 'audio'
-            ? {
-                audio: {
-                  echoCancellation: true,
-                  noiseSuppression: true,
-                  autoGainControl: true,
-                  voiceIsolation: true,
-                } as MediaTrackConstraints,
-              }
-            : { video: true };
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const stream = await navigator.mediaDevices.getUserMedia(constraintsFor(kind));
         const track = kind === 'audio' ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0];
         if (track === undefined) {
           stream.getTracks().forEach((t) => t.stop());
@@ -229,6 +250,42 @@ export function useLocalMedia({
     }
   }, [status, code, toggleMedia]);
 
+  /**
+   * 모바일은 앱 전환 중 카메라·마이크를 회수해 트랙을 끝내 버린다. 돌아오면 새로 잡아 같은
+   * producer에 갈아 끼운다 — 새로 produce 하면 다른 참가자 쪽 consumer까지 다시 만들어진다.
+   */
+  useEffect(() => {
+    const reacquire = async (
+      kind: 'audio' | 'video',
+      producerRef: MutableRefObject<Producer | null>,
+      streamRef: MutableRefObject<MediaStream | null>,
+    ): Promise<void> => {
+      const producer = producerRef.current;
+      if (producer === null || producer.track?.readyState !== 'ended') return;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraintsFor(kind));
+        const track = kind === 'audio' ? stream.getAudioTracks()[0] : stream.getVideoTracks()[0];
+        if (track === undefined || producerRef.current !== producer) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        await producer.replaceTrack({ track: track as never });
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+        streamRef.current = stream;
+        if (kind === 'video') setLocalStream(stream);
+      } catch (e) {
+        reportError(e instanceof Error ? e.message : String(e));
+      }
+    };
+    const onVisibilityChange = (): void => {
+      if (document.visibilityState !== 'visible') return;
+      void reacquire('audio', audioProducerRef, audioStreamRef);
+      void reacquire('video', videoProducerRef, localStreamRef);
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [reportError]);
+
   const startScreenShare = useCallback(async () => {
     if (screenProducerRef.current !== null) return;
     const sendTransport = sendTransportRef.current;
@@ -292,6 +349,7 @@ export function useLocalMedia({
     localStream,
     screenStream,
     isSharingScreen,
+    canShareScreen,
     isAudioMuted,
     isVideoMuted,
     toggleAudio,

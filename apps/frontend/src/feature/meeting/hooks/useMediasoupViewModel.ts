@@ -72,7 +72,7 @@ export function useMediasoupViewModel(
     isSharingScreen: local.isSharingScreen,
     screenStream: local.screenStream,
     isRemoteSharingScreen: remote.isRemoteSharingScreen,
-    canShareScreen: true,
+    canShareScreen: local.canShareScreen,
     isAudioMuted: local.isAudioMuted,
     isAudioToggling: local.isAudioToggling,
     isVideoMuted: local.isVideoMuted,
