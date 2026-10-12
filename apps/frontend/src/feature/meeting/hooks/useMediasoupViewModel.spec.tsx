@@ -13,6 +13,7 @@ class FakeTrack {
   readonly kind: 'audio' | 'video';
   readonly stop = vi.fn();
   enabled = true;
+  readyState: 'live' | 'ended' = 'live';
   private readonly handlers = new Map<string, Array<() => void>>();
   readonly addEventListener = vi.fn((event: string, cb: () => void) => {
     const arr = this.handlers.get(event) ?? [];
@@ -61,9 +62,12 @@ class FakeProducer {
     this.paused = false;
   });
   readonly close = vi.fn();
+  readonly replaceTrack = vi.fn(async ({ track }: { track: FakeTrack }) => {
+    this.track = track;
+  });
   constructor(
     readonly id: string,
-    readonly track: FakeTrack,
+    public track: FakeTrack,
   ) {}
 }
 
@@ -122,6 +126,7 @@ class FakeSocket {
   readonly off = vi.fn();
   readonly emit = vi.fn();
   readonly disconnect = vi.fn();
+  connected = true;
 }
 
 const code = 'abc12xyz';
@@ -144,7 +149,6 @@ const renderMediasoup = (socket: FakeSocket) => {
   };
   return { ...hook, rejoin };
 };
-
 
 const setupSocketAcks = (socket: FakeSocket) => {
   socket.emitWithAck.mockImplementation(async (event: string, _payload: unknown) => {
@@ -622,9 +626,9 @@ describe('useMediasoupViewModel.recoveryStage', () => {
 
     await waitFor(() => expect(fakeDevice.createSendTransport).toHaveBeenCalledTimes(2));
     // 서버가 이미 정리한 transportId로 RPC를 보내면 소유권 검사에서 거부된다.
-    expect(
-      socket.emit.mock.calls.some((c) => c[0] === MEDIASOUP_WS_EVENTS.RESTART_ICE),
-    ).toBe(false);
+    expect(socket.emit.mock.calls.some((c) => c[0] === MEDIASOUP_WS_EVENTS.RESTART_ICE)).toBe(
+      false,
+    );
   });
 
   it('유예 안 복귀이고 transport가 살아 있으면 아무것도 재생성하지 않는다', async () => {
@@ -659,6 +663,126 @@ describe('useMediasoupViewModel.recoveryStage', () => {
     expect(recv.restartIce).toHaveBeenCalled();
     expect(fakeDevice.createSendTransport).toHaveBeenCalledTimes(1);
     expect(send.close).not.toHaveBeenCalled();
+  });
+
+  const failTransport = async (transport: FakeTransport): Promise<void> => {
+    await act(async () => {
+      transport.connectionState = 'failed';
+      transport.listeners.get('connectionstatechange')?.forEach((fn) => fn('failed'));
+    });
+  };
+
+  it('소켓은 그대로인데 transport가 failed로 바뀌면 ICE만 다시 협상한다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderMediasoup(socket);
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    const send = fakeDevice.createSendTransport.mock.results[0].value as FakeTransport;
+    const recv = fakeDevice.createRecvTransport.mock.results[0].value as FakeTransport;
+
+    await failTransport(recv);
+
+    await waitFor(() => expect(recv.restartIce).toHaveBeenCalled());
+    expect(send.restartIce).not.toHaveBeenCalled();
+    expect(fakeDevice.createRecvTransport).toHaveBeenCalledTimes(1);
+  });
+
+  it('소켓까지 끊긴 상태의 failed는 건드리지 않는다 — 재입장 ack이 복구를 맡는다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result } = renderMediasoup(socket);
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    const recv = fakeDevice.createRecvTransport.mock.results[0].value as FakeTransport;
+    socket.connected = false;
+
+    await failTransport(recv);
+
+    expect(recv.restartIce).not.toHaveBeenCalled();
+    expect(fakeDevice.createRecvTransport).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useMediasoupViewModel.backgroundResume', () => {
+  let visibility: DocumentVisibilityState = 'visible';
+
+  beforeEach(() => {
+    fakeDevice = new FakeDevice();
+    getUserMediaMock = vi.fn(async () => new FakeMediaStream());
+    vi.stubGlobal('navigator', {
+      mediaDevices: { getUserMedia: getUserMediaMock },
+    });
+    window.sessionStorage.clear();
+    visibility = 'visible';
+    vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  const setVisibility = async (next: DocumentVisibilityState): Promise<void> => {
+    await act(async () => {
+      visibility = next;
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+  };
+
+  const setupWithCamera = async (socket: FakeSocket) => {
+    const hook = renderMediasoup(socket);
+    await waitFor(() => expect(hook.result.current.status).toBe('ready'));
+    await act(async () => {
+      hook.result.current.toggleVideo();
+    });
+    await waitFor(() => expect(hook.result.current.isVideoMuted).toBe(false));
+    const send = fakeDevice.createSendTransport.mock.results[0].value as FakeTransport;
+    const producer = (await send.produce.mock.results[0].value) as FakeProducer;
+    return { ...hook, producer };
+  };
+
+  it('백그라운드 동안 OS가 카메라 트랙을 끊었으면 복귀 시 다시 취득해 같은 producer에 갈아 끼운다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { result, producer } = await setupWithCamera(socket);
+    const before = result.current.localStream;
+    producer.track.readyState = 'ended';
+    socket.emit.mockClear();
+
+    await setVisibility('visible');
+
+    await waitFor(() => expect(producer.replaceTrack).toHaveBeenCalled());
+    expect(getUserMediaMock).toHaveBeenLastCalledWith({ video: true });
+    expect(producer.track.readyState).toBe('live');
+    // 새 producer를 만들면 다른 참가자 쪽 consumer가 전부 다시 만들어진다.
+    expect(socket.emit.mock.calls.some((c) => c[0] === MEDIASOUP_WS_EVENTS.CLOSE_PRODUCER)).toBe(
+      false,
+    );
+    await waitFor(() => expect(result.current.localStream).not.toBe(before));
+    expect(result.current.isVideoMuted).toBe(false);
+  });
+
+  it('트랙이 살아 있으면 복귀해도 디바이스를 다시 잡지 않는다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { producer } = await setupWithCamera(socket);
+    getUserMediaMock.mockClear();
+
+    await setVisibility('visible');
+
+    expect(getUserMediaMock).not.toHaveBeenCalled();
+    expect(producer.replaceTrack).not.toHaveBeenCalled();
+  });
+
+  it('숨겨지는 시점에는 디바이스를 다시 잡지 않는다', async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const { producer } = await setupWithCamera(socket);
+    producer.track.readyState = 'ended';
+    getUserMediaMock.mockClear();
+
+    await setVisibility('hidden');
+
+    expect(getUserMediaMock).not.toHaveBeenCalled();
   });
 });
 
@@ -781,6 +905,17 @@ describe('useMediasoupViewModel.screenShare', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('getDisplayMedia를 지원하는 브라우저면 canShareScreen=true', () => {
+    const { result } = renderHook(() => useMediasoupViewModel(null, code));
+    expect(result.current.canShareScreen).toBe(true);
+  });
+
+  it('getDisplayMedia가 없는 브라우저(모바일)면 canShareScreen=false', () => {
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: getUserMediaMock } });
+    const { result } = renderHook(() => useMediasoupViewModel(null, code));
+    expect(result.current.canShareScreen).toBe(false);
   });
 
   it('초기 상태에서 isSharingScreen은 false이고 screenStream은 null 이다', async () => {

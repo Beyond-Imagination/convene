@@ -30,6 +30,10 @@ export function useMediaElementBinding<T extends HTMLMediaElement = HTMLMediaEle
       }
     };
     const onLoadedData = (): void => tryPlay();
+    // 모바일은 앱 전환 시 재생을 멈추고, 돌아와도 스스로 재개하지 않는다(검은 화면).
+    const onVisibilityChange = (): void => {
+      if (document.visibilityState === 'visible' && el.paused) tryPlay();
+    };
 
     if (stream === null || !enabled) {
       el.removeEventListener('loadeddata', onLoadedData);
@@ -46,6 +50,7 @@ export function useMediaElementBinding<T extends HTMLMediaElement = HTMLMediaEle
       el.srcObject = stream;
     }
     el.addEventListener('loadeddata', onLoadedData);
+    document.addEventListener('visibilitychange', onVisibilityChange);
     // 이미 데이터가 준비됐다면(예: 재사용된 stream) 즉시 play() 시도.
     if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
       tryPlay();
@@ -53,6 +58,7 @@ export function useMediaElementBinding<T extends HTMLMediaElement = HTMLMediaEle
 
     return () => {
       el.removeEventListener('loadeddata', onLoadedData);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [ref, stream, enabled]);
 }

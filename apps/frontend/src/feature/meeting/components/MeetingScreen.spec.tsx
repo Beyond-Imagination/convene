@@ -20,6 +20,7 @@ const baseMediasoup = (overrides: Partial<UseMediasoupViewModel> = {}): UseMedia
   isSharingScreen: false,
   screenStream: null,
   isRemoteSharingScreen: false,
+  canShareScreen: true,
   isAudioMuted: false,
   isVideoMuted: false,
   toggleAudio: vi.fn(),

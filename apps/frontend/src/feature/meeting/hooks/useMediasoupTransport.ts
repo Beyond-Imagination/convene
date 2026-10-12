@@ -63,51 +63,59 @@ export function useMediasoupTransport(
    * WebRTC transport는 시그널링 소켓과 독립이라, 소켓이 끊겼다고 미디어가 끊긴 것은 아니다.
    * connected면 재동기화만, 끊겼으면 ICE만 재협상, 그마저 실패하면 전면 재생성.
    */
-  const recover = useCallback(async (): Promise<void> => {
-    if (socket === null) return;
-    if (!mediaPreserved) {
-      setReconnectGen((g) => g + 1);
-      return;
-    }
-    const transports = [sendTransportRef.current, recvTransportRef.current];
-    if (transports.some((t) => t === null || t.closed)) {
-      setReconnectGen((g) => g + 1);
-      return;
-    }
-    const broken = (transports as Transport[]).filter((t) => t.connectionState !== 'connected');
-    if (broken.length === 0) {
-      setResumeGen((g) => g + 1);
-      return;
-    }
-    try {
-      for (const transport of broken) {
-        const res = await rpcWithTimeout<RestartIceResponse>(
-          socket,
-          MEDIASOUP_WS_EVENTS.RESTART_ICE,
-          { code, transportId: transport.id },
-          // 서버 로컬 연산이라 즉답이 정상이다. 실패는 ack 없이 오므로,
-          // 기본 타임아웃을 쓰면 전면 재생성으로 내려가기까지 10초를 버린다.
-          RESTART_ICE_TIMEOUT_MS,
-        );
-        await transport.restartIce({ iceParameters: res.iceParameters as never });
+  const recover = useCallback(
+    async (preserved: boolean): Promise<void> => {
+      if (socket === null) return;
+      if (!preserved) {
+        setReconnectGen((g) => g + 1);
+        return;
       }
-      setResumeGen((g) => g + 1);
-    } catch (err) {
-      console.warn('[mediasoup] ICE restart 실패 — 전면 재생성으로 내려간다', err);
-      setReconnectGen((g) => g + 1);
-    }
-  }, [socket, code, mediaPreserved]);
+      const transports = [sendTransportRef.current, recvTransportRef.current];
+      if (transports.some((t) => t === null || t.closed)) {
+        setReconnectGen((g) => g + 1);
+        return;
+      }
+      const broken = (transports as Transport[]).filter((t) => t.connectionState !== 'connected');
+      if (broken.length === 0) {
+        setResumeGen((g) => g + 1);
+        return;
+      }
+      try {
+        for (const transport of broken) {
+          const res = await rpcWithTimeout<RestartIceResponse>(
+            socket,
+            MEDIASOUP_WS_EVENTS.RESTART_ICE,
+            { code, transportId: transport.id },
+            // 서버 로컬 연산이라 즉답이 정상이다. 실패는 ack 없이 오므로,
+            // 기본 타임아웃을 쓰면 전면 재생성으로 내려가기까지 10초를 버린다.
+            RESTART_ICE_TIMEOUT_MS,
+          );
+          await transport.restartIce({ iceParameters: res.iceParameters as never });
+        }
+        setResumeGen((g) => g + 1);
+      } catch (err) {
+        console.warn('[mediasoup] ICE restart 실패 — 전면 재생성으로 내려간다', err);
+        setReconnectGen((g) => g + 1);
+      }
+    },
+    [socket, code],
+  );
 
   // 소켓 'connect'가 아니라 재입장 ack을 기다린다. 그 전에 RPC를 보내면 서버가 이 소켓의
   // 신원을 몰라 socket.id로 대체하고, 그 ID의 미디어는 없으므로 요청이 통째로 실패한다.
   useEffect(() => {
     if (rejoinGen === 0) return;
-    void recover();
-  }, [rejoinGen, recover]);
+    void recover(mediaPreserved);
+  }, [rejoinGen, mediaPreserved, recover]);
 
   useEffect(() => {
     if (socket === null) return undefined;
     let cancelled = false;
+    // 소켓이 끊긴 동안의 failed는 재입장 ack이 맡는다. 여기선 소켓만 멀쩡한 경우
+    // (모바일 앱 전환 등)를 잡는다 — 서버는 내 미디어를 그대로 들고 있다.
+    const onConnectionStateChange = (state: string): void => {
+      if (state === 'failed' && !cancelled && socket.connected) void recover(true);
+    };
 
     void (async () => {
       try {
@@ -164,6 +172,7 @@ export function useMediasoupTransport(
               errback(err instanceof Error ? err : new Error(String(err)));
             });
         });
+        sendTransport.on('connectionstatechange', onConnectionStateChange);
         sendTransportRef.current = sendTransport;
 
         const recvOpts = await rpcWithTimeout<CreateTransportResponse>(
@@ -185,6 +194,7 @@ export function useMediasoupTransport(
               errback(err instanceof Error ? err : new Error(String(err)));
             });
         });
+        recvTransport.on('connectionstatechange', onConnectionStateChange);
         recvTransportRef.current = recvTransport;
 
         setStatus('ready');
@@ -211,7 +221,7 @@ export function useMediasoupTransport(
       // 여기서 status를 되돌리지 않는다. effect body가 즉시 'preparing'으로 올리고,
       // 그 전이를 보고 useLocalMedia/useRemoteMedia가 각자의 stale 미디어를 비운다.
     };
-  }, [socket, code, reconnectGen]);
+  }, [socket, code, reconnectGen, recover]);
 
   const reportError = useCallback((message: string) => {
     setErrorMessage(message);

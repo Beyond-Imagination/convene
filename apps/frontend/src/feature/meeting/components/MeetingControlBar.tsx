@@ -108,30 +108,32 @@ export function MeetingControlBar({
         />
       </button>
 
-      {/* 모바일 브라우저는 화면 공유를 지원하지 않는다. contents 로 감싸 웹에서만 칸을 차지한다. */}
-      <div className="hidden md:contents">
-        {mediasoup.isSharingScreen ? (
-          <button
-            type="button"
-            onClick={mediasoup.stopScreenShare}
-            className={`${controlButton} ${controlActive}`}
-          >
-            <ScreenShareIcon />
-            <span className="whitespace-nowrap">공유 중지</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => void mediasoup.startScreenShare()}
-            // 화면 공유는 동시 1인.
-            disabled={shareDisabled}
-            className={`${controlButton} ${shareDisabled ? controlBlocked : controlNeutral}`}
-          >
-            <ScreenShareIcon />
-            <span className="whitespace-nowrap">화면 공유 시작</span>
-          </button>
-        )}
-      </div>
+      {/* 좁은 화면의 한 줄 그리드에는 자리가 없다. contents 로 감싸 넓은 화면에서만 칸을 차지한다. */}
+      {mediasoup.canShareScreen && (
+        <div className="hidden md:contents">
+          {mediasoup.isSharingScreen ? (
+            <button
+              type="button"
+              onClick={mediasoup.stopScreenShare}
+              className={`${controlButton} ${controlActive}`}
+            >
+              <ScreenShareIcon />
+              <span className="whitespace-nowrap">공유 중지</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void mediasoup.startScreenShare()}
+              // 화면 공유는 동시 1인.
+              disabled={shareDisabled}
+              className={`${controlButton} ${shareDisabled ? controlBlocked : controlNeutral}`}
+            >
+              <ScreenShareIcon />
+              <span className="whitespace-nowrap">화면 공유 시작</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {reaction !== undefined && (
         <button
