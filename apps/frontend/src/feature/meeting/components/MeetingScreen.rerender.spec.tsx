@@ -158,6 +158,7 @@ const mediasoupVm = (overrides: Partial<UseMediasoupViewModel> = {}): UseMediaso
   status: 'ready',
   errorMessage: null,
   localStream: null,
+  localAudioTrack: null,
   remoteMedia,
   isSharingScreen: false,
   screenStream: null,

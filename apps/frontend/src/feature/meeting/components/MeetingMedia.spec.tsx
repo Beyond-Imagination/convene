@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 
 import type { RemoteMediaEntry } from '@/feature/meeting/hooks/useMediasoupViewModel';
+import { useAudioLevelStore } from '@/shared/stores/audio-level.store';
 
 import { RemoteAudioPlayer, VideoTile } from './MeetingMedia';
 
@@ -107,5 +108,67 @@ describe('VideoTile 손들기', () => {
     expect(screen.getByRole('img', { name: '손 듦' })).toHaveTextContent('✋');
     rerender(<VideoTile label="아" />);
     expect(screen.queryByRole('img', { name: '손 듦' })).not.toBeInTheDocument();
+  });
+});
+
+describe('VideoTile 음성 레벨·발화자 강조', () => {
+  beforeEach(() => {
+    useAudioLevelStore.getState().reset();
+  });
+
+  const publish = (level: number, isSpeaking: boolean) =>
+    act(() => {
+      useAudioLevelStore.getState().publish({ pa: level }, { pa: isSpeaking });
+    });
+
+  it('마이크가 켜져 있으면 자기 key의 레벨을 미터로 보여 준다', () => {
+    render(
+      <VideoTile
+        label="아"
+        audioLevelKey="pa"
+      />,
+    );
+    publish(2, true);
+    expect(screen.getByRole('meter', { name: '음성 레벨' })).toHaveAttribute(
+      'aria-valuenow',
+      '2',
+    );
+  });
+
+  it('말하는 중이면 타일을 강조하고, 멈추면 강조를 끈다', () => {
+    render(
+      <VideoTile
+        label="아"
+        audioLevelKey="pa"
+      />,
+    );
+    publish(2, true);
+    expect(screen.getByTestId('speaking-ring')).toHaveAttribute('data-speaking', 'true');
+    publish(0, false);
+    expect(screen.getByTestId('speaking-ring')).toHaveAttribute('data-speaking', 'false');
+  });
+
+  it('음소거면 미터도 강조도 없다', () => {
+    render(
+      <VideoTile
+        label="아"
+        audioLevelKey="pa"
+        isAudioOff
+      />,
+    );
+    publish(2, true);
+    expect(screen.queryByRole('meter')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('speaking-ring')).not.toBeInTheDocument();
+  });
+
+  it('연결이 끊긴 참가자는 미터를 보이지 않는다', () => {
+    render(
+      <VideoTile
+        label="아"
+        audioLevelKey="pa"
+        isDisconnected
+      />,
+    );
+    expect(screen.queryByRole('meter')).not.toBeInTheDocument();
   });
 });

@@ -9,6 +9,7 @@ const baseMediasoup = (): UseMediasoupViewModel => ({
   status: 'ready',
   errorMessage: null,
   localStream: null,
+  localAudioTrack: null,
   remoteMedia: [],
   isSharingScreen: false,
   screenStream: null,

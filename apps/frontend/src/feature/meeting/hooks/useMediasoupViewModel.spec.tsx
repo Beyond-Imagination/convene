@@ -1186,6 +1186,21 @@ describe('useMediasoupViewModel.muteToggle', () => {
     });
   });
 
+  it('마이크를 켜면 localAudioTrack이 그 트랙이 되고, 끄면 null로 돌아간다', async () => {
+    const { result } = await setupReady();
+    expect(result.current.localAudioTrack).toBeNull();
+    await act(async () => {
+      await result.current.toggleAudio();
+    });
+    const stream = (await getUserMediaMock.mock.results[0].value) as FakeMediaStream;
+    expect(result.current.localAudioTrack).toBe(stream.getAudioTracks()[0]);
+    await waitFor(() => expect(result.current.isAudioToggling).toBe(false), { timeout: 2000 });
+    await act(async () => {
+      await result.current.toggleAudio();
+    });
+    expect(result.current.localAudioTrack).toBeNull();
+  });
+
   it('toggleVideo 최초 호출 시 getUserMedia({video:true})로 취득해 produce(source=video) + localStream 설정 + isVideoMuted=false', async () => {
     const { result, send } = await setupReady();
     await act(async () => {

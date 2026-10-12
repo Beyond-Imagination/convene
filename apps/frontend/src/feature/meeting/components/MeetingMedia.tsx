@@ -69,6 +69,8 @@ export interface VideoTileProps {
   /** 연결이 끊겨 복귀를 기다리는 중. 타일은 유지하고 상태만 덮어 보여준다. */
   readonly isDisconnected?: boolean;
   readonly isHandRaised?: boolean;
+  /** 음성 레벨 store의 key. 주어지고 마이크가 켜져 있으면 레벨 막대와 발화 강조를 그린다. */
+  readonly audioLevelKey?: string;
 }
 
 /**

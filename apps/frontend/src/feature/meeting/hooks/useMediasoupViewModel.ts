@@ -15,6 +15,8 @@ export interface UseMediasoupViewModel {
   readonly status: MediasoupConnectionStatus;
   readonly errorMessage: string | null;
   readonly localStream: MediaStream | null;
+  /** 내 마이크 트랙. 꺼져 있으면 null. */
+  readonly localAudioTrack: MediaStreamTrack | null;
   readonly remoteMedia: ReadonlyArray<RemoteMediaEntry>;
   readonly isSharingScreen: boolean;
   readonly screenStream: MediaStream | null;
@@ -67,6 +69,7 @@ export function useMediasoupViewModel(
     status: transport.status,
     errorMessage: transport.errorMessage,
     localStream: local.localStream,
+    localAudioTrack: null,
     remoteMedia: remote.remoteMedia,
     isSharingScreen: local.isSharingScreen,
     screenStream: local.screenStream,

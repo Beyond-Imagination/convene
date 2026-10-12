@@ -16,6 +16,7 @@ const baseMediasoup = (overrides: Partial<UseMediasoupViewModel> = {}): UseMedia
   status: 'ready',
   errorMessage: null,
   localStream: null,
+  localAudioTrack: null,
   remoteMedia: [],
   isSharingScreen: false,
   screenStream: null,
