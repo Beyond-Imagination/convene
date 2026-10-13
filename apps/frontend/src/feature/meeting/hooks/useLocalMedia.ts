@@ -52,6 +52,8 @@ export interface LocalMediaDeps {
 
 export interface UseLocalMedia {
   readonly localStream: MediaStream | null;
+  /** 내 마이크 트랙. 음성 레벨 측정에 쓴다. 꺼져 있으면 null. */
+  readonly localAudioTrack: MediaStreamTrack | null;
   readonly screenStream: MediaStream | null;
   readonly isSharingScreen: boolean;
   /** 이 브라우저가 화면 공유를 지원하는지. */
@@ -92,6 +94,7 @@ export function useLocalMedia({
   reportError,
 }: LocalMediaDeps): UseLocalMedia {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [localAudioTrack, setLocalAudioTrack] = useState<MediaStreamTrack | null>(null);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [isSharingScreen, setIsSharingScreen] = useState(false);
   const canShareScreen = useSyncExternalStore(
@@ -133,6 +136,7 @@ export function useLocalMedia({
       screenStreamRef.current = null;
       setScreenStream(null);
       setLocalStream(null);
+      setLocalAudioTrack(null);
       // 상태만 되돌린다. 켜 둔 의도는 보관돼 있어 transport가 다시 ready가 되면 복원된다.
       setIsAudioMuted(true);
       setIsVideoMuted(true);
@@ -170,6 +174,7 @@ export function useLocalMedia({
         producerRef.current = null;
         streamRef.current = null;
         if (kind === 'video') setLocalStream(null);
+        else setLocalAudioTrack(null);
         setMuted(true);
         saveMediaIntent(code, kind, false);
         return;
@@ -202,6 +207,7 @@ export function useLocalMedia({
         producerRef.current = producer;
         streamRef.current = stream;
         if (kind === 'video') setLocalStream(stream);
+        else setLocalAudioTrack(track);
         setMuted(false);
         saveMediaIntent(code, kind, true);
       } catch (e) {
@@ -347,6 +353,7 @@ export function useLocalMedia({
 
   return {
     localStream,
+    localAudioTrack,
     screenStream,
     isSharingScreen,
     canShareScreen,

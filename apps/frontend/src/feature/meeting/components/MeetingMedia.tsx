@@ -5,6 +5,10 @@ import { memo, useMemo, useRef } from 'react';
 import { MicOffIcon, VideoOffIcon } from '@/feature/meeting/components/icons';
 import { useMediaElementBinding } from '@/feature/meeting/hooks/useMediaElementBinding';
 import type { RemoteMediaEntry } from '@/feature/meeting/hooks/useMediasoupViewModel';
+import {
+  AUDIO_LEVEL_MAX,
+  useTileAudioLevelViewModel,
+} from '@/feature/meeting/hooks/useSpeakerViewModel';
 
 /** 채도를 낮춰 타일 배경과 부딪히지 않게 고른 색들. */
 const AVATAR_COLORS = [
@@ -55,6 +59,46 @@ function VideoTilePlaceholder({ label }: { readonly label: string }) {
   );
 }
 
+/** 레벨 막대의 높이. 왼쪽부터 레벨 1·2·3에 켜진다. */
+const LEVEL_BAR_HEIGHTS = ['h-1.5', 'h-2.5', 'h-3.5'] as const;
+
+/**
+ * 말하는 사람 강조 테두리 + 음성 레벨 막대.
+ * 레벨은 초당 여러 번 바뀌므로 이 경계 안에서만 다시 그린다. 타일 본체는 건드리지 않는다.
+ */
+const AudioActivity = memo(function AudioActivity({ levelKey }: { readonly levelKey: string }) {
+  const { level, isSpeaking } = useTileAudioLevelViewModel(levelKey);
+  return (
+    <>
+      <div
+        data-testid="speaking-ring"
+        data-speaking={isSpeaking}
+        aria-hidden="true"
+        className={`ring-accent pointer-events-none absolute inset-0 rounded-xl ring-[3px] ring-inset transition-opacity duration-200 md:rounded-2xl ${
+          isSpeaking ? 'opacity-100' : 'opacity-0'
+        }`}
+      />
+      <div
+        role="meter"
+        aria-label="음성 레벨"
+        aria-valuemin={0}
+        aria-valuemax={AUDIO_LEVEL_MAX}
+        aria-valuenow={level}
+        className="bg-bg/70 absolute right-2 top-2 flex h-6 items-end gap-[3px] rounded-full px-2 pb-[5px] md:right-[11px] md:top-[11px]"
+      >
+        {LEVEL_BAR_HEIGHTS.map((height, i) => (
+          <span
+            key={height}
+            className={`w-[3px] rounded-full transition-colors ${height} ${
+              i < level ? 'bg-accent' : 'bg-muted/40'
+            }`}
+          />
+        ))}
+      </div>
+    </>
+  );
+});
+
 export interface VideoTileProps {
   readonly label: string;
   /** 내 타일이면 이름표에 "(나)"를 붙인다. */
@@ -69,6 +113,8 @@ export interface VideoTileProps {
   /** 연결이 끊겨 복귀를 기다리는 중. 타일은 유지하고 상태만 덮어 보여준다. */
   readonly isDisconnected?: boolean;
   readonly isHandRaised?: boolean;
+  /** 음성 레벨 store의 key. 주어지고 마이크가 켜져 있으면 레벨 막대와 발화 강조를 그린다. */
+  readonly audioLevelKey?: string;
 }
 
 /**
@@ -86,6 +132,7 @@ export const VideoTile = memo(function VideoTile({
   isAudioOff,
   isDisconnected,
   isHandRaised,
+  audioLevelKey,
 }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   useMediaElementBinding({ ref: videoRef, stream: useTileStream(stream, track) });
@@ -102,6 +149,9 @@ export const VideoTile = memo(function VideoTile({
         className="h-full w-full object-cover"
       />
       {isVideoOff === true && <VideoTilePlaceholder label={label} />}
+      {audioLevelKey !== undefined && isAudioOff !== true && isDisconnected !== true && (
+        <AudioActivity levelKey={audioLevelKey} />
+      )}
       {isDisconnected === true && (
         <div
           data-testid="tile-disconnected"
