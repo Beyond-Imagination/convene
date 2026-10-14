@@ -35,6 +35,15 @@ describe('useMeetingLayoutViewModel', () => {
     expect(result.current.isChatOpen).toBe(true);
   });
 
+  it('설정 모달은 닫힌 채로 시작하고 toggleSettings로 여닫는다', () => {
+    const { result } = renderHook(() => useMeetingLayoutViewModel());
+    expect(result.current.isSettingsOpen).toBe(false);
+    act(() => result.current.toggleSettings());
+    expect(result.current.isSettingsOpen).toBe(true);
+    act(() => result.current.toggleSettings());
+    expect(result.current.isSettingsOpen).toBe(false);
+  });
+
   it('채팅 미읽음은 없음으로 시작하고 setHasUnreadChat으로 바뀐다', () => {
     const { result } = renderHook(() => useMeetingLayoutViewModel());
     expect(result.current.hasUnreadChat).toBe(false);

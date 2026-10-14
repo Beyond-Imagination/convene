@@ -1,6 +1,6 @@
 'use client';
 
-import { LinkIcon } from '@/feature/meeting/components/icons';
+import { LinkIcon, SettingsIcon } from '@/feature/meeting/components/icons';
 import { MeetingControlBar } from '@/feature/meeting/components/MeetingControlBar';
 import { RemoteAudioPlayer } from '@/feature/meeting/components/MeetingMedia';
 import { VideoStage } from '@/feature/meeting/components/VideoStage';
@@ -16,6 +16,7 @@ import type {
   UseMeetingViewModel,
 } from '@/feature/meeting/hooks/useMeetingViewModel';
 import type { UseReactionViewModel } from '@/feature/meeting/hooks/useReactionViewModel';
+import { SettingsDialog } from '@/feature/settings/components/SettingsPanel';
 
 const STATUS_TONE: Partial<
   Record<MeetingConnectionStatus, { readonly text: string; readonly dot: string }>
@@ -89,6 +90,8 @@ export interface MeetingScreenProps extends UseMeetingViewModel {
   readonly isChatOpen?: boolean;
   readonly onToggleChat?: () => void;
   readonly hasUnreadChat?: boolean;
+  readonly isSettingsOpen?: boolean;
+  readonly onToggleSettings?: () => void;
   readonly tileAreaRef?: (el: HTMLElement | null) => void;
   readonly tileSize?: TileSize | null;
   readonly tileGap?: number;
@@ -129,6 +132,8 @@ export function MeetingScreen({
   isChatOpen,
   onToggleChat,
   hasUnreadChat,
+  isSettingsOpen = false,
+  onToggleSettings,
   tileAreaRef,
   tileSize,
   tileGap,
@@ -176,6 +181,17 @@ export function MeetingScreen({
               <span className={`h-1.5 w-1.5 rounded-full md:h-2 md:w-2 ${tone.dot}`} />
               {statusLabel(status)}
             </span>
+          )}
+          {onToggleSettings !== undefined && (
+            <button
+              type="button"
+              onClick={onToggleSettings}
+              aria-label="설정"
+              aria-haspopup="dialog"
+              className="text-muted hover:bg-text/10 hover:text-text -mr-2 grid h-9 w-9 place-items-center rounded-full transition-colors"
+            >
+              <SettingsIcon className="h-5 w-5" />
+            </button>
           )}
         </div>
       </header>
@@ -290,6 +306,13 @@ export function MeetingScreen({
         leave={leave}
         endMeeting={endMeeting}
       />
+
+      {onToggleSettings !== undefined && (
+        <SettingsDialog
+          isOpen={isSettingsOpen}
+          onClose={onToggleSettings}
+        />
+      )}
     </section>
   );
 }

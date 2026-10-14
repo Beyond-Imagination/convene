@@ -5,7 +5,8 @@
 /**
  * Convene 의미 컬러 토큰. Tailwind 의 bg-surface / text-muted 등이 이 변수를 읽는다.
  * 알파 유틸리티(bg-accent/20)를 쓰려면 값이 공백 구분 RGB 채널이어야 한다.
- * 라이트가 기본이고 다크는 시스템 설정(prefers-color-scheme)을 따른다.
+ * 라이트가 기본이다. 다크는 설정에서 고른 data-theme 이 우선이고, 고르지 않았으면(시스템)
+ * prefers-color-scheme 를 따른다. 두 다크 블록의 값은 같아야 한다.
  */
 :root {
   color-scheme: light dark;
@@ -34,8 +35,26 @@
 }
 
 /* --accent-on / --danger-on 은 어두운 바탕 위에서 읽히도록 밝은 쪽으로 옮긴다. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: 34 31 27;
+  --paper: 38 34 32;
+  --surface: 51 45 40;
+  --border: 59 53 47;
+  --text: 244 239 231;
+  --muted: 164 154 142;
+  --tile-off: 44 38 34;
+  --accent-on: 127 201 164;
+  --danger-on: 240 160 154;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
     --bg: 34 31 27;
     --paper: 38 34 32;
     --surface: 51 45 40;
