@@ -93,7 +93,10 @@ function MeetingSession({ code }: { readonly code: string }) {
   const reactionVm = useReactionViewModel(joinedSocket, code, meetingVm.selfParticipantId);
   // self 타일(항상 1) + 원격 참가자 수 = 전체 비디오 타일 수.
   const totalTiles = 1 + meetingVm.remoteParticipants.length;
-  const layout = useMeetingLayoutViewModel(totalTiles);
+  const layout = useMeetingLayoutViewModel(
+    totalTiles,
+    mediasoupVm.isSharingScreen || mediasoupVm.isRemoteSharingScreen,
+  );
   const speakerVm = useSpeakerViewModel(mediasoupVm.localAudioTrack, mediasoupVm.remoteMedia);
   // 첫 페이지의 원격 칸 수 = 페이지 크기 - 내 타일.
   const orderedParticipants = useSpeakerOrderViewModel(
@@ -148,7 +151,11 @@ function MeetingSession({ code }: { readonly code: string }) {
         isChatOpen={layout.isChatOpen}
         onToggleChat={layout.toggleChat}
         hasUnreadChat={layout.hasUnreadChat}
-        variant={layout.variant}
+        tileAreaRef={layout.tileAreaRef}
+        tileSize={layout.tileSize}
+        tileGap={layout.tileGap}
+        shareView={layout.shareView}
+        isSwipeable={layout.variant === 'mobile'}
         isStripOpen={layout.isStripOpen}
         onToggleStrip={layout.toggleStrip}
         page={layout.page}

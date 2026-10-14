@@ -6,7 +6,7 @@ import { RemoteAudioPlayer } from '@/feature/meeting/components/MeetingMedia';
 import { VideoStage } from '@/feature/meeting/components/VideoStage';
 import type { UseMediasoupViewModel } from '@/feature/meeting/hooks/useMediasoupViewModel';
 import { useMeetingElapsedViewModel } from '@/feature/meeting/hooks/useMeetingElapsedViewModel';
-import type { MeetingLayoutVariant } from '@/feature/meeting/hooks/useMeetingLayoutViewModel';
+import type { ShareView, TileSize } from '@/feature/meeting/hooks/useMeetingLayoutViewModel';
 import {
   type CopyLinkStatus,
   useMeetingLinkViewModel,
@@ -89,7 +89,11 @@ export interface MeetingScreenProps extends UseMeetingViewModel {
   readonly isChatOpen?: boolean;
   readonly onToggleChat?: () => void;
   readonly hasUnreadChat?: boolean;
-  readonly variant?: MeetingLayoutVariant;
+  readonly tileAreaRef?: (el: HTMLElement | null) => void;
+  readonly tileSize?: TileSize | null;
+  readonly tileGap?: number;
+  readonly shareView?: ShareView;
+  readonly isSwipeable?: boolean;
   readonly isStripOpen?: boolean;
   readonly onToggleStrip?: () => void;
   /** 비디오 페이지네이션. 주어지지 않으면 전체 타일을 한 번에 표시한다. */
@@ -125,7 +129,11 @@ export function MeetingScreen({
   isChatOpen,
   onToggleChat,
   hasUnreadChat,
-  variant,
+  tileAreaRef,
+  tileSize,
+  tileGap,
+  shareView,
+  isSwipeable,
   isStripOpen,
   onToggleStrip,
   page,
@@ -251,7 +259,11 @@ export function MeetingScreen({
         isHandRaised={isHandRaised}
         raisedHands={raisedHands}
         reactionBubbles={reaction?.bubbles}
-        variant={variant}
+        tileAreaRef={tileAreaRef}
+        tileSize={tileSize}
+        tileGap={tileGap}
+        shareView={shareView}
+        isSwipeable={isSwipeable}
         isStripOpen={isStripOpen}
         onToggleStrip={onToggleStrip}
         page={page}

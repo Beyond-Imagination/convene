@@ -1,6 +1,6 @@
 'use client';
 
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import {
   FullscreenExitIcon,
@@ -12,7 +12,11 @@ import {
 import { ScreenTile, VideoTile } from '@/feature/meeting/components/MeetingMedia';
 import type { RemoteMediaEntry } from '@/feature/meeting/hooks/useMediasoupViewModel';
 import type { UseMediasoupViewModel } from '@/feature/meeting/hooks/useMediasoupViewModel';
-import type { MeetingLayoutVariant } from '@/feature/meeting/hooks/useMeetingLayoutViewModel';
+import {
+  type ShareView,
+  type TileSize,
+  useHorizontalSwipe,
+} from '@/feature/meeting/hooks/useMeetingLayoutViewModel';
 import type { RaisedHand, RemoteParticipant } from '@/feature/meeting/hooks/useMeetingViewModel';
 import type { ReactionBubble } from '@/feature/meeting/hooks/useReactionViewModel';
 import {
@@ -56,65 +60,26 @@ const pickScreenTrack = (
   return null;
 };
 
-/**
- * 12트랙 위의 타일별 grid-column. 한 줄에 3개면 span 4, 2개면 span 6이고,
- * 마지막 줄이 덜 찼으면 시작 위치를 밀어 가운데로 맞춘다.
- */
-const DESKTOP_SPANS: Record<number, ReadonlyArray<string>> = {
-  1: ['1 / span 12'],
-  2: ['1 / span 6', '7 / span 6'],
-  3: ['4 / span 6', '1 / span 6', '7 / span 6'],
-  4: ['1 / span 6', '7 / span 6', '1 / span 6', '7 / span 6'],
-  5: ['1 / span 4', '5 / span 4', '9 / span 4', '3 / span 4', '7 / span 4'],
-  6: ['1 / span 4', '5 / span 4', '9 / span 4', '1 / span 4', '5 / span 4', '9 / span 4'],
-  7: [
-    '1 / span 4',
-    '5 / span 4',
-    '9 / span 4',
-    '1 / span 4',
-    '5 / span 4',
-    '9 / span 4',
-    '5 / span 4',
-  ],
-  8: [
-    '1 / span 4',
-    '5 / span 4',
-    '9 / span 4',
-    '1 / span 4',
-    '5 / span 4',
-    '9 / span 4',
-    '3 / span 4',
-    '7 / span 4',
-  ],
-  9: [
-    '1 / span 4',
-    '5 / span 4',
-    '9 / span 4',
-    '1 / span 4',
-    '5 / span 4',
-    '9 / span 4',
-    '1 / span 4',
-    '5 / span 4',
-    '9 / span 4',
-  ],
-};
+const noop = (): void => {};
 
-const MOBILE_SPANS: Record<number, ReadonlyArray<string>> = {
-  1: ['1 / span 12'],
-  2: ['1 / span 12', '1 / span 12'],
-  3: ['4 / span 6', '1 / span 6', '7 / span 6'],
-  4: ['1 / span 6', '7 / span 6', '1 / span 6', '7 / span 6'],
-};
+/** 모바일 공유 중 위치 — 첫 점이 공유 화면, 나머지가 참가자 페이지. */
+function PageDots({ count, active }: { readonly count: number; readonly active: number }) {
+  return (
+    <div
+      role="img"
+      aria-label={active === 0 ? '공유 화면' : `참가자 ${active} / ${count - 1} 페이지`}
+      className="pointer-events-none absolute bottom-1 left-1/2 z-20 flex -translate-x-1/2 gap-1.5"
+    >
+      {Array.from({ length: count }, (_, i) => (
+        <span
+          key={i}
+          className={`h-1.5 w-1.5 rounded-full ${i === active ? 'bg-text' : 'bg-text/30'}`}
+        />
+      ))}
+    </div>
+  );
+}
 
-const spansFor = (variant: MeetingLayoutVariant, count: number): ReadonlyArray<string> => {
-  const table = variant === 'mobile' ? MOBILE_SPANS : DESKTOP_SPANS;
-  return table[count] ?? DESKTOP_SPANS[9];
-};
-
-/**
- * 행이 남은 높이를 나눠 갖는다. 타일에 고정 비율을 주면 뷰포트가 낮을 때
- * 자연 높이가 영역을 넘어 아랫줄이 잘린다 — 비율은 video 의 object-fit 이 맡는다.
- */
 const NO_BUBBLES: ReadonlyArray<ReactionBubble> = [];
 const NO_HANDS: ReadonlyArray<RaisedHand> = [];
 
@@ -210,6 +175,33 @@ const viewerButton =
 const viewerIconButton =
   'grid h-9 w-9 place-items-center rounded-full transition-colors hover:bg-white/20 disabled:cursor-not-allowed disabled:text-white/35 disabled:hover:bg-transparent';
 
+/** 호버가 되는 기기에서만 숨겼다가 띠에 마우스가 오면 보인다. 터치 기기는 늘 보인다. */
+const hideUntilHover =
+  '[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/strip:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100';
+
+/** 참가자 줄 토글 — 공유 화면을 가리지 않도록 하단 띠에 호버할 때만 드러난다. */
+function StripToggle({
+  isOpen,
+  onToggle,
+}: {
+  readonly isOpen: boolean;
+  readonly onToggle: () => void;
+}) {
+  return (
+    <div className="group/strip absolute bottom-0 left-1/2 z-10 flex h-14 w-[360px] -translate-x-1/2 items-end">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={isOpen}
+        className={`grid h-[26px] w-full place-items-center rounded-t-xl bg-white/75 text-sm font-semibold text-[#5b5349] transition-opacity ${hideUntilHover}`}
+      >
+        <span aria-hidden="true">{isOpen ? '˅' : '˄'}</span>
+        <span className="sr-only">참가자 화면 {isOpen ? '접기' : '펼치기'}</span>
+      </button>
+    </div>
+  );
+}
+
 /**
  * 화면 공유 stage — 배율·이동과 전체화면을 직접 들고 있다.
  * 드래그마다 바뀌는 상태를 이 경계 안에 가둬 참가자 타일까지 다시 그리지 않는다.
@@ -217,12 +209,16 @@ const viewerIconButton =
 function ScreenStage({
   mediasoup,
   remoteParticipants,
+  isHidden,
   isStripOpen,
   onToggleStrip,
 }: {
   readonly mediasoup: UseMediasoupViewModel;
   readonly remoteParticipants: ReadonlyArray<RemoteParticipant>;
+  /** 모바일에서 참가자 그리드로 넘긴 동안. 배율·이동을 지키려고 언마운트하지 않는다. */
+  readonly isHidden: boolean;
   readonly isStripOpen: boolean;
+  /** 주어질 때만(데스크톱) 참가자 줄 토글을 띄운다. */
   readonly onToggleStrip?: () => void;
 }) {
   const viewer = useScreenViewerViewModel();
@@ -232,11 +228,13 @@ function ScreenStage({
     <div
       ref={viewer.stageRef}
       data-testid="screen-stage"
-      className="bg-screen-bg relative min-h-0 flex-1 overflow-hidden rounded-2xl shadow-[0_14px_40px_rgba(0,0,0,0.4)] md:rounded-[20px]"
+      className={`bg-screen-bg relative min-h-0 flex-1 overflow-hidden rounded-2xl ${isHidden ? 'hidden' : ''} shadow-[0_14px_40px_rgba(0,0,0,0.4)] md:rounded-[20px]`}
     >
       {/* 드래그는 이 층에서만 받는다. 컨트롤까지 덮으면 pointer capture 가 버튼 클릭을 삼킨다. */}
       <div
         className={`absolute inset-0 ${cursor} ${viewer.canPan ? 'touch-none' : ''}`}
+        // 확대해 끌어 보는 중에는 이 드래그가 페이지 스와이프로 새지 않게 한다.
+        data-no-swipe={viewer.canPan ? '' : undefined}
         onPointerDown={viewer.onPointerDown}
         onPointerMove={viewer.onPointerMove}
         onPointerUp={viewer.onPointerUp}
@@ -360,24 +358,23 @@ function ScreenStage({
       </div>
 
       {onToggleStrip !== undefined && !viewer.isFullscreen && (
-        <button
-          type="button"
-          onClick={onToggleStrip}
-          aria-expanded={isStripOpen}
-          className="absolute bottom-0 left-1/2 z-10 hidden h-[26px] w-[360px] -translate-x-1/2 place-items-center rounded-t-xl bg-white/75 text-sm font-semibold text-[#5b5349] md:grid"
-        >
-          <span aria-hidden>{isStripOpen ? '˅' : '˄'}</span>
-          <span className="sr-only">참가자 화면 {isStripOpen ? '접기' : '펼치기'}</span>
-        </button>
+        <StripToggle
+          isOpen={isStripOpen}
+          onToggle={onToggleStrip}
+        />
       )}
     </div>
   );
 }
 
-const GRID_STYLE: CSSProperties = { gridAutoRows: 'minmax(0, 1fr)' };
-
+/** h-9 w-9 는 레이아웃 VM 의 PAGER_BUTTON_PX 와 같아야 한다. */
 const pagerButton =
-  'grid h-12 w-12 place-items-center rounded-full bg-text/10 text-text transition-colors hover:bg-text/[0.18] disabled:cursor-not-allowed disabled:text-muted/50 md:h-11 md:w-11';
+  'grid h-9 w-9 shrink-0 place-items-center rounded-full text-lg transition-colors disabled:cursor-not-allowed';
+
+/** 그리드 위에 떠 있는 버튼 — 타일 위에서도 보이게 반투명 배경을 깐다. */
+const gridPagerButton = `${pagerButton} absolute top-1/2 z-10 -translate-y-1/2 bg-bg/70 text-text shadow-md backdrop-blur-sm hover:bg-bg/90 disabled:hidden`;
+
+const stripPagerButton = `${pagerButton} bg-text/10 text-text hover:bg-text/[0.18] disabled:text-muted/50`;
 
 export interface VideoStageProps {
   readonly nickname: string | null;
@@ -386,7 +383,15 @@ export interface VideoStageProps {
   readonly isHandRaised?: boolean;
   readonly raisedHands?: ReadonlyArray<RaisedHand>;
   readonly reactionBubbles?: ReadonlyArray<ReactionBubble>;
-  readonly variant?: MeetingLayoutVariant;
+  /** 타일 영역 측정용. 레이아웃 VM 이 이 크기로 페이지 크기와 타일 크기를 정한다. */
+  readonly tileAreaRef?: (el: HTMLElement | null) => void;
+  /** 주어지지 않으면 타일이 칸을 채운다. */
+  readonly tileSize?: TileSize | null;
+  readonly tileGap?: number;
+  /** 공유 중 보기. 기본은 데스크톱식 하단 참가자 줄. */
+  readonly shareView?: ShareView;
+  /** 좌우 스와이프로 페이지를 넘긴다(모바일). */
+  readonly isSwipeable?: boolean;
   /** 화면 공유 중 하단 참가자 줄 노출. */
   readonly isStripOpen?: boolean;
   readonly onToggleStrip?: () => void;
@@ -401,8 +406,9 @@ export interface VideoStageProps {
 }
 
 /**
- * 회의 화면의 비디오 영역 — 공유 중이면 화면 stage + 가로 strip, 아니면 12트랙 그리드.
+ * 회의 화면의 비디오 영역 — 공유 중이면 화면 stage + 하단 참가자 줄, 아니면 그리드.
  * self 타일이 항상 첫 칸이고, 페이지네이션이 주어지면 그 배열을 페이지 단위로 자른다.
+ * 어느 쪽이든 스크롤 없이 한 페이지씩 보이고 ‹ › 로 넘긴다.
  */
 export function VideoStage({
   nickname,
@@ -411,7 +417,11 @@ export function VideoStage({
   isHandRaised = false,
   raisedHands = NO_HANDS,
   reactionBubbles = NO_BUBBLES,
-  variant = 'desktop',
+  tileAreaRef,
+  tileSize = null,
+  tileGap,
+  shareView = 'strip',
+  isSwipeable = false,
   isStripOpen = true,
   onToggleStrip,
   page,
@@ -469,11 +479,22 @@ export function VideoStage({
     page !== undefined && pageSize !== undefined
       ? tiles.slice(page * pageSize, page * pageSize + pageSize)
       : tiles;
-  const spans = spansFor(variant, visibleTiles.length);
+  const swipe = useHorizontalSwipe(onPrevPage ?? noop, onNextPage ?? noop);
+
+  // 공유 중 모바일은 공유 화면과 참가자 그리드를 넘겨 가며 본다(데스크톱은 하단 줄).
+  const isStrip = hasScreen && shareView === 'strip';
+  const isGrid = !hasScreen || shareView === 'participants';
+  const isMobileShare = hasScreen && shareView !== 'strip';
+  // 참가자 첫 페이지에서도 공유 화면으로 돌아갈 ‹ 가 필요하다.
+  const hasPager = (pageCount !== undefined && pageCount > 1) || shareView === 'participants';
 
   return (
     /* 중앙 비디오 영역 — 스크롤 차단(overflow-hidden) */
-    <div className="px-gutter-sm py-gutter-sm relative flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden md:gap-[18px]">
+    <div
+      className={`px-gutter-sm py-gutter-sm relative flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden md:gap-[18px] ${isSwipeable ? 'touch-pan-y' : ''}`}
+      onPointerDown={isSwipeable ? swipe.onPointerDown : undefined}
+      onPointerUp={isSwipeable ? swipe.onPointerUp : undefined}
+    >
       <RaisedHands hands={raisedHands} />
 
       {/* 화면 공유 stage. 공유가 없으면 자리만 비운다(타일 컨테이너의 형제 위치를 유지). */}
@@ -481,78 +502,93 @@ export function VideoStage({
         <ScreenStage
           mediasoup={mediasoup}
           remoteParticipants={remoteParticipants}
+          isHidden={shareView === 'participants'}
           isStripOpen={isStripOpen}
-          onToggleStrip={onToggleStrip}
+          onToggleStrip={isStrip ? onToggleStrip : undefined}
         />
-      )}
-
-      {hasScreen && onToggleStrip !== undefined && (
-        <button
-          type="button"
-          onClick={onToggleStrip}
-          aria-expanded={isStripOpen}
-          className="bg-text/10 text-text hover:bg-text/[0.18] w-full shrink-0 rounded-xl py-2.5 text-xs font-semibold transition-colors md:hidden"
-        >
-          참가자 {isStripOpen ? '숨기기 ˄' : '보기 ˅'}
-        </button>
       )}
 
       {/*
         타일 컨테이너는 공유 여부와 무관하게 같은 자리·같은 구조를 유지하고 배치만 바꾼다.
         트리 모양이 달라지면 React가 타일을 전부 재마운트해 <video>가 새로 만들어지고,
         그 순간 모든 참가자 영상이 끊긴다. — MeetingScreen.rerender.spec.tsx
-          공유 중: 하단 가로 strip / 공유 없음: 12트랙 그리드
+          데스크톱 공유 중: 하단 참가자 줄(양 끝에 ‹ ›)
+          모바일 공유 중: 공유 화면일 땐 숨기고, 넘기면 그리드
+          공유 없음: 그리드(좌우에 ‹ › 를 띄움)
+        측정은 버튼까지 감싼 바깥 칸에서 한다. 버튼이 생겨도 측정 크기가 바뀌지 않아야
+        페이지 크기가 흔들리지 않는다.
       */}
       <div
+        ref={tileAreaRef}
         className={
-          hasScreen
-            ? isStripOpen
-              ? 'flex shrink-0 gap-2 overflow-x-auto md:gap-3.5'
+          isGrid
+            ? 'relative flex min-h-0 flex-1'
+            : isStrip && isStripOpen
+              ? 'flex shrink-0 items-center'
               : 'hidden'
-            : 'grid min-h-0 w-full flex-1 grid-cols-12 content-center gap-2 md:gap-3.5'
         }
-        style={hasScreen ? undefined : GRID_STYLE}
+        style={{ gap: tileGap }}
       >
-        {visibleTiles.map((tile, i) => (
-          <div
-            key={tile.key}
-            className={hasScreen ? 'w-[168px] shrink-0 md:w-[236px]' : undefined}
-            style={hasScreen ? { aspectRatio: '16 / 9' } : { gridColumn: spans[i], minHeight: 0 }}
+        {hasPager && (
+          <button
+            type="button"
+            onClick={onPrevPage}
+            disabled={canPrev === false}
+            aria-label="이전 페이지"
+            className={isStrip ? stripPagerButton : `${gridPagerButton} left-0`}
           >
-            {tile.node}
-          </div>
-        ))}
-      </div>
-
-      {pageCount !== undefined && pageCount > 1 && (
-        <nav
-          aria-label="비디오 페이지"
-          className="flex shrink-0 items-center justify-between gap-3 md:justify-center"
+            ‹
+          </button>
+        )}
+        <div
+          className={
+            isStrip
+              ? 'flex min-w-0 flex-1 justify-center overflow-hidden'
+              : 'flex min-h-0 min-w-0 flex-1 flex-wrap content-center justify-center overflow-hidden'
+          }
+          style={{ gap: tileGap }}
         >
-          <span className="text-muted text-meta font-mono font-medium">
+          {visibleTiles.map((tile) => (
+            <div
+              key={tile.key}
+              className={tileSize === null ? 'min-h-0 min-w-0 flex-1' : 'shrink-0'}
+              style={
+                tileSize === null ? undefined : { width: tileSize.width, height: tileSize.height }
+              }
+            >
+              {tile.node}
+            </div>
+          ))}
+        </div>
+        {hasPager && (
+          <button
+            type="button"
+            onClick={onNextPage}
+            disabled={canNext === false}
+            aria-label="다음 페이지"
+            className={isStrip ? stripPagerButton : `${gridPagerButton} right-0`}
+          >
+            ›
+          </button>
+        )}
+        {hasPager && !hasScreen && (
+          <span className="bg-bg/70 text-muted text-meta absolute bottom-0 left-1/2 z-10 -translate-x-1/2 rounded-full px-2.5 py-0.5 font-mono font-medium backdrop-blur-sm">
             {(page ?? 0) + 1} / {pageCount}
           </span>
-          <div className="flex items-center gap-2 md:gap-3">
-            <button
-              type="button"
-              onClick={onPrevPage}
-              disabled={canPrev === false}
-              aria-label="이전 페이지"
-              className={pagerButton}
-            >
-              ‹
-            </button>
-            <button
-              type="button"
-              onClick={onNextPage}
-              disabled={canNext === false}
-              aria-label="다음 페이지"
-              className={pagerButton}
-            >
-              ›
-            </button>
-          </div>
-        </nav>
+        )}
+      </div>
+
+      {isStrip && isStripOpen && hasPager && (
+        <span className="text-muted text-meta -mt-1.5 shrink-0 self-center font-mono font-medium md:-mt-3">
+          {(page ?? 0) + 1} / {pageCount}
+        </span>
+      )}
+
+      {isMobileShare && (
+        <PageDots
+          count={1 + (pageCount ?? 1)}
+          active={shareView === 'screen' ? 0 : 1 + (page ?? 0)}
+        />
       )}
 
       <ReactionBubbles bubbles={reactionBubbles} />
