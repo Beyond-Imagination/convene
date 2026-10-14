@@ -22,6 +22,11 @@ export class ForbiddenError extends DomainError {
   readonly httpStatus = 403;
 }
 
+/** 잠시 뒤 다시 시도해야 하는 요청(시간당 상한 초과 등). */
+export class TooManyRequestsError extends DomainError {
+  readonly httpStatus = 429;
+}
+
 /** 현재 상태와 충돌(중복/허용되지 않는 상태 전이 등). */
 export class ConflictError extends DomainError {
   readonly httpStatus = 409;

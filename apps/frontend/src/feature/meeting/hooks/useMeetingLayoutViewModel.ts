@@ -127,6 +127,8 @@ interface UseMeetingLayoutViewModel {
   readonly setHasUnreadChat: (hasUnread: boolean) => void;
   readonly isSettingsOpen: boolean;
   readonly toggleSettings: () => void;
+  readonly isBugReportOpen: boolean;
+  readonly toggleBugReport: () => void;
   /** 비디오 타일의 배치 규칙(비율·상한·열 수)을 가른다. */
   readonly variant: MeetingLayoutVariant;
   /** 데스크톱 화면 공유 중 하단 참가자 줄을 펼쳤는지. */
@@ -153,7 +155,7 @@ interface UseMeetingLayoutViewModel {
 
 /**
  * 회의 페이지의 순수 프레젠테이션 상태를 책임진다.
- *  - 채팅 패널 열림/닫힘, 회의 중 설정 모달
+ *  - 채팅 패널 열림/닫힘, 회의 중 설정·버그 리포트 모달
  *  - 뷰포트에 따른 배치 variant
  *  - 화면 공유 중 보기(참가자 줄 / 공유 화면 / 참가자 그리드)
  *  - 비디오 타일 페이지네이션(Zoom 갤러리식) — 측정한 영역에 들어가는 만큼씩 끊는다
@@ -169,6 +171,7 @@ export function useMeetingLayoutViewModel(
   const [stripOverride, setStripOverride] = useState<boolean | null>(null);
   const [hasUnreadChat, setHasUnreadChat] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
+  const [isBugReportOpen, setBugReportOpen] = useState(false);
   const [area, setArea] = useState<TileSize | null>(null);
   const [isScreenFocused, setScreenFocused] = useState(true);
   const observerRef = useRef<ResizeObserver | null>(null);
@@ -247,6 +250,7 @@ export function useMeetingLayoutViewModel(
   }, [shareView, safePage]);
 
   const toggleSettings = useCallback(() => setSettingsOpen((open) => !open), []);
+  const toggleBugReport = useCallback(() => setBugReportOpen((open) => !open), []);
   const isChatOpen = chatOverride ?? variant === 'desktop';
   const toggleChat = useCallback(() => setChatOverride(!isChatOpen), [isChatOpen]);
   const isStripOpen = stripOverride ?? variant === 'desktop';
@@ -269,6 +273,8 @@ export function useMeetingLayoutViewModel(
     setHasUnreadChat,
     isSettingsOpen,
     toggleSettings,
+    isBugReportOpen,
+    toggleBugReport,
     variant,
     isStripOpen,
     toggleStrip,

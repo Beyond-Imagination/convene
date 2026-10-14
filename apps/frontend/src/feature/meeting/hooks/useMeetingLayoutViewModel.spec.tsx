@@ -44,6 +44,15 @@ describe('useMeetingLayoutViewModel', () => {
     expect(result.current.isSettingsOpen).toBe(false);
   });
 
+  it('버그 리포트 모달은 닫힌 채로 시작하고 toggleBugReport로 여닫는다', () => {
+    const { result } = renderHook(() => useMeetingLayoutViewModel());
+    expect(result.current.isBugReportOpen).toBe(false);
+    act(() => result.current.toggleBugReport());
+    expect(result.current.isBugReportOpen).toBe(true);
+    act(() => result.current.toggleBugReport());
+    expect(result.current.isBugReportOpen).toBe(false);
+  });
+
   it('채팅 미읽음은 없음으로 시작하고 setHasUnreadChat으로 바뀐다', () => {
     const { result } = renderHook(() => useMeetingLayoutViewModel());
     expect(result.current.hasUnreadChat).toBe(false);

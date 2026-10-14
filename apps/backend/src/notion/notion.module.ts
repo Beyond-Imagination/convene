@@ -4,6 +4,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { resolveNotionConfig } from '@/config/notion.config';
 import { resolveCorsOrigins } from '@/config/server.config';
 import { MeetingModule } from '@/meeting/meeting.module';
+import { NotionBugReportService } from '@/notion/application/notion-bug-report.service';
 import {
   MEETING_LINK_BASE,
   NotionMeetingProvisioningService,
@@ -11,11 +12,15 @@ import {
 import { NotionPollingScheduler } from '@/notion/application/notion-polling.scheduler';
 import { NotionReportListener } from '@/notion/application/notion-report.listener';
 import { NotionReportPushService } from '@/notion/application/notion-report-push.service';
+import { NOTION_BUG_REPORT } from '@/notion/domain/ports/notion-bug-report.port';
 import { NOTION_ISSUE } from '@/notion/domain/ports/notion-issue.port';
 import { NOTION_REPORT } from '@/notion/domain/ports/notion-report.port';
+import { BugReportRateLimiter } from '@/notion/infrastructure/bug-report-rate-limiter';
+import { NotionBugReportAdapter } from '@/notion/infrastructure/notion-bug-report.adapter';
 import { NotionHttpClient } from '@/notion/infrastructure/notion-http.client';
 import { NotionIssueAdapter } from '@/notion/infrastructure/notion-issue.adapter';
 import { NotionReportAdapter } from '@/notion/infrastructure/notion-report.adapter';
+import { NotionBugReportsController } from '@/notion/interface/notion-bug-reports.controller';
 import { NotionMeetingsController } from '@/notion/interface/notion-meetings.controller';
 import { NotionSignatureVerifier } from '@/notion/interface/notion-signature';
 import { ReportsModule } from '@/reports/reports.module';
@@ -25,7 +30,7 @@ export const NOTION_CLIENT = Symbol('NOTION_CLIENT');
 
 /**
  * env gate에 따라 조각을 조건부 등록한다(prod-safe): 토큰→provisioning + 회의록 push 코어,
- * +서명 시크릿→즉시 경로 컨트롤러, +DB id→폴링 스케줄러.
+ * +서명 시크릿→즉시 경로 컨트롤러, +DB id→폴링 스케줄러, +버그 리포트 DB id→버그 리포트 접수.
  * register()는 메타데이터 평가 시점 process.env를 읽으므로 운영 env 주입으로만 켜진다.
  */
 @Module({})
@@ -43,7 +48,7 @@ export class NotionModule {
       return { module: NotionModule, providers: [clientProvider], exports: [NOTION_CLIENT] };
     }
 
-    const { databaseIds, signingSecret } = config;
+    const { databaseIds, signingSecret, bugReportDatabaseId } = config;
     // 링크 베이스 = 프론트 오리진. 별도 env 중복 관리를 피해 CORS_ORIGIN에서 파생한다.
     const meetingLinkBase = resolveCorsOrigins()[0];
     const providers: Provider[] = [
@@ -79,6 +84,16 @@ export class NotionModule {
         useFactory: () => new NotionSignatureVerifier(signingSecret),
       });
       controllers.push(NotionMeetingsController);
+    }
+
+    if (bugReportDatabaseId !== null) {
+      providers.push(NotionBugReportService, BugReportRateLimiter, {
+        provide: NOTION_BUG_REPORT,
+        useFactory: (client: NotionHttpClient) =>
+          new NotionBugReportAdapter(client, bugReportDatabaseId),
+        inject: [NOTION_CLIENT],
+      });
+      controllers.push(NotionBugReportsController);
     }
 
     if (databaseIds.length > 0) {

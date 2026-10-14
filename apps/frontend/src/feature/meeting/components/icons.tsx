@@ -187,6 +187,19 @@ export function FullscreenIcon({ className }: IconProps) {
   );
 }
 
+export function ReportProblemIcon({ className }: IconProps) {
+  return (
+    <svg {...base(className)}>
+      <circle
+        cx="12"
+        cy="12"
+        r="10"
+      />
+      <path d="M12 7v6M12 17h.01" />
+    </svg>
+  );
+}
+
 export function SettingsIcon({ className }: IconProps) {
   return (
     <svg {...base(className)}>

@@ -1,4 +1,10 @@
-import { ConflictError, DomainError, ForbiddenError, NotFoundError } from './errors';
+import {
+  ConflictError,
+  DomainError,
+  ForbiddenError,
+  NotFoundError,
+  TooManyRequestsError,
+} from './errors';
 
 describe('도메인 에러 계층', () => {
   it('의미 base는 DomainError이자 Error로 식별되고 name이 클래스명으로 설정된다', () => {
@@ -21,6 +27,10 @@ describe('도메인 에러 계층', () => {
     expect(e).toBeInstanceOf(DomainError);
     expect(e.name).toBe('MeetingNotFoundError');
     expect(e.code).toBe('abc12xyz');
+  });
+
+  it('요청이 너무 잦으면 429로 매핑된다', () => {
+    expect(new TooManyRequestsError('x').httpStatus).toBe(429);
   });
 
   it('서로 다른 의미 base는 교차 식별되지 않는다', () => {

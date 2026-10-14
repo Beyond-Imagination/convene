@@ -1,6 +1,9 @@
 'use client';
 
-import { LinkIcon, SettingsIcon } from '@/feature/meeting/components/icons';
+import type { ReactNode } from 'react';
+
+import { BugReportDialog } from '@/feature/bug-report/components/BugReportPanel';
+import { LinkIcon, ReportProblemIcon, SettingsIcon } from '@/feature/meeting/components/icons';
 import { MeetingControlBar } from '@/feature/meeting/components/MeetingControlBar';
 import { RemoteAudioPlayer } from '@/feature/meeting/components/MeetingMedia';
 import { VideoStage } from '@/feature/meeting/components/VideoStage';
@@ -81,6 +84,37 @@ function MeetingElapsed({ startedAt }: { readonly startedAt: string | null }) {
   );
 }
 
+/** 아이콘만 있는 헤더 버튼. 이름은 마우스를 올리거나 키보드로 오면 툴팁으로 보인다. */
+function HeaderIconButton({
+  label,
+  onClick,
+  children,
+}: {
+  readonly label: string;
+  readonly onClick: () => void;
+  readonly children: ReactNode;
+}) {
+  return (
+    <div className="group relative">
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={label}
+        aria-haspopup="dialog"
+        className="text-muted hover:bg-text/10 hover:text-text peer grid h-9 w-9 place-items-center rounded-full transition-colors"
+      >
+        {children}
+      </button>
+      <span
+        aria-hidden="true"
+        className="bg-text text-paper text-cap pointer-events-none absolute right-0 top-full z-30 mt-1.5 whitespace-nowrap rounded-md px-2 py-1 font-semibold opacity-0 transition-opacity group-hover:opacity-100 peer-focus-visible:opacity-100"
+      >
+        {label}
+      </span>
+    </div>
+  );
+}
+
 export interface MeetingScreenProps extends UseMeetingViewModel {
   readonly mediasoup: UseMediasoupViewModel;
   readonly reaction?: UseReactionViewModel;
@@ -92,6 +126,8 @@ export interface MeetingScreenProps extends UseMeetingViewModel {
   readonly hasUnreadChat?: boolean;
   readonly isSettingsOpen?: boolean;
   readonly onToggleSettings?: () => void;
+  readonly isBugReportOpen?: boolean;
+  readonly onToggleBugReport?: () => void;
   readonly tileAreaRef?: (el: HTMLElement | null) => void;
   readonly tileSize?: TileSize | null;
   readonly tileGap?: number;
@@ -134,6 +170,8 @@ export function MeetingScreen({
   hasUnreadChat,
   isSettingsOpen = false,
   onToggleSettings,
+  isBugReportOpen = false,
+  onToggleBugReport,
   tileAreaRef,
   tileSize,
   tileGap,
@@ -182,17 +220,24 @@ export function MeetingScreen({
               {statusLabel(status)}
             </span>
           )}
-          {onToggleSettings !== undefined && (
-            <button
-              type="button"
-              onClick={onToggleSettings}
-              aria-label="설정"
-              aria-haspopup="dialog"
-              className="text-muted hover:bg-text/10 hover:text-text -mr-2 grid h-9 w-9 place-items-center rounded-full transition-colors"
-            >
-              <SettingsIcon className="h-5 w-5" />
-            </button>
-          )}
+          <div className="-mr-2 flex items-center gap-0.5">
+            {onToggleBugReport !== undefined && (
+              <HeaderIconButton
+                label="버그 리포트"
+                onClick={onToggleBugReport}
+              >
+                <ReportProblemIcon className="h-5 w-5" />
+              </HeaderIconButton>
+            )}
+            {onToggleSettings !== undefined && (
+              <HeaderIconButton
+                label="설정"
+                onClick={onToggleSettings}
+              >
+                <SettingsIcon className="h-5 w-5" />
+              </HeaderIconButton>
+            )}
+          </div>
         </div>
       </header>
 
@@ -306,6 +351,14 @@ export function MeetingScreen({
         leave={leave}
         endMeeting={endMeeting}
       />
+
+      {onToggleBugReport !== undefined && (
+        <BugReportDialog
+          isOpen={isBugReportOpen}
+          onClose={onToggleBugReport}
+          meetingCode={code}
+        />
+      )}
 
       {onToggleSettings !== undefined && (
         <SettingsDialog
