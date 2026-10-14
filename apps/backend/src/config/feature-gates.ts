@@ -15,6 +15,7 @@ export interface FeatureGates {
   readonly notionPolling: boolean;
   /** 노션 버튼(서명된 회의 생성 경로). */
   readonly notionButton: boolean;
+  /** Convene 화면의 버그 리포트를 노션 이슈로 접수. */
   readonly notionBugReport: boolean;
   /** LLM 요약. 없으면 Noop 으로 대체된다. */
   readonly summarizer: boolean;
@@ -27,7 +28,7 @@ export function resolveFeatureGates(env: NodeJS.ProcessEnv = process.env): Featu
     notionReportPush: notion !== null,
     notionPolling: notion !== null && notion.databaseIds.length > 0,
     notionButton: notion !== null && notion.signingSecret !== null,
-    notionBugReport: false,
+    notionBugReport: notion !== null && notion.bugReportDatabaseId !== null,
     summarizer: resolveGeminiConfig(env) !== null,
     adminApi: resolveAdminConfig(env) !== null,
   };

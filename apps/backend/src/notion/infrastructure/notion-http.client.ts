@@ -63,31 +63,49 @@ export class NotionHttpClient {
     return this.request('PATCH', `/pages/${pageId}`, { properties });
   }
 
-  async createPage(_body: unknown): Promise<Record<string, unknown>> {
-    throw new Error('not implemented');
+  async createPage(body: unknown): Promise<Record<string, unknown>> {
+    return this.request('POST', '/pages', body);
   }
 
-  async retrieveDataSource(_dataSourceId: string): Promise<Record<string, unknown>> {
-    throw new Error('not implemented');
+  async retrieveDataSource(dataSourceId: string): Promise<Record<string, unknown>> {
+    return this.request('GET', `/data_sources/${dataSourceId}`);
   }
 
-  async createFileUpload(_filename: string, _contentType: string): Promise<string> {
-    throw new Error('not implemented');
+  /** 업로드 자리를 만든다. 보낸 뒤 1시간 안에 블록에 붙이지 않으면 노션이 지운다. */
+  async createFileUpload(filename: string, contentType: string): Promise<string> {
+    const created = await this.request('POST', '/file_uploads', {
+      mode: 'single_part',
+      filename,
+      content_type: contentType,
+    });
+    return created.id as string;
   }
 
   async sendFileUpload(
-    _uploadId: string,
-    _bytes: Uint8Array,
-    _filename: string,
-    _contentType: string,
+    uploadId: string,
+    bytes: Uint8Array,
+    filename: string,
+    contentType: string,
   ): Promise<void> {
-    throw new Error('not implemented');
+    const form = new FormData();
+    form.append('file', new Blob([bytes], { type: contentType }), filename);
+    // multipart 경계는 fetch 가 붙이므로 Content-Type 을 직접 넣지 않는다.
+    await this.send('POST', `/file_uploads/${uploadId}/send`, form, false);
   }
 
   private async request<T = Record<string, unknown>>(
     method: string,
     path: string,
     body?: unknown,
+  ): Promise<T> {
+    return this.send<T>(method, path, body === undefined ? undefined : JSON.stringify(body), true);
+  }
+
+  private async send<T = Record<string, unknown>>(
+    method: string,
+    path: string,
+    body: string | FormData | undefined,
+    isJson: boolean,
   ): Promise<T> {
     const url = `${this.config.baseUrl}/v1${path}`;
     const controller = new AbortController();
@@ -101,9 +119,9 @@ export class NotionHttpClient {
         headers: {
           Authorization: `Bearer ${this.config.token}`,
           'Notion-Version': this.config.version,
-          'Content-Type': 'application/json',
+          ...(isJson ? { 'Content-Type': 'application/json' } : {}),
         },
-        body: body === undefined ? undefined : JSON.stringify(body),
+        body,
         signal: controller.signal,
       });
 

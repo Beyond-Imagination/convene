@@ -5,6 +5,7 @@
  * - version/baseUrl/timeout은 미설정 시 디폴트. `databaseIds`(폴링용)는 미설정 시 빈 배열.
  *   이슈 관리 DB는 여럿(팀/프로젝트)이라 `NOTION_DB_IDS`를 콤마 구분 복수로 받는다.
  * - `signingSecret`(즉시 버튼 HMAC 검증)은 N-B 즉시 경로용. 없으면 컨트롤러 미등록.
+ * - `bugReportDatabaseId`는 버그 리포트를 이슈로 쌓을 DB. 없으면 접수 엔드포인트 미등록.
  */
 
 // 2025-09-03: 멀티소스 DB 도입. 조회는 databases/{id}/query가 아니라 data_sources/{id}/query.
@@ -61,6 +62,10 @@ export function resolveNotionConfig(env: NodeJS.ProcessEnv = process.env): Notio
   const signingSecret =
     signingSecretRaw === undefined || signingSecretRaw.length === 0 ? null : signingSecretRaw;
 
+  const bugReportRaw = env.NOTION_BUG_REPORT_DB_ID?.trim();
+  const bugReportDatabaseId =
+    bugReportRaw === undefined || bugReportRaw.length === 0 ? null : bugReportRaw;
+
   return {
     token,
     version: versionRaw === undefined || versionRaw.length === 0 ? DEFAULT_NOTION_VERSION : versionRaw,
@@ -68,6 +73,6 @@ export function resolveNotionConfig(env: NodeJS.ProcessEnv = process.env): Notio
     timeoutMs,
     databaseIds,
     signingSecret,
-    bugReportDatabaseId: null,
+    bugReportDatabaseId,
   };
 }
