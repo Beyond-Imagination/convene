@@ -3,6 +3,7 @@
 import { type ReactNode, useId } from 'react';
 
 import { useSettingsViewModel } from '@/feature/settings/hooks/useSettingsViewModel';
+import { Dialog } from '@/shared/Dialog';
 import type { ThemePreference } from '@/shared/stores/theme.store';
 
 const icon = {
@@ -183,44 +184,13 @@ export function SettingsDialog({
 }) {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center p-4">
-      <button
-        type="button"
-        tabIndex={-1}
-        aria-hidden="true"
-        data-testid="settings-backdrop"
-        onClick={onClose}
-        className="absolute inset-0 cursor-default bg-black/45"
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-dialog-title"
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') onClose();
-        }}
-        className="border-border bg-paper relative flex w-full max-w-md flex-col gap-6 rounded-2xl border p-6 shadow-[0_20px_60px_rgba(0,0,0,0.35)] md:p-8"
-      >
-        <div className="flex items-center justify-between">
-          <h2
-            id="settings-dialog-title"
-            className="text-title text-text font-bold"
-          >
-            설정
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="설정 닫기"
-            // 열리자마자 포커스를 안으로 옮겨 Escape 와 Tab 이 모달에서 시작하게 한다.
-            autoFocus
-            className="text-muted hover:bg-text/10 hover:text-text grid h-9 w-9 place-items-center rounded-full text-xl transition-colors"
-          >
-            ×
-          </button>
-        </div>
-        <SettingsPanel />
-      </div>
-    </div>
+    <Dialog
+      title="설정"
+      closeLabel="설정 닫기"
+      onClose={onClose}
+      backdropTestId="settings-backdrop"
+    >
+      <SettingsPanel />
+    </Dialog>
   );
 }

@@ -4,13 +4,13 @@ import Link from 'next/link';
 
 export interface AppHeaderProps {
   /** 지금 보고 있는 화면. */
-  readonly current?: 'reports' | 'settings';
+  readonly current?: 'reports' | 'bug-report' | 'settings';
 }
 
 const navLink = (active: boolean): string =>
   `text-meta font-semibold transition-colors ${active ? 'text-accent-on' : 'text-muted hover:text-accent-on'}`;
 
-/** 홈·회의록·설정이 공유하는 상단 바. */
+/** 홈·회의록·버그 리포트·설정이 공유하는 상단 바. */
 export function AppHeader({ current }: AppHeaderProps) {
   return (
     <header className="border-border px-gutter py-gutter-sm flex items-baseline justify-between gap-4 border-b">
@@ -29,6 +29,12 @@ export function AppHeader({ current }: AppHeaderProps) {
           className={navLink(current === 'reports')}
         >
           회의록
+        </Link>
+        <Link
+          href="/bug-report"
+          className={navLink(current === 'bug-report')}
+        >
+          버그 리포트
         </Link>
         <Link
           href="/settings"

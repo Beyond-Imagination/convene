@@ -153,6 +153,8 @@ function MeetingSession({ code }: { readonly code: string }) {
         hasUnreadChat={layout.hasUnreadChat}
         isSettingsOpen={layout.isSettingsOpen}
         onToggleSettings={layout.toggleSettings}
+        isBugReportOpen={layout.isBugReportOpen}
+        onToggleBugReport={layout.toggleBugReport}
         tileAreaRef={layout.tileAreaRef}
         tileSize={layout.tileSize}
         tileGap={layout.tileGap}
