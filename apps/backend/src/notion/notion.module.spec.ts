@@ -4,6 +4,7 @@ import { NotionMeetingProvisioningService } from '@/notion/application/notion-me
 import { NotionPollingScheduler } from '@/notion/application/notion-polling.scheduler';
 import { NotionReportListener } from '@/notion/application/notion-report.listener';
 import { NotionReportPushService } from '@/notion/application/notion-report-push.service';
+import { NotionBugReportsController } from '@/notion/interface/notion-bug-reports.controller';
 import { NotionMeetingsController } from '@/notion/interface/notion-meetings.controller';
 
 import { NotionHttpClient } from './infrastructure/notion-http.client';
@@ -57,6 +58,16 @@ describe('NotionModule.register (gate)', () => {
   it('서명 시크릿이 없으면 즉시 경로 컨트롤러를 등록하지 않는다', () => {
     const module = registerWith({ NOTION_TOKEN: 't', NOTION_DB_IDS: 'db1' });
     expect(module.controllers ?? []).not.toContain(NotionMeetingsController);
+  });
+
+  it('버그 리포트 DB id가 있으면 버그 리포트 접수 컨트롤러를 등록한다', () => {
+    const module = registerWith({ NOTION_TOKEN: 't', NOTION_BUG_REPORT_DB_ID: 'db-bug' });
+    expect(module.controllers).toContain(NotionBugReportsController);
+  });
+
+  it('버그 리포트 DB id가 없으면 접수 컨트롤러를 등록하지 않는다', () => {
+    const module = registerWith({ NOTION_TOKEN: 't', NOTION_SIGNING_SECRET: 's' });
+    expect(module.controllers ?? []).not.toContain(NotionBugReportsController);
   });
 
   it('DB id가 있으면 폴링 스케줄러를 등록한다', () => {

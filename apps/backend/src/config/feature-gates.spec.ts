@@ -6,6 +6,7 @@ describe('resolveFeatureGates', () => {
       notionReportPush: false,
       notionPolling: false,
       notionButton: false,
+      notionBugReport: false,
       summarizer: false,
       adminApi: false,
     });
@@ -23,6 +24,14 @@ describe('resolveFeatureGates', () => {
     const gates = resolveFeatureGates({ NOTION_TOKEN: 'ntn_x', NOTION_DB_IDS: 'db1,db2' });
 
     expect(gates.notionPolling).toBe(true);
+  });
+
+  it('NOTION_BUG_REPORT_DB_ID가 있어야 버그 리포트 접수가 켜진다', () => {
+    expect(resolveFeatureGates({ NOTION_TOKEN: 'ntn_x' }).notionBugReport).toBe(false);
+    expect(
+      resolveFeatureGates({ NOTION_TOKEN: 'ntn_x', NOTION_BUG_REPORT_DB_ID: 'db-bug' }).notionBugReport,
+    ).toBe(true);
+    expect(resolveFeatureGates({ NOTION_BUG_REPORT_DB_ID: 'db-bug' }).notionBugReport).toBe(false);
   });
 
   it('NOTION_SIGNING_SECRET이 있어야 버튼 경로가 켜진다', () => {

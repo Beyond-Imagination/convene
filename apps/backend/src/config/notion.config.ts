@@ -20,6 +20,7 @@ export interface NotionConfig {
   readonly timeoutMs: number;
   readonly databaseIds: ReadonlyArray<string>;
   readonly signingSecret: string | null;
+  readonly bugReportDatabaseId: string | null;
 }
 
 export function resolveNotionPollCron(env: NodeJS.ProcessEnv = process.env): string {
@@ -67,5 +68,6 @@ export function resolveNotionConfig(env: NodeJS.ProcessEnv = process.env): Notio
     timeoutMs,
     databaseIds,
     signingSecret,
+    bugReportDatabaseId: null,
   };
 }

@@ -22,6 +22,7 @@ describe('resolveNotionConfig', () => {
       timeoutMs: DEFAULT_NOTION_TIMEOUT_MS,
       databaseIds: [],
       signingSecret: null,
+      bugReportDatabaseId: null,
     });
   });
 
@@ -85,6 +86,14 @@ describe('resolveNotionConfig', () => {
     );
     expect(resolveNotionConfig({ NOTION_TOKEN: 't' })?.signingSecret).toBeNull();
     expect(resolveNotionConfig({ NOTION_TOKEN: 't', NOTION_SIGNING_SECRET: '   ' })?.signingSecret).toBeNull();
+  });
+
+  it('NOTION_BUG_REPORT_DB_ID를 파싱한다(버그 리포트 이슈 DB). 미설정/공백이면 null', () => {
+    expect(
+      resolveNotionConfig({ NOTION_TOKEN: 't', NOTION_BUG_REPORT_DB_ID: ' db-bug ' })?.bugReportDatabaseId,
+    ).toBe('db-bug');
+    expect(resolveNotionConfig({ NOTION_TOKEN: 't' })?.bugReportDatabaseId).toBeNull();
+    expect(resolveNotionConfig({ NOTION_TOKEN: 't', NOTION_BUG_REPORT_DB_ID: '  ' })?.bugReportDatabaseId).toBeNull();
   });
 });
 

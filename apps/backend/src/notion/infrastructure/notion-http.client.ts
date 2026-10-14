@@ -63,6 +63,27 @@ export class NotionHttpClient {
     return this.request('PATCH', `/pages/${pageId}`, { properties });
   }
 
+  async createPage(_body: unknown): Promise<Record<string, unknown>> {
+    throw new Error('not implemented');
+  }
+
+  async retrieveDataSource(_dataSourceId: string): Promise<Record<string, unknown>> {
+    throw new Error('not implemented');
+  }
+
+  async createFileUpload(_filename: string, _contentType: string): Promise<string> {
+    throw new Error('not implemented');
+  }
+
+  async sendFileUpload(
+    _uploadId: string,
+    _bytes: Uint8Array,
+    _filename: string,
+    _contentType: string,
+  ): Promise<void> {
+    throw new Error('not implemented');
+  }
+
   private async request<T = Record<string, unknown>>(
     method: string,
     path: string,

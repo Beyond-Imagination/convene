@@ -9,6 +9,7 @@ const config: NotionConfig = {
   timeoutMs: 30_000,
   databaseIds: [],
   signingSecret: null,
+  bugReportDatabaseId: null,
 };
 
 function okResponse(body: unknown): Response {
@@ -113,5 +114,59 @@ describe('NotionHttpClient', () => {
     const payload = { results: [{ id: 'p1' }], has_more: false, next_cursor: null };
     const fetchFn = jest.fn().mockResolvedValue(okResponse(payload));
     await expect(makeClient(fetchFn).queryDataSource('ds-1', {})).resolves.toEqual(payload);
+  });
+});
+
+describe('NotionHttpClient - 페이지 생성·파일 업로드', () => {
+  it('createPage는 POST /v1/pages 로 body를 그대로 보낸다', async () => {
+    const fetchFn = jest.fn().mockResolvedValue(okResponse({ id: 'page-1' }));
+    const body = { parent: { type: 'data_source_id', data_source_id: 'ds-1' }, properties: {} };
+    const page = await makeClient(fetchFn).createPage(body);
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe('https://api.notion.com/v1/pages');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual(body);
+    expect(page.id).toBe('page-1');
+  });
+
+  it('retrieveDataSource는 GET /v1/data_sources/{id} 이다', async () => {
+    const fetchFn = jest.fn().mockResolvedValue(okResponse({ properties: {} }));
+    await makeClient(fetchFn).retrieveDataSource('ds-1');
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe('https://api.notion.com/v1/data_sources/ds-1');
+    expect(init.method).toBe('GET');
+  });
+
+  it('createFileUpload는 single_part 업로드를 만들고 id를 돌려준다', async () => {
+    const fetchFn = jest.fn().mockResolvedValue(okResponse({ id: 'fu-1' }));
+    const id = await makeClient(fetchFn).createFileUpload('shot.png', 'image/png');
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe('https://api.notion.com/v1/file_uploads');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({
+      mode: 'single_part',
+      filename: 'shot.png',
+      content_type: 'image/png',
+    });
+    expect(id).toBe('fu-1');
+  });
+
+  it('sendFileUpload는 multipart 로 파일을 보내고 JSON Content-Type을 붙이지 않는다', async () => {
+    const fetchFn = jest.fn().mockResolvedValue(okResponse({ id: 'fu-1', status: 'uploaded' }));
+    await makeClient(fetchFn).sendFileUpload('fu-1', new Uint8Array([1, 2, 3]), 'shot.png', 'image/png');
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe('https://api.notion.com/v1/file_uploads/fu-1/send');
+    expect(init.method).toBe('POST');
+    expect(init.body).toBeInstanceOf(FormData);
+    expect((init.body as FormData).get('file')).toBeInstanceOf(Blob);
+    expect(init.headers).toMatchObject({ Authorization: 'Bearer secret-token', 'Notion-Version': '2025-09-03' });
+    expect(init.headers['Content-Type']).toBeUndefined();
+  });
+
+  it('sendFileUpload 실패도 NotionApiError로 던진다', async () => {
+    const fetchFn = jest.fn().mockResolvedValue(errResponse(400, { code: 'validation_error', message: 'bad' }));
+    await expect(
+      makeClient(fetchFn).sendFileUpload('fu-1', new Uint8Array([1]), 'a.png', 'image/png'),
+    ).rejects.toBeInstanceOf(NotionApiError);
   });
 });

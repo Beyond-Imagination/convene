@@ -22,6 +22,10 @@ export class ForbiddenError extends DomainError {
   readonly httpStatus = 403;
 }
 
+export class TooManyRequestsError extends DomainError {
+  readonly httpStatus = 500;
+}
+
 /** 현재 상태와 충돌(중복/허용되지 않는 상태 전이 등). */
 export class ConflictError extends DomainError {
   readonly httpStatus = 409;

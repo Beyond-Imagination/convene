@@ -10,3 +10,10 @@ export class NotionMeetingParamsDto {
   @IsNotEmpty()
   sig!: string;
 }
+
+export class BugReportDto {
+  summary!: string;
+  locations!: string[];
+  steps!: string[];
+  imageUploadIds!: string[];
+}
