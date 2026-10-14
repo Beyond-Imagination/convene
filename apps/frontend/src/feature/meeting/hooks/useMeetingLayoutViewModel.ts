@@ -127,6 +127,8 @@ interface UseMeetingLayoutViewModel {
   readonly setHasUnreadChat: (hasUnread: boolean) => void;
   readonly isSettingsOpen: boolean;
   readonly toggleSettings: () => void;
+  readonly isBugReportOpen: boolean;
+  readonly toggleBugReport: () => void;
   /** 비디오 타일의 배치 규칙(비율·상한·열 수)을 가른다. */
   readonly variant: MeetingLayoutVariant;
   /** 데스크톱 화면 공유 중 하단 참가자 줄을 펼쳤는지. */
@@ -269,6 +271,10 @@ export function useMeetingLayoutViewModel(
     setHasUnreadChat,
     isSettingsOpen,
     toggleSettings,
+    isBugReportOpen: false,
+    toggleBugReport: () => {
+      throw new Error('not implemented');
+    },
     variant,
     isStripOpen,
     toggleStrip,

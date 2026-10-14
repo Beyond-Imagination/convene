@@ -589,3 +589,31 @@ describe('MeetingScreen - 설정', () => {
     expect(screen.getByRole('radio', { name: '다크' })).toBeInTheDocument();
   });
 });
+
+describe('MeetingScreen - 버그 리포트', () => {
+  it('헤더의 버그 리포트 버튼을 누르면 onToggleBugReport를 부른다', () => {
+    const onToggleBugReport = vi.fn();
+    render(
+      <MeetingScreen
+        {...baseVm()}
+        mediasoup={baseMediasoup()}
+        onToggleBugReport={onToggleBugReport}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '버그 리포트' }));
+    expect(onToggleBugReport).toHaveBeenCalledTimes(1);
+  });
+
+  it('열려 있으면 이 회의 코드를 채운 버그 리포트 모달을 띄운다', () => {
+    render(
+      <MeetingScreen
+        {...baseVm()}
+        mediasoup={baseMediasoup()}
+        isBugReportOpen
+        onToggleBugReport={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('dialog', { name: '버그 리포트' })).toBeInTheDocument();
+    expect(screen.getByLabelText('회의 코드')).toHaveValue('abc12xyz');
+  });
+});
