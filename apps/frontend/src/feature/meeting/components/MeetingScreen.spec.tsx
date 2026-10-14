@@ -561,3 +561,31 @@ describe('MeetingScreen 화면 공유 보기 옵션·전체화면', () => {
     expect(screen.queryByRole('button', { name: /참가자 화면/ })).not.toBeInTheDocument();
   });
 });
+
+describe('MeetingScreen - 설정', () => {
+  it('헤더의 설정 버튼을 누르면 onToggleSettings를 부른다', () => {
+    const onToggleSettings = vi.fn();
+    render(
+      <MeetingScreen
+        {...baseVm()}
+        mediasoup={baseMediasoup()}
+        onToggleSettings={onToggleSettings}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '설정' }));
+    expect(onToggleSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('설정이 열려 있으면 회의를 떠나지 않고 설정 모달을 띄운다', () => {
+    render(
+      <MeetingScreen
+        {...baseVm()}
+        mediasoup={baseMediasoup()}
+        isSettingsOpen
+        onToggleSettings={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('dialog', { name: '설정' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: '다크' })).toBeInTheDocument();
+  });
+});

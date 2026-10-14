@@ -89,6 +89,8 @@ export interface MeetingScreenProps extends UseMeetingViewModel {
   readonly isChatOpen?: boolean;
   readonly onToggleChat?: () => void;
   readonly hasUnreadChat?: boolean;
+  readonly isSettingsOpen?: boolean;
+  readonly onToggleSettings?: () => void;
   readonly tileAreaRef?: (el: HTMLElement | null) => void;
   readonly tileSize?: TileSize | null;
   readonly tileGap?: number;

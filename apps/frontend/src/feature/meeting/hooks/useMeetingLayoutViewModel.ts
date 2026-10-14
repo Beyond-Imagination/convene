@@ -125,6 +125,8 @@ interface UseMeetingLayoutViewModel {
   /** 채팅 패널이 알려 준다. 회의 화면은 이 불리언이 바뀔 때만 다시 그려진다. */
   readonly hasUnreadChat: boolean;
   readonly setHasUnreadChat: (hasUnread: boolean) => void;
+  readonly isSettingsOpen: boolean;
+  readonly toggleSettings: () => void;
   /** 비디오 타일의 배치 규칙(비율·상한·열 수)을 가른다. */
   readonly variant: MeetingLayoutVariant;
   /** 데스크톱 화면 공유 중 하단 참가자 줄을 펼쳤는지. */
@@ -263,6 +265,10 @@ export function useMeetingLayoutViewModel(
     toggleChat,
     hasUnreadChat,
     setHasUnreadChat,
+    isSettingsOpen: false,
+    toggleSettings: () => {
+      throw new Error('not implemented');
+    },
     variant,
     isStripOpen,
     toggleStrip,
