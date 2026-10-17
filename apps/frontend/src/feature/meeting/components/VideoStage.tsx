@@ -535,6 +535,7 @@ export function VideoStage({
             onClick={onPrevPage}
             disabled={canPrev === false}
             aria-label="이전 페이지"
+            data-guide="pages"
             className={isStrip ? stripPagerButton : `${gridPagerButton} left-0`}
           >
             ‹
@@ -566,6 +567,7 @@ export function VideoStage({
             onClick={onNextPage}
             disabled={canNext === false}
             aria-label="다음 페이지"
+            data-guide="pages"
             className={isStrip ? stripPagerButton : `${gridPagerButton} right-0`}
           >
             ›

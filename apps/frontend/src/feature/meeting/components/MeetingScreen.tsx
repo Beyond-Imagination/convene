@@ -101,6 +101,7 @@ function HeaderIconButton({
         onClick={onClick}
         aria-label={label}
         aria-haspopup="dialog"
+        data-guide="help"
         className="text-muted hover:bg-text/10 hover:text-text peer grid h-9 w-9 place-items-center rounded-full transition-colors"
       >
         {children}

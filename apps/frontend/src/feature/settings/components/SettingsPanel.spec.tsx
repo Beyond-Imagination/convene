@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 
+import { useMeetingGuideStore } from '@/shared/stores/meeting-guide.store';
 import { useThemeStore } from '@/shared/stores/theme.store';
 
 import { SettingsDialog, SettingsPanel, ThemeSetting } from './SettingsPanel';
@@ -94,5 +95,21 @@ describe('SettingsDialog', () => {
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
     fireEvent.click(screen.getByTestId('settings-backdrop'));
     expect(onClose).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('SettingsPanel - 회의 화면 가이드', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    useMeetingGuideStore.setState({ showMeetingGuide: true, isHydrated: false });
+  });
+
+  it('체크박스로 가이드 보기를 켜고 끈다', () => {
+    render(<SettingsPanel />);
+    const box = screen.getByRole('checkbox', { name: '회의 화면 가이드 보기' });
+    expect(box).toBeChecked();
+    fireEvent.click(box);
+    expect(box).not.toBeChecked();
+    expect(useMeetingGuideStore.getState().showMeetingGuide).toBe(false);
   });
 });

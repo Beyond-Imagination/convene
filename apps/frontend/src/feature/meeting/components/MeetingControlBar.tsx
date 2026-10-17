@@ -80,6 +80,7 @@ export function MeetingControlBar({
         type="button"
         onClick={mediasoup.toggleAudio}
         disabled={micDisabled}
+        data-guide="media"
         aria-label={micLabel}
         className={`${controlButton} ${
           micDisabled ? controlBlocked : mediasoup.isAudioMuted ? controlOff : controlNeutral
@@ -96,6 +97,7 @@ export function MeetingControlBar({
         type="button"
         onClick={mediasoup.toggleVideo}
         disabled={!mediaReady}
+        data-guide="media"
         aria-label={camLabel}
         className={`${controlButton} ${
           !mediaReady ? controlBlocked : mediasoup.isVideoMuted ? controlOff : controlNeutral
@@ -115,6 +117,7 @@ export function MeetingControlBar({
             <button
               type="button"
               onClick={mediasoup.stopScreenShare}
+              data-guide="screen-share"
               className={`${controlButton} ${controlActive}`}
             >
               <ScreenShareIcon />
@@ -124,6 +127,7 @@ export function MeetingControlBar({
             <button
               type="button"
               onClick={() => void mediasoup.startScreenShare()}
+              data-guide="screen-share"
               // 화면 공유는 동시 1인.
               disabled={shareDisabled}
               className={`${controlButton} ${shareDisabled ? controlBlocked : controlNeutral}`}
@@ -139,6 +143,7 @@ export function MeetingControlBar({
         <button
           type="button"
           onClick={reaction.togglePicker}
+          data-guide="reaction"
           aria-expanded={reaction.isPickerOpen}
           aria-label={isHandRaised ? '반응, 손 든 상태' : '반응'}
           className={`${controlButton} ${
@@ -215,6 +220,7 @@ export function MeetingControlBar({
           type="button"
           onClick={onToggleChat}
           aria-pressed={isChatOpen}
+          data-guide="chat"
           className={`${controlButton} ${isChatOpen === true ? controlActive : controlNeutral}`}
         >
           <span className="relative inline-flex">
@@ -236,6 +242,7 @@ export function MeetingControlBar({
       <button
         type="button"
         onClick={leave}
+        data-guide="leave"
         className={`${controlButton} ${controlNeutral}`}
       >
         <LeaveIcon />
@@ -247,6 +254,7 @@ export function MeetingControlBar({
         <button
           type="button"
           onClick={() => void endMeeting()}
+          data-guide="leave"
           aria-label="회의 종료"
           className={`${controlButton} ${controlEnd}`}
         >
