@@ -6,6 +6,7 @@ import type { Socket } from 'socket.io-client';
 import { ChatPanel } from '@/feature/meeting/components/ChatPanel';
 import { EmbedGate } from '@/feature/meeting/components/EmbedGate';
 import { MeetingEntryGate } from '@/feature/meeting/components/MeetingEntryGate';
+import { MeetingGuide } from '@/feature/meeting/components/MeetingGuide';
 import { MeetingScreen } from '@/feature/meeting/components/MeetingScreen';
 import { NicknameGate } from '@/feature/meeting/components/NicknameGate';
 import { useChatScrollViewModel, useChatViewModel } from '@/feature/meeting/hooks/useChatViewModel';
@@ -13,6 +14,7 @@ import { useEmbedGateViewModel } from '@/feature/meeting/hooks/useEmbedGateViewM
 import { useMediasoupViewModel } from '@/feature/meeting/hooks/useMediasoupViewModel';
 import { useMeetingCardViewModel } from '@/feature/meeting/hooks/useMeetingCardViewModel';
 import { useMeetingEntryViewModel } from '@/feature/meeting/hooks/useMeetingEntryViewModel';
+import { useMeetingGuideViewModel } from '@/feature/meeting/hooks/useMeetingGuideViewModel';
 import { useMeetingLayoutViewModel } from '@/feature/meeting/hooks/useMeetingLayoutViewModel';
 import { useMeetingViewModel } from '@/feature/meeting/hooks/useMeetingViewModel';
 import { useNicknameGateViewModel } from '@/feature/meeting/hooks/useNicknameGateViewModel';
@@ -67,12 +69,13 @@ function ChatSection({
 }
 
 /**
- * 실제 회의 세션. 다섯 ViewModel hook을 합성한다:
+ * 실제 회의 세션. 여섯 ViewModel hook을 합성한다:
  *   - `useMeetingEntryViewModel`
  *   - `useMeetingViewModel`
  *   - `useMediasoupViewModel`
  *   - `useReactionViewModel`
  *   - `useSpeakerViewModel` (+ 발화자를 첫 페이지로 올리는 `useSpeakerOrderViewModel`)
+ *   - `useMeetingGuideViewModel` (처음 입장 때 버튼 사용법 가이드)
  *
  * 채팅은 `ChatSection` 이 자기 ViewModel 을 직접 들고 있다(위 주석 참조).
  */
@@ -105,6 +108,10 @@ function MeetingSession({ code }: { readonly code: string }) {
     layout.pageSize - 1,
   );
   const gateVm = useNicknameGateViewModel(code, meetingVm.nicknameError);
+  const guideVm = useMeetingGuideViewModel({
+    ready: meetingVm.status === 'joined',
+    blocked: layout.isSettingsOpen || layout.isBugReportOpen,
+  });
 
   if (entry.state !== 'ready') {
     return (
@@ -186,6 +193,7 @@ function MeetingSession({ code }: { readonly code: string }) {
           onUnreadChange={layout.setHasUnreadChat}
         />
       </aside>
+      <MeetingGuide {...guideVm} />
     </div>
   );
 }

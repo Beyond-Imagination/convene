@@ -161,6 +161,41 @@ export function ThemeSetting({
   );
 }
 
+export function MeetingGuideSetting({
+  value,
+  onChange,
+}: {
+  readonly value: boolean;
+  readonly onChange: (value: boolean) => void;
+}) {
+  return (
+    <SettingRow
+      title="회의 화면 가이드"
+      description="켜 두면 다음 회의에 들어갈 때 버튼 사용법을 보여 줘요. 회의 중에 켜면 설정을 닫자마자 시작해요."
+    >
+      {() => (
+        <label className="relative inline-flex cursor-pointer items-center">
+          <input
+            type="checkbox"
+            checked={value}
+            onChange={(e) => onChange(e.target.checked)}
+            aria-label="회의 화면 가이드 보기"
+            className="peer sr-only"
+          />
+          <span
+            aria-hidden="true"
+            className="bg-text/20 peer-checked:bg-accent peer-focus-visible:ring-accent/30 h-6 w-11 rounded-full transition-colors peer-focus-visible:ring-4"
+          />
+          <span
+            aria-hidden="true"
+            className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5"
+          />
+        </label>
+      )}
+    </SettingRow>
+  );
+}
+
 /** 설정 페이지와 회의 중 설정 모달이 같은 내용을 보여 준다. 항목이 늘면 여기에 줄을 더한다. */
 export function SettingsPanel() {
   const vm = useSettingsViewModel();
@@ -169,6 +204,10 @@ export function SettingsPanel() {
       <ThemeSetting
         value={vm.theme}
         onChange={vm.setTheme}
+      />
+      <MeetingGuideSetting
+        value={vm.meetingGuide}
+        onChange={vm.setMeetingGuide}
       />
     </div>
   );

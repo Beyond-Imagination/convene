@@ -2,11 +2,13 @@
 
 import { useEffect } from 'react';
 
+import { useMeetingGuideStore } from '@/shared/stores/meeting-guide.store';
 import { type ThemePreference, useThemeStore } from '@/shared/stores/theme.store';
 
 export interface UseSettingsViewModel {
   readonly theme: ThemePreference;
   readonly setTheme: (theme: ThemePreference) => void;
+  /** 다음 회의 입장 때(회의 중이면 설정을 닫자마자) 가이드를 보여 줄지. */
   readonly meetingGuide: boolean;
   readonly setMeetingGuide: (show: boolean) => void;
 }
@@ -16,17 +18,14 @@ export function useSettingsViewModel(): UseSettingsViewModel {
   const theme = useThemeStore((s) => s.preference);
   const setTheme = useThemeStore((s) => s.setPreference);
   const hydrate = useThemeStore((s) => s.hydrate);
+  const meetingGuide = useMeetingGuideStore((s) => s.showMeetingGuide);
+  const setMeetingGuide = useMeetingGuideStore((s) => s.setShowMeetingGuide);
+  const hydrateGuide = useMeetingGuideStore((s) => s.hydrate);
 
   useEffect(() => {
     hydrate();
-  }, [hydrate]);
+    hydrateGuide();
+  }, [hydrate, hydrateGuide]);
 
-  return {
-    theme,
-    setTheme,
-    meetingGuide: true,
-    setMeetingGuide: () => {
-      throw new Error('not implemented');
-    },
-  };
+  return { theme, setTheme, meetingGuide, setMeetingGuide };
 }
