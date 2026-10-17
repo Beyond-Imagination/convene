@@ -617,3 +617,23 @@ describe('MeetingScreen - 버그 리포트', () => {
     expect(screen.getByLabelText('회의 코드')).toHaveValue('abc12xyz');
   });
 });
+
+describe('MeetingScreen - 가이드 대상', () => {
+  it('가이드가 밝힐 버튼에 표시를 단다', () => {
+    const { container } = render(
+      <MeetingScreen
+        {...baseVm()}
+        mediasoup={baseMediasoup()}
+        onToggleChat={vi.fn()}
+        onToggleSettings={vi.fn()}
+        onToggleBugReport={vi.fn()}
+      />,
+    );
+    const marked = (id: string): number => container.querySelectorAll(`[data-guide="${id}"]`).length;
+    expect(marked('media')).toBe(2);
+    expect(marked('screen-share')).toBe(1);
+    expect(marked('chat')).toBe(1);
+    expect(marked('help')).toBe(2);
+    expect(marked('leave')).toBeGreaterThanOrEqual(1);
+  });
+});

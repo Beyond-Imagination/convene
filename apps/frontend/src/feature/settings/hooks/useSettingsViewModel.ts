@@ -7,6 +7,8 @@ import { type ThemePreference, useThemeStore } from '@/shared/stores/theme.store
 export interface UseSettingsViewModel {
   readonly theme: ThemePreference;
   readonly setTheme: (theme: ThemePreference) => void;
+  readonly meetingGuide: boolean;
+  readonly setMeetingGuide: (show: boolean) => void;
 }
 
 /** 설정 페이지와 회의 중 설정 모달이 함께 쓴다. */
@@ -19,5 +21,12 @@ export function useSettingsViewModel(): UseSettingsViewModel {
     hydrate();
   }, [hydrate]);
 
-  return { theme, setTheme };
+  return {
+    theme,
+    setTheme,
+    meetingGuide: true,
+    setMeetingGuide: () => {
+      throw new Error('not implemented');
+    },
+  };
 }
