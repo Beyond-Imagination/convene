@@ -5,6 +5,10 @@ import {
   useMeetingGuideStore,
 } from '@/shared/stores/meeting-guide.store';
 import { THEME_STORAGE_KEY, useThemeStore } from '@/shared/stores/theme.store';
+import {
+  useVideoQualityStore,
+  VIDEO_QUALITY_STORAGE_KEY,
+} from '@/shared/stores/video-quality.store';
 
 import { useSettingsViewModel } from './useSettingsViewModel';
 
@@ -47,5 +51,24 @@ describe('useSettingsViewModel - 회의 화면 가이드', () => {
     act(() => result.current.setMeetingGuide(true));
     expect(result.current.meetingGuide).toBe(true);
     expect(window.localStorage.getItem(MEETING_GUIDE_STORAGE_KEY)).toBe('show');
+  });
+});
+
+describe('useSettingsViewModel - 영상 화질', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    useVideoQualityStore.setState({ quality: 'auto' });
+  });
+
+  it('마운트하면 저장된 화질 선택을 보여 준다', () => {
+    window.localStorage.setItem(VIDEO_QUALITY_STORAGE_KEY, 'high');
+    const { result } = renderHook(() => useSettingsViewModel());
+    expect(result.current.videoQuality).toBe('high');
+  });
+
+  it('setVideoQuality로 화질을 바꾼다', () => {
+    const { result } = renderHook(() => useSettingsViewModel());
+    act(() => result.current.setVideoQuality('saver'));
+    expect(result.current.videoQuality).toBe('saver');
   });
 });

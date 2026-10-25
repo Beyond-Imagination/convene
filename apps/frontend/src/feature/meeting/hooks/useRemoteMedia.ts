@@ -32,6 +32,14 @@ export interface RemoteMediaEntry {
   readonly paused: boolean;
 }
 
+/** 화면에 보이는 영상과 받을 simulcast 레이어. 목록에 없는 영상은 받지 않는다. */
+export interface VideoDemand {
+  /** participantId → 카메라 레이어. */
+  readonly cameras: ReadonlyMap<string, number>;
+  /** 공유 화면이 안 보이면 null. */
+  readonly screenLayer: number | null;
+}
+
 export interface RemoteMediaDeps {
   readonly socket: Socket | null;
   readonly code: string;
@@ -48,6 +56,7 @@ export interface UseRemoteMedia {
    * 같은 회의의 다른 참가자가 화면을 공유 중인지. 화면 공유는 동시 1인 제약이라 true 면 View가 "화면 공유 시작" 버튼을 disabled 한다.
    */
   readonly isRemoteSharingScreen: boolean;
+  readonly setVideoDemand: (demand: VideoDemand) => void;
 }
 
 /**
@@ -212,5 +221,7 @@ export function useRemoteMedia({
 
   const isRemoteSharingScreen = remoteMedia.some((m) => m.source === 'screen');
 
-  return { remoteMedia, isRemoteSharingScreen };
+  const setVideoDemand = useCallback((_demand: VideoDemand) => {}, []);
+
+  return { remoteMedia, isRemoteSharingScreen, setVideoDemand };
 }

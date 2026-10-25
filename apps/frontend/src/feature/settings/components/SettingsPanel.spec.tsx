@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import { useMeetingGuideStore } from '@/shared/stores/meeting-guide.store';
 import { useThemeStore } from '@/shared/stores/theme.store';
+import { useVideoQualityStore } from '@/shared/stores/video-quality.store';
 
 import { SettingsDialog, SettingsPanel, ThemeSetting } from './SettingsPanel';
 
@@ -111,5 +112,22 @@ describe('SettingsPanel - 회의 화면 가이드', () => {
     fireEvent.click(box);
     expect(box).not.toBeChecked();
     expect(useMeetingGuideStore.getState().showMeetingGuide).toBe(false);
+  });
+});
+
+describe('SettingsPanel - 영상 화질', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    useVideoQualityStore.setState({ quality: 'auto' });
+  });
+
+  it('자동·데이터 절약·고화질 중 하나를 고른다', () => {
+    render(<SettingsPanel />);
+    const group = screen.getByRole('radiogroup', { name: '영상 화질' });
+    expect(group).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: '자동' })).toBeChecked();
+    fireEvent.click(screen.getByRole('radio', { name: '데이터 절약' }));
+    expect(screen.getByRole('radio', { name: '데이터 절약' })).toBeChecked();
+    expect(useVideoQualityStore.getState().quality).toBe('saver');
   });
 });

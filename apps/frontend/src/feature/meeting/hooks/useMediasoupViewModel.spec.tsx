@@ -1,6 +1,8 @@
 import { MEDIASOUP_WS_EVENTS, MEETING_WS_EVENTS } from '@convene/shared-interfaces';
 import { act, renderHook, waitFor } from '@testing-library/react';
 
+import { useVideoQualityStore } from '@/shared/stores/video-quality.store';
+
 import { useMediasoupViewModel } from './useMediasoupViewModel';
 
 /**
@@ -13,6 +15,7 @@ class FakeTrack {
   readonly kind: 'audio' | 'video';
   readonly stop = vi.fn();
   enabled = true;
+  contentHint = '';
   readyState: 'live' | 'ended' = 'live';
   private readonly handlers = new Map<string, Array<() => void>>();
   readonly addEventListener = vi.fn((event: string, cb: () => void) => {
@@ -62,6 +65,7 @@ class FakeProducer {
     this.paused = false;
   });
   readonly close = vi.fn();
+  readonly setMaxSpatialLayer = vi.fn(async () => {});
   readonly replaceTrack = vi.fn(async ({ track }: { track: FakeTrack }) => {
     this.track = track;
   });
@@ -176,12 +180,15 @@ const setupSocketAcks = (socket: FakeSocket) => {
       return {
         id: `c-${payload.producerId}`,
         producerId: payload.producerId,
-        kind: 'audio',
+        kind: payload.producerId.includes('audio') ? 'audio' : 'video',
         rtpParameters: {},
       };
     }
     if (event === MEDIASOUP_WS_EVENTS.RESUME_CONSUMER) {
       return undefined;
+    }
+    if (event === MEDIASOUP_WS_EVENTS.SET_CONSUMER_PREFERENCE) {
+      return { ok: true };
     }
     if (event === MEDIASOUP_WS_EVENTS.LIST_PRODUCERS) {
       return { producers: [] };
@@ -713,12 +720,17 @@ describe('useMediasoupViewModel.backgroundResume', () => {
     });
     window.sessionStorage.clear();
     visibility = 'visible';
-    vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
+    // spyOn 으로 getter를 바꾸면 restore 뒤 jsdom getter가 재귀에 빠진다. 인스턴스 속성으로 덮고 지운다.
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => visibility,
+    });
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    delete (document as { visibilityState?: unknown }).visibilityState;
   });
 
   const setVisibility = async (next: DocumentVisibilityState): Promise<void> => {
@@ -751,7 +763,7 @@ describe('useMediasoupViewModel.backgroundResume', () => {
     await setVisibility('visible');
 
     await waitFor(() => expect(producer.replaceTrack).toHaveBeenCalled());
-    expect(getUserMediaMock).toHaveBeenLastCalledWith({ video: true });
+    expect(getUserMediaMock).toHaveBeenLastCalledWith({ video: expect.any(Object) });
     expect(producer.track.readyState).toBe('live');
     // 새 producer를 만들면 다른 참가자 쪽 consumer가 전부 다시 만들어진다.
     expect(socket.emit.mock.calls.some((c) => c[0] === MEDIASOUP_WS_EVENTS.CLOSE_PRODUCER)).toBe(
@@ -1336,12 +1348,12 @@ describe('useMediasoupViewModel.muteToggle', () => {
     expect(result.current.localAudioTrack).toBeNull();
   });
 
-  it('toggleVideo 최초 호출 시 getUserMedia({video:true})로 취득해 produce(source=video) + localStream 설정 + isVideoMuted=false', async () => {
+  it('toggleVideo 최초 호출 시 getUserMedia(카메라 제약)로 취득해 produce(source=video) + localStream 설정 + isVideoMuted=false', async () => {
     const { result, send } = await setupReady();
     await act(async () => {
       await result.current.toggleVideo();
     });
-    expect(getUserMediaMock).toHaveBeenCalledWith({ video: true });
+    expect(getUserMediaMock).toHaveBeenCalledWith({ video: expect.any(Object) });
     expect(send.produce.mock.calls[0][0].appData).toMatchObject({ source: 'video' });
     expect(result.current.isVideoMuted).toBe(false);
     expect(result.current.localStream).not.toBeNull();
@@ -1390,5 +1402,293 @@ describe('useMediasoupViewModel.muteToggle', () => {
       MEDIASOUP_WS_EVENTS.PRODUCER_TOGGLED,
       expect.any(Function),
     );
+  });
+});
+
+describe('useMediasoupViewModel.videoDemand (보이는 영상만 받기)', () => {
+  let visibility: DocumentVisibilityState = 'visible';
+
+  beforeEach(() => {
+    fakeDevice = new FakeDevice();
+    getUserMediaMock = vi.fn(async () => new FakeMediaStream());
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: getUserMediaMock } });
+    window.sessionStorage.clear();
+    visibility = 'visible';
+    // spyOn 으로 getter를 바꾸면 restore 뒤 jsdom getter가 재귀에 빠진다. 인스턴스 속성으로 덮고 지운다.
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => visibility,
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    delete (document as { visibilityState?: unknown }).visibilityState;
+  });
+
+  const demand = (cameras: Record<string, number>, screenLayer: number | null = null) => ({
+    cameras: new Map(Object.entries(cameras)),
+    screenLayer,
+  });
+
+  const preferenceCalls = (socket: FakeSocket) =>
+    socket.emitWithAck.mock.calls
+      .filter((c) => c[0] === MEDIASOUP_WS_EVENTS.SET_CONSUMER_PREFERENCE)
+      .map((c) => c[1] as { consumerId: string; paused: boolean; spatialLayer?: number });
+
+  const resumeCalls = (socket: FakeSocket) =>
+    socket.emitWithAck.mock.calls.filter((c) => c[0] === MEDIASOUP_WS_EVENTS.RESUME_CONSUMER);
+
+  const setup = async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const hook = renderMediasoup(socket);
+    await waitFor(() => expect(hook.result.current.status).toBe('ready'));
+    const onNewProducer = captureSocketListener(socket, MEDIASOUP_WS_EVENTS.NEW_PRODUCER);
+    const addVideo = async (peerId: string, source: 'video' | 'screen' = 'video') => {
+      const before = hook.result.current.remoteMedia.length;
+      onNewProducer({ peerId, producerId: `p-${peerId}-${source}`, kind: 'video', source });
+      await waitFor(() => expect(hook.result.current.remoteMedia.length).toBe(before + 1));
+    };
+    const setDemand = (d: ReturnType<typeof demand>) =>
+      act(async () => {
+        hook.result.current.setVideoDemand(d);
+      });
+    return { socket, ...hook, onNewProducer, addVideo, setDemand };
+  };
+
+  it('보이는 참가자의 카메라는 정한 레이어로 받기 시작한다', async () => {
+    const { socket, setDemand, addVideo } = await setup();
+    await setDemand(demand({ s2: 1 }));
+    await addVideo('s2');
+    await waitFor(() =>
+      expect(preferenceCalls(socket)).toEqual([
+        { code, consumerId: 'c-p-s2-video', paused: false, spatialLayer: 1 },
+      ]),
+    );
+    expect(resumeCalls(socket)).toHaveLength(0);
+  });
+
+  it('화면에 없는 참가자의 카메라는 받지 않는다 (서버 consumer는 멈춘 채로 둔다)', async () => {
+    const { socket, setDemand, addVideo } = await setup();
+    await setDemand(demand({ s2: 1 }));
+    await addVideo('s3');
+    await act(async () => {});
+    expect(preferenceCalls(socket).filter((c) => !c.paused)).toEqual([]);
+    expect(resumeCalls(socket)).toHaveLength(0);
+  });
+
+  it('타일이 화면에서 사라지면 수신을 멈추고, 다시 보이면 재개한다', async () => {
+    const { socket, setDemand, addVideo } = await setup();
+    await setDemand(demand({ s2: 0 }));
+    await addVideo('s2');
+    await waitFor(() => expect(preferenceCalls(socket)).toHaveLength(1));
+
+    await setDemand(demand({}));
+    await waitFor(() => expect(preferenceCalls(socket).at(-1)?.paused).toBe(true));
+
+    await setDemand(demand({ s2: 2 }));
+    await waitFor(() =>
+      expect(preferenceCalls(socket).at(-1)).toEqual({
+        code,
+        consumerId: 'c-p-s2-video',
+        paused: false,
+        spatialLayer: 2,
+      }),
+    );
+  });
+
+  it('공유 화면은 화면 수요의 레이어를 따른다', async () => {
+    const { socket, setDemand, addVideo } = await setup();
+    await setDemand(demand({}, 0));
+    await addVideo('s2', 'screen');
+    await waitFor(() =>
+      expect(preferenceCalls(socket)).toEqual([
+        { code, consumerId: 'c-p-s2-screen', paused: false, spatialLayer: 0 },
+      ]),
+    );
+  });
+
+  it('같은 수요를 다시 받으면 서버에 다시 보내지 않는다', async () => {
+    const { socket, setDemand, addVideo } = await setup();
+    await setDemand(demand({ s2: 1 }));
+    await addVideo('s2');
+    await waitFor(() => expect(preferenceCalls(socket)).toHaveLength(1));
+    await setDemand(demand({ s2: 1, s9: 0 }));
+    await act(async () => {});
+    expect(preferenceCalls(socket)).toHaveLength(1);
+  });
+
+  it('연달아 바뀌어도 순서가 뒤집히지 않고 마지막 수요로 끝난다', async () => {
+    const { socket, setDemand, addVideo } = await setup();
+    const pending: Array<() => void> = [];
+    const ack = socket.emitWithAck.getMockImplementation()!;
+    socket.emitWithAck.mockImplementation(async (event: string, payload: unknown) => {
+      if (event === MEDIASOUP_WS_EVENTS.SET_CONSUMER_PREFERENCE) {
+        await new Promise<void>((resolve) => pending.push(resolve));
+      }
+      return ack(event, payload);
+    });
+    await setDemand(demand({ s2: 1 }));
+    await addVideo('s2');
+    await waitFor(() => expect(preferenceCalls(socket)).toHaveLength(1));
+
+    // 첫 요청이 끝나기 전에 숨김 → 보임 → 숨김.
+    await setDemand(demand({}));
+    await setDemand(demand({ s2: 1 }));
+    await setDemand(demand({}));
+    await act(async () => pending.shift()!());
+    await waitFor(() => expect(preferenceCalls(socket)).toHaveLength(2));
+    await act(async () => pending.shift()!());
+    await act(async () => {});
+    expect(preferenceCalls(socket).map((c) => c.paused)).toEqual([false, true]);
+  });
+
+  it('오디오는 화면 배치와 상관없이 항상 받는다', async () => {
+    const { socket, setDemand, onNewProducer, result } = await setup();
+    await setDemand(demand({}));
+    onNewProducer({ peerId: 's2', producerId: 'p-s2-audio', kind: 'audio', source: 'audio' });
+    await waitFor(() => expect(result.current.remoteMedia).toHaveLength(1));
+    expect(resumeCalls(socket)).toHaveLength(1);
+    expect(preferenceCalls(socket)).toEqual([]);
+  });
+
+  it('수요를 받기 전에는 영상을 모두 받는다', async () => {
+    const { socket, addVideo } = await setup();
+    await addVideo('s2');
+    await waitFor(() =>
+      expect(preferenceCalls(socket)).toEqual([
+        { code, consumerId: 'c-p-s2-video', paused: false },
+      ]),
+    );
+  });
+
+  it('숨김 상태로 열렸다가 이벤트를 놓친 채 보이게 돼도 영상을 받는다', async () => {
+    visibility = 'hidden';
+    const { socket, setDemand, addVideo } = await setup();
+    visibility = 'visible';
+    await setDemand(demand({ s2: 1 }));
+    await addVideo('s2');
+    await waitFor(() => expect(preferenceCalls(socket).at(-1)?.paused).toBe(false));
+  });
+
+  it('앱이 백그라운드로 가면 영상 수신을 모두 멈추고, 돌아오면 다시 받는다', async () => {
+    const { socket, setDemand, addVideo } = await setup();
+    await setDemand(demand({ s2: 1 }));
+    await addVideo('s2');
+    await waitFor(() => expect(preferenceCalls(socket)).toHaveLength(1));
+
+    await act(async () => {
+      visibility = 'hidden';
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await waitFor(() => expect(preferenceCalls(socket).at(-1)?.paused).toBe(true));
+
+    await act(async () => {
+      visibility = 'visible';
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await waitFor(() =>
+      expect(preferenceCalls(socket).at(-1)).toEqual({
+        code,
+        consumerId: 'c-p-s2-video',
+        paused: false,
+        spatialLayer: 1,
+      }),
+    );
+  });
+});
+
+describe('useMediasoupViewModel.sendQuality (송출 화질)', () => {
+  let getDisplayMediaMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fakeDevice = new FakeDevice();
+    getUserMediaMock = vi.fn(async () => new FakeMediaStream());
+    getDisplayMediaMock = vi.fn(async () => {
+      const stream = new FakeMediaStream();
+      stream.tracks.splice(0, 1);
+      return stream;
+    });
+    vi.stubGlobal('navigator', {
+      mediaDevices: { getUserMedia: getUserMediaMock, getDisplayMedia: getDisplayMediaMock },
+    });
+    window.sessionStorage.clear();
+    window.localStorage.clear();
+    useVideoQualityStore.setState({ quality: 'auto' });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  type ProduceOptions = {
+    track: FakeTrack;
+    encodings?: Array<{ scaleResolutionDownBy?: number; maxBitrate?: number }>;
+  };
+
+  const ready = async () => {
+    const socket = new FakeSocket();
+    setupSocketAcks(socket);
+    const hook = renderMediasoup(socket);
+    await waitFor(() => expect(hook.result.current.status).toBe('ready'));
+    const send = fakeDevice.createSendTransport.mock.results[0].value as FakeTransport;
+    return { ...hook, send };
+  };
+
+  const turnOnCamera = async (hook: Awaited<ReturnType<typeof ready>>) => {
+    await act(async () => {
+      hook.result.current.toggleVideo();
+    });
+    await waitFor(() => expect(hook.result.current.isVideoMuted).toBe(false));
+    const call = hook.send.produce.mock.calls.at(-1)![0] as ProduceOptions;
+    const producer = (await hook.send.produce.mock.results.at(-1)!.value) as FakeProducer;
+    return { call, producer };
+  };
+
+  it('카메라는 해상도를 나눈 3단 simulcast로 송출한다 (받는 쪽이 골라 받는다)', async () => {
+    const hook = await ready();
+    const { call } = await turnOnCamera(hook);
+    const encodings = call.encodings ?? [];
+    expect(encodings.map((e) => e.scaleResolutionDownBy)).toEqual([4, 2, 1]);
+    const bitrates = encodings.map((e) => e.maxBitrate ?? Infinity);
+    expect(bitrates.every(Number.isFinite)).toBe(true);
+    expect(bitrates).toEqual([...bitrates].sort((a, b) => a - b));
+  });
+
+  it('화면 공유는 프레임 수를 제한하고 글자 선명도 우선 힌트를 주며 2단 simulcast로 송출한다', async () => {
+    const hook = await ready();
+    await act(async () => {
+      await hook.result.current.startScreenShare();
+    });
+    const constraints = getDisplayMediaMock.mock.calls[0][0] as {
+      video: { frameRate?: unknown };
+    };
+    expect(constraints.video.frameRate).toBeDefined();
+    const call = hook.send.produce.mock.calls.at(-1)![0] as ProduceOptions;
+    expect(call.track.contentHint).toBe('detail');
+    expect(call.encodings?.map((e) => e.scaleResolutionDownBy)).toEqual([2, 1]);
+    expect(call.encodings?.every((e) => Number.isFinite(e.maxBitrate))).toBe(true);
+  });
+
+  it('데이터 절약이면 내 카메라 송출을 중간 레이어까지로 제한한다', async () => {
+    useVideoQualityStore.setState({ quality: 'saver' });
+    const hook = await ready();
+    const { producer } = await turnOnCamera(hook);
+    await waitFor(() => expect(producer.setMaxSpatialLayer).toHaveBeenLastCalledWith(1));
+  });
+
+  it('회의 중 화질 설정을 바꾸면 켜져 있는 카메라 송출에 바로 반영한다', async () => {
+    const hook = await ready();
+    const { producer } = await turnOnCamera(hook);
+    await act(async () => {
+      useVideoQualityStore.setState({ quality: 'saver' });
+    });
+    await waitFor(() => expect(producer.setMaxSpatialLayer).toHaveBeenLastCalledWith(1));
+    await act(async () => {
+      useVideoQualityStore.setState({ quality: 'high' });
+    });
+    await waitFor(() => expect(producer.setMaxSpatialLayer).toHaveBeenLastCalledWith(2));
   });
 });

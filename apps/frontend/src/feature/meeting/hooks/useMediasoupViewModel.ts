@@ -7,9 +7,13 @@ import {
   type MediasoupConnectionStatus,
   useMediasoupTransport,
 } from '@/feature/meeting/hooks/useMediasoupTransport';
-import { type RemoteMediaEntry, useRemoteMedia } from '@/feature/meeting/hooks/useRemoteMedia';
+import {
+  type RemoteMediaEntry,
+  useRemoteMedia,
+  type VideoDemand,
+} from '@/feature/meeting/hooks/useRemoteMedia';
 
-export type { MediasoupConnectionStatus, RemoteMediaEntry };
+export type { MediasoupConnectionStatus, RemoteMediaEntry, VideoDemand };
 
 export interface UseMediasoupViewModel {
   readonly status: MediasoupConnectionStatus;
@@ -29,6 +33,8 @@ export interface UseMediasoupViewModel {
   readonly toggleVideo: () => void;
   readonly startScreenShare: () => Promise<void>;
   readonly stopScreenShare: () => void;
+  /** 화면에 보이는 영상만 받도록 알려 준다(useVideoDemandViewModel). */
+  readonly setVideoDemand: (demand: VideoDemand) => void;
 }
 
 /**
@@ -83,5 +89,6 @@ export function useMediasoupViewModel(
     toggleVideo: local.toggleVideo,
     startScreenShare: local.startScreenShare,
     stopScreenShare: local.stopScreenShare,
+    setVideoDemand: remote.setVideoDemand,
   };
 }
