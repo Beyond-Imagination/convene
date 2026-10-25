@@ -23,6 +23,7 @@ import {
   useSpeakerOrderViewModel,
   useSpeakerViewModel,
 } from '@/feature/meeting/hooks/useSpeakerViewModel';
+import { useVideoDemandViewModel } from '@/feature/meeting/hooks/useVideoDemandViewModel';
 import { useRouteSegment } from '@/shared/hooks/useRouteSegment';
 
 /**
@@ -69,13 +70,14 @@ function ChatSection({
 }
 
 /**
- * 실제 회의 세션. 여섯 ViewModel hook을 합성한다:
+ * 실제 회의 세션. 일곱 ViewModel hook을 합성한다:
  *   - `useMeetingEntryViewModel`
  *   - `useMeetingViewModel`
  *   - `useMediasoupViewModel`
  *   - `useReactionViewModel`
  *   - `useSpeakerViewModel` (+ 발화자를 첫 페이지로 올리는 `useSpeakerOrderViewModel`)
  *   - `useMeetingGuideViewModel` (처음 입장 때 버튼 사용법 가이드)
+ *   - `useVideoDemandViewModel` (화면에 보이는 영상만 받기)
  *
  * 채팅은 `ChatSection` 이 자기 ViewModel 을 직접 들고 있다(위 주석 참조).
  */
@@ -107,6 +109,13 @@ function MeetingSession({ code }: { readonly code: string }) {
     speakerVm.activeSpeaker,
     layout.pageSize - 1,
   );
+  useVideoDemandViewModel({
+    participants: orderedParticipants,
+    layout,
+    isSharing: mediasoupVm.isSharingScreen || mediasoupVm.isRemoteSharingScreen,
+    isRemoteSharingScreen: mediasoupVm.isRemoteSharingScreen,
+    setVideoDemand: mediasoupVm.setVideoDemand,
+  });
   const gateVm = useNicknameGateViewModel(code, meetingVm.nicknameError);
   const guideVm = useMeetingGuideViewModel({
     ready: meetingVm.status === 'joined',

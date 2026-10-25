@@ -25,13 +25,15 @@ export function useSettingsViewModel(): UseSettingsViewModel {
   const setMeetingGuide = useMeetingGuideStore((s) => s.setShowMeetingGuide);
   const hydrateGuide = useMeetingGuideStore((s) => s.hydrate);
 
+  const videoQuality = useVideoQualityStore((s) => s.quality);
+  const setVideoQuality = useVideoQualityStore((s) => s.setQuality);
+  const hydrateVideoQuality = useVideoQualityStore((s) => s.hydrate);
+
   useEffect(() => {
     hydrate();
     hydrateGuide();
-  }, [hydrate, hydrateGuide]);
-
-  const videoQuality = useVideoQualityStore((s) => s.quality);
-  const setVideoQuality = useVideoQualityStore((s) => s.setQuality);
+    hydrateVideoQuality();
+  }, [hydrate, hydrateGuide, hydrateVideoQuality]);
 
   return { theme, setTheme, meetingGuide, setMeetingGuide, videoQuality, setVideoQuality };
 }

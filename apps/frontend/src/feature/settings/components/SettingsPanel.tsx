@@ -5,6 +5,7 @@ import { type ReactNode, useId } from 'react';
 import { useSettingsViewModel } from '@/feature/settings/hooks/useSettingsViewModel';
 import { Dialog } from '@/shared/Dialog';
 import type { ThemePreference } from '@/shared/stores/theme.store';
+import type { VideoQuality } from '@/shared/stores/video-quality.store';
 
 const icon = {
   width: 18,
@@ -81,6 +82,15 @@ const THEME_OPTIONS: ReadonlyArray<{
     selectedClass:
       '[[data-theme-pref=system]_&]:bg-accent [[data-theme-pref=system]_&]:text-accent-fg',
   },
+];
+
+const VIDEO_QUALITY_OPTIONS: ReadonlyArray<{
+  readonly value: VideoQuality;
+  readonly label: string;
+}> = [
+  { value: 'auto', label: '자동' },
+  { value: 'saver', label: '데이터 절약' },
+  { value: 'high', label: '고화질' },
 ];
 
 /** 설정 한 줄 — 왼쪽에 이름·설명, 오른쪽에 컨트롤. 항목이 늘어도 같은 모양으로 쌓인다. */
@@ -161,6 +171,45 @@ export function ThemeSetting({
   );
 }
 
+export function VideoQualitySetting({
+  value,
+  onChange,
+}: {
+  readonly value: VideoQuality;
+  readonly onChange: (value: VideoQuality) => void;
+}) {
+  return (
+    <SettingRow
+      title="영상 화질"
+      description="데이터 절약은 받고 보내는 화질을 모두 낮춰요."
+    >
+      {(labelId) => (
+        <div
+          role="radiogroup"
+          aria-labelledby={labelId}
+          className="border-border bg-surface flex gap-0.5 rounded-xl border p-1"
+        >
+          {VIDEO_QUALITY_OPTIONS.map((o) => (
+            <label key={o.value}>
+              <input
+                type="radio"
+                name="video-quality"
+                value={o.value}
+                checked={value === o.value}
+                onChange={() => onChange(o.value)}
+                className="peer sr-only"
+              />
+              <span className="text-muted text-meta hover:text-text peer-checked:bg-accent peer-checked:text-accent-fg peer-focus-visible:ring-accent flex h-9 cursor-pointer items-center whitespace-nowrap rounded-lg px-3 font-semibold peer-focus-visible:ring-2">
+                {o.label}
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
+    </SettingRow>
+  );
+}
+
 export function MeetingGuideSetting({
   value,
   onChange,
@@ -204,6 +253,10 @@ export function SettingsPanel() {
       <ThemeSetting
         value={vm.theme}
         onChange={vm.setTheme}
+      />
+      <VideoQualitySetting
+        value={vm.videoQuality}
+        onChange={vm.setVideoQuality}
       />
       <MeetingGuideSetting
         value={vm.meetingGuide}
