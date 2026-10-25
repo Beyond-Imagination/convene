@@ -26,6 +26,8 @@ export const MEDIASOUP_WS_EVENTS = {
   PRODUCE: 'mediasoup:produce',
   CONSUME: 'mediasoup:consume',
   RESUME_CONSUMER: 'mediasoup:resumeConsumer',
+  /** 화면에 안 보이는 영상은 받지 않고, 보이는 영상은 타일 크기에 맞는 화질로 받는다. */
+  SET_CONSUMER_PREFERENCE: 'mediasoup:setConsumerPreference',
   LIST_PRODUCERS: 'mediasoup:listProducers',
   TOGGLE_PRODUCER: 'mediasoup:toggleProducer',
   CLOSE_PRODUCER: 'mediasoup:closeProducer',
