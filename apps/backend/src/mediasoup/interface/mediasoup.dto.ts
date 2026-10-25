@@ -19,17 +19,23 @@ import {
   IsBoolean,
   IsDefined,
   IsIn,
+  IsInt,
   IsObject,
   IsOptional,
   IsString,
   Length,
+  Max,
   MaxLength,
+  Min,
 } from 'class-validator';
 
 import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
 
 /** transport/producer/consumer 식별자 상한. mediasoup가 생성하는 uuid보다 넉넉하게 잡는다. */
 const ID_MAX = 64;
+
+/** 프론트 simulcast 인코딩 수(3) - 1. */
+const SPATIAL_LAYER_MAX = 2;
 
 /**
  * mediasoup WS 페이로드는 모두 회의 code를 싣는다.
@@ -111,6 +117,10 @@ export class SetConsumerPreferenceDto
   @IsBoolean()
   paused!: boolean;
 
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(SPATIAL_LAYER_MAX)
   spatialLayer?: number;
 }
 

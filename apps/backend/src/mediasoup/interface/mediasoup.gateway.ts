@@ -198,10 +198,17 @@ export class MediasoupGateway {
 
   @SubscribeMessage(MEDIASOUP_WS_EVENTS.SET_CONSUMER_PREFERENCE)
   async handleSetConsumerPreference(
-    @MessageBody() _dto: SetConsumerPreferenceDto,
-    @ConnectedSocket() _client: Socket,
+    @MessageBody() dto: SetConsumerPreferenceDto,
+    @ConnectedSocket() client: Socket,
   ): Promise<{ ok: true }> {
-    throw new Error('not implemented');
+    await this.service.setConsumerPreference({
+      meetingCode: dto.code,
+      participantId: this.participantIdOf(client),
+      consumerId: dto.consumerId,
+      paused: dto.paused,
+      spatialLayer: dto.spatialLayer,
+    });
+    return { ok: true };
   }
 
   @SubscribeMessage(MEDIASOUP_WS_EVENTS.LIST_PRODUCERS)

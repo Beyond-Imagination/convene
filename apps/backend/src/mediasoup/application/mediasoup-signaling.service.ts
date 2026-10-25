@@ -276,8 +276,11 @@ export class MediasoupSignalingService {
     await this.transportPort.resumeConsumer(command.consumerId);
   }
 
-  async setConsumerPreference(_command: SetConsumerPreferenceCommand): Promise<void> {
-    throw new Error('not implemented');
+  async setConsumerPreference(command: SetConsumerPreferenceCommand): Promise<void> {
+    await this.transportPort.setConsumerPreference(command.consumerId, {
+      paused: command.paused,
+      spatialLayer: command.spatialLayer,
+    });
   }
 
   async toggleProducer(command: ToggleProducerCommand): Promise<void> {
