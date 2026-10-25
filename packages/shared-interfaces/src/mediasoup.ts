@@ -105,6 +105,17 @@ export interface ResumeConsumerRequest {
   consumerId: string;
 }
 
+/**
+ * 내 consumer의 수신 여부와 simulcast 레이어를 정한다. `spatialLayer`는 0(가장 낮음)부터이고,
+ * 생략하면 레이어는 그대로 둔다. simulcast가 아닌 consumer는 레이어를 무시한다.
+ */
+export interface SetConsumerPreferenceRequest {
+  code: string;
+  consumerId: string;
+  paused: boolean;
+  spatialLayer?: number;
+}
+
 export interface RestartIceRequest {
   code: string;
   transportId: string;
