@@ -170,6 +170,7 @@ const mediasoupVm = (overrides: Partial<UseMediasoupViewModel> = {}): UseMediaso
   toggleVideo: () => {},
   startScreenShare: async () => {},
   stopScreenShare: () => {},
+  setVideoDemand: () => {},
   ...overrides,
 });
 

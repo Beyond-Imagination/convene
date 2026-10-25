@@ -24,6 +24,7 @@ import {
   type RestartIceRequest,
   type RestartIceResponse,
   type ResumeConsumerRequest,
+  type SetConsumerPreferenceRequest,
   type ToggleProducerRequest,
   type ToggleProducerResponse,
   TRANSPORT_DIRECTIONS,
@@ -37,9 +38,9 @@ describe('Mediasoup wire format', () => {
     }
   });
 
-  it('WS 이벤트 이름은 모두 서로 다르고 14개다 (RPC 10 + 브로드캐스트 4)', () => {
+  it('WS 이벤트 이름은 모두 서로 다르고 15개다 (RPC 11 + 브로드캐스트 4)', () => {
     const all = Object.values(MEDIASOUP_WS_EVENTS);
-    expect(all).toHaveLength(14);
+    expect(all).toHaveLength(15);
     expect(new Set(all).size).toBe(all.length);
   });
 
@@ -48,6 +49,22 @@ describe('Mediasoup wire format', () => {
     const req: RestartIceRequest = { code: 'ABCDEFGH', transportId: 't1' };
     const res: RestartIceResponse = { iceParameters: {} };
     expect([req.transportId, res.iceParameters]).toEqual(['t1', {}]);
+  });
+
+  it('setConsumerPreference는 수신 중단과 받을 화질 레이어를 한 번에 정한다', () => {
+    expect(MEDIASOUP_WS_EVENTS.SET_CONSUMER_PREFERENCE).toBe('mediasoup:setConsumerPreference');
+    const paused: SetConsumerPreferenceRequest = {
+      code: 'ABCDEFGH',
+      consumerId: 'c1',
+      paused: true,
+    };
+    const layered: SetConsumerPreferenceRequest = {
+      code: 'ABCDEFGH',
+      consumerId: 'c1',
+      paused: false,
+      spatialLayer: 1,
+    };
+    expect([paused.spatialLayer, layered.spatialLayer]).toEqual([undefined, 1]);
   });
 
   it('MediasoupWsEventName union은 상수 값과 일치한다', () => {

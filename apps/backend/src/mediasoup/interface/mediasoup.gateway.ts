@@ -36,6 +36,7 @@ import {
   ProduceDto,
   RestartIceDto,
   ResumeConsumerDto,
+  SetConsumerPreferenceDto,
   ToggleProducerDto,
 } from '@/mediasoup/interface/mediasoup.dto';
 import { wsValidationPipe } from '@/shared-kernel/interface/ws-validation.pipe';
@@ -191,6 +192,21 @@ export class MediasoupGateway {
       meetingCode: dto.code,
       participantId: this.participantIdOf(client),
       consumerId: dto.consumerId,
+    });
+    return { ok: true };
+  }
+
+  @SubscribeMessage(MEDIASOUP_WS_EVENTS.SET_CONSUMER_PREFERENCE)
+  async handleSetConsumerPreference(
+    @MessageBody() dto: SetConsumerPreferenceDto,
+    @ConnectedSocket() client: Socket,
+  ): Promise<{ ok: true }> {
+    await this.service.setConsumerPreference({
+      meetingCode: dto.code,
+      participantId: this.participantIdOf(client),
+      consumerId: dto.consumerId,
+      paused: dto.paused,
+      spatialLayer: dto.spatialLayer,
     });
     return { ok: true };
   }

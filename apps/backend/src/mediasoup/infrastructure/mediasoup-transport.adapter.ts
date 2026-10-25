@@ -8,7 +8,13 @@ import {
   WebRtcTransport,
 } from 'mediasoup/node/lib/types';
 
-import { ConsumeInput, CreateWebRtcTransportInput, MediaTransportPort, ProduceInput } from '@/mediasoup/domain/ports/media-transport.port';
+import {
+  ConsumeInput,
+  ConsumerPreference,
+  CreateWebRtcTransportInput,
+  MediaTransportPort,
+  ProduceInput,
+} from '@/mediasoup/domain/ports/media-transport.port';
 
 import { MediasoupRouterAdapter } from './mediasoup-router.adapter';
 
@@ -108,6 +114,19 @@ export class MediasoupTransportAdapter implements MediaTransportPort {
       throw new Error(`MediasoupTransportAdapter: consumer "${consumerId}" not found`);
     }
     await consumer.resume();
+  }
+
+  async setConsumerPreference(consumerId: string, preference: ConsumerPreference): Promise<void> {
+    const consumer = this.consumers.get(consumerId);
+    if (!consumer || consumer.closed) {
+      throw new Error(`MediasoupTransportAdapter: consumer "${consumerId}" not found`);
+    }
+    // 재개 전에 레이어부터 낮춰 둬야 재개 직후 높은 레이어가 한 번 쏟아지지 않는다.
+    if (preference.spatialLayer !== undefined && consumer.type !== 'simple') {
+      await consumer.setPreferredLayers({ spatialLayer: preference.spatialLayer });
+    }
+    if (preference.paused) await consumer.pause();
+    else await consumer.resume();
   }
 
   async pauseProducer(producerId: string): Promise<void> {

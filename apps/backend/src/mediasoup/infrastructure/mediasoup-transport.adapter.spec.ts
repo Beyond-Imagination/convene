@@ -152,6 +152,17 @@ describe('MediasoupTransportAdapter', () => {
     }
   });
 
+  it('알 수 없는 consumerId로 setConsumerPreference를 호출하면 throw 한다', async () => {
+    const { transportAdapter, cleanup } = await setup();
+    try {
+      await expect(
+        transportAdapter.setConsumerPreference('c-unknown', { paused: true }),
+      ).rejects.toThrow();
+    } finally {
+      await cleanup();
+    }
+  });
+
   it('알 수 없는 producerId로 pauseProducer를 호출하면 throw 한다', async () => {
     const { transportAdapter, cleanup } = await setup();
     try {

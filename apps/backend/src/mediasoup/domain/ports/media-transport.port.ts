@@ -37,6 +37,12 @@ export interface ConsumeInput {
   rtpCapabilities: unknown;
 }
 
+export interface ConsumerPreference {
+  paused: boolean;
+  /** 생략하면 레이어는 그대로 둔다. */
+  spatialLayer?: number;
+}
+
 export interface MediaTransportPort {
   createWebRtcTransport(input: CreateWebRtcTransportInput): Promise<CreateTransportResponse>;
 
@@ -47,6 +53,9 @@ export interface MediaTransportPort {
   consume(input: ConsumeInput): Promise<ConsumeResponse>;
 
   resumeConsumer(consumerId: string): Promise<void>;
+
+  /** simulcast가 아닌 consumer는 레이어를 무시한다. */
+  setConsumerPreference(consumerId: string, preference: ConsumerPreference): Promise<void>;
 
   pauseProducer(producerId: string): Promise<void>;
 

@@ -22,6 +22,7 @@ const baseMediasoup = (): UseMediasoupViewModel => ({
   toggleVideo: vi.fn(),
   startScreenShare: vi.fn(async () => {}),
   stopScreenShare: vi.fn(),
+  setVideoDemand: vi.fn(),
 });
 
 const baseReaction = (

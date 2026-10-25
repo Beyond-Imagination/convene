@@ -5,7 +5,7 @@ import {
   MEDIASOUP_WS_EVENTS,
   type MediaType,
 } from '@convene/shared-interfaces';
-import type { Producer, Transport } from 'mediasoup-client/types';
+import type { Producer, RtpEncodingParameters, Transport } from 'mediasoup-client/types';
 import {
   type MutableRefObject,
   useCallback,
@@ -18,6 +18,7 @@ import type { Socket } from 'socket.io-client';
 
 import type { MediasoupConnectionStatus } from '@/feature/meeting/hooks/useMediasoupTransport';
 import { getMediaIntent, saveMediaIntent } from '@/shared/stores/meeting.storage';
+import { useVideoQualityStore } from '@/shared/stores/video-quality.store';
 
 /** 마이크 토글 쿨다운. 서버 배선 재생성이 뒤따르므로 연타를 흘려보내지 않는다. */
 const AUDIO_TOGGLE_COOLDOWN_MS = 700;
@@ -34,7 +35,35 @@ const constraintsFor = (kind: 'audio' | 'video'): MediaStreamConstraints =>
           voiceIsolation: true,
         } as MediaTrackConstraints,
       }
-    : { video: true };
+    : {
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 24, max: 30 },
+        },
+      };
+
+/**
+ * 카메라 simulcast — 1/4 · 1/2 · 원본. 받는 쪽이 타일 크기에 맞는 레이어를 고른다
+ * (useVideoDemandViewModel 의 레이어 높이와 맞춘다).
+ */
+const CAMERA_ENCODINGS: RtpEncodingParameters[] = [
+  { scaleResolutionDownBy: 4, maxBitrate: 150_000 },
+  { scaleResolutionDownBy: 2, maxBitrate: 500_000 },
+  { scaleResolutionDownBy: 1, maxBitrate: 1_200_000 },
+];
+const CAMERA_TOP_LAYER = CAMERA_ENCODINGS.length - 1;
+/** 데이터 절약일 때 내 카메라가 보내는 가장 높은 레이어. */
+const SAVER_CAMERA_MAX_LAYER = 1;
+
+/** 화면 공유 — 절반 해상도 · 원본. 글자는 움직임보다 선명도가 중요해 프레임 수를 묶는다. */
+const SCREEN_CONSTRAINTS: DisplayMediaStreamOptions = {
+  video: { frameRate: { ideal: 15, max: 15 } },
+};
+const SCREEN_ENCODINGS: RtpEncodingParameters[] = [
+  { scaleResolutionDownBy: 2, maxBitrate: 500_000 },
+  { scaleResolutionDownBy: 1, maxBitrate: 1_500_000 },
+];
 
 // 모바일 브라우저에는 getDisplayMedia가 없다. 지원 여부는 바뀌지 않으므로 구독할 것이 없다.
 const subscribeNever = (): (() => void) => () => {};
@@ -120,6 +149,19 @@ export function useLocalMedia({
   // 그 안의 stopScreenShare 직접 참조는 socket=null 버전이라 closeProducer emit이
   // 누락된다(stale closure). ref 우회로 socket 연결 이후 버전을 호출한다.
   const stopScreenShareRef = useRef<() => void>(() => {});
+  const cameraMaxLayer =
+    useVideoQualityStore((s) => s.quality) === 'saver' ? SAVER_CAMERA_MAX_LAYER : CAMERA_TOP_LAYER;
+  const cameraMaxLayerRef = useRef(cameraMaxLayer);
+  cameraMaxLayerRef.current = cameraMaxLayer;
+  // 레이어 제한은 데이터 절약용이라 실패해도 카메라는 그대로 송출한다.
+  const limitCameraLayer = useCallback(
+    (producer: Producer, layer: number): void => {
+      producer.setMaxSpatialLayer(layer).catch((e: unknown) => {
+        reportError(e instanceof Error ? e.message : String(e));
+      });
+    },
+    [reportError],
+  );
 
   // 재연결/unmount 로 transport가 내려가면 토글로 켜 둔 미디어를 정리한다.
   useEffect(() => {
@@ -201,9 +243,12 @@ export function useLocalMedia({
                   opusMaxAverageBitrate: 64000,
                 },
               }
-            : {}),
+            : { encodings: CAMERA_ENCODINGS }),
           appData: { source: kind as MediaType },
         });
+        if (kind === 'video' && cameraMaxLayerRef.current < CAMERA_TOP_LAYER) {
+          limitCameraLayer(producer, cameraMaxLayerRef.current);
+        }
         producerRef.current = producer;
         streamRef.current = stream;
         if (kind === 'video') setLocalStream(stream);
@@ -215,7 +260,7 @@ export function useLocalMedia({
         reportError(message);
       }
     },
-    [socket, code, sendTransportRef, reportError],
+    [socket, code, sendTransportRef, reportError, limitCameraLayer],
   );
 
   const toggleAudio = useCallback(() => {
@@ -239,6 +284,12 @@ export function useLocalMedia({
   const toggleVideo = useCallback(() => {
     void toggleMedia('video', videoProducerRef, localStreamRef, setIsVideoMuted);
   }, [toggleMedia]);
+
+  // 회의 중 화질 설정을 바꾸면 켜져 있는 카메라에 바로 적용한다.
+  useEffect(() => {
+    const producer = videoProducerRef.current;
+    if (producer !== null) limitCameraLayer(producer, cameraMaxLayer);
+  }, [cameraMaxLayer, limitCameraLayer]);
 
   /**
    * 전면 재생성·새로고침으로 producer가 사라졌을 때 켜 뒀던 것을 되살린다.
@@ -297,14 +348,16 @@ export function useLocalMedia({
     const sendTransport = sendTransportRef.current;
     if (sendTransport === null) return;
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      const stream = await navigator.mediaDevices.getDisplayMedia(SCREEN_CONSTRAINTS);
       const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack === undefined) {
         stream.getTracks().forEach((t) => t.stop());
         return;
       }
+      videoTrack.contentHint = 'detail';
       const producer = await sendTransport.produce({
         track: videoTrack as never,
+        encodings: SCREEN_ENCODINGS,
         appData: { source: 'screen' as MediaType },
       });
       screenStreamRef.current = stream;

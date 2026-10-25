@@ -28,6 +28,7 @@ const baseMediasoup = (overrides: Partial<UseMediasoupViewModel> = {}): UseMedia
   toggleVideo: vi.fn(),
   startScreenShare: vi.fn(async () => {}),
   stopScreenShare: vi.fn(),
+  setVideoDemand: vi.fn(),
   ...overrides,
 });
 

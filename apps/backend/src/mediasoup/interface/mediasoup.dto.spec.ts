@@ -8,6 +8,7 @@ import {
   GetRtpCapabilitiesDto,
   ProduceDto,
   ResumeConsumerDto,
+  SetConsumerPreferenceDto,
   ToggleProducerDto,
 } from './mediasoup.dto';
 
@@ -141,6 +142,37 @@ describe('ResumeConsumerDto', () => {
     await expect(run(ResumeConsumerDto, { code, consumerId: 'x'.repeat(65) })).rejects.toThrow(
       /consumerId/i,
     );
+  });
+});
+
+describe('SetConsumerPreferenceDto', () => {
+  it('레이어 없이 수신 여부만 보내도 통과', async () => {
+    const dto = await run<SetConsumerPreferenceDto>(SetConsumerPreferenceDto, {
+      code,
+      consumerId: 'c-1',
+      paused: true,
+    });
+    expect(dto.spatialLayer).toBeUndefined();
+  });
+
+  it('레이어를 함께 보내면 통과', async () => {
+    const dto = await run<SetConsumerPreferenceDto>(SetConsumerPreferenceDto, {
+      code,
+      consumerId: 'c-1',
+      paused: false,
+      spatialLayer: 2,
+    });
+    expect(dto.spatialLayer).toBe(2);
+  });
+
+  it.each([-1, 3, 1.5, '1'])('레이어가 0~2 정수가 아니면(%p) 거부', async (spatialLayer) => {
+    await expect(
+      run(SetConsumerPreferenceDto, { code, consumerId: 'c-1', paused: false, spatialLayer }),
+    ).rejects.toThrow();
+  });
+
+  it('paused 누락 거부', async () => {
+    await expect(run(SetConsumerPreferenceDto, { code, consumerId: 'c-1' })).rejects.toThrow();
   });
 });
 

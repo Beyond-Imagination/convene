@@ -26,6 +26,8 @@ export const MEDIASOUP_WS_EVENTS = {
   PRODUCE: 'mediasoup:produce',
   CONSUME: 'mediasoup:consume',
   RESUME_CONSUMER: 'mediasoup:resumeConsumer',
+  /** 화면에 안 보이는 영상은 받지 않고, 보이는 영상은 타일 크기에 맞는 화질로 받는다. */
+  SET_CONSUMER_PREFERENCE: 'mediasoup:setConsumerPreference',
   LIST_PRODUCERS: 'mediasoup:listProducers',
   TOGGLE_PRODUCER: 'mediasoup:toggleProducer',
   CLOSE_PRODUCER: 'mediasoup:closeProducer',
@@ -103,6 +105,17 @@ export interface ConsumeResponse {
 export interface ResumeConsumerRequest {
   code: string;
   consumerId: string;
+}
+
+/**
+ * 내 consumer의 수신 여부와 simulcast 레이어를 정한다. `spatialLayer`는 0(가장 낮음)부터이고,
+ * 생략하면 레이어는 그대로 둔다. simulcast가 아닌 consumer는 레이어를 무시한다.
+ */
+export interface SetConsumerPreferenceRequest {
+  code: string;
+  consumerId: string;
+  paused: boolean;
+  spatialLayer?: number;
 }
 
 export interface RestartIceRequest {

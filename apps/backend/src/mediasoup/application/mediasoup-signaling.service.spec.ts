@@ -118,6 +118,9 @@ const makeTransportPort = () => {
     async resumeConsumer(consumerId) {
       calls.push({ name: 'resumeConsumer', args: [consumerId] });
     },
+    async setConsumerPreference(consumerId, preference) {
+      calls.push({ name: 'setConsumerPreference', args: [consumerId, preference] });
+    },
     async pauseProducer(producerId) {
       calls.push({ name: 'pauseProducer', args: [producerId] });
     },
@@ -862,6 +865,25 @@ describe('MediasoupSignalingService.resumeConsumer', () => {
     expect(transport.calls.some((c) => c.name === 'resumeConsumer' && c.args[0] === 'c-1')).toBe(
       true,
     );
+  });
+});
+
+describe('MediasoupSignalingService.setConsumerPreference', () => {
+  it('수신 여부와 레이어를 transportPort에 그대로 위임한다', async () => {
+    const { service, transport } = makeService();
+    await service.openRoom({ meetingCode });
+    await service.admitParticipant({ meetingCode, participantId: 's1' });
+    await service.setConsumerPreference({
+      meetingCode,
+      participantId: 's1',
+      consumerId: 'c-1',
+      paused: false,
+      spatialLayer: 0,
+    });
+    expect(transport.calls).toContainEqual({
+      name: 'setConsumerPreference',
+      args: ['c-1', { paused: false, spatialLayer: 0 }],
+    });
   });
 });
 
