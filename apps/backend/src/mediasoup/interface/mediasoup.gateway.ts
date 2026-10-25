@@ -36,6 +36,7 @@ import {
   ProduceDto,
   RestartIceDto,
   ResumeConsumerDto,
+  SetConsumerPreferenceDto,
   ToggleProducerDto,
 } from '@/mediasoup/interface/mediasoup.dto';
 import { wsValidationPipe } from '@/shared-kernel/interface/ws-validation.pipe';
@@ -193,6 +194,14 @@ export class MediasoupGateway {
       consumerId: dto.consumerId,
     });
     return { ok: true };
+  }
+
+  @SubscribeMessage(MEDIASOUP_WS_EVENTS.SET_CONSUMER_PREFERENCE)
+  async handleSetConsumerPreference(
+    @MessageBody() _dto: SetConsumerPreferenceDto,
+    @ConnectedSocket() _client: Socket,
+  ): Promise<{ ok: true }> {
+    throw new Error('not implemented');
   }
 
   @SubscribeMessage(MEDIASOUP_WS_EVENTS.LIST_PRODUCERS)

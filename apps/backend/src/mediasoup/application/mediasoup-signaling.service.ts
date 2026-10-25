@@ -56,6 +56,12 @@ interface ResumeConsumerCommand extends ParticipantCommand {
   consumerId: string;
 }
 
+interface SetConsumerPreferenceCommand extends ParticipantCommand {
+  consumerId: string;
+  paused: boolean;
+  spatialLayer?: number;
+}
+
 interface ToggleProducerCommand extends ParticipantCommand {
   producerId: string;
   paused: boolean;
@@ -268,6 +274,10 @@ export class MediasoupSignalingService {
 
   async resumeConsumer(command: ResumeConsumerCommand): Promise<void> {
     await this.transportPort.resumeConsumer(command.consumerId);
+  }
+
+  async setConsumerPreference(_command: SetConsumerPreferenceCommand): Promise<void> {
+    throw new Error('not implemented');
   }
 
   async toggleProducer(command: ToggleProducerCommand): Promise<void> {

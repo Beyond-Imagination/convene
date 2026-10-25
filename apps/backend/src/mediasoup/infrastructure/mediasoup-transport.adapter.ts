@@ -8,7 +8,13 @@ import {
   WebRtcTransport,
 } from 'mediasoup/node/lib/types';
 
-import { ConsumeInput, CreateWebRtcTransportInput, MediaTransportPort, ProduceInput } from '@/mediasoup/domain/ports/media-transport.port';
+import {
+  ConsumeInput,
+  ConsumerPreference,
+  CreateWebRtcTransportInput,
+  MediaTransportPort,
+  ProduceInput,
+} from '@/mediasoup/domain/ports/media-transport.port';
 
 import { MediasoupRouterAdapter } from './mediasoup-router.adapter';
 
@@ -108,6 +114,10 @@ export class MediasoupTransportAdapter implements MediaTransportPort {
       throw new Error(`MediasoupTransportAdapter: consumer "${consumerId}" not found`);
     }
     await consumer.resume();
+  }
+
+  async setConsumerPreference(_consumerId: string, _preference: ConsumerPreference): Promise<void> {
+    throw new Error('not implemented');
   }
 
   async pauseProducer(producerId: string): Promise<void> {

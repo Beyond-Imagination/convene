@@ -10,6 +10,7 @@ import {
   GetRtpCapabilitiesDto,
   ProduceDto,
   ResumeConsumerDto,
+  SetConsumerPreferenceDto,
   ToggleProducerDto,
 } from '@/mediasoup/interface/mediasoup.dto';
 import { stub } from '@/shared-kernel/testing/stub';
@@ -68,6 +69,9 @@ const makeService = () => {
     },
     resumeConsumer: async (cmd: unknown) => {
       calls.push({ name: 'resumeConsumer', args: [cmd] });
+    },
+    setConsumerPreference: async (cmd: unknown) => {
+      calls.push({ name: 'setConsumerPreference', args: [cmd] });
     },
     toggleProducer: async (cmd: unknown) => {
       calls.push({ name: 'toggleProducer', args: [cmd] });
@@ -215,6 +219,33 @@ describe('MediasoupGateway.handleResumeConsumer', () => {
     expect(calls[0]).toEqual({
       name: 'resumeConsumer',
       args: [{ meetingCode: codeStr, participantId: 's1', consumerId: 'c-1' }],
+    });
+  });
+});
+
+describe('MediasoupGateway.handleSetConsumerPreference', () => {
+  it('dto + client.id를 service.setConsumerPreference에 위임한다', async () => {
+    const { gateway, calls } = setup();
+    const dto = Object.assign(new SetConsumerPreferenceDto(), {
+      code: codeStr,
+      consumerId: 'c-1',
+      paused: false,
+      spatialLayer: 1,
+    });
+    await expect(gateway.handleSetConsumerPreference(dto, makeClient('s1'))).resolves.toEqual({
+      ok: true,
+    });
+    expect(calls[0]).toEqual({
+      name: 'setConsumerPreference',
+      args: [
+        {
+          meetingCode: codeStr,
+          participantId: 's1',
+          consumerId: 'c-1',
+          paused: false,
+          spatialLayer: 1,
+        },
+      ],
     });
   });
 });

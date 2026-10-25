@@ -10,6 +10,7 @@ import {
   type ProduceRequest,
   type RestartIceRequest,
   type ResumeConsumerRequest,
+  type SetConsumerPreferenceRequest,
   type ToggleProducerRequest,
   TRANSPORT_DIRECTIONS,
   type TransportDirection,
@@ -97,6 +98,20 @@ export class ResumeConsumerDto extends MeetingScopedDto implements ResumeConsume
   @IsString()
   @MaxLength(ID_MAX)
   consumerId!: string;
+}
+
+export class SetConsumerPreferenceDto
+  extends MeetingScopedDto
+  implements SetConsumerPreferenceRequest
+{
+  @IsString()
+  @MaxLength(ID_MAX)
+  consumerId!: string;
+
+  @IsBoolean()
+  paused!: boolean;
+
+  spatialLayer?: number;
 }
 
 export class ToggleProducerDto extends MeetingScopedDto implements ToggleProducerRequest {
