@@ -145,6 +145,15 @@ function asStringArray(value: unknown, field: string): string[] {
   });
 }
 
+/** 모델이 모르는 선택 필드를 생략하지 않고 빈 문자열로 채워 보내는 경우가 있다 — 없는 값으로 본다. */
+function asOptionalString(value: unknown, field: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') {
+    throw new Error(`Gemini response field "${field}" is not a string`);
+  }
+  return value.trim().length === 0 ? undefined : value;
+}
+
 function asActionItemArray(value: unknown): Array<{ owner?: string; task: string; due?: string }> {
   if (!Array.isArray(value)) {
     throw new Error('Gemini response field "actionItems" is not an array');
@@ -158,18 +167,10 @@ function asActionItemArray(value: unknown): Array<{ owner?: string; task: string
       throw new Error(`Gemini response field "actionItems[${i}].task" is not a string`);
     }
     const result: { owner?: string; task: string; due?: string } = { task: item.task };
-    if (item.owner !== undefined) {
-      if (typeof item.owner !== 'string') {
-        throw new Error(`Gemini response field "actionItems[${i}].owner" is not a string`);
-      }
-      result.owner = item.owner;
-    }
-    if (item.due !== undefined) {
-      if (typeof item.due !== 'string') {
-        throw new Error(`Gemini response field "actionItems[${i}].due" is not a string`);
-      }
-      result.due = item.due;
-    }
+    const owner = asOptionalString(item.owner, `actionItems[${i}].owner`);
+    if (owner !== undefined) result.owner = owner;
+    const due = asOptionalString(item.due, `actionItems[${i}].due`);
+    if (due !== undefined) result.due = due;
     return result;
   });
 }
