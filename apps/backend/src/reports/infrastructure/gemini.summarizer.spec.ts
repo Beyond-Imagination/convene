@@ -158,6 +158,27 @@ describe('GeminiSummarizer', () => {
     expect(summary.keyTopics).toEqual([{ topic: '인증', points: ['JWT 정책', '세션 만료'] }]);
   });
 
+  it('actionItem의 owner·due가 빈 문자열이면 없는 것으로 보고 요약을 돌려준다', async () => {
+    const withBlankFields = JSON.stringify({
+      title: '주간 동기화',
+      overview: '다음 스프린트 작업을 정리했다.',
+      decisions: [],
+      actionItems: [
+        { owner: '', task: '회의록 공유', due: '' },
+        { owner: 'alice', task: '마이그레이션 PoC 작성', due: '  ' },
+      ],
+      keyTopics: [],
+    });
+    const fetchMock = jest.fn().mockResolvedValueOnce(okResponse(withBlankFields));
+    const summarizer = new GeminiSummarizer(options, fetchMock as unknown as typeof fetch);
+
+    const summary = await summarizer.summarize({ transcript: [], chat: [], meta });
+    expect(summary.actionItems).toEqual([
+      { task: '회의록 공유' },
+      { owner: 'alice', task: '마이그레이션 PoC 작성' },
+    ]);
+  });
+
   it('빈 transcript + 빈 chat도 정상 호출하고 응답을 매핑한다', async () => {
     const fetchMock = jest.fn().mockResolvedValueOnce(okResponse(validSummaryJson));
     const summarizer = new GeminiSummarizer(options, fetchMock as unknown as typeof fetch);
