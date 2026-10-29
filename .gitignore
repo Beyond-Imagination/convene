@@ -45,6 +45,10 @@ apps/ai-worker/bench/result*.json
 apps/ai-worker/bench/configs*.json
 apps/ai-worker/bench/flow_check.py
 
+# 요약 벤치 — 실제 회의 전사·정답·결과라 커밋하지 않는다.
+apps/backend/bench/summary/data/
+apps/backend/bench/summary/results/
+
 # graphify
 graphify-out/
 
