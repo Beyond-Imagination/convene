@@ -15,7 +15,7 @@ import { isRetryableHttpStatus, withRetry } from '@/shared-kernel/infrastructure
 
 import { exportMeetings, loadBenchInput, loadVariantConfig } from './data';
 import { buildJudgePrompt, computeMetrics, JUDGE_SCHEMA, JudgeResult, Metrics } from './judge';
-import { CallResult, STRATEGIES, Usage } from './strategies';
+import { CallResult, GenerateOptions, STRATEGIES, Usage } from './strategies';
 
 const BENCH_DIR = __dirname;
 const DEFAULT_MODEL = 'gemini-2.5-flash';
@@ -101,13 +101,21 @@ async function generateJson(
   schema: object,
   temperature: number,
   dumpPath: string,
+  options: GenerateOptions = {},
 ): Promise<CallResult> {
   const baseUrl = process.env.GEMINI_BASE_URL ?? DEFAULT_BASE_URL;
   const url = `${baseUrl}/v1beta/models/${model}:generateContent?key=${requireEnv('GEMINI_API_KEY')}`;
   const timeoutMs = Number(process.env.BENCH_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
   const body = JSON.stringify({
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: { responseMimeType: 'application/json', temperature, responseSchema: schema },
+    generationConfig: {
+      responseMimeType: 'application/json',
+      temperature,
+      responseSchema: schema,
+      ...(options.thinkingBudget === undefined
+        ? {}
+        : { thinkingConfig: { thinkingBudget: options.thinkingBudget } }),
+    },
   });
 
   return withRetry(
@@ -224,9 +232,11 @@ async function summarize(
   }
 
   for (let rep = 1; rep <= reps; rep++) {
+    // 중간에 끊긴 run을 같은 --name으로 다시 돌리면 끝난 회차는 건너뛴다.
+    if (existsSync(join(dir, `${strategyId}-${rep}.summary.json`))) continue;
     console.log(`summarize ${inputId}/${strategyId} #${rep}`);
     const startedAt = Date.now();
-    const out = await strategy.run(bench.input, (tag, prompt, schema, temperature) => {
+    const out = await strategy.run(bench.input, (tag, prompt, schema, temperature, options) => {
       if (rep === 1) writeFileSync(join(dir, `${strategyId}.${tag}.prompt.txt`), prompt);
       return generateJson(
         model,
@@ -234,6 +244,7 @@ async function summarize(
         schema,
         temperature,
         join(dir, `${strategyId}-${rep}.${tag}.raw.txt`),
+        options,
       );
     });
     const error = await validateForProd(out.summary);
@@ -267,6 +278,10 @@ function summaryFiles(runDir: string): Array<{ inputId: string; path: string }> 
 async function judgeRun(dataDir: string, runDir: string, force: boolean): Promise<void> {
   const scoring = loadVariantConfig(dataDir).scoring;
   const model = process.env.BENCH_JUDGE_MODEL ?? process.env.GEMINI_MODEL ?? DEFAULT_MODEL;
+  // 채점 출력 토큰의 대부분이 사고 토큰이다. 비용을 줄일 때만 지정한다(0이면 끔).
+  const thinking = process.env.BENCH_JUDGE_THINKING;
+  const judgeOptions: GenerateOptions =
+    thinking === undefined ? {} : { thinkingBudget: Number(thinking) };
   for (const { inputId, path } of summaryFiles(runDir)) {
     const judgePath = path.replace('.summary.json', '.judge.json');
     if (!force && existsSync(judgePath)) continue;
@@ -279,6 +294,7 @@ async function judgeRun(dataDir: string, runDir: string, force: boolean): Promis
       JUDGE_SCHEMA,
       JUDGE_TEMPERATURE,
       path.replace('.summary.json', '.judge.raw.txt'),
+      judgeOptions,
     );
     const judged: JudgeRecord = {
       judgeModel: model,

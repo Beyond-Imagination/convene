@@ -10,6 +10,8 @@ const MENTION_ONLY_SCORE = 0.25;
 const EVIDENCE_WINDOW = 10;
 /** 의역된 근거를 인정하는 단어 겹침 비율. */
 const WORD_OVERLAP = 0.7;
+/** '기능'·'요청' 같은 두 글자 단어는 어느 요약에나 있어 정답 키를 베낀 근거도 통과시킨다. */
+const MIN_WORD_LENGTH = 3;
 
 const STRING = { type: 'STRING' } as const;
 const BOOLEAN = { type: 'BOOLEAN' } as const;
@@ -161,7 +163,7 @@ function quotedFrom(evidence: string | undefined, summaryText: string): boolean 
   const words = (evidence ?? '')
     .split(/\s+/)
     .map(normalize)
-    .filter((w) => w.length >= 2);
+    .filter((w) => w.length >= MIN_WORD_LENGTH);
   if (words.length === 0) return false;
   return words.filter((w) => summaryText.includes(w)).length >= words.length * WORD_OVERLAP;
 }
