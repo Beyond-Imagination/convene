@@ -75,8 +75,8 @@ importers:
         specifier: ^5
         version: 5.10.1
       mediasoup:
-        specifier: ^3.19.22
-        version: 3.19.22
+        specifier: ^3.20.10
+        version: 3.20.10
       mongoose:
         specifier: ^9.6.2
         version: 9.6.2
@@ -2935,6 +2935,10 @@ packages:
     resolution: {integrity: sha512-hnq1UDlw7WGJV6GCr/g7wnkHYUjdAY2bis9rgn2JqSdQS2WfVvnt1ZE9g8nTguracodf5LLKZOwURsDN49YtBQ==}
     engines: {node: '>=20'}
 
+  h264-profile-level-id@2.3.3:
+    resolution: {integrity: sha512-rPd5gpyWuIfEbBiHC/f9I4wdeCpAhg0aWdYgjMRdVTqhJT22C6VrWTi4hpAAgJad1Vv8BJDEvrzAQTW7CxzmJw==}
+    engines: {node: '>=22'}
+
   handlebars@4.7.9:
     resolution: {integrity: sha512-4E71E0rpOaQuJR2A3xDZ+GM1HyWYv1clR58tC8emQNeQe3RH7MAzSbat+V0wG78LQBo6m6bzSG/L4pBuCsgnUQ==}
     engines: {node: '>=0.4.7'}
@@ -3463,8 +3467,8 @@ packages:
     resolution: {integrity: sha512-FL6RlsGwvmXbXkbMoc1eW2EqW7k8Cw/Mhls3QewQXH+mioWVeVNWjzcDPmTZ3Sw+mua/n0IH5C/ntuVsx+KegA==}
     engines: {node: '>=22'}
 
-  mediasoup@3.19.22:
-    resolution: {integrity: sha512-BzEl6zSNsANdq8LCGswoF7cr2r84SDgfGHnA393SL4wFjPmW7kij3gHPHvj6o+i15hjnzSvqWV2fUiFNWKq6Jw==}
+  mediasoup@3.20.10:
+    resolution: {integrity: sha512-RYmwWuOjLTJ046TE1e8cFmbTHIIKO/3t9/UgVJsOL1wVm/krYOyZRGT+2Q4/XDX9S4wc/Q+KW5arMwseq5PZEA==}
     engines: {node: '>=22'}
 
   memfs@3.5.3:
@@ -4492,8 +4496,8 @@ packages:
   tar-stream@3.2.0:
     resolution: {integrity: sha512-ojzvCvVaNp6aOTFmG7jaRD0meowIAuPc3cMMhSgKiVWws1GyHbGd/xvnyuRKcKlMpt3qvxx6r0hreCNITP9hIg==}
 
-  tar@7.5.15:
-    resolution: {integrity: sha512-dzGK0boVlC4W5QFuQN1EFSl3bIDYsk7Tj40U6eIBnK2k/8ml7TZ5agbI5j5+qnoVcAA+rNtBml8SEiLxZpNqRQ==}
+  tar@7.5.22:
+    resolution: {integrity: sha512-MFO/QzvtAOmJbkhOaCTvbGcFN9L9b+JunIsDwaKljSOdcLMea3NJ1k9Usz/rjdfSXTq4dfzfeS7W4p4YOAAHeA==}
     engines: {node: '>=18'}
 
   teex@1.0.1:
@@ -7846,6 +7850,12 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  h264-profile-level-id@2.3.3(supports-color@10.2.2):
+    dependencies:
+      debug: 4.4.3(supports-color@10.2.2)
+    transitivePeerDependencies:
+      - supports-color
+
   handlebars@4.7.9:
     dependencies:
       minimist: 1.2.8
@@ -8544,14 +8554,14 @@ snapshots:
       sdp-transform: 3.0.0
       supports-color: 10.2.2
 
-  mediasoup@3.19.22:
+  mediasoup@3.20.10:
     dependencies:
       debug: 4.4.3(supports-color@10.2.2)
       flatbuffers: 25.9.23
-      h264-profile-level-id: 2.3.2(supports-color@10.2.2)
+      h264-profile-level-id: 2.3.3(supports-color@10.2.2)
       node-fetch: 3.3.2
       supports-color: 10.2.2
-      tar: 7.5.15
+      tar: 7.5.22
 
   memfs@3.5.3:
     dependencies:
@@ -9649,7 +9659,7 @@ snapshots:
       - bare-buffer
       - react-native-b4a
 
-  tar@7.5.15:
+  tar@7.5.22:
     dependencies:
       '@isaacs/fs-minipass': 4.0.1
       chownr: 3.0.0

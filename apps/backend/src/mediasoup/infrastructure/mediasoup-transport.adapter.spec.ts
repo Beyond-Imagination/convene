@@ -73,9 +73,9 @@ describe('MediasoupTransportAdapter', () => {
       );
       expect(Array.isArray(res.iceCandidates)).toBe(true);
       expect((res.iceCandidates as unknown[]).length).toBeGreaterThan(0);
-      expect(res.dtlsParameters).toEqual(
-        expect.objectContaining({ fingerprints: expect.any(Array) }),
-      );
+      // mediasoup가 돌려주는 복제 배열은 jest 실행 환경과 realm이 달라 expect.any(Array)로는 판별되지 않는다.
+      const { fingerprints } = res.dtlsParameters as { fingerprints: unknown };
+      expect(Array.isArray(fingerprints)).toBe(true);
     } finally {
       await cleanup();
     }
