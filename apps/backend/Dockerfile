@@ -13,11 +13,12 @@
 # ============================================================================
 FROM node:22-bookworm-slim AS builder
 
-# mediasoup 가 prebuilt binary 다운로드에 실패하면 source 빌드로 fallback 한다.
-# 이때 python3 + build-essential 이 필요하므로 안전망으로 설치한다.
+# mediasoup 가 prebuilt binary 다운로드에 실패하거나 받은 바이너리가 이 이미지에서 돌지 않으면 source 빌드로 fallback 한다.
+# 이때 python3(+pip, 빌드 도구 설치용) + build-essential 이 필요하다.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       python3 \
+      python3-pip \
       build-essential \
       ca-certificates \
  && rm -rf /var/lib/apt/lists/*
