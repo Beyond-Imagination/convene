@@ -35,6 +35,10 @@ Thumbs.db
 **/.env.*
 !**/.env.example
 
+# 벤치의 실제 회의 전사·결과(gitignore 대상)는 빌드 컨텍스트로 보내지 않는다.
+apps/backend/bench/summary/data
+apps/backend/bench/summary/results
+
 # 다른 앱(ai-worker, frontend) 은 자체 Dockerfile 이 있으므로 backend 이미지엔 불필요.
 # 단, monorepo root manifest 경로 해석을 위해 폴더는 남기되 무거운 산출물만 차단.
 apps/frontend/.next
