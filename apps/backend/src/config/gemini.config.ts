@@ -7,7 +7,7 @@
 
 import { positiveInteger } from './required-env';
 
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
 export const DEFAULT_GEMINI_TIMEOUT_MS = 30_000;
 export const DEFAULT_GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com';
 

@@ -10,6 +10,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { DEFAULT_GEMINI_MODEL } from '@/config/gemini.config';
 import { GeminiSummarizer } from '@/reports/infrastructure/gemini.summarizer';
 import { isRetryableHttpStatus, withRetry } from '@/shared-kernel/infrastructure/retry';
 
@@ -18,7 +19,6 @@ import { buildJudgePrompt, computeMetrics, JUDGE_SCHEMA, JudgeResult, Metrics } 
 import { CallResult, GenerateOptions, STRATEGIES, Usage } from './strategies';
 
 const BENCH_DIR = __dirname;
-const DEFAULT_MODEL = 'gemini-2.5-flash';
 const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com';
 /** 4시간 회의 한 번에 운영 기본값(30초)을 넘길 수 있다. */
 const DEFAULT_TIMEOUT_MS = 300_000;
@@ -277,7 +277,7 @@ function summaryFiles(runDir: string): Array<{ inputId: string; path: string }> 
 
 async function judgeRun(dataDir: string, runDir: string, force: boolean): Promise<void> {
   const scoring = loadVariantConfig(dataDir).scoring;
-  const model = process.env.BENCH_JUDGE_MODEL ?? process.env.GEMINI_MODEL ?? DEFAULT_MODEL;
+  const model = process.env.BENCH_JUDGE_MODEL ?? process.env.GEMINI_MODEL ?? DEFAULT_GEMINI_MODEL;
   // 채점 출력 토큰의 대부분이 사고 토큰이다. 비용을 줄일 때만 지정한다(0이면 끔).
   const thinking = process.env.BENCH_JUDGE_THINKING;
   const judgeOptions: GenerateOptions =
@@ -432,7 +432,7 @@ async function main(): Promise<void> {
       const runDir = join(resultsDir, flags.get('name') ?? runId());
       mkdirSync(runDir, { recursive: true });
       const reps = Number(flags.get('reps') ?? 3);
-      const model = flags.get('model') ?? process.env.GEMINI_MODEL ?? DEFAULT_MODEL;
+      const model = flags.get('model') ?? process.env.GEMINI_MODEL ?? DEFAULT_GEMINI_MODEL;
       for (const inputId of list(flags, 'inputs', '9midnhyd,solo,head,middle,tail')) {
         for (const strategyId of list(flags, 'strategies', 'prod,s0,s0p,s2')) {
           await summarize(dataDir, runDir, inputId, strategyId, reps, model);
