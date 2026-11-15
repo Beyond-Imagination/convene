@@ -9,7 +9,10 @@ import { Meeting } from '@/meeting/domain/meeting';
 import { IdleTimeout } from '@/meeting/domain/value-objects/idle-timeout';
 import { MeetingCode } from '@/meeting/domain/value-objects/meeting-code';
 import { ChatEntry, chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
-import { externalReference, NO_EXTERNAL_REFERENCE } from '@/shared-kernel/domain/value-objects/external-reference';
+import {
+  externalReference,
+  NO_EXTERNAL_REFERENCE,
+} from '@/shared-kernel/domain/value-objects/external-reference';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 import { noopLogger } from '@/shared-kernel/testing/noop-logger';
 
@@ -34,7 +37,10 @@ const makeEventPublisher = () => {
       publish: async (name: string, payload: unknown): Promise<void> => {
         events.push({ name, payload });
       },
-    } satisfies Pick<NestEventBusDomainEventPublisher, 'publish'> as NestEventBusDomainEventPublisher,
+    } satisfies Pick<
+      NestEventBusDomainEventPublisher,
+      'publish'
+    > as NestEventBusDomainEventPublisher,
   };
 };
 
@@ -162,7 +168,10 @@ describe('MeetingService.createMeeting', () => {
       externalReference: externalReference(),
     });
     expect(retro.meetingType).toBe('retrospective');
-    const def = await service.createMeeting({ source: 'web', externalReference: externalReference() });
+    const def = await service.createMeeting({
+      source: 'web',
+      externalReference: externalReference(),
+    });
     expect(def.meetingType).toBe('general');
   });
 });
@@ -1142,5 +1151,85 @@ describe('MeetingService.sweepIdleMeetings 유예 만료', () => {
     await expect(service.sweepIdleMeetings()).resolves.toEqual({ scanned: 1, closed: 0 });
     expect(meeting.activeParticipantCount).toBe(1);
     expect(events).toHaveLength(0);
+  });
+});
+
+describe('MeetingService 동시 요청', () => {
+  const t0 = new Date('2026-01-01T00:00:00Z');
+  const nextTick = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+  // 실제 저장소처럼 읽을 때마다 새 Aggregate를 만들고, 읽기·쓰기 사이에 다른 요청이 끼어들 수 있다.
+  const makeStore = (initial: Meeting) => {
+    let stored = initial.snapshot();
+    return {
+      current: () => Meeting.fromSnapshot(stored),
+      repository: {
+        findByCode: async (c: string) => {
+          await nextTick();
+          return c === initial.code.value ? Meeting.fromSnapshot(stored) : null;
+        },
+        listOpenCodes: async () => [initial.code.value],
+        save: async (m: Meeting) => {
+          await nextTick();
+          stored = m.snapshot();
+        },
+      },
+    };
+  };
+
+  const makeService = (store: ReturnType<typeof makeStore>) =>
+    new MeetingService(
+      store.repository,
+      noopChatRepository(),
+      { next: () => code },
+      { now: () => t0 },
+      makeEventPublisher().publisher,
+      noopLogger(),
+    );
+
+  it('같은 회의의 퇴장과 끊김이 동시에 와도 둘 다 남는다', async () => {
+    const meeting = makeMeeting(t0);
+    meeting.addParticipant('p-1', 'alice', t0, 'socket-a');
+    meeting.addParticipant('p-2', 'bob', t0, 'socket-b');
+    const store = makeStore(meeting);
+    const service = makeService(store);
+
+    await Promise.all([
+      service.leaveMeeting({ code: 'abc12xyz', participantId: 'p-1' }),
+      service.disconnectParticipant({ code: 'abc12xyz', connectionId: 'socket-b' }),
+    ]);
+
+    const result = store.current();
+    expect(result.findParticipant('p-1')?.isActive).toBe(false);
+    expect(result.findParticipant('p-2')?.isDisconnected).toBe(true);
+  });
+
+  it('빈 방에 동시에 들어와도 둘 다 남고 방장 토큰은 한 명만 받는다', async () => {
+    const store = makeStore(makeMeeting(t0));
+    const service = makeService(store);
+
+    const results = await Promise.all([
+      service.joinMeeting({ code: 'abc12xyz', participantId: 'p-1', nickname: 'alice' }),
+      service.joinMeeting({ code: 'abc12xyz', participantId: 'p-2', nickname: 'bob' }),
+    ]);
+
+    expect(store.current().activeParticipantCount).toBe(2);
+    expect(results.filter((r) => r.hostToken !== null)).toHaveLength(1);
+  });
+
+  it('앞선 요청이 실패해도 뒤 요청은 실행된다', async () => {
+    const meeting = makeMeeting(t0);
+    meeting.addParticipant('p-1', 'alice', t0, 'socket-a');
+    const store = makeStore(meeting);
+    const service = makeService(store);
+
+    const [failed, left] = await Promise.allSettled([
+      service.leaveMeeting({ code: 'abc12xyz', participantId: 'ghost' }),
+      service.leaveMeeting({ code: 'abc12xyz', participantId: 'p-1' }),
+    ]);
+
+    expect(failed.status).toBe('rejected');
+    expect(left.status).toBe('fulfilled');
+    expect(store.current().findParticipant('p-1')?.isActive).toBe(false);
   });
 });

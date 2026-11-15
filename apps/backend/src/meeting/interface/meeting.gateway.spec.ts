@@ -178,6 +178,19 @@ describe('MeetingGateway.handleJoin', () => {
     expect(data).toEqual({ code: 'abc12xyz', participantId: 'p-1' });
   });
 
+  it('입장 처리 중에 끊겨도 disconnect가 회의를 찾도록 서비스 호출 전에 socket.data를 채운다', async () => {
+    const { gateway, service } = makeGateway();
+    const { socket, data } = makeSocket('s1');
+    let seen: typeof data | undefined;
+    const original = service.joinMeeting.getMockImplementation()!;
+    service.joinMeeting.mockImplementation(async (cmd) => {
+      seen = { ...data };
+      return original(cmd);
+    });
+    await gateway.handleJoin(dtoOf({ participantId: 'p-1' }), socket as unknown as Socket);
+    expect(seen).toEqual({ code: 'abc12xyz', participantId: 'p-1' });
+  });
+
   it('ack에 확정된 participantId·재접속 여부·채팅 히스토리를 담아 돌려준다', async () => {
     const history = [chatEntry({ nickname: 'bob', text: '먼저 시작할게요', sentAt: t1 })];
     const { gateway } = makeGateway(true, history);
