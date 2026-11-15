@@ -155,7 +155,8 @@ class KeyedMutex {
 
 @Injectable()
 export class MeetingService {
-  // 이벤트 발행까지 잠금 안이다. 리스너가 같은 회의의 잠긴 메서드를 다시 부르면 교착된다.
+  // 회의별 이벤트 순서를 지키려고 발행도 잠금 안에서 한다. 리스너가 같은 회의의 잠긴 메서드를
+  // 다시 부르면 교착된다. 종료(ENDED)만 밖에서 발행한다 — 리포트 생성을 기다리며 회의를 붙잡지 않게.
   private readonly locks = new KeyedMutex();
 
   constructor(
@@ -390,7 +391,7 @@ export class MeetingService {
   }
 
   async closeMeeting(command: CloseMeetingCommand): Promise<Meeting> {
-    return this.locks.run(command.code, async () => {
+    const { meeting, payload } = await this.locks.run(command.code, async () => {
       const meeting = await this.requireMeeting(command.code);
       // 수동 종료는 host 토큰을 제시한 요청자만 가능하다. idle 자동 종료는 별도 경로로 처리하므로 본 검증을 거치지 않는다.
       if (!meeting.isHost(command.hostToken)) {
@@ -400,10 +401,11 @@ export class MeetingService {
       meeting.close(endedAt);
       await this.repository.save(meeting);
       const payload = await this.buildEndedPayload(meeting, command.code, endedAt, command.reason);
-      await this.eventPublisher.publish(MEETING_EVENTS.ENDED, payload);
-      this.logger.info({ meetingCode: command.code, reason: command.reason }, 'meeting closed');
-      return meeting;
+      return { meeting, payload };
     });
+    await this.eventPublisher.publish(MEETING_EVENTS.ENDED, payload);
+    this.logger.info({ meetingCode: command.code, reason: command.reason }, 'meeting closed');
+    return meeting;
   }
 
   /**
@@ -451,22 +453,23 @@ export class MeetingService {
    * 이미 종료됐거나 idle 조건 미충족이면 no-op(false). idle이면 close + 이벤트 두 건.
    */
   async detectIdleAndClose(command: DetectIdleAndCloseCommand): Promise<boolean> {
-    return this.locks.run(command.code, async () => {
+    const payload = await this.locks.run(command.code, async () => {
       const meeting = await this.requireMeeting(command.code);
-      if (!meeting.isOpen) return false;
+      if (!meeting.isOpen) return null;
       const now = this.clock.now();
-      if (!meeting.isIdleSince(now)) return false;
+      if (!meeting.isIdleSince(now)) return null;
       meeting.close(now);
       await this.repository.save(meeting);
       await this.eventPublisher.publish(MEETING_EVENTS.IDLE_DETECTED, {
         code: command.code,
         detectedAt: now,
       });
-      const payload = await this.buildEndedPayload(meeting, command.code, now, 'idle');
-      await this.eventPublisher.publish(MEETING_EVENTS.ENDED, payload);
-      this.logger.info({ meetingCode: command.code }, 'meeting closed by idle timeout');
-      return true;
+      return this.buildEndedPayload(meeting, command.code, now, 'idle');
     });
+    if (payload === null) return false;
+    await this.eventPublisher.publish(MEETING_EVENTS.ENDED, payload);
+    this.logger.info({ meetingCode: command.code }, 'meeting closed by idle timeout');
+    return true;
   }
 
   private async buildEndedPayload(
