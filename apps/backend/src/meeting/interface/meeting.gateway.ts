@@ -101,6 +101,9 @@ export class MeetingGateway implements OnGatewayDisconnect {
   ): Promise<JoinMeetingResponse> {
     // Promise<void> 는 NestJS socket.io가 ack 미호출 → emitWithAck 영원 대기.
     const participantId = dto.participantId ?? client.id;
+    // handleDisconnect가 어느 회의·참가자였는지 복원하는 값. 입장 저장 도중 끊겨도 놓치지 않게 먼저 채운다.
+    client.data.code = dto.code;
+    client.data.participantId = participantId;
     let joined: JoinMeetingResult;
     try {
       joined = await this.service.joinMeeting({
@@ -110,6 +113,8 @@ export class MeetingGateway implements OnGatewayDisconnect {
         nickname: dto.nickname,
       });
     } catch (error) {
+      client.data.code = undefined;
+      client.data.participantId = undefined;
       const reason = rejectReasonOf(error);
       if (reason === null) throw error;
       this.logger.info({ meetingCode: dto.code, participantId, reason }, 'join rejected');
@@ -119,9 +124,6 @@ export class MeetingGateway implements OnGatewayDisconnect {
     await client.join(roomOf(dto.code));
     // socket.id가 바뀌어도 이 참가자를 지목·제외할 수 있게 하는 room.
     await client.join(participantId);
-    // handleDisconnect에서 어느 회의·참가자였는지 복원하기 위해 저장.
-    client.data.code = dto.code;
-    client.data.participantId = participantId;
 
     // 늦게 입장한 클라이언트가 stale 한 빈 목록을 보지 않도록 본인에게만 기존
     // 참가자 목록을 전달. 자기 자신은 제외.
@@ -198,7 +200,12 @@ export class MeetingGateway implements OnGatewayDisconnect {
       nickname: payload.nickname,
       joinedAt: payload.joinedAt.toISOString(),
     };
-    this.broadcast(payload.code, MEETING_WS_EVENTS.PARTICIPANT_JOINED, broadcast, payload.participantId);
+    this.broadcast(
+      payload.code,
+      MEETING_WS_EVENTS.PARTICIPANT_JOINED,
+      broadcast,
+      payload.participantId,
+    );
   }
 
   @OnEvent(MEETING_EVENTS.PARTICIPANT_LEFT)
@@ -207,7 +214,12 @@ export class MeetingGateway implements OnGatewayDisconnect {
       participantId: payload.participantId,
       leftAt: (payload.leftAt ?? new Date()).toISOString(),
     };
-    this.broadcast(payload.code, MEETING_WS_EVENTS.PARTICIPANT_LEFT, broadcast, payload.participantId);
+    this.broadcast(
+      payload.code,
+      MEETING_WS_EVENTS.PARTICIPANT_LEFT,
+      broadcast,
+      payload.participantId,
+    );
   }
 
   @OnEvent(MEETING_EVENTS.PARTICIPANT_DISCONNECTED)

@@ -40,8 +40,14 @@ import { SharedKernelModule } from '@/shared-kernel/shared-kernel.module';
           redact: [
             'req.headers.authorization',
             'req.headers.cookie',
+            'req.headers["x-host-token"]',
+            'req.query.nickname',
             'res.headers["set-cookie"]',
           ],
+          serializers: {
+            // 쿼리에 닉네임이 실리는 경로가 있어 url은 경로만 남긴다.
+            req: (req: { url?: string }) => ({ ...req, url: req.url?.split('?')[0] }),
+          },
         },
       }),
     }),

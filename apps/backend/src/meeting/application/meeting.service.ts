@@ -15,7 +15,10 @@ import { CHAT_REPOSITORY, ChatRepository } from '@/meeting/domain/ports/chat.rep
 import { MEETING_REPOSITORY, MeetingRepository } from '@/meeting/domain/ports/meeting.repository';
 import { IdleTimeout } from '@/meeting/domain/value-objects/idle-timeout';
 import { RandomMeetingCodeGenerator } from '@/meeting/infrastructure/random-meeting-code.generator';
-import { MeetingEndedPayload, MeetingEndedReason } from '@/shared-kernel/domain/domain-event.payloads';
+import {
+  MeetingEndedPayload,
+  MeetingEndedReason,
+} from '@/shared-kernel/domain/domain-event.payloads';
 import { ChatEntry, chatEntry } from '@/shared-kernel/domain/value-objects/chat-entry';
 import { ExternalReference } from '@/shared-kernel/domain/value-objects/external-reference';
 import { MeetingType } from '@/shared-kernel/domain/value-objects/meeting-type';
@@ -129,8 +132,33 @@ export interface IdleSweepOutcome {
   readonly closed: number;
 }
 
+/**
+ * 같은 key의 작업을 도착 순서대로 하나씩 실행한다. 회의 저장은 문서 전체를 덮어쓰므로
+ * 읽기~저장이 겹치면 먼저 끝난 쪽의 변경이 사라진다. 단일 프로세스에서만 유효하다.
+ */
+class KeyedMutex {
+  private readonly tails = new Map<string, Promise<void>>();
+
+  run<T>(key: string, task: () => Promise<T>): Promise<T> {
+    const result = (this.tails.get(key) ?? Promise.resolve()).then(task);
+    const tail = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    this.tails.set(key, tail);
+    void tail.then(() => {
+      if (this.tails.get(key) === tail) this.tails.delete(key);
+    });
+    return result;
+  }
+}
+
 @Injectable()
 export class MeetingService {
+  // 회의별 이벤트 순서를 지키려고 발행도 잠금 안에서 한다. 리스너가 같은 회의의 잠긴 메서드를
+  // 다시 부르면 교착된다. 종료(ENDED)만 밖에서 발행한다 — 리포트 생성을 기다리며 회의를 붙잡지 않게.
+  private readonly locks = new KeyedMutex();
+
   constructor(
     @Inject(MEETING_REPOSITORY) private readonly repository: MeetingRepository,
     @Inject(CHAT_REPOSITORY) private readonly chatRepository: ChatRepository,
@@ -204,127 +232,135 @@ export class MeetingService {
   }
 
   async joinMeeting(command: JoinMeetingCommand): Promise<JoinMeetingResult> {
-    const meeting = await this.requireMeeting(command.code);
-    if (meeting.status === 'closed') {
-      throw new MeetingClosedError(command.code);
-    }
-    if (meeting.isNicknameTaken(command.nickname, command.participantId)) {
-      throw new NicknameTakenError(command.code, command.nickname);
-    }
-    const now = this.clock.now();
-    const connectionId = command.connectionId ?? command.participantId;
-    const existing = meeting.findParticipant(command.participantId);
+    return this.locks.run(command.code, async () => {
+      const meeting = await this.requireMeeting(command.code);
+      if (meeting.status === 'closed') {
+        throw new MeetingClosedError(command.code);
+      }
+      if (meeting.isNicknameTaken(command.nickname, command.participantId)) {
+        throw new NicknameTakenError(command.code, command.nickname);
+      }
+      const now = this.clock.now();
+      const connectionId = command.connectionId ?? command.participantId;
+      const existing = meeting.findParticipant(command.participantId);
 
-    // 활성 참가자로 남아 있었으므로 host 승격 대상이 아니다.
-    if (existing?.isActive) {
-      const participant = meeting.reconnectParticipant(command.participantId, connectionId, now);
+      // 활성 참가자로 남아 있었으므로 host 승격 대상이 아니다.
+      if (existing?.isActive) {
+        const participant = meeting.reconnectParticipant(command.participantId, connectionId, now);
+        await this.repository.save(meeting);
+        await this.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_RECONNECTED, {
+          code: command.code,
+          participantId: participant.id,
+          reconnectedAt: now,
+        });
+        this.logger.info(
+          { meetingCode: command.code, participantId: participant.id },
+          'participant reconnected',
+        );
+        return {
+          meeting,
+          participant,
+          hostToken: null,
+          reconnected: true,
+          chat: await this.chatRepository.listByCode(command.code),
+        };
+      }
+
+      // 빈 방에 들어오는 사람이 방장이 된다. 노션이 만든 회의는 생성자(백엔드)가 접속하지 않아
+      // 이 승격이 없으면 아무도 회의를 종료할 수 없다.
+      const claimsHost = meeting.activeParticipantCount === 0;
+      const wasScheduled = meeting.status === 'scheduled';
+      // 유예가 만료돼 퇴장 처리된 참가자가 돌아온 경우는 같은 Entity를 되살린다(중복 방지).
+      const participant = existing
+        ? meeting.rejoinParticipant(command.participantId, connectionId, now)
+        : meeting.addParticipant(command.participantId, command.nickname, now, connectionId);
       await this.repository.save(meeting);
-      await this.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_RECONNECTED, {
+      // 참가자 입장을 알리기 전에 방부터 연다(미디어 리소스가 먼저 준비돼야 한다).
+      if (wasScheduled) {
+        await this.eventPublisher.publish(MEETING_EVENTS.OPENED, { code: command.code });
+      }
+      await this.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_JOINED, {
         code: command.code,
         participantId: participant.id,
-        reconnectedAt: now,
+        nickname: participant.nickname,
+        joinedAt: participant.joinedAt,
       });
       this.logger.info(
         { meetingCode: command.code, participantId: participant.id },
-        'participant reconnected',
+        'participant joined',
       );
       return {
         meeting,
         participant,
-        hostToken: null,
-        reconnected: true,
+        hostToken: claimsHost ? meeting.hostToken : null,
+        reconnected: false,
         chat: await this.chatRepository.listByCode(command.code),
       };
-    }
-
-    // 빈 방에 들어오는 사람이 방장이 된다. 노션이 만든 회의는 생성자(백엔드)가 접속하지 않아
-    // 이 승격이 없으면 아무도 회의를 종료할 수 없다.
-    const claimsHost = meeting.activeParticipantCount === 0;
-    const wasScheduled = meeting.status === 'scheduled';
-    // 유예가 만료돼 퇴장 처리된 참가자가 돌아온 경우는 같은 Entity를 되살린다(중복 방지).
-    const participant = existing
-      ? meeting.rejoinParticipant(command.participantId, connectionId, now)
-      : meeting.addParticipant(command.participantId, command.nickname, now, connectionId);
-    await this.repository.save(meeting);
-    // 참가자 입장을 알리기 전에 방부터 연다(미디어 리소스가 먼저 준비돼야 한다).
-    if (wasScheduled) {
-      await this.eventPublisher.publish(MEETING_EVENTS.OPENED, { code: command.code });
-    }
-    await this.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_JOINED, {
-      code: command.code,
-      participantId: participant.id,
-      nickname: participant.nickname,
-      joinedAt: participant.joinedAt,
     });
-    this.logger.info(
-      { meetingCode: command.code, participantId: participant.id },
-      'participant joined',
-    );
-    return {
-      meeting,
-      participant,
-      hostToken: claimsHost ? meeting.hostToken : null,
-      reconnected: false,
-      chat: await this.chatRepository.listByCode(command.code),
-    };
   }
 
   /** 연결 종료 경로는 best-effort라 던지지 않는다 — 이미 종료된 회의나 모르는 연결이면 no-op. */
   async disconnectParticipant(
     command: DisconnectParticipantCommand,
   ): Promise<Participant | undefined> {
-    const meeting = await this.repository.findByCode(command.code);
-    if (!meeting) return undefined;
-    const now = this.clock.now();
-    const participant = meeting.disconnectParticipant(command.connectionId, now);
-    if (!participant) return undefined;
-    await this.repository.save(meeting);
-    await this.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_DISCONNECTED, {
-      code: command.code,
-      participantId: participant.id,
-      disconnectedAt: now,
+    return this.locks.run(command.code, async () => {
+      const meeting = await this.repository.findByCode(command.code);
+      if (!meeting) return undefined;
+      const now = this.clock.now();
+      const participant = meeting.disconnectParticipant(command.connectionId, now);
+      if (!participant) return undefined;
+      await this.repository.save(meeting);
+      await this.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_DISCONNECTED, {
+        code: command.code,
+        participantId: participant.id,
+        disconnectedAt: now,
+      });
+      this.logger.info(
+        { meetingCode: command.code, participantId: participant.id },
+        'participant disconnected',
+      );
+      return participant;
     });
-    this.logger.info(
-      { meetingCode: command.code, participantId: participant.id },
-      'participant disconnected',
-    );
-    return participant;
   }
 
   async leaveMeeting(command: LeaveMeetingCommand): Promise<LeaveMeetingResult> {
-    const meeting = await this.requireMeeting(command.code);
-    const participant = meeting.removeParticipant(command.participantId, this.clock.now());
-    await this.repository.save(meeting);
-    await this.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_LEFT, {
-      code: command.code,
-      participantId: participant.id,
-      leftAt: participant.leftAt,
+    return this.locks.run(command.code, async () => {
+      const meeting = await this.requireMeeting(command.code);
+      const participant = meeting.removeParticipant(command.participantId, this.clock.now());
+      await this.repository.save(meeting);
+      await this.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_LEFT, {
+        code: command.code,
+        participantId: participant.id,
+        leftAt: participant.leftAt,
+      });
+      this.logger.info(
+        { meetingCode: command.code, participantId: participant.id },
+        'participant left',
+      );
+      return { meeting, participant };
     });
-    this.logger.info(
-      { meetingCode: command.code, participantId: participant.id },
-      'participant left',
-    );
-    return { meeting, participant };
   }
 
   async postChat(command: PostChatCommand): Promise<ChatEntry> {
-    const meeting = await this.requireMeeting(command.code);
-    const participant = meeting.findParticipant(command.participantId);
-    if (!participant) {
-      throw new Error(
-        `Participant "${command.participantId}" not found in meeting "${command.code}"`,
+    return this.locks.run(command.code, async () => {
+      const meeting = await this.requireMeeting(command.code);
+      const participant = meeting.findParticipant(command.participantId);
+      if (!participant) {
+        throw new Error(
+          `Participant "${command.participantId}" not found in meeting "${command.code}"`,
+        );
+      }
+      const now = this.clock.now();
+      const entry = chatEntry({ nickname: participant.nickname, text: command.text, sentAt: now });
+      meeting.markActive(now);
+      await this.chatRepository.append(command.code, entry);
+      await this.repository.save(meeting);
+      this.logger.debug(
+        { meetingCode: command.code, participantId: command.participantId },
+        'chat posted',
       );
-    }
-    const now = this.clock.now();
-    const entry = chatEntry({ nickname: participant.nickname, text: command.text, sentAt: now });
-    meeting.markActive(now);
-    await this.chatRepository.append(command.code, entry);
-    await this.repository.save(meeting);
-    this.logger.debug(
-      { meetingCode: command.code, participantId: command.participantId },
-      'chat posted',
-    );
-    return entry;
+      return entry;
+    });
   }
 
   /** 흘려보내는 신호라 저장하지 않는다. */
@@ -345,23 +381,28 @@ export class MeetingService {
   }
 
   async setHand(command: SetHandCommand): Promise<HandChange> {
-    const meeting = await this.requireMeeting(command.code);
-    const now = this.clock.now();
-    const participant = meeting.setHand(command.participantId, command.raised, now);
-    await this.repository.save(meeting);
-    return { participantId: participant.id, handRaisedAt: participant.handRaisedAt };
+    return this.locks.run(command.code, async () => {
+      const meeting = await this.requireMeeting(command.code);
+      const now = this.clock.now();
+      const participant = meeting.setHand(command.participantId, command.raised, now);
+      await this.repository.save(meeting);
+      return { participantId: participant.id, handRaisedAt: participant.handRaisedAt };
+    });
   }
 
   async closeMeeting(command: CloseMeetingCommand): Promise<Meeting> {
-    const meeting = await this.requireMeeting(command.code);
-    // 수동 종료는 host 토큰을 제시한 요청자만 가능하다. idle 자동 종료는 별도 경로로 처리하므로 본 검증을 거치지 않는다.
-    if (!meeting.isHost(command.hostToken)) {
-      throw new NotHostError(command.code);
-    }
-    const endedAt = this.clock.now();
-    meeting.close(endedAt);
-    await this.repository.save(meeting);
-    const payload = await this.buildEndedPayload(meeting, command.code, endedAt, command.reason);
+    const { meeting, payload } = await this.locks.run(command.code, async () => {
+      const meeting = await this.requireMeeting(command.code);
+      // 수동 종료는 host 토큰을 제시한 요청자만 가능하다. idle 자동 종료는 별도 경로로 처리하므로 본 검증을 거치지 않는다.
+      if (!meeting.isHost(command.hostToken)) {
+        throw new NotHostError(command.code);
+      }
+      const endedAt = this.clock.now();
+      meeting.close(endedAt);
+      await this.repository.save(meeting);
+      const payload = await this.buildEndedPayload(meeting, command.code, endedAt, command.reason);
+      return { meeting, payload };
+    });
     await this.eventPublisher.publish(MEETING_EVENTS.ENDED, payload);
     this.logger.info({ meetingCode: command.code, reason: command.reason }, 'meeting closed');
     return meeting;
@@ -387,22 +428,24 @@ export class MeetingService {
   }
 
   async expireDisconnectedParticipants(code: string): Promise<number> {
-    const meeting = await this.requireMeeting(code);
-    const expired = meeting.expireDisconnected(this.clock.now(), RECONNECT_GRACE_MS);
-    if (expired.length === 0) return 0;
-    await this.repository.save(meeting);
-    for (const participant of expired) {
-      await this.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_LEFT, {
-        code,
-        participantId: participant.id,
-        leftAt: participant.leftAt,
-      });
-      this.logger.info(
-        { meetingCode: code, participantId: participant.id },
-        'participant left by reconnect grace expiry',
-      );
-    }
-    return expired.length;
+    return this.locks.run(code, async () => {
+      const meeting = await this.requireMeeting(code);
+      const expired = meeting.expireDisconnected(this.clock.now(), RECONNECT_GRACE_MS);
+      if (expired.length === 0) return 0;
+      await this.repository.save(meeting);
+      for (const participant of expired) {
+        await this.eventPublisher.publish(MEETING_EVENTS.PARTICIPANT_LEFT, {
+          code,
+          participantId: participant.id,
+          leftAt: participant.leftAt,
+        });
+        this.logger.info(
+          { meetingCode: code, participantId: participant.id },
+          'participant left by reconnect grace expiry',
+        );
+      }
+      return expired.length;
+    });
   }
 
   /**
@@ -410,17 +453,20 @@ export class MeetingService {
    * 이미 종료됐거나 idle 조건 미충족이면 no-op(false). idle이면 close + 이벤트 두 건.
    */
   async detectIdleAndClose(command: DetectIdleAndCloseCommand): Promise<boolean> {
-    const meeting = await this.requireMeeting(command.code);
-    if (!meeting.isOpen) return false;
-    const now = this.clock.now();
-    if (!meeting.isIdleSince(now)) return false;
-    meeting.close(now);
-    await this.repository.save(meeting);
-    await this.eventPublisher.publish(MEETING_EVENTS.IDLE_DETECTED, {
-      code: command.code,
-      detectedAt: now,
+    const payload = await this.locks.run(command.code, async () => {
+      const meeting = await this.requireMeeting(command.code);
+      if (!meeting.isOpen) return null;
+      const now = this.clock.now();
+      if (!meeting.isIdleSince(now)) return null;
+      meeting.close(now);
+      await this.repository.save(meeting);
+      await this.eventPublisher.publish(MEETING_EVENTS.IDLE_DETECTED, {
+        code: command.code,
+        detectedAt: now,
+      });
+      return this.buildEndedPayload(meeting, command.code, now, 'idle');
     });
-    const payload = await this.buildEndedPayload(meeting, command.code, now, 'idle');
+    if (payload === null) return false;
     await this.eventPublisher.publish(MEETING_EVENTS.ENDED, payload);
     this.logger.info({ meetingCode: command.code }, 'meeting closed by idle timeout');
     return true;
