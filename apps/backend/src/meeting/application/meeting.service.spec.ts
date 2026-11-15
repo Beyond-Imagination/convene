@@ -15,6 +15,7 @@ import {
 } from '@/shared-kernel/domain/value-objects/external-reference';
 import { NestEventBusDomainEventPublisher } from '@/shared-kernel/infrastructure/nest-event-bus.publisher';
 import { noopLogger } from '@/shared-kernel/testing/noop-logger';
+import { stub } from '@/shared-kernel/testing/stub';
 
 import {
   MeetingClosedError,
@@ -1215,6 +1216,42 @@ describe('MeetingService 동시 요청', () => {
 
     expect(store.current().activeParticipantCount).toBe(2);
     expect(results.filter((r) => r.hostToken !== null)).toHaveLength(1);
+  });
+
+  it('종료 이벤트(리포트 생성) 처리가 끝나기 전에도 같은 회의의 다음 요청은 기다리지 않는다', async () => {
+    const meeting = makeMeeting(t0);
+    meeting.addParticipant('p-1', 'alice', t0, 'socket-a');
+    const store = makeStore(meeting);
+    let finishEnded!: () => void;
+    const endedHandled = new Promise<void>((resolve) => (finishEnded = resolve));
+    const publisher = stub<NestEventBusDomainEventPublisher>({
+      publish: async (name) => {
+        if (name === MEETING_EVENTS.ENDED) await endedHandled;
+      },
+    });
+    const service = new MeetingService(
+      store.repository,
+      noopChatRepository(),
+      { next: () => code },
+      { now: () => t0 },
+      publisher,
+      noopLogger(),
+    );
+
+    const closing = service.closeMeeting({
+      code: 'abc12xyz',
+      reason: 'manual',
+      hostToken: 'host-token-1',
+    });
+    const next = service.disconnectParticipant({ code: 'abc12xyz', connectionId: 'socket-a' }).then(
+      () => 'settled',
+      () => 'settled',
+    );
+    const blocked = new Promise((resolve) => setTimeout(() => resolve('blocked'), 200));
+
+    await expect(Promise.race([next, blocked])).resolves.toBe('settled');
+    finishEnded();
+    await closing;
   });
 
   it('앞선 요청이 실패해도 뒤 요청은 실행된다', async () => {
