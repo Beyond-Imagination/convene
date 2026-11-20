@@ -8,10 +8,10 @@
     "start": "node dist/main.js",
     "start:prod": "node dist/main.js",
     "lint": "eslint .",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
-    "test:e2e": "jest --config ./test/jest-e2e.config.cjs"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
+    "test:cov": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
+    "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config ./test/jest-e2e.config.cjs"
   },
   "dependencies": {
     "@convene/shared-interfaces": "workspace:*",
@@ -27,9 +27,9 @@
     "class-validator": "^0.14.1",
     "ioredis": "^5",
     "mediasoup": "^3.20.10",
-    "mongoose": "^9.6.2",
+    "mongoose": "^9.12.2",
     "nestjs-pino": "^4.6.1",
-    "newrelic": "^14.1.2",
+    "newrelic": "^14.13.0",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
     "reflect-metadata": "^0.2.2",
